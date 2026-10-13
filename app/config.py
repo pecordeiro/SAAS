@@ -45,6 +45,8 @@ class Config:
     # CSRF em todo POST
     WTF_CSRF_ENABLED = True
     WTF_CSRF_TIME_LIMIT = 60 * 60 * 8
+    # Sem Flask-Babel: as mensagens vêm das traduções do próprio WTForms (Meta.locales em forms.py).
+    WTF_I18N_ENABLED = False
 
     # Rate limit (memória na Fase 0; Redis em produção a partir da Fase 5/7)
     RATELIMIT_ENABLED = True

@@ -1,6 +1,99 @@
-{% extends "base.html" %}
-{% block content %}
-<h1>Controle de Produção</h1>
-<p>Acompanhe a produção por etapas e atividades: progresso, unidades concluídas, horas que faltam e prazo em dias úteis.</p>
-<p><a href="{{ url_for('auth.signup') }}">Cadastrar minha empresa</a> · <a href="{{ url_for('auth.login') }}">Entrar</a></p>
+{% extends "base_publica.html" %}
+{% from "components/button.html" import button %}
+{% from "components/icon.html" import icon %}
+{% from "components/progress.html" import progress %}
+{% from "components/badge.html" import status_badge, badge %}
+{% block title %}Controle de Produção · saiba onde cada lote está{% endblock %}
+{% block main %}
+{# telas.md §1: proposta + CTA → prova (painel em HTML) → como funciona → para quem → preços → CTA final #}
+<section class="container hero" aria-labelledby="hero-titulo">
+  <div class="hero__text">
+    <h1 class="hero__title" id="hero-titulo">Saiba onde cada lote está.</h1>
+    <p class="hero__lead">Unidades concluídas, horas que faltam e prazo em dias úteis — do celular ao escritório, sem planilha.</p>
+    <div class="hero__actions">
+      {{ button("Começar teste grátis de 14 dias", "primary", size="lg", href=url_for('auth.signup'), class_="hero__cta") }}
+      {{ button("Ver preços", "ghost", href="#precos") }}
+    </div>
+    <p class="muted text-sm">Sem cartão · cancela quando quiser</p>
+  </div>
+
+  <div class="card proof" role="img" aria-label="Exemplo de painel: Lote 2026-014, 1 de 10 unidades concluídas, 56% de progresso, faltam 100 horas, 4,2 dias úteis, no prazo.">
+    <p class="proof__title">Lote 2026-014 · 10 equipamentos</p>
+    <div class="proof__kpis" aria-hidden="true">
+      <div class="proof__kpi only-desktop"><span class="kpi__label">Unid.</span><span class="kpi__value">1/10</span></div>
+      <div class="proof__kpi"><span class="kpi__label">Progresso</span><span class="kpi__value">56%</span></div>
+      <div class="proof__kpi"><span class="kpi__label">Faltam</span><span class="kpi__value">100 h</span></div>
+      <div class="proof__kpi"><span class="kpi__label">Prazo</span><span class="kpi__value">4,2 <span class="kpi__unit">d</span></span></div>
+    </div>
+    <div class="proof__bars" aria-hidden="true">
+      {%- for name, v in [("Preparação de chassi", 1.0), ("Montagem mecânica", 0.82), ("Instalação elétrica", 0.51), ("Testes funcionais", 0.20)] %}
+      <div class="proof__bar">
+        <span class="text-sm">{{ name }}</span>
+        {{ progress(v, 1, label=name, size="sm") }}
+      </div>
+      {%- endfor %}
+    </div>
+    <p class="cluster" aria-hidden="true">{{ status_badge("Em andamento") }} {{ badge("no prazo", "success", "check") }}</p>
+  </div>
+</section>
+
+<section class="container landing-section" aria-labelledby="como-titulo">
+  <h2 class="section-title" id="como-titulo">Como funciona</h2>
+  <ol class="steps">
+    <li class="steps__item">
+      <span class="steps__num" aria-hidden="true">1</span>
+      <div><h3 class="steps__title">Monte as etapas</h3><p class="muted">Etapas, atividades e o tempo ideal de cada uma por unidade.</p></div>
+    </li>
+    <li class="steps__item">
+      <span class="steps__num" aria-hidden="true">2</span>
+      <div><h3 class="steps__title">Crie o lote e chame a equipe</h3><p class="muted">Quantidade, prazo e quantas pessoas trabalham por dia.</p></div>
+    </li>
+    <li class="steps__item">
+      <span class="steps__num" aria-hidden="true">3</span>
+      <div><h3 class="steps__title">Registre peças pelo celular</h3><p class="muted">2 toques; horas que faltam e prazo se recalculam na hora.</p></div>
+    </li>
+  </ol>
+</section>
+
+<section class="container landing-section" aria-labelledby="quem-titulo">
+  <h2 class="section-title" id="quem-titulo">Feito para montagem</h2>
+  <p class="landing-lead">Equipamentos, máquinas, painéis, bancadas: qualquer produção em lotes com etapas que se repetem por unidade.</p>
+</section>
+
+<section class="container landing-section" id="precos" aria-labelledby="precos-titulo">
+  <h2 class="section-title" id="precos-titulo">Preços</h2>
+  <div class="plans">
+    {%- for name, price, projects, users, extra, featured in [
+      ("Essencial", "149", "3 projetos ativos", "5 usuários", None, False),
+      ("Profissional", "349", "15 projetos ativos", "25 usuários", None, True),
+      ("Empresa", "799", "Projetos ilimitados", "100 usuários", "MFA obrigatório · API", False),
+    ] %}
+    <article class="card plan{% if featured %} plan--featured{% endif %}" aria-labelledby="plano-{{ loop.index }}">
+      <div class="plan__head">
+        <h3 class="plan__name" id="plano-{{ loop.index }}">{{ name }}</h3>
+        {%- if featured %}{{ badge("Mais escolhido", "info") }}{% endif %}
+      </div>
+      <p class="plan__price"><span class="plan__currency">R$</span> {{ price }} <span class="kpi__unit">/mês</span></p>
+      <ul class="plan__list">
+        <li>{{ icon("check", "sm") }} {{ projects }}</li>
+        <li>{{ icon("check", "sm") }} {{ users }}</li>
+        {%- if extra %}<li>{{ icon("check", "sm") }} {{ extra }}</li>{% endif %}
+      </ul>
+      {%- if featured %}
+      {{ button("Começar teste grátis", "primary", block=True, href=url_for('auth.signup')) }}
+      {%- else %}
+      {{ button("Começar com o " ~ name, "secondary", block=True, href=url_for('auth.signup')) }}
+      {%- endif %}
+    </article>
+    {%- endfor %}
+  </div>
+  <p class="muted text-sm mt-4">Todos os planos: histórico, exportação, Pix/boleto/cartão e 14 dias grátis sem cartão.</p>
+</section>
+
+<section class="container landing-section">
+  <div class="cta-band">
+    <p class="cta-band__text">Pare de perguntar no chão de fábrica.</p>
+    {{ button("Começar teste grátis", "primary", size="lg", href=url_for('auth.signup')) }}
+  </div>
+</section>
 {% endblock %}

@@ -26,11 +26,18 @@ MAX_STAGE_SLOTS = 6
 MAX_ACTIVITIES_PER_STAGE = 50
 
 
+class BaseForm(FlaskForm):
+    """Mensagens padrão do WTForms em português (com WTF_I18N_ENABLED=False na config)."""
+
+    class Meta:
+        locales = ("pt_BR", "pt")
+
+
 def _strip(value):
     return value.strip() if isinstance(value, str) else value
 
 
-class SignupForm(FlaskForm):
+class SignupForm(BaseForm):
     company_name = StringField("Nome da empresa", filters=[_strip], validators=[DataRequired(), Length(max=120)])
     name = StringField("Seu nome", filters=[_strip], validators=[DataRequired(), Length(max=120)])
     email = EmailField(
@@ -44,7 +51,7 @@ class SignupForm(FlaskForm):
     )
 
 
-class LoginForm(FlaskForm):
+class LoginForm(BaseForm):
     email = EmailField(
         "E-mail",
         filters=[_strip, lambda v: v.lower() if isinstance(v, str) else v],
@@ -54,7 +61,7 @@ class LoginForm(FlaskForm):
     next = HiddenField()
 
 
-class LogoutForm(FlaskForm):
+class LogoutForm(BaseForm):
     pass
 
 
@@ -84,6 +91,9 @@ def parse_activities(text: str | None) -> list[NewActivity]:
 
 
 class StageSlotForm(Form):
+    class Meta:
+        locales = ("pt_BR", "pt")
+
     name = StringField("Etapa", filters=[_strip], validators=[Optional(), Length(max=160)])
     activities = TextAreaField("Atividades (uma por linha: Nome; minutos por unidade)")
 
@@ -96,7 +106,7 @@ class StageSlotForm(Form):
         self.parsed = parsed
 
 
-class ProjectForm(FlaskForm):
+class ProjectForm(BaseForm):
     name = StringField("Nome do projeto", filters=[_strip], validators=[DataRequired(), Length(max=160)])
     quantity = IntegerField(
         "Quantidade de equipamentos", validators=[InputRequired(), NumberRange(min=1, max=100000)]
@@ -126,11 +136,11 @@ class ProjectForm(FlaskForm):
         ]
 
 
-class StageForm(FlaskForm):
+class StageForm(BaseForm):
     name = StringField("Nova etapa", filters=[_strip], validators=[DataRequired(), Length(max=160)])
 
 
-class ActivityForm(FlaskForm):
+class ActivityForm(BaseForm):
     name = StringField("Nova atividade", filters=[_strip], validators=[DataRequired(), Length(max=160)])
     ideal_minutes = DecimalField(
         "Tempo ideal (min por unidade)", places=2,
@@ -138,6 +148,6 @@ class ActivityForm(FlaskForm):
     )
 
 
-class ProgressForm(FlaskForm):
+class ProgressForm(BaseForm):
     delta = IntegerField("Peças concluídas agora", validators=[InputRequired(), NumberRange(min=1, max=100000)])
     version = IntegerField(validators=[Optional()])

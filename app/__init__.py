@@ -31,11 +31,13 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
 
     from app.blueprints.app import bp as app_bp
     from app.blueprints.auth import bp as auth_bp
+    from app.blueprints.dev import bp as dev_bp
     from app.blueprints.public import bp as public_bp
 
     app.register_blueprint(public_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(app_bp)
+    app.register_blueprint(dev_bp)  # /estilo: responde 404 fora de development
 
     from app.tenancy import load_company
 
@@ -123,23 +125,32 @@ def _register_security_headers(app: Flask) -> None:
 
 
 def _register_template_helpers(app: Flask) -> None:
-    from app.formatting import br_date, br_datetime, br_number, br_pct
+    from app.formatting import br_date, br_date_short, br_datetime, br_day_label, br_hours, br_number, br_pct, br_time
     from app.models import ROLE_LABELS
 
     app.add_template_filter(br_number, "num")
     app.add_template_filter(br_pct, "pct")
     app.add_template_filter(br_date, "data")
     app.add_template_filter(br_datetime, "datahora")
+    app.add_template_filter(br_date_short, "data_curta")
+    app.add_template_filter(br_hours, "horas")
+    app.add_template_filter(br_time, "hora")
+    app.add_template_filter(br_day_label, "dia_rotulo")
 
     @app.context_processor
     def inject():
-        from flask import g
+        from flask import g, request
 
+        from app.blueprints.public import THEME_COOKIE, THEMES_FIXED
         from app.forms import LogoutForm
+
+        theme = request.cookies.get(THEME_COOKIE)
 
         return {
             "current_company": getattr(g, "company", None),
             "current_membership": getattr(g, "membership", None),
             "role_labels": ROLE_LABELS,
             "logout_form": LogoutForm(formdata=None),
+            # Tema fixado pelo usuário (cookie); ausente = segue o sistema.
+            "theme": theme if theme in THEMES_FIXED else None,
         }

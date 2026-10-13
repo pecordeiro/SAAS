@@ -1,0 +1,45 @@
+{% from "components/icon.html" import icon %}
+{#
+  Navegação da área logada — design-system §11 (menu lateral, ≥ 768 px) e §12 (navegação
+  inferior, < 768 px). items = lista de dicts {key, label, href, icon}.
+#}
+{% macro sidebar_nav(items, current) -%}
+<nav class="sidebar__nav" aria-label="Principal">
+  {%- for item in items %}
+  <a class="sidebar__item" href="{{ item.href }}"{% if item.key == current %} aria-current="page"{% endif %}>{{ icon(item.icon) }}<span>{{ item.label }}</span></a>
+  {%- endfor %}
+</nav>
+{%- endmacro %}
+
+{% macro bottom_nav(items, current, more_href="#mais", more_label="Mais") -%}
+<nav class="bottom-nav" aria-label="Principal">
+  {%- for item in items[:3] %}
+  <a class="bottom-nav__item" href="{{ item.href }}"{% if item.key == current %} aria-current="page"{% endif %}>{{ icon(item.icon, "lg") }}<span>{{ item.label }}</span></a>
+  {%- endfor %}
+  <a class="bottom-nav__item" href="{{ more_href }}" aria-haspopup="dialog">{{ icon("more", "lg") }}<span>{{ more_label }}</span></a>
+</nav>
+{%- endmacro %}
+
+{#
+  Seletor de tema Sistema/Claro/Escuro. Sem JS: POST /tema (cookie) e volta à página.
+  Com JS: aplica na hora (data-theme no <html>) e grava o mesmo cookie.
+#}
+{% macro theme_switch(theme, next_url, action, prefix="tema") -%}
+{%- set current = theme or "system" -%}
+<form class="theme-form" method="post" action="{{ action }}" data-theme-form>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ next_url }}">
+  <fieldset class="theme-switch">
+    <legend class="theme-switch__legend">Tema</legend>
+    <div class="theme-switch__options">
+      {%- for value, label, ico in [("system", "Sistema", "monitor"), ("light", "Claro", "sun"), ("dark", "Escuro", "moon")] %}
+      <label class="theme-switch__option">
+        <input type="radio" name="tema" value="{{ value }}" id="{{ prefix }}-{{ value }}"{% if current == value %} checked{% endif %}>
+        <span>{{ icon(ico, "sm") }}{{ label }}</span>
+      </label>
+      {%- endfor %}
+    </div>
+  </fieldset>
+  <button class="btn btn--secondary btn--block theme-switch__apply no-js-only" type="submit">Aplicar tema</button>
+</form>
+{%- endmacro %}

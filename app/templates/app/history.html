@@ -1,24 +1,44 @@
-{% extends "base.html" %}
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/table.html" import data_table %}
+{% from "components/chart.html" import bar_chart %}
+{% from "components/empty_state.html" import empty_state %}
+{% set nav_current = "history" %}
+{% set nav_project = project %}
 {% block title %}Histórico · {{ project.name }}{% endblock %}
 {% block content %}
-<p><a href="{{ url_for('app.project_detail', project_id=project.id) }}">← {{ project.name }}</a></p>
-<h1>Histórico</h1>
-{% if entries %}
-<table>
-  <thead><tr><th>Quando</th><th>Etapa</th><th>Atividade</th><th>Peças</th><th>Quem</th></tr></thead>
+{# telas.md §9: lista cronológica (quando, quem, onde, quanto) agrupada por dia + peças por dia. #}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('app.project_detail', project_id=project.id) }}">{{ icon("chevron-left") }}{{ project.name }}</a>
+    <h1>Histórico</h1>
+    <p class="page-header__subtitle">{{ project.name }} · {{ entries|length }} {{ "registro" if entries|length == 1 else "registros" }}{% if entries|length >= 200 %} (os 200 mais recentes){% endif %}</p>
+  </div>
+</header>
+
+{%- if entries %}
+<div class="card mb-4">
+  {{ bar_chart(per_day, "Peças por dia", orientation="vertical", table_headers=("Dia", "Peças")) }}
+</div>
+
+{% call data_table([("Quando", "is-nowrap"), ("Pessoa", ""), ("Etapa › atividade", ""), ("Qtd.", "is-num")], caption="Registros de peças", class_="history-table") %}
+  {%- for day, items in days.items() %}
   <tbody>
-  {% for e in entries %}
-    <tr>
-      <td>{{ e.at|datahora }}</td>
-      <td>{{ e.activity.stage.name }}</td>
-      <td>{{ e.activity.name }}</td>
-      <td>{{ "%+d"|format(e.delta) }}</td>
-      <td>{{ e.user.name if e.user else "—" }}</td>
+    <tr class="table__group"><th scope="rowgroup" colspan="4">{{ day|dia_rotulo }}</th></tr>
+    {%- for e in items %}
+    <tr class="history-row">
+      <td class="history-row__when is-nowrap is-plain"><span class="wide-only">{{ e.at|datahora }}</span><span class="compact-only num">{{ e.at|hora }}</span></td>
+      <td class="history-row__who is-plain">{{ e.user.name if e.user else "—" }}</td>
+      <td class="history-row__where is-plain">{{ e.activity.stage.name }} › {{ e.activity.name }}</td>
+      <td class="history-row__qty is-num is-plain">{{ "%+d"|format(e.delta) }}</td>
     </tr>
-  {% endfor %}
+    {%- endfor %}
   </tbody>
-</table>
-{% else %}
-<p>Nenhum registro ainda.</p>
-{% endif %}
+  {%- endfor %}
+{% endcall %}
+{%- else %}
+<div class="card">
+  {{ empty_state("Nenhum registro ainda", "Os registros aparecem quando alguém soma peças.", ghost_action=("Ir para o projeto", url_for('app.project_detail', project_id=project.id)), icon="history") }}
+</div>
+{%- endif %}
 {% endblock %}

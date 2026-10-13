@@ -1,0 +1,77 @@
+{% extends "_base.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/nav.html" import sidebar_nav, bottom_nav, theme_switch %}
+{% from "components/toast.html" import toast_region %}
+{#
+  Layout da área logada (telas.md, “Área logada”):
+  - < 768 px: barra superior (logo, empresa, iniciais → folha “Mais”), conteúdo e navegação
+    inferior fixa.
+  - ≥ 768 px: menu lateral (logo, empresa e papel, itens, usuário, tema, Sair).
+  Páginas definem `nav_current` (e `nav_project` para o atalho de Histórico do projeto).
+  Itens de Modelos, Usuários, Empresa e Assinatura entram quando as rotas existirem (Fases 4–6).
+#}
+{%- set role_label = role_labels.get(current_membership.role, current_membership.role) if current_membership else "" -%}
+{%- set nav_items = [{"key": "projects", "label": "Projetos", "href": url_for("app.projects"), "icon": "projects"}] -%}
+{%- if nav_project is defined and nav_project -%}
+  {%- set _ = nav_items.append({"key": "history", "label": "Histórico", "href": url_for("app.project_history", project_id=nav_project.id), "icon": "history"}) -%}
+{%- endif -%}
+{%- set name_parts = (current_user.name or "?").split() -%}
+{%- set initials = (name_parts[0][0] ~ (name_parts[-1][0] if name_parts|length > 1 else ""))|upper -%}
+{%- set here = request.full_path.rstrip("?") -%}
+{% block body_class %}app{% endblock %}
+{% block body %}
+<a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+<div class="app-shell">
+  <aside class="app-sidebar" aria-label="Menu lateral">
+    <a class="brand" href="{{ url_for('app.projects') }}">
+      <img class="brand__logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="" width="32" height="32">
+      <span>Controle de Produção</span>
+    </a>
+    {%- if current_company %}
+    <p class="sidebar__company">{{ current_company.name }}<br><span class="muted text-sm">{{ role_label }}</span></p>
+    {%- endif %}
+    {{ sidebar_nav(nav_items, nav_current | default("")) }}
+    <div class="sidebar__footer stack">
+      <p class="sidebar__user"><span class="text-strong">{{ current_user.name }}</span><br><span class="muted text-sm">{{ current_user.email }}</span></p>
+      {{ theme_switch(theme, here, url_for("public.set_theme"), "tema-lateral") }}
+      <form method="post" action="{{ url_for('auth.logout') }}">
+        {{ logout_form.csrf_token }}
+        <button class="btn btn--ghost btn--block sidebar__logout" type="submit">{{ icon("logout") }}<span>Sair</span></button>
+      </form>
+    </div>
+  </aside>
+
+  <header class="app-topbar">
+    <a href="{{ url_for('app.projects') }}" class="app-topbar__logo"><img class="brand__logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="Controle de Produção — Projetos" width="32" height="32"></a>
+    <span class="app-topbar__company">{{ current_company.name if current_company else "Controle de Produção" }}</span>
+    <a class="avatar" href="#mais" aria-haspopup="dialog" aria-controls="mais" title="{{ current_user.name }}"><span aria-hidden="true">{{ initials }}</span><span class="visually-hidden">Conta e opções de {{ current_user.name }}</span></a>
+  </header>
+
+  <main id="conteudo" class="app-main" tabindex="-1">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+{{ bottom_nav(nav_items, nav_current | default("")) }}
+
+<div class="sheet" id="mais" role="dialog" aria-modal="true" aria-labelledby="mais-titulo" data-dialog>
+  <a class="sheet__backdrop" href="#fechar" tabindex="-1" aria-hidden="true"></a>
+  <div class="sheet__panel stack">
+    <div class="sheet__handle" aria-hidden="true"></div>
+    <div class="sheet__head">
+      <div>
+        <p class="sheet__title" id="mais-titulo">{{ current_user.name }}</p>
+        <p class="muted text-sm">{{ role_label }}{% if current_company %} · {{ current_company.name }}{% endif %}</p>
+      </div>
+      <a class="btn btn--ghost btn--icon sheet__close" href="#fechar" aria-label="Fechar" data-dialog-cancel>{{ icon("x") }}</a>
+    </div>
+    {{ theme_switch(theme, here, url_for("public.set_theme"), "tema-mais") }}
+    <form method="post" action="{{ url_for('auth.logout') }}">
+      {{ logout_form.csrf_token }}
+      <button class="btn btn--secondary btn--lg btn--block" type="submit">{{ icon("logout") }}<span>Sair</span></button>
+    </form>
+  </div>
+</div>
+
+{{ toast_region() }}
+{% endblock %}

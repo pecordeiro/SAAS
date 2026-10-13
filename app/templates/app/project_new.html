@@ -1,26 +1,82 @@
-{% extends "base.html" %}
-{% from "_macros.html" import field %}
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/field.html" import field, form_errors %}
+{% from "components/button.html" import button %}
+{% from "components/stepper.html" import stepper %}
+{% set nav_current = "projects" %}
 {% block title %}Novo projeto · Controle de Produção{% endblock %}
 {% block content %}
-<h1>Novo projeto</h1>
-<form method="post" action="{{ url_for('app.project_new') }}" novalidate>
-  {{ form.csrf_token }}
-  {{ field(form.name, {"required": true}) }}
-  {{ field(form.quantity, {"min": 1, "required": true, "inputmode": "numeric"}) }}
-  {{ field(form.start_date) }}
-  {{ field(form.due_date) }}
-  {{ field(form.people, {"min": 1, "inputmode": "numeric"}) }}
-  {{ field(form.hours_per_day, {"inputmode": "decimal"}) }}
-  <h2>Etapas</h2>
-  <p>Preencha só as etapas que vai usar. Em cada uma, uma atividade por linha no formato <code>Nome; minutos por unidade</code>.</p>
-  {% for error in form.stages.errors if error is string %}<p><strong role="alert">{{ error }}</strong></p>{% endfor %}
-  {% for slot in form.stages %}
-    <fieldset>
-      <legend>Etapa {{ loop.index }}</legend>
-      {{ field(slot.form.name) }}
-      {{ field(slot.form.activities, {"rows": 4, "cols": 50}) }}
-    </fieldset>
-  {% endfor %}
-  <button type="submit">Criar projeto</button>
-</form>
+{#
+  telas.md §10 (supervisor+). Nesta fase as etapas ainda são digitadas aqui (até 6 blocos,
+  “Nome; minutos” por linha); o seletor de modelo de etapas e o resumo calculado via HTMX
+  chegam com os modelos (Fase 4/6).
+#}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('app.projects') }}">{{ icon("chevron-left") }}Projetos</a>
+    <h1>Novo projeto</h1>
+  </div>
+</header>
+
+<div class="split split--form">
+  <form class="stack--lg" method="post" action="{{ url_for('app.project_new') }}" novalidate>
+    {{ form_errors(form, list_label="Etapa") }}
+    {{ form.csrf_token }}
+    <section class="card stack" aria-labelledby="dados-titulo">
+      <h2 class="section-title" id="dados-titulo">Projeto</h2>
+      {{ field(form.name, attrs={"required": true, "placeholder": "Lote 2026-017"}) }}
+      <div class="field{% if form.quantity.errors %} field--error{% endif %}">
+        <label class="field__label" for="{{ form.quantity.id }}">{{ form.quantity.label.text }}</label>
+        {{ stepper(form.quantity.name, form.quantity.data if form.quantity.data is not none else (form.quantity.raw_data[0] if form.quantity.raw_data else 1), 1, 100000, id=form.quantity.id, label="Quantidade de equipamentos", size="md", describedby=(form.quantity.id ~ "-erro") if form.quantity.errors else None, invalid=form.quantity.errors|length > 0) }}
+        {%- if form.quantity.errors %}<p class="field__error" id="{{ form.quantity.id }}-erro">{{ icon("alert", "sm") }}<span>{{ form.quantity.errors|join(" ") }}</span></p>{% endif %}
+      </div>
+      <div class="form-row form-row--2">
+        {{ field(form.start_date, optional=True) }}
+        {{ field(form.due_date, optional=True) }}
+      </div>
+      <div class="form-row form-row--2">
+        {{ field(form.people, label="Pessoas na equipe", attrs={"min": 1, "inputmode": "numeric", "required": true}) }}
+        {{ field(form.hours_per_day, label="Horas por dia", hint="Por pessoa.", attrs={"inputmode": "decimal", "required": true}) }}
+      </div>
+    </section>
+
+    <section class="card stack" aria-labelledby="etapas-titulo">
+      <div>
+        <h2 class="section-title" id="etapas-titulo">Etapas</h2>
+        <p class="muted text-sm">Preencha só as etapas que vai usar. Em cada uma, uma atividade por linha: <code>Nome; minutos por unidade</code>.</p>
+      </div>
+      {%- for error in form.stages.errors if error is string %}<p class="field__error">{{ icon("alert", "sm") }}<span>{{ error }}</span></p>{% endfor %}
+      {%- for slot in form.stages %}
+      {%- if loop.index == 3 %}
+      <details class="more-stages"{% if form.stages.entries[2:]|selectattr("form.name.data")|list or form.stages.entries[2:]|selectattr("form.activities.errors")|list %} open{% endif %}>
+        <summary class="btn btn--ghost">{{ icon("plus") }}<span>Mais etapas (até {{ form.stages|length }})</span></summary>
+        <div class="stack mt-4">
+      {%- endif %}
+      <fieldset class="fieldset stage-slot stack--sm">
+        <legend class="stage-slot__legend">Etapa {{ loop.index }}</legend>
+        {{ field(slot.form.name, label="Nome da etapa", attrs=({"placeholder": "Montagem mecânica"} if loop.first else {})) }}
+        {{ field(slot.form.activities, label="Atividades", hint="Ex.: Fixação da base; 120", attrs={"rows": 4}) }}
+      </fieldset>
+      {%- if loop.last and loop.length > 2 %}
+        </div>
+      </details>
+      {%- endif %}
+      {%- endfor %}
+    </section>
+
+    <div class="form-actions">
+      {{ button("Criar projeto", "primary", size="lg") }}
+      {{ button("Cancelar", "secondary", size="lg", href=url_for('app.projects')) }}
+    </div>
+  </form>
+
+  <aside class="split__aside">
+    <section class="card stack" aria-labelledby="como-titulo">
+      <h2 class="section-title" id="como-titulo">Como o prazo é calculado</h2>
+      <p class="text-sm">Tempo total = soma dos tempos ideais × quantidade.</p>
+      <p class="text-sm">Dias úteis = horas que faltam ÷ (pessoas × horas por dia), pulando fins de semana e feriados da empresa.</p>
+      <p class="text-sm muted">Depois de criar, os números aparecem no painel do projeto e se atualizam a cada peça registrada.</p>
+    </section>
+  </aside>
+</div>
 {% endblock %}

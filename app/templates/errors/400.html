@@ -1,7 +1,5 @@
-{% extends "base.html" %}
+{% extends "errors/_layout.html" %}
 {% block title %}Requisição inválida · Controle de Produção{% endblock %}
-{% block content %}
-<h1>Requisição inválida</h1>
-<p>{{ message or "Requisição inválida." }}</p>
-<p><a href="{{ url_for('public.index') }}">Voltar ao início</a></p>
-{% endblock %}
+{% block code %}400{% endblock %}
+{% block heading %}Não deu para concluir{% endblock %}
+{% block message %}{{ message or "Requisição inválida." }}{% endblock %}

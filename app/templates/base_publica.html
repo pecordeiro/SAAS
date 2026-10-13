@@ -1,0 +1,72 @@
+{% extends "_base.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/toast.html" import toast_region %}
+{#
+  Layout do site público (telas.md, “Telas públicas”): cabeçalho com logo e links,
+  ☰ no celular abre folha com os links; rodapé. Páginas preenchem `content`
+  (dentro de .container) ou `main` (largura livre).
+#}
+{% block body_class %}site{% endblock %}
+{% block body %}
+<a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+<header class="site-header">
+  <div class="container site-header__inner">
+    <a class="brand" href="{{ url_for('public.index') }}">
+      <img class="brand__logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="" width="32" height="32">
+      <span>Controle de Produção</span>
+    </a>
+    <nav class="site-nav" aria-label="Site">
+      <a class="site-nav__link" href="{{ url_for('public.index') }}#precos">Preços</a>
+      {%- if current_user.is_authenticated %}
+      {{ button("Ir para Projetos", "primary", href=url_for('app.projects')) }}
+      {%- else %}
+      <a class="site-nav__link" href="{{ url_for('auth.login') }}">Entrar</a>
+      {{ button("Teste grátis", "primary", href=url_for('auth.signup')) }}
+      {%- endif %}
+    </nav>
+    <a class="btn btn--ghost btn--icon site-header__menu only-mobile" href="#menu" aria-haspopup="dialog" aria-controls="menu">{{ icon("menu") }}<span class="visually-hidden">Abrir menu</span></a>
+  </div>
+</header>
+
+<main id="conteudo" class="site-main" tabindex="-1">
+  {% block main %}<div class="container">{% block content %}{% endblock %}</div>{% endblock %}
+</main>
+
+<footer class="site-footer">
+  <div class="container site-footer__inner">
+    <nav class="cluster" aria-label="Rodapé">
+      <a href="{{ url_for('public.index') }}#precos">Preços</a>
+      <span aria-hidden="true">·</span>
+      <a href="{{ url_for('auth.login') }}">Entrar</a>
+      <span aria-hidden="true">·</span>
+      <a href="{{ url_for('auth.signup') }}">Cadastrar empresa</a>
+    </nav>
+    <p>© 2026 Controle de Produção</p>
+  </div>
+</footer>
+
+<div class="sheet" id="menu" role="dialog" aria-modal="true" aria-label="Menu" data-dialog>
+  <a class="sheet__backdrop" href="#fechar" tabindex="-1" aria-hidden="true"></a>
+  <div class="sheet__panel">
+    <div class="sheet__handle" aria-hidden="true"></div>
+    <div class="sheet__head">
+      <p class="sheet__title">Menu</p>
+      <a class="btn btn--ghost btn--icon sheet__close" href="#fechar" aria-label="Fechar menu" data-dialog-cancel>{{ icon("x") }}</a>
+    </div>
+    <nav class="menu-list" aria-label="Site">
+      <a class="menu-list__item" href="{{ url_for('public.index') }}#precos">Preços</a>
+      {%- if current_user.is_authenticated %}
+      <a class="menu-list__item" href="{{ url_for('app.projects') }}">Projetos</a>
+      {%- else %}
+      <a class="menu-list__item" href="{{ url_for('auth.login') }}">Entrar</a>
+      {%- endif %}
+    </nav>
+    {%- if not current_user.is_authenticated %}
+    <div class="mt-4">{{ button("Começar teste grátis", "primary", size="lg", block=True, href=url_for('auth.signup')) }}</div>
+    {%- endif %}
+  </div>
+</div>
+
+{{ toast_region() }}
+{% endblock %}

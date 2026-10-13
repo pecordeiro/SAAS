@@ -1,0 +1,15 @@
+{#
+  Barra de progresso — design-system §6. <progress> nativo (papel progressbar implícito,
+  sem estilo inline, compatível com a CSP). value e max numéricos; 100% fica verde.
+  `text`: texto ao lado (padrão: % inteiro). `value_text`: leitura exata para leitores de tela.
+#}
+{% macro progress(value, max=1, label="Progresso", size="md", text=None, value_text=None, show_text=True) -%}
+{%- set v = value or 0 -%}
+{%- set m = max if max else 1 -%}
+{%- set ratio = (v / m) if m else 0 -%}
+{%- set shown = text if text is not none else (ratio|pct(0)) -%}
+<div class="progress progress--{{ size }}{% if ratio >= 1 %} progress--done{% endif %}">
+  <progress class="progress__bar" value="{{ [v, m]|min }}" max="{{ m }}" aria-label="{{ label }}" aria-valuetext="{{ value_text or shown }}">{{ shown }}</progress>
+  {%- if show_text %}<span class="progress__text" aria-hidden="true">{{ shown }}</span>{% endif %}
+</div>
+{%- endmacro %}

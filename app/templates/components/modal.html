@@ -1,0 +1,23 @@
+{% from "components/icon.html" import icon %}
+{#
+  Modal de confirmação — design-system §10. Abre por âncora (#id): funciona sem JS; o JS
+  prende o foco, fecha com Esc e devolve o foco ao gatilho. Celular: folha inferior com
+  botões empilhados (ação embaixo, no alcance do polegar). Desktop: caixa central.
+  A ação é um POST com CSRF para `action`. variant: danger | primary.
+#}
+{% macro confirm_dialog(id, title, body, confirm_label, action, variant="danger", cancel_href="#fechar", cancel_label="Cancelar") -%}
+<div class="sheet sheet--dialog" id="{{ id }}" role="dialog" aria-modal="true" aria-labelledby="{{ id }}-titulo" aria-describedby="{{ id }}-texto" data-dialog>
+  <a class="sheet__backdrop" href="{{ cancel_href }}" tabindex="-1" aria-hidden="true"></a>
+  <form class="sheet__panel" method="post" action="{{ action }}">
+    <div class="sheet__handle" aria-hidden="true"></div>
+    <h2 class="dialog__title" id="{{ id }}-titulo">{{ title }}</h2>
+    <p class="dialog__body muted" id="{{ id }}-texto">{{ body }}</p>
+    {%- if caller is defined %}{{ caller() }}{% endif %}
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="sheet__actions">
+      <button class="btn btn--{{ variant }} btn--lg" type="submit"><span class="btn__spinner" aria-hidden="true"></span><span class="btn__label">{{ confirm_label }}</span></button>
+      <a class="btn btn--secondary btn--lg" href="{{ cancel_href }}" data-dialog-cancel>{{ cancel_label }}</a>
+    </div>
+  </form>
+</div>
+{%- endmacro %}

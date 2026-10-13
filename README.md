@@ -8,8 +8,10 @@ e exportação. Site renderizado no servidor (Flask + Jinja + HTMX), em portugu�
 
 Fase 0 (esqueleto) entregue: app factory, modelos e primeira migration, isolamento por
 empresa (`app/tenancy.py`), regras de cálculo puras (`app/services/calc.py`) conferidas
-contra a planilha de referência, cadastro/login, telas provisórias sem design e testes.
-Progresso por fase em [`docs/plano/progresso.md`](docs/plano/progresso.md).
+contra a planilha de referência, cadastro/login e testes.
+Fase 2 (base visual) entregue: design system “Prumo” no código (tokens, CSS em camadas,
+fontes e HTMX locais, macros, layouts público e logado, tema claro/escuro, registro de peças
+em 2 toques no celular). Progresso por fase em [`docs/plano/progresso.md`](docs/plano/progresso.md).
 
 - Contexto para o Claude: [`CLAUDE.md`](CLAUDE.md)
 - Plano: [`docs/plano/`](docs/plano/) — PRD, arquitetura, ADRs, roadmap, backlog, riscos e progresso
@@ -46,6 +48,22 @@ TEST_DATABASE_URL=postgresql+psycopg://usuario@localhost/controle_test python -m
 - `tests/test_isolation.py`: recurso da empresa B acessado por usuário da A → 404; falha se
   surgir rota com `<uuid:...>` sem caso A/B.
 - `tests/test_auth.py`: cadastro, login, papéis (403), CSRF (400), rate limit.
+
+### Interface (Fase 2)
+
+- Tokens: `app/static/css/tokens.css` é cópia de `docs/design/tokens.css` (o handoff do
+  design, ADR-0008). Mudou a marca? Troque os valores lá e copie; nomes não mudam.
+- CSS: `app/static/css/{base,layout,components,pages,utilities}.css` em `@layer`. Só
+  `var(--…)`: cor hex, `rgb(`/`hsl(` ou `px` fora de `tokens.css` quebram
+  `tests/test_visual.py`.
+- Componentes: macros em `app/templates/components/` (`{% from "components/button.html"
+  import button %}` etc.). Páginas estendem `base_publica.html` ou `base_app.html`.
+- Vitrine: `http://127.0.0.1:5000/estilo` (só com `APP_ENV=development`; 404 nos demais).
+- Sem CDN e sem script/estilo inline (CSP `default-src 'self'`): fontes woff2 (OFL) em
+  `app/static/fonts`, HTMX 2.0.4 em `app/static/js/htmx.min.js` (`allowEval:false`),
+  melhorias em `app/static/js/app.js`. Tudo funciona sem JS.
+- Tema: Sistema/Claro/Escuro no menu (cookie `tema`).
+- Capturas de referência: `docs/design/capturas/fase2/` (375/768/1280, claro e escuro).
 
 ### Migrations
 

@@ -1,0 +1,22 @@
+{% from "components/icon.html" import icon as _icon %}
+{#
+  Botão — design-system §1.
+  variant: primary | secondary | danger | ghost · size: md | lg
+  Com `href` vira link com cara de botão. `icon_only=True` exige `aria_label`.
+  `attrs`: atributos extras (ex.: {"hx-post": "..."}); valores são escapados pelo xmlattr.
+#}
+{% macro button(label, variant="primary", size="md", icon=None, type="submit", href=None, disabled=False, loading=False, block=False, icon_only=False, aria_label=None, class_="", attrs={}) -%}
+{%- set cls = "btn btn--" ~ variant ~ (" btn--lg" if size == "lg" else "") ~ (" btn--block" if block else "") ~ (" btn--icon" if icon_only else "") ~ (" is-loading" if loading else "") ~ ((" " ~ class_) if class_ else "") -%}
+{%- set inner -%}
+  <span class="btn__spinner" aria-hidden="true"></span>
+  {%- if icon %}{{ _icon(icon, "lg" if (icon_only and size == "lg") else None, class_="btn__icon") }}{% endif -%}
+  {%- if icon_only %}<span class="visually-hidden">{{ aria_label or label }}</span>{% else %}<span class="btn__label">{{ label }}</span>{% endif -%}
+{%- endset -%}
+{%- if href and not disabled -%}
+<a class="{{ cls }}" href="{{ href }}"{{ attrs|xmlattr }}>{{ inner }}</a>
+{%- elif href -%}
+<a class="{{ cls }}" role="link" aria-disabled="true"{{ attrs|xmlattr }}>{{ inner }}</a>
+{%- else -%}
+<button class="{{ cls }}" type="{{ type }}"{% if disabled %} disabled{% endif %}{% if loading %} aria-busy="true"{% endif %}{{ attrs|xmlattr }}>{{ inner }}</button>
+{%- endif -%}
+{%- endmacro %}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from datetime import date
 
 from flask import Blueprint, flash, g, redirect, render_template, url_for
@@ -10,6 +11,8 @@ from flask_login import current_user
 from app.extensions import db
 from app.forms import ActivityForm, ProgressForm, ProjectForm, StageForm
 from app.models import ROLE_OPERATOR, ROLE_SUPERVISOR, Activity, Project, Stage
+from app.formatting import local_dt
+from app.services import calc
 from app.services import projects as svc
 from app.services.projects import ConflictError, NewActivity, ProgressError
 from app.tenancy import get_or_404, tenant_required
@@ -23,10 +26,29 @@ def home():
     return redirect(url_for("app.projects"))
 
 
+def _project_status(project: Project, result: calc.ResultadoProjeto) -> str:
+    """Situação do projeto para o selo: mesma regra de status das etapas (calc), aplicada às unidades prontas."""
+    return calc.status_etapa(result.unidades_concluidas, project.quantity, result.progresso_geral)
+
+
+def _deadline(project: Project, result: calc.ResultadoProjeto, status: str) -> dict:
+    """Término previsto e se cabe no prazo (só exibição; datas vêm de svc/calc)."""
+    forecast = svc.forecast_end(project, result, g.company, date.today())
+    late = bool(
+        status != calc.STATUS_CONCLUIDA and forecast and project.due_date and forecast > project.due_date
+    )
+    on_time = bool(status != calc.STATUS_CONCLUIDA and forecast and project.due_date and not late)
+    return {"forecast": forecast, "late": late, "on_time": on_time}
+
+
 @bp.get("/projetos")
 @tenant_required(ROLE_OPERATOR)
 def projects():
-    items = [(p, svc.summary(p)) for p in svc.list_projects()]
+    items = []
+    for project in svc.list_projects():
+        result = svc.summary(project)
+        status = _project_status(project, result)
+        items.append((project, result, status, _deadline(project, result, status)))
     return render_template("app/projects.html", items=items)
 
 
@@ -60,13 +82,21 @@ def _render_detail(project: Project, *, errors: dict | None = None, status: int 
         activities = svc.active_activities(stage)
         rows.append((stage, stage_result, list(zip(activities, stage_result.atividades))))
     can_edit = g.membership.has_role(ROLE_SUPERVISOR)
+    project_status = _project_status(project, result)
+    deadline = _deadline(project, result, project_status)
+    # Etapa atual = primeira não concluída: vem aberta; as demais ficam recolhidas.
+    current_stage = next((s.id for s, sr, _ in rows if sr.status != calc.STATUS_CONCLUIDA), None)
     return (
         render_template(
             "app/project_detail.html",
             project=project,
             result=result,
             rows=rows,
-            forecast=svc.forecast_end(project, result, g.company, date.today()),
+            project_status=project_status,
+            deadline=deadline,
+            current_stage=current_stage,
+            recent=svc.history(project, limit=5),
+            forecast=deadline["forecast"],
             errors=errors or {},
             progress_form=ProgressForm(formdata=None),
             stage_form=StageForm(formdata=None),
@@ -88,7 +118,16 @@ def project_detail(project_id):
 @tenant_required(ROLE_OPERATOR)
 def project_history(project_id):
     project = get_or_404(Project, project_id)
-    return render_template("app/history.html", project=project, entries=svc.history(project))
+    entries = svc.history(project)
+    # Agrupa por dia (fuso da empresa) para a lista e para o gráfico “peças por dia”.
+    days: OrderedDict = OrderedDict()
+    for entry in entries:
+        days.setdefault(local_dt(entry.at, g.company.timezone).date(), []).append(entry)
+    per_day = [
+        {"label": day.strftime("%d/%m"), "value": sum(e.delta for e in items)}
+        for day, items in list(days.items())[:14][::-1]
+    ]
+    return render_template("app/history.html", project=project, entries=entries, days=days, per_day=per_day)
 
 
 @bp.post("/projetos/<uuid:project_id>/etapas")
@@ -150,5 +189,5 @@ def activity_progress(activity_id):
     except ProgressError as exc:
         return _render_detail(project, errors={activity.id: str(exc)}, status=400)
     db.session.commit()
-    flash(f"{form.delta.data} peça(s) registrada(s) em “{activity.name}”.", "sucesso")
+    flash(f"+{form.delta.data} em {activity.name} · {activity.units_done} de {project.quantity}", "sucesso")
     return redirect(url_for("app.project_detail", project_id=project.id, _anchor=f"atividade-{activity.id}"), 303)

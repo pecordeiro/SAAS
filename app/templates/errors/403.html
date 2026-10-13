@@ -1,7 +1,5 @@
-{% extends "base.html" %}
+{% extends "errors/_layout.html" %}
 {% block title %}Acesso negado · Controle de Produção{% endblock %}
-{% block content %}
-<h1>Acesso negado</h1>
-<p>Seu perfil não tem permissão para esta ação.</p>
-<p><a href="{{ url_for('public.index') }}">Voltar ao início</a></p>
-{% endblock %}
+{% block code %}403{% endblock %}
+{% block heading %}Você não tem permissão para isto{% endblock %}
+{% block message %}Peça a um supervisor ou proprietário.{% endblock %}

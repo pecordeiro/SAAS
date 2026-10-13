@@ -1,87 +1,187 @@
-{% extends "base.html" %}
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/kpi.html" import kpi %}
+{% from "components/progress.html" import progress %}
+{% from "components/badge.html" import status_badge, badge %}
+{% from "components/stepper.html" import piece_stepper %}
+{% from "components/alert.html" import alert %}
+{% from "components/chart.html" import bar_chart %}
+{% from "components/empty_state.html" import empty_state %}
+{% set nav_current = "projects" %}
+{% set nav_project = project %}
 {% block title %}{{ project.name }} · Controle de Produção{% endblock %}
 {% block content %}
-<p><a href="{{ url_for('app.projects') }}">← Projetos</a></p>
-<h1>{{ project.name }}</h1>
-<p><a href="{{ url_for('app.project_history', project_id=project.id) }}">Histórico</a></p>
+{#
+  telas.md §8 — tela principal. Ordem: indicadores → etapas com registro rápido →
+  equipe e prazo → recente → ações. Registro em 2 toques no celular: toque na atividade abre a
+  folha com +1 (âncora #registrar-<id>, funciona sem JS) → “Registrar +1”.
+#}
+{%- set detail_url = url_for('app.project_detail', project_id=project.id) %}
+<header class="page-header detail-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('app.projects') }}">{{ icon("chevron-left") }}Projetos</a>
+    <h1>{{ project.name }}</h1>
+    <p class="cluster page-header__meta">
+      {{ status_badge(project_status) }}
+      {%- if deadline.late %}{{ badge("Atraso previsto", "danger", "alert") }}
+      {%- elif deadline.on_time %}<span class="text-success text-sm text-strong">{{ icon("check", "sm") }} no prazo</span>{% endif %}
+    </p>
+  </div>
+  <div class="page-header__actions only-desktop">
+    {{ button("Histórico", "secondary", icon="history", href=url_for('app.project_history', project_id=project.id)) }}
+  </div>
+</header>
 
-<h2>Indicadores</h2>
-<dl>
-  <dt>Equipamentos concluídos</dt><dd>{{ result.unidades_concluidas }} de {{ project.quantity }}</dd>
-  <dt>Progresso geral (pelas tarefas)</dt><dd>{{ result.progresso_geral|pct }}</dd>
-  <dt>Unidades concluídas (soma das etapas)</dt><dd>{{ result.unidades_etapas }} de {{ result.unidades_etapas_previstas }}</dd>
-  <dt>Etapas concluídas</dt><dd>{{ result.etapas_concluidas }} de {{ result.etapas|length }}</dd>
-  <dt>Tarefas concluídas</dt><dd>{{ result.tarefas_concluidas }} de {{ result.tarefas }}</dd>
-  <dt>Tempo total</dt><dd>{{ result.tempo_total_h|num }} h</dd>
-  <dt>Horas que faltam</dt><dd>{{ result.tempo_restante_h|num }} h</dd>
-  <dt>Equipe</dt><dd>{{ project.people }} pessoa(s) × {{ project.hours_per_day|num }} h/dia</dd>
-  <dt>Dias úteis restantes</dt><dd>{{ result.dias_uteis_restantes|num }}</dd>
-  <dt>Previsão de término</dt><dd>{{ forecast|data }}</dd>
-  <dt>Prazo</dt><dd>{{ project.due_date|data }}</dd>
-</dl>
-
-<h2>Etapas</h2>
-{% for stage, sr, activities in rows %}
-<section id="etapa-{{ stage.id }}">
-  <h3>{{ stage.name }}</h3>
-  <p>
-    Status: <strong>{{ sr.status }}</strong> ·
-    Unidades: {{ sr.unidades }}/{{ sr.previstas }} ·
-    Progresso pelas tarefas: {{ sr.progresso|pct }} ·
-    Peso no equipamento: {{ sr.peso_no_projeto|pct }} ·
-    Falta: {{ (sr.tempo_restante_min / 60)|num }} h de {{ (sr.tempo_total_min / 60)|num }} h
-  </p>
-  {% if errors.get(stage.id) %}<p><strong role="alert">{{ errors.get(stage.id) }}</strong></p>{% endif %}
-  <table>
-    <thead>
-      <tr><th>Atividade</th><th>Tempo ideal (min)</th><th>Peso</th><th>Peças</th><th>%</th><th>Falta (min)</th><th>Registrar peças</th></tr>
-    </thead>
-    <tbody>
-    {% for activity, ar in activities %}
-      <tr id="atividade-{{ activity.id }}">
-        <td>{{ activity.name }}</td>
-        <td>{{ activity.ideal_minutes|num(2) }}</td>
-        <td>{{ ar.peso|pct }}</td>
-        <td>{{ activity.units_done }}/{{ project.quantity }}</td>
-        <td>{{ ar.pct|pct }}</td>
-        <td>{{ ar.tempo_restante_min|num }}</td>
-        <td>
-          {% if ar.faltam > 0 %}
-          <form method="post" action="{{ url_for('app.activity_progress', activity_id=activity.id) }}">
-            {{ progress_form.csrf_token }}
-            <input type="hidden" name="version" value="{{ activity.version }}">
-            <label>Peças <input type="number" name="delta" min="1" max="{{ ar.faltam }}" value="1" inputmode="numeric" required></label>
-            <button type="submit">Registrar</button>
-          </form>
-          {% else %}Concluída{% endif %}
-          {% if errors.get(activity.id) %}<br><strong role="alert">{{ errors.get(activity.id) }}</strong>{% endif %}
-        </td>
-      </tr>
-    {% else %}
-      <tr><td colspan="7">Nenhuma atividade nesta etapa.</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% if can_edit %}
-  <form method="post" action="{{ url_for('app.activity_create', stage_id=stage.id) }}">
-    {{ activity_form.csrf_token }}
-    <label>Nova atividade <input type="text" name="name" maxlength="160" required></label>
-    <label>Tempo ideal (min) <input type="number" name="ideal_minutes" min="0" step="0.01" required></label>
-    <button type="submit">Incluir atividade</button>
-  </form>
-  {% endif %}
+<section class="kpi-grid" aria-label="Indicadores">
+  {{ kpi("Unidades", result.unidades_concluidas ~ "/" ~ project.quantity, sub="concluídas") }}
+  {% call kpi("Progresso", result.progresso_geral|pct(0)) %}{{ progress(result.progresso_geral, 1, label="Progresso geral", size="sm", show_text=False, value_text=result.progresso_geral|pct) }}{% endcall %}
+  {{ kpi("Faltam", result.tempo_restante_h|horas, sub="de " ~ (result.tempo_total_h|horas)) }}
+  {%- if result.dias_uteis_restantes is none %}
+  {{ kpi("Dias úteis", None, empty_sub="informe a equipe") }}
+  {%- elif deadline.late %}
+  {{ kpi("Dias úteis", result.dias_uteis_restantes|num, sub="término " ~ (forecast|data_curta) ~ " · após o prazo", tone="danger") }}
+  {%- elif deadline.on_time %}
+  {{ kpi("Dias úteis", result.dias_uteis_restantes|num, sub="término " ~ (forecast|data_curta) ~ " · no prazo", tone="success") }}
+  {%- else %}
+  {{ kpi("Dias úteis", result.dias_uteis_restantes|num, sub="término previsto " ~ (forecast|data_curta)) }}
+  {%- endif %}
 </section>
-{% else %}
-<p>Nenhuma etapa.</p>
-{% endfor %}
 
-{% if can_edit %}
-<h2>Incluir etapa</h2>
-{% if errors.get("stage") %}<p><strong role="alert">{{ errors.get("stage") }}</strong></p>{% endif %}
-<form method="post" action="{{ url_for('app.stage_create', project_id=project.id) }}">
-  {{ stage_form.csrf_token }}
-  <label>Nome da etapa <input type="text" name="name" maxlength="160" required></label>
-  <button type="submit">Incluir etapa</button>
-</form>
-{% endif %}
+<div class="split detail-split">
+  <section aria-labelledby="etapas-titulo">
+    <h2 class="section-title mt-8" id="etapas-titulo"><span>Etapas</span><span class="num">{{ rows|length }}</span></h2>
+    {%- if errors.get("stage") %}{{ alert("danger", errors.get("stage"), role="alert") }}{% endif %}
+    {%- if not rows %}
+    <div class="card">{{ empty_state("Nenhuma etapa", "Inclua a primeira etapa para começar a registrar peças.") }}</div>
+    {%- endif %}
+    <div class="stages">
+      <div class="stages__head wide-only" aria-hidden="true">
+        <span>Etapa</span><span class="is-num">Unid.</span><span>Progresso</span><span class="is-num">Faltam</span><span>Status</span>
+      </div>
+      {%- for stage, sr, activities in rows %}
+      {%- set stage_has_error = errors.get(stage.id) or (activities | selectattr("0.id", "in", errors) | list) %}
+      <details class="stage{% if sr.status == 'Concluída' %} stage--done{% endif %}" id="etapa-{{ stage.id }}"{% if stage.id == current_stage or stage_has_error or (not current_stage and loop.first) %} open{% endif %}>
+        <summary class="stage__summary">
+          <span class="stage__name">{{ icon("chevron-down", class_="stage__chevron") }}<span>{{ stage.name }}</span></span>
+          <span class="stage__units num">{{ sr.unidades }}/{{ sr.previstas }}<span class="compact-only"> un.</span></span>
+          <span class="stage__progress">{{ progress(sr.progresso, 1, label="Progresso de " ~ stage.name, size="sm", value_text=sr.progresso|pct) }}</span>
+          <span class="stage__left num">{{ (sr.tempo_restante_min / 60)|horas(true) }}</span>
+          <span class="stage__status">{{ status_badge(sr.status) }}</span>
+        </summary>
+        <div class="stage__body">
+          {%- if errors.get(stage.id) %}{{ alert("danger", errors.get(stage.id), role="alert") }}{% endif %}
+          <ul class="activities" role="list">
+            {%- for activity, ar in activities %}
+            {%- set done = activity.units_done %}
+            {%- set err = errors.get(activity.id) %}
+            <li class="activity{% if ar.faltam == 0 %} activity--done{% endif %}" id="atividade-{{ activity.id }}">
+              {%- if ar.faltam > 0 %}
+              <a class="activity__open compact-only" href="#registrar-{{ activity.id }}" aria-haspopup="dialog" aria-controls="registrar-{{ activity.id }}">
+                <span class="activity__name">{{ activity.name }}</span>
+                <span class="activity__units num">{{ done }}/{{ project.quantity }}</span>
+                <span class="btn btn--secondary btn--icon activity__plus" aria-hidden="true">{{ icon("plus") }}</span>
+                <span class="visually-hidden">Registrar peças em {{ activity.name }}</span>
+              </a>
+              {%- else %}
+              <div class="activity__open activity__open--static compact-only">
+                <span class="activity__name">{{ activity.name }}</span>
+                <span class="activity__units num">{{ done }}/{{ project.quantity }}</span>
+                {{ status_badge("Concluída") }}
+              </div>
+              {%- endif %}
+              <div class="activity__cells wide-only">
+                <span class="activity__name">{{ activity.name }}</span>
+                <span class="activity__ideal muted num">{{ activity.ideal_minutes|num(0) }} min</span>
+                <span class="activity__units num">{{ done }}/{{ project.quantity }}</span>
+                <span class="activity__progress">{{ progress(ar.pct, 1, label="Progresso de " ~ activity.name, size="sm", value_text=ar.pct|pct, show_text=False) }}</span>
+              </div>
+              <div class="activity__action">
+                {%- if ar.faltam > 0 %}
+                {{ piece_stepper(activity.id, activity.name, stage.name, done, project.quantity,
+                     url_for('app.activity_progress', activity_id=activity.id), activity.version,
+                     detail_url ~ "#atividade-" ~ activity.id, error=err, open=err is not none) }}
+                {%- else %}
+                <span class="wide-only">{{ status_badge("Concluída") }}</span>
+                {%- if err %}{{ alert("danger", err, role="alert") }}{% endif %}
+                {%- endif %}
+              </div>
+            </li>
+            {%- else %}
+            <li class="activity activity--empty muted">Nenhuma atividade nesta etapa.</li>
+            {%- endfor %}
+          </ul>
+          {%- if can_edit %}
+          <form class="inline-form" method="post" action="{{ url_for('app.activity_create', stage_id=stage.id) }}">
+            {{ activity_form.csrf_token }}
+            <div class="field">
+              <label class="field__label" for="nova-atividade-{{ stage.id }}">Nova atividade</label>
+              <input class="field__input" id="nova-atividade-{{ stage.id }}" type="text" name="name" maxlength="160" required>
+            </div>
+            <div class="field inline-form__small">
+              <label class="field__label" for="tempo-{{ stage.id }}">Tempo ideal (min)</label>
+              <input class="field__input" id="tempo-{{ stage.id }}" type="number" name="ideal_minutes" min="0" step="0.01" inputmode="decimal" required>
+            </div>
+            {{ button("Incluir atividade", "secondary", icon="plus") }}
+          </form>
+          {%- endif %}
+        </div>
+      </details>
+      {%- endfor %}
+    </div>
+
+    {%- if rows %}
+    <details class="chart-toggle mt-4">
+      <summary class="btn btn--ghost">{{ icon("chart") }}<span>Ver gráfico por etapa</span></summary>
+      <div class="card mt-2">
+        {%- set series = [] %}
+        {%- for stage, sr, _ in rows %}{% set _x = series.append({"label": stage.name, "value": sr.progresso, "max": 1, "text": sr.progresso|pct(0), "done": sr.progresso >= 1}) %}{% endfor %}
+        {{ bar_chart(series, "Progresso por etapa", max=1, table_headers=("Etapa", "Progresso")) }}
+      </div>
+    </details>
+    {%- endif %}
+
+    {%- if can_edit %}
+    <form class="card inline-form mt-6" method="post" action="{{ url_for('app.stage_create', project_id=project.id) }}">
+      {{ stage_form.csrf_token }}
+      <div class="field">
+        <label class="field__label" for="nova-etapa">Incluir etapa</label>
+        <input class="field__input" id="nova-etapa" type="text" name="name" maxlength="160" required>
+      </div>
+      {{ button("Incluir etapa", "secondary", icon="plus") }}
+    </form>
+    {%- endif %}
+  </section>
+
+  <aside class="split__aside detail-aside stack--lg" aria-label="Equipe, prazo e registros recentes">
+    <section class="card" aria-labelledby="equipe-titulo">
+      <h2 class="section-title" id="equipe-titulo">Equipe e prazo</h2>
+      {%- set weekdays = current_company.workdays() %}
+      <dl class="meta-list">
+        <div><dt>Equipe</dt><dd>{{ project.people }} {{ "pessoa" if project.people == 1 else "pessoas" }} × {{ project.hours_per_day|num(0) }} h/dia</dd></div>
+        <div><dt>Dias de trabalho</dt><dd>{{ "seg–sex" if weekdays == (0, 1, 2, 3, 4) else (weekdays|length ~ " por semana") }}</dd></div>
+        <div><dt>Início</dt><dd>{{ project.start_date|data }}</dd></div>
+        <div><dt>Prazo</dt><dd>{{ project.due_date|data }}</dd></div>
+        <div><dt>Término previsto</dt><dd>{{ forecast|data }}</dd></div>
+        <div><dt>Tempo total</dt><dd>{{ result.tempo_total_h|horas }}</dd></div>
+      </dl>
+    </section>
+    <section class="card mt-6" aria-labelledby="recente-titulo">
+      <h2 class="section-title" id="recente-titulo">Recente</h2>
+      {%- if recent %}
+      <ul class="recent">
+        {%- for e in recent %}
+        <li class="recent__item">
+          <span class="recent__time num muted">{{ e.at|hora }}</span>
+          <span class="recent__text"><span class="text-strong">{{ e.user.name if e.user else "—" }}</span> {{ "%+d"|format(e.delta) }} {{ e.activity.name }}</span>
+        </li>
+        {%- endfor %}
+      </ul>
+      {%- else %}
+      <p class="muted">Toque em + para registrar a primeira peça.</p>
+      {%- endif %}
+      <a class="btn btn--ghost recent__more" href="{{ url_for('app.project_history', project_id=project.id) }}">Ver histórico do projeto</a>
+    </section>
+  </aside>
+</div>
 {% endblock %}
