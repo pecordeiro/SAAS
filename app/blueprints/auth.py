@@ -9,6 +9,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
+from app import rls
 from app.extensions import db, limiter
 from app.forms import LoginForm, LogoutForm, SignupForm
 from app.models import ROLE_OWNER, Company, Membership, User
@@ -71,6 +72,8 @@ def signup():
             user = User(email=form.email.data, name=form.name.data, password_hash=hash_password(form.password.data))
             db.session.add_all([company, user])
             db.session.flush()
+            # RLS: o vínculo novo só pode ser gravado com a empresa recém-criada no contexto.
+            rls.set_context(company_id=company.id, user_id=user.id)
             db.session.add(Membership(company_id=company.id, user_id=user.id, role=ROLE_OWNER))
             try:
                 db.session.commit()

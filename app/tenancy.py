@@ -18,6 +18,7 @@ from flask import abort, g, session
 from flask_login import current_user
 from sqlalchemy import Select, select
 
+from app import rls
 from app.extensions import db, login_manager
 from app.models import ROLE_LEVEL, ROLE_OPERATOR, Company, Membership
 
@@ -30,8 +31,11 @@ def load_company() -> None:
     """before_request: põe a empresa ativa em ``g.company`` e o vínculo em ``g.membership``."""
     g.company = None
     g.membership = None
+    rls.set_context(company_id=None, user_id=None)
     if not current_user.is_authenticated:
         return
+    # Antes de validar o vínculo, o RLS só deixa ler os vínculos do próprio usuário.
+    rls.set_context(user_id=current_user.id)
     raw = session.get(SESSION_KEY)
     if not raw:
         return
@@ -54,6 +58,7 @@ def load_company() -> None:
         return
     g.company = membership.company
     g.membership = membership
+    rls.set_context(company_id=membership.company_id)
 
 
 def set_company(membership: Membership) -> None:
@@ -61,9 +66,12 @@ def set_company(membership: Membership) -> None:
     session[SESSION_KEY] = str(membership.company_id)
     g.company = membership.company
     g.membership = membership
+    rls.set_context(company_id=membership.company_id)
 
 
 def first_active_membership(user_id: uuid.UUID) -> Membership | None:
+    """Primeiro vínculo ativo do usuário (já autenticado por quem chama)."""
+    rls.set_context(user_id=user_id)
     return db.session.execute(
         select(Membership)
         .where(Membership.user_id == user_id, Membership.active.is_(True))

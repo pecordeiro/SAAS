@@ -61,11 +61,11 @@ critérios de pronto da anterior estiverem marcados.
 - Commit: 8f29a49 feat: fase 0 — esqueleto Flask, tenancy, calc com paridade da planilha
 - ADRs criados: nenhum (ADR-0007 já cobria a fase).
 - Pendências e dívidas:
-  - Feriados: `holidays.company_id` é NOT NULL (só feriados da empresa); feriados nacionais
-    compartilhados ficam para a Fase 3 (decidir entre linha global ou seed por empresa).
-  - `users.email` é `String` em minúsculas; `citext` no PostgreSQL fica para a Fase 3.
+  - ~~Feriados nacionais compartilhados~~ — resolvido na Fase 3 (linha global com
+    `company_id` NULL).
+  - ~~`citext` para e-mail~~ — resolvido na Fase 3 (índice único em `lower(email)`).
   - Rate limit em memória e sem bloqueio progressivo por conta (Fase 5/7, Redis).
-  - CSP sem nonce (não há script ainda); RLS não ligado (`RLS_ENABLED`, Fase 3).
+  - CSP sem nonce (não há script ainda); RLS pronto na Fase 3 (desligado por padrão).
   - Cadastro informa “não foi possível cadastrar com este e-mail” em e-mail repetido:
     não revela dados da outra conta, mas permite enumerar e-mails; resolver com confirmação
     por e-mail na Fase 5.
@@ -78,3 +78,71 @@ critérios de pronto da anterior estiverem marcados.
 - Entregas: docs/design/ (marca “Prumo”, logo/favicon/OG SVG, tokens.css, contraste, design system, telas) e ADR-0008.
 - Commit: c873665 docs(design): fase 1 — marca Prumo, tokens e design system
 - Pendências: aprovar direção de marca; demonstrar “≤ 2 toques” na tela real (Fase 2).
+
+### Fase 3 — Banco de dados
+- Status: concluída
+- Datas: início 2026-10-13 · fim 2026-10-13
+- Entregas:
+  - `docker-compose.yml` (PostgreSQL 16 com bancos `controle` e `controle_test`, Redis 7).
+  - Modelos novos: `templates`, `template_versions`, `template_stages`,
+    `template_activities` (projeto guarda `template_version_id` e copia as etapas —
+    `services/templates.py`); `invitations`, `password_resets`, `email_confirmations`,
+    `mfa_recovery_codes`; `plans`, `subscriptions` (1 por empresa), `payments`
+    (`company_id` redundante para isolamento/RLS), `webhook_events`; `audit_logs`
+    (append-only), `domain_events` (outbox, índice parcial dos não publicados),
+    `api_clients`, `api_tokens`. Campos novos: `users.totp_secret_enc`, `users.mfa_enabled`;
+    `companies.mfa_required`, `companies.deletion_requested_at`.
+  - CHECK (papéis, status de projeto/assinatura/cobrança/webhook, provedor, quantidades,
+    preços, posições, `version ≥ 1`, horas/dia, máscara de dias) e UNIQUE onde a regra existe
+    (`token_hash`, `provider_payment_id`, `external_event_id`, `plans.code`, número de versão
+    por modelo, nome de modelo por empresa, assinatura por empresa, feriado nacional por dia).
+  - E-mail case-insensitive: índice único em `lower(email)` (SQLite e PostgreSQL) em vez de
+    `citext` — mesma garantia nos dois bancos, sem extensão.
+  - Feriados nacionais: `holidays.company_id` NULL = nacional (índice único parcial por dia),
+    `services/holidays.py` (fixos + Sexta-feira da Paixão pela Páscoa) e `flask seed-holidays`
+    idempotente; o prazo usa nacionais + os da empresa.
+  - RLS (ADR-0003 aceito): migration `b3e9f1a2c4d5` com políticas em 17 tabelas;
+    `app/rls.py` (hook `after_begin` com `set_config(..., true)` = `SET LOCAL` por transação;
+    `flask rls enable|disable|status`); `tenancy.py` passa empresa/usuário já validados.
+    Pronto e desligado por padrão.
+  - Planos: migration de dados `a7c2d4e8f901` (Essencial R$ 149 / 3 projetos / 5 usuários;
+    Profissional R$ 349 / 15 / 25; Empresa R$ 799 / ilimitado / 100 com `mfa_required` e
+    `api`), ids estáveis (uuid5 do código) e `flask seed-plans` idempotente.
+  - `flask seed-demo`: modelo de etapas versionado, 2 projetos por empresa criados a partir
+    dele (snapshot), histórico espalhado em dias, assinatura `trialing` de 14 dias no
+    Profissional, feriado próprio da empresa + nacionais.
+  - Testes no PostgreSQL pelas migrations (schema recriado, TRUNCATE entre testes; o nome do
+    banco precisa conter “test”); SQLite continua como atalho.
+  - CI: serviço `postgres:16`; ciclo `upgrade → check → downgrade base → upgrade → check` no
+    PostgreSQL e no SQLite; pytest com `TEST_DATABASE_URL` (com cobertura) e no SQLite.
+  - ER e §5 de `arquitetura.md` atualizados; README e `.env.example`.
+- Critérios de pronto:
+  - [x] `flask db upgrade` do zero → `flask db downgrade base` → `flask db upgrade` sem erro em
+        PostgreSQL 16 (local, 16.15) e no SQLite; `flask db check` sem drift nos dois.
+        No CI está configurado (ainda não executado no GitHub).
+  - [x] Teste confirma que toda tabela com dado de cliente tem `company_id NOT NULL` e índice
+        começando por `company_id` (`tests/test_schema.py`, exceções explícitas e justificadas).
+  - [x] Com RLS ligado e papel `NOSUPERUSER NOBYPASSRLS` criado no teste, consulta crua sem
+        `app.company_id` retorna 0 linhas nas 17 tabelas; com o id de A, só linhas de A.
+  - [x] Testes, inclusive isolamento A/B, verdes em PostgreSQL — e os casos A/B também com o
+        app inteiro rodando como o papel comum e `RLS_ENABLED=1`.
+  - [x] `UNIQUE` em `payments.provider_payment_id` e `webhook_events.external_event_id` testados.
+- Testes: PostgreSQL 16 (`TEST_DATABASE_URL`): `125 passed` (~78 s), cobertura 95% de `app/`;
+  SQLite: `88 passed, 37 skipped` (RLS e migração no PG só rodam no PostgreSQL).
+- /security-review: revisão manual das mudanças (tokens só como hash; contexto RLS só com
+  vínculo validado e por bind parameter; SQL dinâmico só com nomes de tabela constantes;
+  nenhum segredo em log); sem achados abertos.
+- Telas conferidas (375/768/1280, claro/escuro): n/a (fase sem tela).
+- Commit: “feat: fase 3 — banco de dados” (hash no histórico do branch).
+- ADRs criados: nenhum novo; ADR-0003 passou a “aceito” com a decisão final.
+- Pendências e dívidas:
+  - RLS desligado por padrão. Antes de ligar em produção, os fluxos entre empresas precisam
+    de papel de plataforma (`BYPASSRLS`) ou função `SECURITY DEFINER`: webhook/reconciliação
+    do Asaas (Fase 8), aceitar convite e autenticar token de API (busca por `token_hash`
+    antes de saber a empresa; Fases 5/9), worker do outbox, LGPD e `flask seed-holidays`
+    (gravar nacionais com RLS forçado). Verificar se o Render permite papel com `BYPASSRLS`.
+  - O modo batch do SQLite não recria índice de expressão: migration futura que altere
+    `users` em batch precisa tirar e recriar `uq_users_email_lower` fora do batch.
+  - Sem FK composta `(company_id, id)` entre pai e filho (a garantia de mesma empresa é do
+    serviço + RLS); `project_members` fica para quando a tela de equipe existir.
+  - Tabelas de convite/reset/confirmação/MFA/API ainda sem serviço (Fases 5 e 9).
