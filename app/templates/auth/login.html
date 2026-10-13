@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}Entrar · Controle de Produção{% endblock %}
+{% block content %}
+<h1>Entrar</h1>
+{% if error %}<p role="alert"><strong>{{ error }}</strong></p>{% endif %}
+<form method="post" action="{{ url_for('auth.login') }}" novalidate>
+  {{ form.csrf_token }}
+  {{ form.next }}
+  {{ field(form.email, {"autocomplete": "email", "required": true}) }}
+  {{ field(form.password, {"autocomplete": "current-password", "required": true}) }}
+  <button type="submit">Entrar</button>
+</form>
+<p>Ainda não tem conta? <a href="{{ url_for('auth.signup') }}">Cadastre sua empresa</a>.</p>
+{% endblock %}

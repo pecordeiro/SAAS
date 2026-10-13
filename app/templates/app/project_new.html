@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}Novo projeto · Controle de Produção{% endblock %}
+{% block content %}
+<h1>Novo projeto</h1>
+<form method="post" action="{{ url_for('app.project_new') }}" novalidate>
+  {{ form.csrf_token }}
+  {{ field(form.name, {"required": true}) }}
+  {{ field(form.quantity, {"min": 1, "required": true, "inputmode": "numeric"}) }}
+  {{ field(form.start_date) }}
+  {{ field(form.due_date) }}
+  {{ field(form.people, {"min": 1, "inputmode": "numeric"}) }}
+  {{ field(form.hours_per_day, {"inputmode": "decimal"}) }}
+  <h2>Etapas</h2>
+  <p>Preencha só as etapas que vai usar. Em cada uma, uma atividade por linha no formato <code>Nome; minutos por unidade</code>.</p>
+  {% for error in form.stages.errors if error is string %}<p><strong role="alert">{{ error }}</strong></p>{% endfor %}
+  {% for slot in form.stages %}
+    <fieldset>
+      <legend>Etapa {{ loop.index }}</legend>
+      {{ field(slot.form.name) }}
+      {{ field(slot.form.activities, {"rows": 4, "cols": 50}) }}
+    </fieldset>
+  {% endfor %}
+  <button type="submit">Criar projeto</button>
+</form>
+{% endblock %}

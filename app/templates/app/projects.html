@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Projetos · Controle de Produção{% endblock %}
+{% block content %}
+<h1>Projetos</h1>
+{% if current_membership and current_membership.has_role("supervisor") %}
+  <p><a href="{{ url_for('app.project_new') }}">Novo projeto</a></p>
+{% endif %}
+{% if items %}
+<table>
+  <thead>
+    <tr><th>Projeto</th><th>Concluídos</th><th>Progresso</th><th>Horas que faltam</th><th>Dias úteis</th><th>Prazo</th></tr>
+  </thead>
+  <tbody>
+  {% for project, r in items %}
+    <tr>
+      <td><a href="{{ url_for('app.project_detail', project_id=project.id) }}">{{ project.name }}</a></td>
+      <td>{{ r.unidades_concluidas }} de {{ project.quantity }}</td>
+      <td>{{ r.progresso_geral|pct }}</td>
+      <td>{{ r.tempo_restante_h|num }} h</td>
+      <td>{{ r.dias_uteis_restantes|num }}</td>
+      <td>{{ project.due_date|data }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>Nenhum projeto ainda.</p>
+{% endif %}
+{% endblock %}

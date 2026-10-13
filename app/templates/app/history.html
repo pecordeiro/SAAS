@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Histórico · {{ project.name }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('app.project_detail', project_id=project.id) }}">← {{ project.name }}</a></p>
+<h1>Histórico</h1>
+{% if entries %}
+<table>
+  <thead><tr><th>Quando</th><th>Etapa</th><th>Atividade</th><th>Peças</th><th>Quem</th></tr></thead>
+  <tbody>
+  {% for e in entries %}
+    <tr>
+      <td>{{ e.at|datahora }}</td>
+      <td>{{ e.activity.stage.name }}</td>
+      <td>{{ e.activity.name }}</td>
+      <td>{{ "%+d"|format(e.delta) }}</td>
+      <td>{{ e.user.name if e.user else "—" }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>Nenhum registro ainda.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,7 @@
+{% macro field(f, attrs={}) %}
+  <p>
+    {{ f.label }}<br>
+    {{ f(**attrs) }}
+    {% for error in f.errors %}<br><strong role="alert">{{ error }}</strong>{% endfor %}
+  </p>
+{% endmacro %}

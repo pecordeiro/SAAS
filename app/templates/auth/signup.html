@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}Cadastrar empresa · Controle de Produção{% endblock %}
+{% block content %}
+<h1>Cadastrar empresa</h1>
+<form method="post" action="{{ url_for('auth.signup') }}" novalidate>
+  {{ form.csrf_token }}
+  {{ field(form.company_name, {"autocomplete": "organization", "required": true}) }}
+  {{ field(form.name, {"autocomplete": "name", "required": true}) }}
+  {{ field(form.email, {"autocomplete": "email", "required": true}) }}
+  {{ field(form.password, {"autocomplete": "new-password", "required": true, "minlength": 10}) }}
+  {{ field(form.password_confirm, {"autocomplete": "new-password", "required": true}) }}
+  <button type="submit">Cadastrar</button>
+</form>
+<p>Já tem conta? <a href="{{ url_for('auth.login') }}">Entrar</a>.</p>
+{% endblock %}

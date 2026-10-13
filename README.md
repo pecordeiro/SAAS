@@ -6,14 +6,59 @@ e exportação. Site renderizado no servidor (Flask + Jinja + HTMX), em portugu�
 
 ## Estado
 
-Fase de planejamento concluída (Prompt 0). Ainda não há código de produto.
+Fase 0 (esqueleto) entregue: app factory, modelos e primeira migration, isolamento por
+empresa (`app/tenancy.py`), regras de cálculo puras (`app/services/calc.py`) conferidas
+contra a planilha de referência, cadastro/login, telas provisórias sem design e testes.
+Progresso por fase em [`docs/plano/progresso.md`](docs/plano/progresso.md).
 
 - Contexto para o Claude: [`CLAUDE.md`](CLAUDE.md)
 - Plano: [`docs/plano/`](docs/plano/) — PRD, arquitetura, ADRs, roadmap, backlog, riscos e progresso
 - Guia de segurança: [`.claude/claude-security-guidance.md`](.claude/claude-security-guidance.md)
 
-Próximo passo: aprovar as decisões pendentes em `docs/plano/prd.md` e iniciar a Fase 0
-(esqueleto) descrita em `docs/plano/roadmap.md`.
+## Como rodar
+
+Requisitos: Python 3.12+ (o CI usa 3.12). PostgreSQL 16 é opcional nesta fase; sem
+`DATABASE_URL`, o ambiente de desenvolvimento usa SQLite em `instance/dev.db`.
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+cp .env.example .env          # APP_ENV=development já vem preenchido
+
+flask db upgrade              # cria o schema pelas migrations (nunca db.create_all)
+flask seed-demo               # 2 empresas fictícias, 1 projeto de 10 equipamentos cada
+python run.py                 # http://127.0.0.1:5000  (/health responde {"status": "ok"})
+```
+
+O `seed-demo` cria `owner.a@demo.invalid`, `supervisor.a@demo.invalid`,
+`operator.a@demo.invalid` (e os mesmos com `.b`). A senha é a de `DEMO_PASSWORD` no `.env`
+ou, se vazia, uma senha gerada e exibida no terminal. Só roda em development/test.
+
+### Testes
+
+```bash
+python -m pytest -q                                      # SQLite em memória
+TEST_DATABASE_URL=postgresql+psycopg://usuario@localhost/controle_test python -m pytest -q
+```
+
+- `tests/test_calc.py`: casos conferidos à mão, pureza do `calc.py` e paridade com
+  `docs/referencia/acompanhamento_montagem_v4.xlsx` (valores calculados pelo Excel).
+- `tests/test_isolation.py`: recurso da empresa B acessado por usuário da A → 404; falha se
+  surgir rota com `<uuid:...>` sem caso A/B.
+- `tests/test_auth.py`: cadastro, login, papéis (403), CSRF (400), rate limit.
+
+### Migrations
+
+```bash
+flask db migrate -m "descrição"   # gera; revise o arquivo em migrations/versions/ antes do commit
+flask db upgrade
+```
+
+### Produção
+
+`APP_ENV=production` exige `SECRET_KEY` e `DATABASE_URL` (o app não sobe sem eles).
+Servidor: `gunicorn run:app`. Variáveis em [`.env.example`](.env.example) e em
+`docs/plano/arquitetura.md` §10.
 
 ## Base de referência
 

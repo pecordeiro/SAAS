@@ -15,9 +15,9 @@ Python 3.12, Flask 3, SQLAlchemy 2, Alembic (Flask-Migrate), PostgreSQL 16,
 Flask-Login, Flask-WTF (CSRF), Flask-Limiter, Gunicorn, pytest. Pagamento: Asaas.
 
 ## Estado atual
-O repositório começou vazio. `app/`, `app/services/calc.py`, `app/tenancy.py`, testes e
-migrations ainda não existem: nascem na Fase 0 do roadmap (docs/plano/roadmap.md).
-Os caminhos abaixo são os alvos.
+Fase 0 (esqueleto) concluída: app factory, tenancy.py, services/calc.py (paridade com a
+planilha de referência), login/cadastro, telas provisórias, testes e CI. Ver
+docs/plano/progresso.md para a fase corrente.
 
 ## Regras invioláveis
 1. Multiempresa: toda tabela com dado de cliente tem company_id. A empresa vem da
