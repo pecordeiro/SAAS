@@ -8,9 +8,22 @@ from app.models.accounts import (  # noqa: F401
     ROLE_SUPERVISOR,
     ROLES,
     Company,
+    EmailConfirmation,
+    Invitation,
     Membership,
+    MfaRecoveryCode,
+    PasswordReset,
     User,
 )
+from app.models.billing import (  # noqa: F401
+    PAYMENT_STATUSES,
+    SUBSCRIPTION_STATUSES,
+    Payment,
+    Plan,
+    Subscription,
+    WebhookEvent,
+)
+from app.models.platform import ApiClient, ApiToken, AuditLog, DomainEvent  # noqa: F401
 from app.models.production import (  # noqa: F401
     PROJECT_ACTIVE,
     PROJECT_DONE,
@@ -20,3 +33,4 @@ from app.models.production import (  # noqa: F401
     ProgressEntry,
     Stage,
 )
+from app.models.templates import Template, TemplateActivity, TemplateStage, TemplateVersion  # noqa: F401

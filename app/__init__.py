@@ -24,6 +24,9 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
     from app import models  # noqa: F401  (registra os modelos no metadata)
 
     db.init_app(app)
+    from app import rls
+
+    rls.init_app(app)
     migrate.init_app(app, db, render_as_batch=True, compare_type=True)
     csrf.init_app(app)
     limiter.init_app(app)

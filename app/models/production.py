@@ -18,6 +18,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
     event,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -37,8 +38,13 @@ class Project(UUIDPk, Timestamps, TenantMixin, db.Model):
         CheckConstraint("quantity >= 0", name="quantity_nonnegative"),
         CheckConstraint("people >= 1", name="people_positive"),
         CheckConstraint("hours_per_day > 0", name="hours_per_day_positive"),
+        CheckConstraint("status IN ('active', 'done')", name="status_valid"),
     )
 
+    # Modelo de origem (snapshot): as etapas foram COPIADAS desta versão na criação.
+    template_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("template_versions.id", ondelete="RESTRICT")
+    )
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     start_date: Mapped[date | None] = mapped_column(Date)
@@ -57,7 +63,10 @@ class Project(UUIDPk, Timestamps, TenantMixin, db.Model):
 
 class Stage(UUIDPk, Timestamps, TenantMixin, db.Model):
     __tablename__ = "stages"
-    __table_args__ = (Index("ix_stages_company_project_position", "company_id", "project_id", "position"),)
+    __table_args__ = (
+        Index("ix_stages_company_project_position", "company_id", "project_id", "position"),
+        CheckConstraint("position >= 0", name="position_nonnegative"),
+    )
 
     project_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False
@@ -78,6 +87,8 @@ class Activity(UUIDPk, Timestamps, TenantMixin, db.Model):
         Index("ix_activities_company_stage_position", "company_id", "stage_id", "position"),
         CheckConstraint("ideal_minutes >= 0", name="ideal_minutes_nonnegative"),
         CheckConstraint("units_done >= 0", name="units_done_nonnegative"),
+        CheckConstraint("version >= 1", name="version_positive"),
+        CheckConstraint("position >= 0", name="position_nonnegative"),
     )
 
     stage_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("stages.id", ondelete="RESTRICT"), nullable=False)
@@ -123,9 +134,32 @@ def _progress_entry_no_delete(mapper, connection, target):  # pragma: no cover -
     raise RuntimeError("progress_entries é append-only: não pode ser apagado.")
 
 
-class Holiday(UUIDPk, Timestamps, TenantMixin, db.Model):
-    __tablename__ = "holidays"
-    __table_args__ = (UniqueConstraint("company_id", "day", name="uq_holidays_company_day"),)
+class Holiday(UUIDPk, Timestamps, db.Model):
+    """Feriado. ``company_id`` NULL = feriado nacional (compartilhado, só leitura para as
+    empresas; gravado por `flask seed-holidays`). Com ``company_id`` = feriado da empresa.
 
+    Decisão da Fase 3 (pendência da Fase 0): linha global em vez de copiar os nacionais para
+    cada empresa — um único lugar para corrigir, sem N cópias. A política RLS permite ler as
+    linhas com company_id NULL e só gravar as da própria empresa.
+    """
+
+    __tablename__ = "holidays"
+    __table_args__ = (
+        UniqueConstraint("company_id", "day", name="uq_holidays_company_day"),
+        # NULL não colide em UNIQUE: os nacionais têm índice único parcial próprio.
+        Index(
+            "uq_holidays_national_day",
+            "day",
+            unique=True,
+            postgresql_where=text("company_id IS NULL"),
+            sqlite_where=text("company_id IS NULL"),
+        ),
+    )
+
+    company_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("companies.id", ondelete="RESTRICT"))
     day: Mapped[date] = mapped_column(Date, nullable=False)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
+
+    @property
+    def national(self) -> bool:
+        return self.company_id is None

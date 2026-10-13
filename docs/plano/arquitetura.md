@@ -1,6 +1,6 @@
 # Arquitetura
 
-Status: rascunho para aprovação · Atualizado: 2026-10-13
+Status: rascunho para aprovação (§4 e §5 implementados na Fase 3) · Atualizado: 2026-10-13
 
 ## 1. Ponto de partida e o que muda
 
@@ -95,10 +95,16 @@ docs/plano/, docs/api/
    na mesma transação.
 6. Resposta: página inteira ou fragmento HTMX (`HX-Request`); CSP com nonce.
 
-## 4. Modelo de dados alvo
+## 4. Modelo de dados (implementado na Fase 3)
 
 Todas as chaves primárias são UUID. Tabelas com dado de cliente têm `company_id NOT NULL`
-e índices compostos começando por `company_id`.
+e pelo menos um índice (ou UNIQUE) começando por `company_id` — conferido por
+`tests/test_schema.py` inspecionando o metadata. Exceções, com motivo: `companies` (raiz do
+tenant), `users`, `password_resets`, `email_confirmations`, `mfa_recovery_codes`
+(identidade global do usuário), `plans` (catálogo), `webhook_events` (caixa de entrada da
+plataforma) e `holidays` (`company_id` NULL = feriado nacional). Migrations:
+`e972bfba83c7` (Fase 0) → `e05ae54663a3` (schema da Fase 3) → `b3e9f1a2c4d5` (políticas
+RLS) → `a7c2d4e8f901` (seed dos planos).
 
 ```mermaid
 erDiagram
@@ -111,21 +117,23 @@ erDiagram
 
   companies ||--o{ templates : possui
   templates ||--o{ template_versions : versiona
+  templates |o--o| template_versions : "versão atual"
   template_versions ||--o{ template_stages : contem
   template_stages ||--o{ template_activities : contem
 
   companies ||--o{ projects : possui
-  template_versions |o--o{ projects : origem
+  template_versions |o--o{ projects : "origem (snapshot)"
   projects ||--o{ stages : contem
   stages ||--o{ activities : contem
   activities ||--o{ progress_entries : registra
-  projects ||--o{ project_members : equipe
-  companies ||--o{ holidays : define
+  users |o--o{ progress_entries : registrou
+  companies |o--o{ holidays : "define (NULL = nacional)"
 
   plans ||--o{ subscriptions : define
   companies ||--o| subscriptions : assina
   subscriptions ||--o{ payments : cobra
-  webhook_events }o--|| companies : "refere (opcional)"
+  companies ||--o{ payments : paga
+  companies |o--o{ webhook_events : "refere (opcional)"
 
   companies ||--o{ audit_logs : registra
   companies ||--o{ domain_events : publica
@@ -137,35 +145,38 @@ erDiagram
     string name
     string cnpj
     string timezone
-    numeric daily_hours
-    int workdays_mask
+    numeric daily_hours "CHECK 0 < h <= 24"
+    int workdays_mask "CHECK 0..127"
     bool mfa_required
     timestamptz deletion_requested_at
   }
   users {
     uuid id PK
-    citext email UK
+    string email UK "UNIQUE lower(email)"
     string password_hash
     timestamptz email_confirmed_at
     int session_version
     string totp_secret_enc
+    bool mfa_enabled
     bool active
   }
   memberships {
     uuid id PK
     uuid company_id FK
     uuid user_id FK
-    string role "owner|supervisor|operator"
+    string role "CHECK owner|supervisor|operator"
     bool active
   }
   invitations {
     uuid id PK
     uuid company_id FK
-    citext email
-    string role
+    string email "CHECK minúsculas"
+    string role "CHECK"
     string token_hash UK
+    uuid invited_by_user_id FK
     timestamptz expires_at
     timestamptz used_at
+    timestamptz revoked_at
   }
   password_resets {
     uuid id PK
@@ -174,18 +185,33 @@ erDiagram
     timestamptz expires_at
     timestamptz used_at
   }
+  email_confirmations {
+    uuid id PK
+    uuid user_id FK
+    string email
+    string token_hash UK
+    timestamptz expires_at
+    timestamptz used_at
+  }
+  mfa_recovery_codes {
+    uuid id PK
+    uuid user_id FK
+    string code_hash "UNIQUE (user_id, code_hash)"
+    timestamptz used_at
+  }
   templates {
     uuid id PK
     uuid company_id FK
-    string name
-    uuid current_version_id
+    string name "UNIQUE (company_id, name)"
+    uuid current_version_id FK
     timestamptz archived_at
   }
   template_versions {
     uuid id PK
     uuid company_id FK
     uuid template_id FK
-    int number
+    int number "UNIQUE (company_id, template_id, number)"
+    uuid created_by_user_id FK
   }
   template_stages {
     uuid id PK
@@ -207,10 +233,12 @@ erDiagram
     uuid company_id FK
     uuid template_version_id FK
     string name
-    int quantity
+    int quantity "CHECK >= 0"
     date start_date
     date due_date
-    string status
+    int people
+    numeric hours_per_day
+    string status "CHECK active|done"
     timestamptz archived_at
   }
   stages {
@@ -227,8 +255,8 @@ erDiagram
     uuid stage_id FK
     string name
     numeric ideal_minutes "tempo ideal por unidade (min)"
-    int units_done
-    int version
+    int units_done "CHECK >= 0"
+    int version "controle otimista"
     timestamptz archived_at
   }
   progress_entries {
@@ -236,35 +264,44 @@ erDiagram
     uuid company_id FK
     uuid activity_id FK
     uuid user_id FK
-    int delta
+    int delta "CHECK <> 0"
     timestamptz at
+  }
+  holidays {
+    uuid id PK
+    uuid company_id FK "NULL = nacional"
+    date day "UNIQUE (company_id, day); nacional: UNIQUE parcial"
+    string name
   }
   plans {
     uuid id PK
     string code UK
     string name
     int price_cents
-    int max_projects
+    int max_projects "NULL = ilimitado"
     int max_users
     jsonb features
+    bool active
   }
   subscriptions {
     uuid id PK
-    uuid company_id FK
+    uuid company_id FK "UNIQUE: 1 por empresa"
     uuid plan_id FK
-    string provider
+    string provider "CHECK asaas|fake"
     string provider_customer_id
     string provider_subscription_id
-    string status
+    string status "CHECK trialing|active|past_due|canceled|expired"
+    timestamptz trial_ends_at
     timestamptz current_period_end
     timestamptz grace_until
     timestamptz canceled_at
   }
   payments {
     uuid id PK
+    uuid company_id FK
     uuid subscription_id FK
     string provider_payment_id UK
-    string status
+    string status "CHECK"
     int value_cents
     date due_date
     timestamptz paid_at
@@ -274,9 +311,10 @@ erDiagram
     string provider
     string external_event_id UK
     string type
+    uuid company_id FK "opcional"
     timestamptz received_at
     timestamptz processed_at
-    string status
+    string status "CHECK received|processed|ignored|failed"
     text error
   }
   audit_logs {
@@ -286,7 +324,8 @@ erDiagram
     string action
     string object_type
     uuid object_id
-    inet ip
+    string ip
+    jsonb details
     timestamptz at
   }
   domain_events {
@@ -296,18 +335,21 @@ erDiagram
     jsonb payload
     timestamptz created_at
     timestamptz published_at
+    int attempts
   }
   api_clients {
     uuid id PK
     uuid company_id FK
     string name
+    timestamptz revoked_at
   }
   api_tokens {
     uuid id PK
     uuid company_id FK
     uuid api_client_id FK
     string token_hash UK
-    string[] scopes
+    string token_prefix
+    jsonb scopes
     timestamptz expires_at
     timestamptz last_used_at
     timestamptz revoked_at
@@ -316,11 +358,22 @@ erDiagram
 
 Observações:
 - **Snapshot de modelo**: criar projeto copia `template_stages/activities` para
-  `stages/activities` e guarda `template_version_id`. Editar o modelo cria nova versão; o
-  projeto só muda com confirmação explícita (registrada no histórico).
+  `stages/activities` e guarda `template_version_id` (`services/templates.py`). Editar o
+  modelo cria nova versão; o projeto só muda com confirmação explícita (Fase 4).
 - **Concorrência**: `activities.version` para controle otimista (409 no conflito).
-- **Histórico**: `progress_entries` é append-only; arquivar nunca apaga.
-- **Holidays**: feriados nacionais (seed) + feriados da empresa; alimentam `calc.dias_uteis`.
+- **Histórico**: `progress_entries` e `audit_logs` são append-only (guarda no ORM);
+  arquivar nunca apaga.
+- **Feriados**: linha global com `company_id` NULL = feriado nacional (`flask
+  seed-holidays`, idempotente; índice único parcial por dia) + feriados da empresa. Escolha
+  da Fase 3 em vez de copiar os nacionais para cada empresa: um só lugar para corrigir; o
+  RLS deixa todas lerem os nacionais e só gravar os próprios. `services/holidays.py`
+  junta os dois para `calc.prazo_em_data`.
+- **E-mail sem diferenciar maiúsculas**: índice único em `lower(email)` (igual no SQLite e
+  no PostgreSQL) em vez de `citext`; a aplicação também grava em minúsculas.
+- **JSON**: `JSONB` no PostgreSQL, `JSON` no SQLite (mesmo tipo no modelo).
+- **Fica para depois**: `project_members` (equipe por projeto) entra quando a tela de
+  equipe existir; FK composta `(company_id, id)` entre pai e filho (garantia de que o filho
+  é da mesma empresa) está registrada como melhoria — hoje a garantia é do serviço + RLS.
 
 ## 5. Estratégia multiempresa
 
@@ -329,9 +382,12 @@ Três barreiras, da mais importante à de reserva:
    `scoped()`/`get_or_404()` de `tenancy.py`; recurso de outra empresa responde 404.
 2. **Testes**: `tests/test_isolation.py` percorre o `url_map` e falha se uma rota com
    `<uuid:...>` não tiver caso A/B (fase 7); cada rota nova ganha caso já na sua fase.
-3. **Banco (RLS)**: políticas `USING (company_id = current_setting('app.company_id')::uuid)`
-   em todas as tabelas de cliente; o app conecta com um papel sem `BYPASSRLS`. Ligado por
-   `RLS_ENABLED` (ADR-0003).
+3. **Banco (RLS)**: políticas
+   `company_id = NULLIF(current_setting('app.company_id', true), '')::uuid` em todas as
+   tabelas de cliente (`app/rls.py`); com `RLS_ENABLED=1` o app faz `SET LOCAL` da empresa
+   (e do usuário) no início de cada transação; `flask rls enable` liga `ENABLE` + `FORCE`.
+   O app conecta com papel sem `SUPERUSER`/`BYPASSRLS`. Pronto e desligado por padrão
+   (ADR-0003).
 
 Vínculo com várias empresas: `memberships` N:N; a troca de empresa reescreve
 `session['company_id']` após validar o vínculo.
@@ -383,7 +439,8 @@ Vínculo com várias empresas: `memberships` N:N; a troca de empresa reescreve
 | Variável | Uso |
 |---|---|
 | `SECRET_KEY`, `DATABASE_URL`, `REDIS_URL` | básicos |
-| `RLS_ENABLED`, `FEATURE_PUBLIC_API` | flags |
+| `RLS_ENABLED`, `FEATURE_PUBLIC_API` | flags (`RLS_ENABLED=1` + `flask rls enable`, ADR-0003) |
+| `TEST_DATABASE_URL` | testes no PostgreSQL (nome do banco com “test”; o schema é recriado) |
 | `ASAAS_API_KEY`, `ASAAS_BASE_URL`, `ASAAS_WEBHOOK_TOKEN` | pagamento |
 | `EMAIL_BACKEND`, `RESEND_API_KEY`, `MAIL_FROM` | e-mail |
 | `SENTRY_DSN` | monitoramento |

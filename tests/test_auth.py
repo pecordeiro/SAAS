@@ -174,23 +174,15 @@ def test_usuario_inativo_nao_entra(client, app, tenants):
     assert login(client, app, a.owner_email).status_code == 400
 
 
-def test_rate_limit_no_login():
-    app = create_app("test", {"RATELIMIT_ENABLED": True, "LOGIN_RATE_LIMIT": "3 per minute"})
-    with app.app_context():
-        db.create_all()
-    try:
-        client = app.test_client()
-        codes = [
-            client.post("/entrar", data={"email": "x@exemplo.com", "password": "y", "csrf_token": csrf_token(client, app)}).status_code
-            for _ in range(4)
-        ]
-        assert codes[:3] == [400, 400, 400]
-        assert codes[3] == 429
-    finally:
-        with app.app_context():
-            db.session.remove()
-            db.drop_all()
-            db.engine.dispose()
+def test_rate_limit_no_login(app_factory):
+    app = app_factory({"RATELIMIT_ENABLED": True, "LOGIN_RATE_LIMIT": "3 per minute"})
+    client = app.test_client()
+    codes = [
+        client.post("/entrar", data={"email": "x@exemplo.com", "password": "y", "csrf_token": csrf_token(client, app)}).status_code
+        for _ in range(4)
+    ]
+    assert codes[:3] == [400, 400, 400]
+    assert codes[3] == 429
 
 
 def test_config_producao_exige_secret_key(monkeypatch):

@@ -1,44 +1,141 @@
 """Fixtures comuns.
 
-Banco: SQLite em memória por padrão; defina TEST_DATABASE_URL para rodar no PostgreSQL.
-db.create_all() é usado SÓ aqui (testes); em qualquer outro ambiente o schema vem das
-migrations Alembic.
+Banco:
+- PostgreSQL (recomendado, igual à produção): defina TEST_DATABASE_URL. O schema vem das
+  MIGRATIONS (upgrade uma vez por sessão de testes, num schema public recriado do zero) e
+  cada teste começa com as tabelas esvaziadas (TRUNCATE), mantendo o seed de planos da
+  migration. Por segurança, o nome do banco precisa conter "test".
+- SQLite em memória (atalho rápido, sem TEST_DATABASE_URL): db.create_all() por teste +
+  `seed_plans()`. create_all é usado SÓ aqui; fora dos testes o schema vem das migrations.
 """
 
 from __future__ import annotations
 
+import os
 import re
 import secrets
 from dataclasses import dataclass
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from itsdangerous import URLSafeTimedSerializer
+from sqlalchemy import text
+from sqlalchemy.engine import make_url
 
 from app import create_app
+from app.config import _database_url_raw
 from app.extensions import db as _db
 from app.models import ROLE_OPERATOR, ROLE_OWNER, ROLE_SUPERVISOR, Company, Membership, User
 from app.services import projects as svc
 from app.services.passwords import hash_password
+from app.services.plans import seed_plans
 
 PASSWORD = "senha-de-teste-123"
+MIGRATIONS_DIR = str(Path(__file__).resolve().parent.parent / "migrations")
+# Tabelas que o TRUNCATE entre testes preserva (seed da migration).
+KEEP_TABLES = {"alembic_version", "plans"}
+
+
+def get_test_database_url() -> str | None:
+    return _database_url_raw(os.environ.get("TEST_DATABASE_URL") or None)
+
+
+def using_postgres() -> bool:
+    url = get_test_database_url()
+    return bool(url) and make_url(url).get_backend_name() == "postgresql"
+
+
+requires_postgres = pytest.mark.skipif(not using_postgres(), reason="precisa de TEST_DATABASE_URL (PostgreSQL)")
+
+
+def run_migrations(app, revision: str = "head") -> None:
+    from flask_migrate import upgrade
+
+    with app.app_context():
+        upgrade(directory=MIGRATIONS_DIR, revision=revision)
+
+
+def downgrade_migrations(app, revision: str = "base") -> None:
+    from flask_migrate import downgrade
+
+    with app.app_context():
+        downgrade(directory=MIGRATIONS_DIR, revision=revision)
+
+
+@pytest.fixture(scope="session")
+def _postgres_schema():
+    """Recria o schema public do banco de TESTE e aplica as migrations (uma vez)."""
+    if not using_postgres():
+        yield None
+        return
+    database = make_url(get_test_database_url()).database or ""
+    if "test" not in database:
+        pytest.exit(f"TEST_DATABASE_URL deve apontar para um banco de teste (nome com 'test'), não {database!r}.")
+    app = create_app("test")
+    with app.app_context():
+        with _db.engine.begin() as conn:
+            conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+            conn.execute(text("CREATE SCHEMA public"))
+        _db.engine.dispose()
+    run_migrations(app)
+    yield app
+    with app.app_context():
+        _db.engine.dispose()
+
+
+def truncate_all() -> None:
+    tables = _db.session.execute(
+        text("SELECT tablename FROM pg_tables WHERE schemaname = current_schema()")
+    ).scalars()
+    names = ", ".join(f'"{t}"' for t in tables if t not in KEEP_TABLES)
+    if names:
+        _db.session.execute(text(f"TRUNCATE {names} CASCADE"))
+    _db.session.commit()
+
+
+def _prepare_db(app) -> None:
+    with app.app_context():
+        if using_postgres():
+            truncate_all()
+        else:
+            _db.drop_all()
+            _db.create_all()
+            seed_plans()
+            _db.session.commit()
+
+
+def _cleanup_db(app) -> None:
+    with app.app_context():
+        _db.session.remove()
+        if not using_postgres():
+            _db.drop_all()
+        _db.engine.dispose()
 
 
 @pytest.fixture()
-def app():
+def app_factory(_postgres_schema):
+    """Cria apps de teste com overrides de config, banco limpo e limpeza no fim."""
+    created = []
+
+    def factory(overrides: dict | None = None):
+        new_app = create_app("test", overrides)
+        _prepare_db(new_app)
+        created.append(new_app)
+        return new_app
+
+    yield factory
+    for created_app in created:
+        _cleanup_db(created_app)
+
+
+@pytest.fixture()
+def app(app_factory):
     """App de teste. O contexto NÃO fica ativo durante o teste: cada requisição do client
     abre o seu (como em produção), então `g` e o usuário em cache não vazam entre requisições.
     Para mexer no banco dentro do teste, use `with app.app_context():`.
     """
-    app = create_app("test")
-    with app.app_context():
-        _db.drop_all()
-        _db.create_all()
-    yield app
-    with app.app_context():
-        _db.session.remove()
-        _db.drop_all()
-        _db.engine.dispose()
+    return app_factory()
 
 
 @pytest.fixture()

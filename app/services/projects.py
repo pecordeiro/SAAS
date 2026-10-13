@@ -10,9 +10,10 @@ from decimal import Decimal
 from sqlalchemy import update
 
 from app.extensions import db
-from app.models import Activity, Company, Holiday, Project, ProgressEntry, Stage
+from app.models import Activity, Company, Project, ProgressEntry, Stage
 from app.services import calc
-from app.tenancy import scoped
+from app.services.holidays import holidays_for
+from app.tenancy import current_company_id, scoped
 
 
 class ProgressError(Exception):
@@ -53,9 +54,13 @@ def create_project(
     people: int,
     hours_per_day: Decimal,
     stages: list[NewStage],
+    template_version_id: uuid.UUID | None = None,
 ) -> Project:
+    """Cria o projeto com as etapas dadas. Vindas de um modelo (``template_version_id``),
+    as etapas já são a cópia (snapshot) da versão: ver ``services.templates``."""
     project = Project(
         company_id=company.id,
+        template_version_id=template_version_id,
         name=name,
         quantity=quantity,
         start_date=start_date,
@@ -155,7 +160,8 @@ def summary(project: Project) -> calc.ResultadoProjeto:
 
 
 def company_holidays() -> list[date]:
-    return list(db.session.execute(scoped(Holiday).with_only_columns(Holiday.day)).scalars())
+    """Feriados nacionais (company_id NULL) + os da empresa da sessão."""
+    return holidays_for(current_company_id())
 
 
 def forecast_end(project: Project, result: calc.ResultadoProjeto, company: Company, today: date) -> date | None:
@@ -163,7 +169,7 @@ def forecast_end(project: Project, result: calc.ResultadoProjeto, company: Compa
     if result.dias_uteis_restantes is None:
         return None
     inicio = max(today, project.start_date) if project.start_date else today
-    return calc.prazo_em_data(inicio, result.dias_uteis_restantes, company_holidays(), company.workdays())
+    return calc.prazo_em_data(inicio, result.dias_uteis_restantes, holidays_for(company.id), company.workdays())
 
 
 def list_projects() -> list[Project]:
