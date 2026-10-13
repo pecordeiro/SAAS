@@ -32,19 +32,26 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
     limiter.init_app(app)
     _init_login(app)
 
+    from app.blueprints.account import bp as account_bp
     from app.blueprints.app import bp as app_bp
     from app.blueprints.auth import bp as auth_bp
     from app.blueprints.dev import bp as dev_bp
     from app.blueprints.public import bp as public_bp
+    from app.blueprints.team import bp as team_bp
 
     app.register_blueprint(public_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(app_bp)
+    app.register_blueprint(account_bp)  # Fase 5: /conta
+    app.register_blueprint(team_bp)  # Fase 5: /app/usuarios e /convite
     app.register_blueprint(dev_bp)  # /estilo: responde 404 fora de development
 
     from app.tenancy import load_company
 
     app.before_request(load_company)
+    from app.blueprints.account import register_guards
+
+    register_guards(app)  # depois de load_company: confirmação de e-mail e MFA obrigatório
     _register_errors(app)
     _register_security_headers(app)
     _register_template_helpers(app)

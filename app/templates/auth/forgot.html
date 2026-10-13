@@ -1,0 +1,23 @@
+{% extends "base_publica.html" %}
+{% from "components/field.html" import field %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% block title %}Esqueci a senha · Controle de Produção{% endblock %}
+{% block content %}
+{# telas.md §5: resposta sempre igual, exista ou não a conta. #}
+<div class="auth">
+  <div class="card auth__card stack">
+    <a class="back-link" href="{{ url_for('auth.login') }}">Entrar</a>
+    <h1>Esqueci a senha</h1>
+    <p class="muted">Enviaremos um link para criar uma nova.</p>
+    <form class="stack" method="post" action="{{ url_for('auth.forgot_password') }}" novalidate>
+      {{ form.csrf_token }}
+      {{ field(form.email, attrs={"autocomplete": "email", "required": true, "inputmode": "email"}) }}
+      {{ button("Enviar link", "primary", size="lg", block=True) }}
+    </form>
+    {%- if sent %}
+    {{ alert("success", message) }}
+    {%- endif %}
+  </div>
+</div>
+{% endblock %}

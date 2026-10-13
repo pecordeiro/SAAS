@@ -1,0 +1,132 @@
+{% extends "base_app.html" %}
+{% from "components/field.html" import field %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/badge.html" import badge %}
+{% from "components/table.html" import data_table %}
+{% from "components/progress.html" import progress %}
+{% from "components/modal.html" import confirm_dialog %}
+{% set nav_current = "users" %}
+{% block title %}Usuários · Controle de Produção{% endblock %}
+{% block content %}
+{# telas.md §12: pessoas ativas com papel · convites pendentes · Convidar · uso do plano. #}
+<header class="page-header">
+  <div class="page-header__titles">
+    <h1>Usuários</h1>
+    <p class="page-header__subtitle muted">{{ seats }} de {{ max_users if max_users else "∞" }} usuários (convites pendentes contam)</p>
+  </div>
+  <div class="page-header__actions">{{ button("Convidar", "primary", icon="plus", href="#convidar") }}</div>
+</header>
+{%- if max_users %}
+{{ progress(seats, max_users, label="Uso do plano", size="sm", value_text=seats ~ " de " ~ max_users) }}
+{%- endif %}
+
+{%- if error %}
+<div class="alert-focus mt-4" tabindex="-1" data-autofocus>{{ alert("danger", error, role="alert") }}</div>
+{%- endif %}
+
+{% call data_table([("Nome", ""), ("E-mail", "is-desktop"), ("Papel", ""), ("Último acesso", "is-desktop"), ("MFA", "is-desktop"), ("Ações", "")], caption="Membros da empresa", class_="mt-4") %}
+  <tbody>
+  {%- for m in members %}
+    <tr>
+      <td class="is-plain"><span class="text-strong">{{ m.user.name }}</span>{% if m.user_id == current_user.id %} (você){% endif %}<br><span class="muted text-sm">{{ m.user.email }}</span></td>
+      <td data-label="E-mail" class="is-desktop">{{ m.user.email }}</td>
+      <td data-label="Papel">{{ badge(role_labels.get(m.role, m.role), "info" if m.role == "owner" else "neutral") }}{% if not m.active %} {{ badge("Desativado", "danger", "x") }}{% endif %}</td>
+      <td data-label="Último acesso" class="is-desktop">{{ m.user.last_login_at|datahora if m.user.last_login_at else "—" }}</td>
+      <td data-label="MFA" class="is-desktop">{{ "Sim" if m.user.mfa_enabled else "Não" }}</td>
+      <td data-label="Ações">
+        {%- if is_owner %}
+        <div class="cluster">
+          {%- if m.active %}
+          <form class="cluster" method="post" action="{{ url_for('team.change_role', membership_id=m.id) }}">
+            {{ action_form.csrf_token }}
+            <label class="visually-hidden" for="papel-{{ m.id }}">Papel de {{ m.user.name }}</label>
+            <select class="field__input" id="papel-{{ m.id }}" name="role">
+              {%- for value, label in [("operator", "Operador"), ("supervisor", "Supervisor"), ("owner", "Proprietário")] %}
+              <option value="{{ value }}"{% if m.role == value %} selected{% endif %}>{{ label }}</option>
+              {%- endfor %}
+            </select>
+            {{ button("Mudar papel", "secondary") }}
+          </form>
+          {%- if m.user_id != current_user.id %}
+          {{ button("Desativar", "ghost", href="#desativar-" ~ m.id) }}
+          {%- endif %}
+          {%- else %}
+          <form method="post" action="{{ url_for('team.reactivate', membership_id=m.id) }}">
+            {{ action_form.csrf_token }}
+            {{ button("Reativar", "secondary") }}
+          </form>
+          {%- endif %}
+        </div>
+        {%- else %}<span class="muted">—</span>{% endif %}
+      </td>
+    </tr>
+  {%- endfor %}
+  </tbody>
+{% endcall %}
+
+<section class="stack mt-6" aria-labelledby="convites-titulo">
+  <h2 class="section-title" id="convites-titulo">Convites pendentes</h2>
+  {%- if invites %}
+  <ul class="card stack">
+    {%- for inv in invites %}
+    <li class="stack stack--sm">
+      <p><span class="text-strong">{{ inv.email }}</span> {{ badge(role_labels.get(inv.role, inv.role)) }}</p>
+      <p class="muted text-sm">Enviado {{ inv.created_at|data_curta }} · vence {{ inv.expires_at|data_curta }}</p>
+      {%- if is_owner or inv.role != "owner" %}
+      <div class="cluster">
+        <form method="post" action="{{ url_for('team.resend_invite', invitation_id=inv.id) }}">
+          {{ action_form.csrf_token }}
+          {{ button("Reenviar", "ghost") }}
+        </form>
+        <form method="post" action="{{ url_for('team.revoke_invite', invitation_id=inv.id) }}">
+          {{ action_form.csrf_token }}
+          {{ button("Cancelar convite", "ghost") }}
+        </form>
+      </div>
+      {%- endif %}
+    </li>
+    {%- endfor %}
+  </ul>
+  {%- else %}
+  <p class="muted">Nenhum convite pendente.</p>
+  {%- endif %}
+</section>
+
+<section class="card stack mt-6" id="convidar" aria-labelledby="convidar-titulo">
+  <h2 class="section-title" id="convidar-titulo">Convidar pessoa</h2>
+  <form class="stack" method="post" action="{{ url_for('team.invite') }}" novalidate>
+    {{ invite_form.csrf_token }}
+    {{ field(invite_form.email, attrs={"autocomplete": "off", "inputmode": "email", "required": true}) }}
+    <fieldset class="stack stack--sm">
+      <legend class="field__label">Papel</legend>
+      {%- for value, label in invite_form.role.choices %}
+      {%- if is_owner or value != "owner" %}
+      <label class="check"><input type="radio" name="role" value="{{ value }}"{% if invite_form.role.data == value %} checked{% endif %}><span>{{ label }}</span></label>
+      {%- endif %}
+      {%- endfor %}
+      {%- if invite_form.role.errors %}<p class="field__error">{{ invite_form.role.errors|join(" ") }}</p>{% endif %}
+    </fieldset>
+    <div>{{ button("Enviar convite", "primary") }}</div>
+  </form>
+</section>
+
+{%- if is_owner %}
+<section class="card stack mt-6" aria-labelledby="seguranca-titulo">
+  <h2 class="section-title" id="seguranca-titulo">Segurança</h2>
+  {%- if can_require_mfa %}
+  <p>Exigir verificação em duas etapas dos proprietários: <span class="text-strong">{{ "ligado" if current_company.mfa_required else "desligado" }}</span></p>
+  <form method="post" action="{{ url_for('team.require_mfa') }}">
+    {{ action_form.csrf_token }}
+    <input type="hidden" name="exigir" value="{{ '0' if current_company.mfa_required else '1' }}">
+    {{ button("Desligar exigência" if current_company.mfa_required else "Exigir MFA dos proprietários", "secondary") }}
+  </form>
+  {%- else %}
+  <p class="muted">Exigir verificação em duas etapas dos proprietários é um recurso do plano Empresa.</p>
+  {%- endif %}
+</section>
+{%- for m in members if m.active and m.user_id != current_user.id %}
+{{ confirm_dialog("desativar-" ~ m.id, "Desativar " ~ m.user.name ~ "?", "A pessoa perde o acesso a esta empresa na hora. Dá para reativar depois.", "Desativar", url_for('team.deactivate', membership_id=m.id)) }}
+{%- endfor %}
+{%- endif %}
+{% endblock %}

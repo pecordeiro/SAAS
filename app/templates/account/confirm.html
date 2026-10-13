@@ -1,0 +1,25 @@
+{% extends "base_publica.html" %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% block title %}Confirmar e-mail · Controle de Produção{% endblock %}
+{% block content %}
+{# O link do e-mail abre esta página (GET não altera nada); confirmar é um POST com CSRF. #}
+<div class="auth">
+  <div class="card auth__card stack">
+    <h1>Confirmar e-mail</h1>
+    {%- if error %}
+    {{ alert("danger", error) }}
+    {%- elif state == "valid" %}
+    <p class="muted">Toque no botão para confirmar o seu endereço de e-mail.</p>
+    <form method="post">
+      {{ form.csrf_token }}
+      {{ button("Confirmar e-mail", "primary", size="lg", block=True) }}
+    </form>
+    {%- elif state == "expired" %}
+    {{ alert("warning", "Este link venceu.", "Links de confirmação valem 24 horas. Entre e peça outro.", action=("Entrar", url_for('auth.login'))) }}
+    {%- else %}
+    {{ alert("warning", "Este link não vale mais.", "Ele já foi usado ou está incompleto.", action=("Entrar", url_for('auth.login'))) }}
+    {%- endif %}
+  </div>
+</div>
+{% endblock %}

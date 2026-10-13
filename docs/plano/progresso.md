@@ -236,3 +236,101 @@ critérios de pronto da anterior estiverem marcados.
   - Sem FK composta `(company_id, id)` entre pai e filho (a garantia de mesma empresa é do
     serviço + RLS); `project_members` fica para quando a tela de equipe existir.
   - Tabelas de convite/reset/confirmação/MFA/API ainda sem serviço (Fases 5 e 9).
+
+### Fase 5 — Login, convites e contas
+- Status: concluída (telas não conferidas por captura; ver pendências)
+- Datas: início 2026-10-13 · fim 2026-10-13
+- Entregas:
+  - `app/services/email.py`: `EmailSender` com `ConsoleEmailSender` (memória para testes;
+    `.eml` em `instance/emails/` no development; loga só assunto e domínio) e
+    `ResendEmailSender` (`requests`, timeout `MAIL_TIMEOUT_SECONDS`, loga só status).
+    Links por `APP_BASE_URL` (obrigatório fora de dev/test — evita envenenar link pelo
+    header Host). Templates `emails/*.txt|.html` com a marca, sem CSS (regra de tokens).
+  - `app/services/tokens.py`: 32 bytes `token_urlsafe` no link, SHA-256 no banco, uso único,
+    expiração (confirmação 24 h, reset 1 h, convite 7 dias). Links abrem página (GET não
+    altera nada) e a ação é POST com CSRF; páginas de token com `Referrer-Policy: no-referrer`.
+  - Confirmação de e-mail no cadastro + reenviar; sem confirmar, acesso por 7 dias desde o
+    cadastro e depois só `/conta/confirmar-email` (guarda `register_guards` após `load_company`).
+  - Cadastro sem enumeração (resolve a pendência da Fase 0): e-mail novo ou existente →
+    mesmo 303 para “Confirme seu e-mail”; o dono da conta existente recebe aviso; o hash
+    Argon2 é calculado nos dois caminhos. O cadastro não loga mais automaticamente.
+  - Esqueci a senha: resposta e status iguais para e-mail existente e inexistente; trocar a
+    senha incrementa `session_version`, consome todos os resets pendentes e zera o bloqueio.
+  - Convites (`/app/usuarios`): owner convida qualquer papel, supervisor só
+    supervisor/operador (e só mexe nesses convites); reenviar (token e prazo novos),
+    revogar; reconvidar o mesmo e-mail substitui o pendente; vagas = vínculos ativos +
+    convites pendentes contra `plans.max_users` (`accounts.max_users_for`, provisório até o
+    `entitlements.py` da Fase 4; sem assinatura usa o Profissional do teste grátis).
+    Aceite cria conta (e-mail já confirmado) ou vincula a existente (logada com o mesmo
+    e-mail); e-mail diferente é recusado.
+  - Membros: mudar papel, desativar/reativar (owner). Último owner ativo não pode ser
+    rebaixado nem desativado (`FOR UPDATE` nos owners no PostgreSQL). Desativado perde a
+    empresa na requisição seguinte; sem outro vínculo ativo, `session_version` sobe.
+  - Perfil (`/conta/perfil`): nome; e-mail com reconfirmação no novo endereço (pede senha;
+    aviso ao endereço antigo; endereço já usado → mesma resposta, sem enumerar); senha
+    (pede a atual; derruba as outras sessões e mantém a atual).
+  - Sessões: `/sair` limpa só a sessão atual (decisão: logout NÃO incrementa
+    `session_version`); “Sair de todos os dispositivos” incrementa. Como a sessão do Flask
+    é cookie assinado, uma cópia roubada do cookie continua válida até expirar (12 h) se o
+    usuário só clicar em “Sair” — por isso o botão “Sair de todos” e o reset derrubam tudo.
+  - MFA TOTP (`pyotp==2.9.0`): segredo cifrado com Fernet (chave HKDF-SHA256 de
+    `MFA_ENCRYPTION_KEY` ou `SECRET_KEY`); segredo pendente só cifrado na sessão; QR em SVG
+    gerado no servidor (`segno==1.6.6`, rota `/conta/mfa/qr.svg`, `no-store`); 10 códigos
+    de recuperação (SHA-256, uso único); código TOTP não reutilizável
+    (`users.totp_last_step`); etapa `/entrar/mfa` com validade de 5 min. “Exigir MFA dos
+    proprietários” (plano Empresa) em `/app/usuarios`; owner sem MFA é levado a ativar.
+  - Bloqueio progressivo (`app/services/lockout.py`, tabela `login_throttles`, chaves só
+    em SHA-256): 5 falhas por conta / 20 por IP → 1, 5, 15, 60 min; e-mail inexistente se
+    comporta igual; código MFA errado conta; além do Flask-Limiter (novos limites para
+    reset, MFA, convite e reenvio).
+  - Troca de empresa (`/conta/empresas`): só para vínculo ativo; senão 404.
+  - Auditoria provisória `app/services/audit_accounts.py` (convite criado/reenviado/
+    revogado/aceito, papel, desativar/reativar, exigência de MFA), sem token nos detalhes.
+  - Migration `4d8a644d753b` (reversível): `login_throttles`, `users.totp_last_step`,
+    `users.last_login_at` (ADD COLUMN sem batch; downgrade no SQLite tira e recria
+    `uq_users_email_lower`) e a política RLS `invitations_by_token`.
+  - RLS: reset/confirmação usam só tabelas globais (sem RLS). O convite é lido antes de
+    saber a empresa pela política `invitations_by_token` (SELECT onde `token_hash =
+    app.token_hash`; o app faz `SET LOCAL` do hash do token apresentado — ter o token é a
+    autorização; não autoriza gravar); depois o vínculo é gravado com a empresa do convite
+    no contexto. Testado com RLS forçado e papel comum.
+- Critérios de pronto:
+  - [x] Testes de cada fluxo com token válido, expirado, reutilizado e de outra empresa/
+        usuário (confirmação, reset, convite; `tests/test_accounts.py`).
+  - [x] Pedido de reset devolve a mesma resposta e mesmo status para e-mail existente e
+        inexistente (HTML comparado sem o CSRF).
+  - [x] Usuário desativado é deslogado na requisição seguinte.
+  - [x] Último proprietário não pode ser removido nem rebaixado.
+  - [x] Busca no banco (todas as tabelas) e nos logs (caplog DEBUG) não encontra token em
+        texto puro; o hash está no banco.
+  - [x] Após N tentativas erradas, login bloqueado por conta e por IP.
+  - [x] Isolamento A/B para cada rota nova (`ROUTES_CONTAS` no fim de
+        `tests/test_isolation.py`; o teste de cobertura de `<uuid:>` inclui essas rotas).
+  - [x] `flask db upgrade`/`check`/`downgrade` sem drift em PostgreSQL 16 e SQLite.
+- Testes: SQLite `161 passed, 39 skipped`; PostgreSQL 16 (`TEST_DATABASE_URL`) `200 passed`.
+- /security-review: revisão manual (tokens só hash; GET sem efeito; CSRF em todo POST;
+  `next` só interno; sem `|safe`/`Markup` — QR servido como imagem; segredos fora do log).
+  Sem achado aberto acima do limiar; riscos aceitos listados abaixo.
+- Telas conferidas (375/768/1280, claro/escuro): não (só macros e classes existentes;
+  `tests/test_visual.py` verde). Conferir com Playwright na Fase 6.
+- Commit: “feat: fase 5 — login, convites e contas” (hash no histórico do branch).
+- ADRs criados: nenhum.
+- Pendências e dívidas:
+  - Unificar `audit_accounts.py` com `audit.py` e `max_users_for`/`plan_allows_mfa_requirement`
+    com `entitlements.py` (Fase 4). A migration `4d8a644d753b` e a da Fase 4 descendem de
+    `a7c2d4e8f901`: ao juntar os branches, criar migration de merge (`flask db merge`).
+  - `base_app.html` ganhou itens “Usuários”, “Perfil”, “Trocar empresa” e o aviso de e-mail
+    não confirmado: conflito provável com a Fase 4 (menu Modelos).
+  - IP do bloqueio vem de `request.remote_addr`: atrás do proxy do Render precisa de
+    `ProxyFix` (Fase 7), senão todos dividem o IP do proxy e o limite por IP trava todo mundo.
+  - Bloqueio por conta permite a terceiros atrasar o login de uma conta conhecida (risco
+    aceito; mitigado pelo teto de 60 min e pelo reset de senha que zera o bloqueio).
+  - E-mail é enviado de forma síncrona: com Resend, o tempo de resposta do “esqueci a
+    senha”/cadastro pode denunciar se a conta existe; mover o envio para o outbox/worker.
+  - Cadastro sem enumeração na tela, mas cadastrar com a senha X e tentar entrar com X ainda
+    distingue e-mail novo de existente (custo alto, sujeito a bloqueio) — risco aceito.
+  - E-mails sem CSS (regra de tokens nos templates); estilizar com inliner a partir dos tokens.
+  - Sessão em cookie assinado: logout não revoga cópias do cookie (ver acima); sessões no
+    servidor (Redis) na Fase 7. “Último acesso” é o último login, não a última requisição.
+  - Rotação de `MFA_ENCRYPTION_KEY` exige reativar o MFA (sem MultiFernet ainda).
+  - Telas desta fase não foram capturadas em 375/768/1280 (Playwright na Fase 6).

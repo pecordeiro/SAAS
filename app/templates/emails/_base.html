@@ -1,0 +1,22 @@
+{#
+  Base dos e-mails (HTML). Sem folha de estilo nem atributo de estilo (regra dos templates: só tokens, e os
+  tokens CSS não chegam ao cliente de e-mail): HTML semântico simples, que todo cliente
+  mostra bem nos temas claro e escuro. Os textos ficam também na versão .txt.
+#}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>{{ subject }}</title>
+</head>
+<body>
+  <p><strong>▣ Controle de Produção</strong></p>
+  <h1>{{ subject }}</h1>
+  {% block body %}{% endblock %}
+  <hr>
+  <p><small>Você recebeu esta mensagem por causa de uma ação na sua conta do Controle de Produção.
+  Se não foi você, ignore este e-mail ou troque a senha. Não responda: esta caixa não é lida.</small></p>
+</body>
+</html>

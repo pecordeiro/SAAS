@@ -1,0 +1,6 @@
+{% extends "emails/_base.txt" %}
+{% block body %}{{ inviter_name }} convidou você para a empresa {{ company_name }} no Controle de Produção, como {{ role_label }}.
+
+O convite vale 7 dias e só pode ser usado uma vez.
+
+Aceitar convite: {{ url }}{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base_publica.html" %}
+{% from "components/field.html" import field, form_errors %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% block title %}Nova senha · Controle de Produção{% endblock %}
+{% block content %}
+{# telas.md §5 (redefinir): token vencido/usado → alerta com “Pedir outro”. #}
+<div class="auth">
+  <div class="card auth__card stack">
+    <h1>Criar nova senha</h1>
+    {%- if state == "valid" %}
+    {{ form_errors(form) }}
+    <form class="stack" method="post" novalidate>
+      {{ form.csrf_token }}
+      {{ field(form.password, hint="Mín. 10 caracteres. As outras sessões serão encerradas.", attrs={"autocomplete": "new-password", "required": true, "minlength": 10}) }}
+      {{ field(form.password_confirm, attrs={"autocomplete": "new-password", "required": true}) }}
+      {{ button("Salvar nova senha", "primary", size="lg", block=True) }}
+    </form>
+    {%- elif state == "expired" %}
+    {{ alert("warning", "Este link venceu.", "Links de troca de senha valem 1 hora.", action=("Pedir outro", url_for('auth.forgot_password'))) }}
+    {%- else %}
+    {{ alert("warning", "Este link não vale mais.", "Ele já foi usado ou está incompleto.", action=("Pedir outro", url_for('auth.forgot_password'))) }}
+    {%- endif %}
+  </div>
+</div>
+{% endblock %}

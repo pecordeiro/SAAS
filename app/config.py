@@ -58,6 +58,29 @@ class Config:
     RLS_ENABLED = False
     FEATURE_PUBLIC_API = False
 
+    # Fase 5 — contas
+    # Limites extras (além do bloqueio progressivo por conta/IP de app/services/lockout.py).
+    PASSWORD_RESET_RATE_LIMIT = "5 per minute; 20 per hour"
+    MFA_RATE_LIMIT = "10 per minute; 50 per hour"
+    INVITE_RATE_LIMIT = "20 per minute; 100 per hour"
+    EMAIL_RESEND_RATE_LIMIT = "3 per minute; 10 per hour"
+    # Bloqueio progressivo: N falhas seguidas → espera 1, 5, 15, 60 min (o último se repete).
+    LOCKOUT_ACCOUNT_THRESHOLD = 5
+    LOCKOUT_IP_THRESHOLD = 20
+    LOCKOUT_STEPS_MINUTES = (1, 5, 15, 60)
+    LOCKOUT_RESET_HOURS = 24  # falhas mais antigas que isto deixam de contar
+    # E-mail: "console" (guarda em memória e, em development, grava .eml em instance/emails)
+    # ou "resend" (API HTTP). Sem MAIL_BACKEND: resend se houver RESEND_API_KEY, senão console.
+    MAIL_BACKEND: str | None = None
+    MAIL_FROM = "Controle de Produção <nao-responda@localhost>"
+    RESEND_API_KEY: str | None = None
+    MAIL_TIMEOUT_SECONDS = 10
+    # Base dos links enviados por e-mail (https://app.exemplo.com.br). Fora de development/test
+    # é obrigatória na hora de enviar: o host da requisição não é confiável (host header).
+    APP_BASE_URL: str | None = None
+    # Chave do Fernet que cifra o segredo TOTP (derivada por HKDF). Sem valor: SECRET_KEY.
+    MFA_ENCRYPTION_KEY: str | None = None
+
     @classmethod
     def from_env(cls) -> dict:
         """Lê as variáveis de ambiente na hora de criar o app (não na importação)."""
@@ -69,8 +92,17 @@ class Config:
             "RLS_ENABLED": _bool("RLS_ENABLED", cls.RLS_ENABLED),
             "FEATURE_PUBLIC_API": _bool("FEATURE_PUBLIC_API", cls.FEATURE_PUBLIC_API),
         }
-        for key in ("LOGIN_RATE_LIMIT", "SIGNUP_RATE_LIMIT"):
+        for key in (
+            "LOGIN_RATE_LIMIT",
+            "SIGNUP_RATE_LIMIT",
+            "PASSWORD_RESET_RATE_LIMIT",
+            "MFA_RATE_LIMIT",
+            "INVITE_RATE_LIMIT",
+            "EMAIL_RESEND_RATE_LIMIT",
+        ):
             values[key] = os.environ.get(key, getattr(cls, key))
+        for key in ("MAIL_BACKEND", "MAIL_FROM", "RESEND_API_KEY", "APP_BASE_URL", "MFA_ENCRYPTION_KEY"):
+            values[key] = os.environ.get(key) or getattr(cls, key)
         return values
 
 
@@ -100,6 +132,9 @@ class TestConfig(Config):
         # Testes nunca usam DATABASE_URL (evita apagar um banco real por engano).
         values["SQLALCHEMY_DATABASE_URI"] = _database_url_raw(os.environ.get("TEST_DATABASE_URL")) or "sqlite://"
         values["RATELIMIT_ENABLED"] = False
+        # Testes nunca mandam e-mail de verdade: backend console (caixa em memória).
+        values["MAIL_BACKEND"] = "console"
+        values["RESEND_API_KEY"] = None
         return values
 
 

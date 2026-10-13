@@ -1,0 +1,22 @@
+{% extends "base_publica.html" %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% block title %}Confirme seu e-mail · Controle de Produção{% endblock %}
+{% block content %}
+{#
+  telas.md §4 (sucesso): “Confirme seu e-mail”. A MESMA tela aparece para e-mail novo e já
+  cadastrado (sem enumeração); quem já tem conta recebe um aviso no próprio e-mail.
+#}
+<div class="auth">
+  <div class="card auth__card stack">
+    <h1>Confirme seu e-mail</h1>
+    {{ alert("info", "Enviamos um e-mail para " ~ email ~ ".", "Abra a mensagem e siga o link (vale 24 horas). Você já pode entrar; sem confirmar, o acesso dura 7 dias.") }}
+    {{ button("Entrar", "primary", size="lg", block=True, href=url_for('auth.login')) }}
+    <form method="post" action="{{ url_for('auth.signup_resend') }}">
+      {{ form.csrf_token }}
+      {{ button("Reenviar e-mail", "secondary", block=True) }}
+    </form>
+  </div>
+  <p class="auth__switch">E-mail errado? <a href="{{ url_for('auth.signup') }}">Cadastrar de novo</a></p>
+</div>
+{% endblock %}

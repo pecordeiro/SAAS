@@ -14,7 +14,9 @@ fontes e HTMX locais, macros, layouts, tema claro/escuro, registro de peças em 
 Fase 3 (banco) entregue: schema completo do MVP em PostgreSQL 16 (modelos de etapas
 versionados, convites, tokens de conta, MFA, planos, assinaturas, cobranças, webhooks,
 auditoria, outbox, API), CHECK/UNIQUE, feriados nacionais, políticas RLS ligáveis e testes
-em PostgreSQL. Progresso por fase em [`docs/plano/progresso.md`](docs/plano/progresso.md).
+em PostgreSQL. Fase 5 (contas) entregue: confirmação de e-mail, esqueci a senha,
+convites, gestão de membros, perfil, “sair de todos os dispositivos”, MFA TOTP, bloqueio
+progressivo de login e troca de empresa. Progresso por fase em [`docs/plano/progresso.md`](docs/plano/progresso.md).
 
 - Contexto para o Claude: [`CLAUDE.md`](CLAUDE.md)
 - Plano: [`docs/plano/`](docs/plano/) — PRD, arquitetura, ADRs, roadmap, backlog, riscos e progresso
@@ -105,9 +107,32 @@ e `flask rls status` para conferir. O app precisa conectar com papel **sem** `SU
 sem `BYPASSRLS` (para esses o RLS não vale); no docker-compose o usuário é superusuário, então
 lá o RLS não tem efeito — os testes criam um papel comum para provar o isolamento.
 
+### Contas (Fase 5)
+
+- E-mail: `app/services/email.py` (`EmailSender`: console em development/test — guarda em
+  memória e grava `.eml` em `instance/emails/` no development — ou Resend com
+  `RESEND_API_KEY`/`MAIL_FROM`). Links usam `APP_BASE_URL` (obrigatório fora de dev/test).
+  Textos em `app/templates/emails/*.txt|.html`.
+- Tokens (confirmação 24 h, reset 1 h, convite 7 dias): 32 bytes aleatórios só no link; no
+  banco só o SHA-256; uso único (`app/services/tokens.py`). Páginas de token mandam
+  `Referrer-Policy: no-referrer` e só alteram algo via POST com CSRF.
+- Cadastro sem enumeração: e-mail novo ou já cadastrado vê a mesma tela “Confirme seu
+  e-mail”; o dono da conta existente recebe um aviso. Sem confirmar, o acesso dura 7 dias.
+- Sessões: `/sair` encerra só a sessão atual; “Sair de todos os dispositivos” (perfil),
+  troca/redefinição de senha e desativação do último vínculo incrementam `session_version`.
+- MFA TOTP (`/conta/mfa`): segredo cifrado (Fernet, chave por HKDF de `MFA_ENCRYPTION_KEY`
+  ou `SECRET_KEY`), QR em SVG gerado no servidor, 10 códigos de recuperação de uso único.
+  Owner de empresa com “Exigir MFA” (plano Empresa) é levado a ativar.
+- Bloqueio progressivo (`app/services/lockout.py`, tabela `login_throttles`): 5 falhas na
+  conta ou 20 no IP → espera 1, 5, 15, 60 min (`LOCKOUT_*` na config), além do Flask-Limiter.
+- Usuários e convites: `/app/usuarios` (supervisor convida supervisor/operador; owner muda
+  papel, desativa/reativa; último owner protegido; convites pendentes contam no limite do plano).
+- Testes: `tests/test_accounts.py` e os casos A/B no fim de `tests/test_isolation.py`.
+
 ### Produção
 
-`APP_ENV=production` exige `SECRET_KEY` e `DATABASE_URL` (o app não sobe sem eles).
+`APP_ENV=production` exige `SECRET_KEY` e `DATABASE_URL` (o app não sobe sem eles); para
+mandar e-mail, também `APP_BASE_URL`, `RESEND_API_KEY` e `MAIL_FROM`.
 Servidor: `gunicorn run:app`. Variáveis em [`.env.example`](.env.example) e em
 `docs/plano/arquitetura.md` §10.
 

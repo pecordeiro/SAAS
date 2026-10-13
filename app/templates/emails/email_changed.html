@@ -1,0 +1,6 @@
+{% extends "emails/_base.html" %}
+{% block body %}
+  <p>Olá, {{ name }}.</p>
+  <p>O e-mail de acesso da sua conta foi trocado para {{ new_email }}.<br>
+  Se não foi você, responda ao suporte imediatamente.</p>
+{% endblock %}

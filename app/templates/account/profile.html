@@ -1,0 +1,92 @@
+{% extends "base_app.html" %}
+{% from "components/field.html" import field %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/badge.html" import badge %}
+{% set nav_current = "profile" %}
+{% block title %}Perfil · Controle de Produção{% endblock %}
+{% block content %}
+{# Perfil: nome, e-mail (com reconfirmação), senha (pede a atual), MFA e sessões. #}
+<header class="page-header">
+  <div class="page-header__titles"><h1>Perfil</h1></div>
+</header>
+
+<div class="stack stack--lg">
+  <section class="card stack" aria-labelledby="perfil-nome">
+    <h2 class="section-title" id="perfil-nome">Nome</h2>
+    <form class="stack" method="post" action="{{ url_for('account.profile_name') }}" novalidate>
+      {{ name_form.csrf_token }}
+      {{ field(name_form.name, attrs={"autocomplete": "name", "required": true}) }}
+      <div>{{ button("Salvar nome", "secondary") }}</div>
+    </form>
+  </section>
+
+  <section class="card stack" aria-labelledby="perfil-email">
+    <h2 class="section-title" id="perfil-email">E-mail</h2>
+    <p>{{ current_user.email }}
+      {% if current_user.email_confirmed_at %}{{ badge("Confirmado", "success", "check") }}{% else %}{{ badge("Não confirmado", "warning", "alert") }}{% endif %}</p>
+    {%- if not current_user.email_confirmed_at %}
+    <p><a href="{{ url_for('account.confirm_required') }}">Reenviar confirmação</a></p>
+    {%- endif %}
+    <form class="stack" method="post" action="{{ url_for('account.profile_email') }}" novalidate>
+      {{ email_form.csrf_token }}
+      {{ field(email_form.email, hint="Enviamos um link para o novo endereço; o e-mail só muda depois de confirmar.", attrs={"autocomplete": "email", "inputmode": "email", "required": true}) }}
+      {{ field(email_form.current_password, attrs={"autocomplete": "current-password", "required": true}) }}
+      <div>{{ button("Trocar e-mail", "secondary") }}</div>
+    </form>
+  </section>
+
+  <section class="card stack" aria-labelledby="perfil-senha">
+    <h2 class="section-title" id="perfil-senha">Senha</h2>
+    <form class="stack" method="post" action="{{ url_for('account.profile_password') }}" novalidate>
+      {{ password_form.csrf_token }}
+      {{ field(password_form.current_password, attrs={"autocomplete": "current-password", "required": true}) }}
+      {{ field(password_form.password, hint="Mín. 10 caracteres. As outras sessões serão encerradas.", attrs={"autocomplete": "new-password", "required": true, "minlength": 10}) }}
+      {{ field(password_form.password_confirm, attrs={"autocomplete": "new-password", "required": true}) }}
+      <div>{{ button("Trocar senha", "secondary") }}</div>
+    </form>
+  </section>
+
+  <section class="card stack" aria-labelledby="perfil-mfa">
+    <h2 class="section-title" id="perfil-mfa">Verificação em duas etapas</h2>
+    {%- if current_user.mfa_enabled %}
+    <p>{{ badge("Ativa", "success", "check") }} Restam {{ recovery_left }} códigos de recuperação.</p>
+    <form class="stack" method="post" action="{{ url_for('account.mfa_regenerate') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="field">
+        <label class="field__label" for="regen-senha">Senha atual</label>
+        <input class="field__input" type="password" id="regen-senha" name="current_password" autocomplete="current-password" required>
+      </div>
+      <div>{{ button("Gerar novos códigos de recuperação", "secondary") }}</div>
+    </form>
+    <form class="stack" method="post" action="{{ url_for('account.mfa_disable') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="field">
+        <label class="field__label" for="mfa-off-senha">Senha atual</label>
+        <input class="field__input" type="password" id="mfa-off-senha" name="current_password" autocomplete="current-password" required>
+      </div>
+      <div class="field">
+        <label class="field__label" for="mfa-off-codigo">Código do aplicativo ou de recuperação</label>
+        <input class="field__input" type="text" id="mfa-off-codigo" name="code" inputmode="numeric" autocomplete="one-time-code" required>
+      </div>
+      <div>{{ button("Desativar", "danger") }}</div>
+    </form>
+    {%- else %}
+    <p class="muted">Proteja a conta com um código do celular (Google Authenticator, Authy, 1Password…).</p>
+    <div>{{ button("Ativar verificação em duas etapas", "primary", href=url_for('account.mfa_setup')) }}</div>
+    {%- endif %}
+  </section>
+
+  <section class="card stack" aria-labelledby="perfil-sessoes">
+    <h2 class="section-title" id="perfil-sessoes">Sessões</h2>
+    <p class="muted">“Sair” encerra só este aparelho. Use o botão abaixo se perdeu um celular ou entrou num computador de outra pessoa.</p>
+    <form method="post" action="{{ url_for('account.logout_everywhere') }}">
+      {{ sessions_form.csrf_token }}
+      {{ button("Sair de todos os dispositivos", "danger", icon="logout") }}
+    </form>
+    {%- if company_count and company_count > 1 %}
+    <p><a href="{{ url_for('account.companies') }}">Trocar de empresa</a></p>
+    {%- endif %}
+  </section>
+</div>
+{% endblock %}

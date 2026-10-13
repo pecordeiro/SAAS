@@ -26,26 +26,30 @@ def test_health(client):
     assert response.get_json() == {"status": "ok"}
 
 
-def test_cadastro_cria_empresa_e_owner_e_entra(client, app):
+def test_cadastro_cria_empresa_e_owner_e_pede_confirmacao(client, app):
     response = post(client, app, "/cadastro", SIGNUP)
-    assert response.status_code == 302
-    assert response.headers["Location"].endswith("/app/projetos")
+    assert response.status_code == 303
+    assert response.headers["Location"].endswith("/cadastro/confirme")
+    assert "maria@exemplo.com" in text_of(client.get("/cadastro/confirme"))
     with app.app_context():
         user = db.session.execute(select(User).where(User.email == "maria@exemplo.com")).scalar_one()
         assert user.password_hash.startswith("$argon2id$")
+        assert user.email_confirmed_at is None
         membership = db.session.execute(select(Membership).where(Membership.user_id == user.id)).scalar_one()
         assert membership.role == "owner"
         assert db.session.get(Company, membership.company_id).name == "Indústria Teste"
+    # Sem confirmar ainda entra (carência de 7 dias).
+    assert login(client, app, "maria@exemplo.com", SIGNUP["password"]).status_code == 302
     assert client.get("/app/projetos").status_code == 200
 
 
-def test_cadastro_email_repetido_mostra_erro_generico(client, app):
-    post(client, app, "/cadastro", SIGNUP)
-    client.post("/sair", data={"csrf_token": csrf_token(client, app)})
-    response = post(client, app, "/cadastro", {**SIGNUP, "company_name": "Outra"})
-    assert response.status_code == 400
-    assert "Não foi possível cadastrar com este e-mail" in text_of(response)
-    assert "Indústria Teste" not in text_of(response)
+def test_cadastro_email_repetido_mesma_resposta_sem_enumerar(client, app):
+    first = post(client, app, "/cadastro", SIGNUP)
+    second = post(client, app, "/cadastro", {**SIGNUP, "company_name": "Outra"})
+    assert first.status_code == second.status_code == 303
+    assert first.headers["Location"] == second.headers["Location"]
+    page = text_of(client.get("/cadastro/confirme"))
+    assert "Indústria Teste" not in page
     with app.app_context():
         assert db.session.query(Company).count() == 1
 

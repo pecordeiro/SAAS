@@ -32,6 +32,9 @@ from app.extensions import db
 
 COMPANY_GUC = "app.company_id"
 USER_GUC = "app.user_id"
+# Fase 5: SHA-256 do token de convite apresentado (política invitations_by_token, migration
+# 4d8a644d753b) — permite ler SÓ o convite cujo hash é este, antes de saber a empresa.
+TOKEN_GUC = "app.token_hash"
 
 # Tabelas com política, iguais às da migration b3e9f1a2c4d5. tests/test_schema.py confere
 # que toda tabela com company_id NOT NULL do metadata está aqui (e no banco).
@@ -68,14 +71,25 @@ def _enabled() -> bool:
 
 def _context() -> dict[str, str]:
     ctx = g.get("rls_context") or {}
-    return {"company_id": ctx.get("company_id") or "", "user_id": ctx.get("user_id") or ""}
+    return {
+        "company_id": ctx.get("company_id") or "",
+        "user_id": ctx.get("user_id") or "",
+        "token_hash": ctx.get("token_hash") or "",
+    }
 
 
 def _apply(connection: Connection) -> None:
     ctx = _context()
     connection.execute(
-        text("SELECT set_config(:cg, :company, true), set_config(:ug, :user, true)"),
-        {"cg": COMPANY_GUC, "company": ctx["company_id"], "ug": USER_GUC, "user": ctx["user_id"]},
+        text("SELECT set_config(:cg, :company, true), set_config(:ug, :user, true), set_config(:tg, :token, true)"),
+        {
+            "cg": COMPANY_GUC,
+            "company": ctx["company_id"],
+            "ug": USER_GUC,
+            "user": ctx["user_id"],
+            "tg": TOKEN_GUC,
+            "token": ctx["token_hash"],
+        },
     )
 
 
@@ -90,7 +104,11 @@ def init_app(app) -> None:
         event.listen(db.session, "after_begin", _after_begin)
 
 
-def set_context(company_id: uuid.UUID | str | None = _UNSET, user_id: uuid.UUID | str | None = _UNSET) -> None:
+def set_context(
+    company_id: uuid.UUID | str | None = _UNSET,
+    user_id: uuid.UUID | str | None = _UNSET,
+    token_hash: str | None = _UNSET,
+) -> None:
     """Define a empresa e/ou o usuário da transação atual e das próximas desta requisição.
 
     Chamado por ``tenancy`` depois de validar o vínculo (nunca com valor vindo do usuário).
@@ -103,6 +121,8 @@ def set_context(company_id: uuid.UUID | str | None = _UNSET, user_id: uuid.UUID 
         ctx["company_id"] = str(company_id) if company_id else ""
     if user_id is not _UNSET:
         ctx["user_id"] = str(user_id) if user_id else ""
+    if token_hash is not _UNSET:
+        ctx["token_hash"] = str(token_hash) if token_hash else ""
     g.rls_context = ctx
     session = db.session()  # a Session real por trás do scoped_session
     if _enabled() and session.in_transaction():

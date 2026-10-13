@@ -41,6 +41,7 @@ EXCEPTIONS = {
     "plans": "catálogo de planos, igual para todos",
     "webhook_events": "caixa de entrada da plataforma: chega antes de saber a empresa",
     "holidays": "company_id NULL = feriado nacional compartilhado (tem índice por company_id)",
+    "login_throttles": "bloqueio de login por conta/IP: chega antes de saber a empresa (Fase 5)",
 }
 
 

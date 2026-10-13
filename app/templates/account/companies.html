@@ -1,0 +1,27 @@
+{% extends "base_app.html" %}
+{% from "components/button.html" import button %}
+{% from "components/badge.html" import badge %}
+{% set nav_current = "profile" %}
+{% block title %}Trocar de empresa · Controle de Produção{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div class="page-header__titles"><h1>Suas empresas</h1></div>
+</header>
+<ul class="card stack">
+  {%- for m in memberships %}
+  <li class="cluster">
+    <span class="text-strong">{{ m.company.name }}</span>
+    {{ badge(role_labels.get(m.role, m.role)) }}
+    {%- if current_company and current_company.id == m.company_id %}
+    {{ badge("Atual", "success", "check") }}
+    {%- else %}
+    <form method="post" action="{{ url_for('account.switch_company') }}">
+      {{ form.csrf_token }}
+      <input type="hidden" name="company_id" value="{{ m.company_id }}">
+      {{ button("Entrar nesta empresa", "secondary") }}
+    </form>
+    {%- endif %}
+  </li>
+  {%- endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,8 @@
+{% extends "emails/_base.txt" %}
+{% block body %}Olá, {{ name }}.
+
+Alguém tentou criar uma conta nova com este e-mail, que já está cadastrado.
+Se foi você, entre na sua conta. Se esqueceu a senha, peça uma nova:
+
+Entrar: {{ login_url }}
+Esqueci a senha: {{ reset_url }}{% endblock %}

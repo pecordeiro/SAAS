@@ -1,0 +1,7 @@
+{% extends "emails/_base.html" %}
+{% block body %}
+  <p>{{ inviter_name }} convidou você para a empresa {{ company_name }} no Controle de Produção, como {{ role_label }}.</p>
+  <p>O convite vale 7 dias e só pode ser usado uma vez.</p>
+  <p><a href="{{ url }}">Aceitar convite</a></p>
+  <p><small>Se o botão não abrir, copie o endereço: {{ url }}</small></p>
+{% endblock %}

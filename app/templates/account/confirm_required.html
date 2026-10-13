@@ -1,0 +1,25 @@
+{% extends "base_app.html" %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% block title %}Confirme seu e-mail · Controle de Produção{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div class="page-header__titles"><h1>Confirme seu e-mail</h1></div>
+</header>
+<div class="card stack">
+  {%- if blocked %}
+  {{ alert("warning", "Seu acesso está pausado até confirmar o e-mail.", "Já se passaram 7 dias desde o cadastro. Confirme " ~ current_user.email ~ " para continuar.") }}
+  {%- elif email_unconfirmed %}
+  {{ alert("info", "Falta confirmar " ~ current_user.email ~ ".", "Sem confirmar, o acesso dura 7 dias desde o cadastro.") }}
+  {%- else %}
+  {{ alert("success", "E-mail confirmado.") }}
+  {%- endif %}
+  {%- if email_unconfirmed %}
+  <form method="post" action="{{ url_for('account.confirm_resend') }}">
+    {{ form.csrf_token }}
+    {{ button("Reenviar e-mail de confirmação", "primary") }}
+  </form>
+  {%- endif %}
+  <p><a href="{{ url_for('account.profile') }}">Trocar o e-mail no perfil</a></p>
+</div>
+{% endblock %}

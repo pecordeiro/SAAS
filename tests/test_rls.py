@@ -218,7 +218,8 @@ def test_cadastro_com_rls_ligado(app, rls_app):
             "password_confirm": "senha-forte-123",
         },
     )
-    assert response.status_code == 302
+    assert response.status_code == 303
+    assert login(client, rls_app, "ana@exemplo.com", "senha-forte-123").status_code == 302
     assert client.get("/app/projetos").status_code == 200
     with app.app_context():
         assert db.session.query(Membership).count() == 1

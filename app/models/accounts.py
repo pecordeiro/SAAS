@@ -80,6 +80,9 @@ class User(UUIDPk, Timestamps, UserMixin, db.Model):
     # Fase 5 (MFA TOTP): segredo cifrado pela aplicação, nunca em claro.
     totp_secret_enc: Mapped[str | None] = mapped_column(String(255))
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    # Fase 5: último passo TOTP aceito (impede reusar o mesmo código de 30 s) e último acesso.
+    totp_last_step: Mapped[int | None] = mapped_column(Integer)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="user")
 

@@ -1,0 +1,46 @@
+{% extends "base_publica.html" %}
+{% from "components/field.html" import field, form_errors %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% block title %}Convite · Controle de Produção{% endblock %}
+{% block content %}
+{# Aceite de convite: cria conta (sem conta), pede para entrar (conta existe) ou vincula (logado). #}
+<div class="auth">
+  <div class="card auth__card stack">
+    {%- if state != "valid" %}
+    <h1>Convite</h1>
+    {%- if state == "expired" %}
+    {{ alert("warning", "Este convite venceu.", "Convites valem 7 dias. Peça a quem convidou para reenviar.") }}
+    {%- else %}
+    {{ alert("warning", "Este convite não vale mais.", "Ele já foi usado, foi cancelado ou o link está incompleto.") }}
+    {%- endif %}
+    {%- else %}
+    <h1>Entrar em {{ company_name }}</h1>
+    <p class="muted">Convite para {{ invitation.email }} como {{ role_labels.get(invitation.role, invitation.role) }}.</p>
+    {%- if error %}{{ alert("danger", error, role="alert") }}{% endif %}
+    {%- if mode == "logged" %}
+      {%- if mismatch %}
+      {{ alert("warning", "Você entrou com outra conta.", "Este convite é para " ~ invitation.email ~ ". Saia e entre com essa conta.") }}
+      {%- else %}
+      <form method="post">
+        {{ form.csrf_token }}
+        {{ button("Aceitar convite", "primary", size="lg", block=True) }}
+      </form>
+      {%- endif %}
+    {%- elif mode == "login" %}
+    <p>Você já tem conta com este e-mail. Entre para aceitar.</p>
+    {{ button("Entrar e aceitar", "primary", size="lg", block=True, href=login_url) }}
+    {%- else %}
+    {{ form_errors(form) }}
+    <form class="stack" method="post" novalidate>
+      {{ form.csrf_token }}
+      {{ field(form.name, attrs={"autocomplete": "name", "required": true}) }}
+      {{ field(form.password, hint="Mín. 10 caracteres.", attrs={"autocomplete": "new-password", "required": true, "minlength": 10}) }}
+      {{ field(form.password_confirm, attrs={"autocomplete": "new-password", "required": true}) }}
+      {{ button("Criar conta e entrar", "primary", size="lg", block=True) }}
+    </form>
+    {%- endif %}
+    {%- endif %}
+  </div>
+</div>
+{% endblock %}

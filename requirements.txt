@@ -15,3 +15,8 @@ psycopg[binary]==3.3.6
 gunicorn==26.2.0
 openpyxl==3.1.5
 python-dotenv==1.2.4
+# Fase 5 — contas (MFA TOTP, cifra do segredo, QR em SVG no servidor, e-mail via Resend)
+pyotp==2.9.0
+cryptography==50.0.1
+segno==1.6.6
+requests==2.34.2

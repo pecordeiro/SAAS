@@ -18,6 +18,7 @@
       {{ field(form.password, attrs={"autocomplete": "current-password", "required": true}) }}
       {{ button("Entrar", "primary", size="lg", block=True) }}
     </form>
+    <p><a href="{{ url_for('auth.forgot_password') }}">Esqueci a senha</a></p>
   </div>
   <p class="auth__switch">Ainda não tem conta? <a href="{{ url_for('auth.signup') }}">Cadastre a empresa</a></p>
 </div>
