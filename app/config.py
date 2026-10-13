@@ -57,6 +57,9 @@ class Config:
 
     RLS_ENABLED = False
     FEATURE_PUBLIC_API = False
+    # API pública (Fase 9): limite por token e teto por IP.
+    API_RATE_LIMIT = "120 per minute"
+    API_RATE_LIMIT_IP = "600 per minute"
 
     # Assinatura/planos (app/services/entitlements.py). Sem assinatura ativa a empresa fica
     # em modo leitura (402 em escrita) — READ_ONLY_ENFORCED=0 desliga a regra.
@@ -81,6 +84,8 @@ class Config:
             "RATELIMIT_STORAGE_URI": os.environ.get("RATELIMIT_STORAGE_URI", cls.RATELIMIT_STORAGE_URI),
             "RLS_ENABLED": _bool("RLS_ENABLED", cls.RLS_ENABLED),
             "FEATURE_PUBLIC_API": _bool("FEATURE_PUBLIC_API", cls.FEATURE_PUBLIC_API),
+            "API_RATE_LIMIT": os.environ.get("API_RATE_LIMIT", cls.API_RATE_LIMIT),
+            "API_RATE_LIMIT_IP": os.environ.get("API_RATE_LIMIT_IP", cls.API_RATE_LIMIT_IP),
             "READ_ONLY_ENFORCED": _bool("READ_ONLY_ENFORCED", cls.READ_ONLY_ENFORCED),
             "TRIAL_DAYS": int(os.environ.get("TRIAL_DAYS", cls.TRIAL_DAYS)),
             "DEFAULT_TRIAL_PLAN": os.environ.get("DEFAULT_TRIAL_PLAN", cls.DEFAULT_TRIAL_PLAN),

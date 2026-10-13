@@ -28,6 +28,17 @@ Variáveis da Fase 4 (opcionais): `READ_ONLY_ENFORCED` (padrão 1: sem assinatur
 empresa fica em modo leitura), `TRIAL_DAYS` (14, teste implícito de empresa sem assinatura),
 `DEFAULT_TRIAL_PLAN` (`profissional`), `PAST_DUE_GRACE_DAYS` (7).
 
+Fase 9 (API de publicação, reservada) desenhada e mínima, **desligada por padrão**: contrato
+OpenAPI 3.1 em [`docs/api/openapi.yaml`](docs/api/openapi.yaml), desenho de webhooks em
+[`docs/api/webhooks.md`](docs/api/webhooks.md). Com `FEATURE_PUBLIC_API=1` o app registra
+`/api/v1` (token Bearer `cp_...` por empresa, escopos `read:projects` e `write:progress`, erros
+RFC 9457, auditoria de cada chamada) e a tela `/app/integracoes/api` (só proprietário; plano
+Empresa) para criar/revogar tokens. Implementados: `GET /projects` e
+`GET /projects/{id}/summary`; as demais rotas respondem 501. Sem a flag, `/api/v1/*` é 404 e o
+menu não mostra a tela. Variáveis: `FEATURE_PUBLIC_API`, `API_RATE_LIMIT` (`120 per minute`
+por token) e `API_RATE_LIMIT_IP` (`600 per minute`). Com RLS ligado, a busca do token antes de
+saber a empresa precisa de papel de plataforma (ver progresso.md, Fase 9).
+
 - Contexto para o Claude: [`CLAUDE.md`](CLAUDE.md)
 - Plano: [`docs/plano/`](docs/plano/) — PRD, arquitetura, ADRs, roadmap, backlog, riscos e progresso
 - Guia de segurança: [`.claude/claude-security-guidance.md`](.claude/claude-security-guidance.md)

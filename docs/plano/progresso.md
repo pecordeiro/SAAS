@@ -324,3 +324,46 @@ critérios de pronto da anterior estiverem marcados.
   - `audit.client_ip` usa `request.remote_addr`: em produção atrás de proxy configurar ProxyFix.
   - Werkzeug guarda upload > 500 KB em arquivo temporário anônimo durante a requisição (o
     serviço lê em memória e não grava nada).
+
+### Fase 9 — API de publicação (reservada)
+- Status: concluída no escopo mínimo (atrás de `FEATURE_PUBLIC_API`, desligada por padrão)
+- Datas: início 2026-10-13 · fim 2026-10-13
+- Entregas:
+  - `docs/api/openapi.yaml` (OpenAPI 3.1, validado com `openapi-spec-validator==0.9.0` em
+    `requirements-dev.txt`): `GET /projects`, `GET /projects/{id}`, `GET /projects/{id}/summary`,
+    `GET /projects/{id}/events`, `POST /activities/{id}/progress` (`If-Match` = versão da
+    atividade); cursor opaco, erros `application/problem+json` (RFC 9457, extensão `code`),
+    datas ISO 8601 UTC, `bearerAuth`, escopos `read:projects` e `write:progress`.
+  - `docs/api/webhooks.md`: desenho (HMAC-SHA256 + timestamp, retentativas com backoff,
+    bloqueio de SSRF). Não implementado.
+  - `app/services/api_tokens.py`: token `cp_` + 43 caracteres; no banco só SHA-256 e prefixo;
+    escopos, expiração, revogação (token e integração), `last_used_at`.
+  - `app/blueprints/api_v1.py`: `/api/v1` (registrado só com a flag; isento de CSRF; sessão de
+    navegador NÃO autentica) e tela `/app/integracoes/api` (owner; token mostrado uma vez com
+    `Cache-Control: no-store`; revogar). Ordem das recusas: 401 → 403 plano sem `api` → 403
+    escopo → 404. Rate limit por token (hash do token como chave) e teto por IP. Toda chamada
+    de token conhecido vai para `audit_logs` (`api.request`, sem o token). `GET /projects` e
+    `GET /projects/{id}/summary` (saída de `calc.py`) implementados; os outros três contratos
+    respondem 501 problem+json (testes `xfail(strict=True)` com o comportamento futuro).
+  - Menu “API” só para proprietário e só com a flag. Arquivos compartilhados tocados:
+    `app/__init__.py` (registro condicional), `app/config.py` (limites), `base_app.html` (menu).
+- Critérios de pronto:
+  - [x] Flag desligada: `/api/v1/*` → 404 e tela/menu invisíveis (teste).
+  - [x] Flag ligada: token de A não lê B (404), sem escopo → 403, revogado → 401, expirado → 401,
+        sem token → 401, plano sem feature `api` → 403 (testes).
+  - [x] Token nunca em texto puro no banco (varredura de `api_tokens`, `api_clients`, `audit_logs`)
+        nem nos logs (`caplog`).
+  - [x] `openapi.yaml` válido e rotas do blueprint = paths do contrato (teste bate método + path).
+  - [x] Caso A/B no fim de `tests/test_isolation.py` (revogar token de B → 404, B intacto).
+- Telas conferidas (375/768/1280, claro/escuro): não (só macros/tokens existentes; `test_visual` verde).
+- Pendências e dívidas:
+  - **RLS**: `tokens.find_by_raw` consulta `api_tokens` por hash ANTES de saber a empresa; com
+    `RLS_ENABLED` + `flask rls enable` isso volta 0 linhas. Decidir na ativação: papel de plataforma
+    (BYPASSRLS) só para essa consulta ou função `SECURITY DEFINER` estreita (ADR-0003).
+  - Stubs 501: detalhe do projeto, eventos (cursor sobre `domain_events`) e registrar progresso
+    (`If-Match` → `register_progress`, 412/422/428, 402 em modo leitura, evento + auditoria).
+  - Método errado em rota existente da API responde 404 (catch-all), não 405.
+  - Rate limit em memória (`memory://`): em produção usar Redis (`RATELIMIT_STORAGE_URI`).
+  - Atrás de proxy, `request.remote_addr` (teto por IP e auditoria) exige ProxyFix.
+  - Tela: sem rotação de token nem edição de escopos (revoga e cria outro); fase 6 confere as
+    capturas responsivas.
