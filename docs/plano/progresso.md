@@ -22,7 +22,7 @@ critérios de pronto da anterior estiverem marcados.
 ## Fases
 
 ### Fase 0 — Esqueleto do projeto
-- Status: concluída (aguarda /security-review e commit do orquestrador)
+- Status: concluída
 - Datas: início 2026-10-13 · fim 2026-10-13
 - Entregas:
   - `requirements.txt` / `requirements-dev.txt` fixados; `.gitignore`; `.env.example`; `run.py`.
@@ -56,9 +56,9 @@ critérios de pronto da anterior estiverem marcados.
   - [x] `flask db upgrade` em banco vazio cria tudo; `/health` responde 200 (servidor real).
 - Testes: `65 passed` (SQLite em memória, ~21 s); mesmos 64 da suíte principal também
   verdes com `TEST_DATABASE_URL` em PostgreSQL 16 local. Cobertura 90% de `app/`.
-- /security-review: não executado nesta sessão (pendente para o orquestrador).
+- /security-review: sem achados (confiança ≥ 8). Abaixo do limiar, viram dívida: logout não incrementa `session_version` (Fase 5); busca por id não exclui arquivados (Fase 4).
 - Telas conferidas (375/768/1280, claro/escuro): n/a (telas provisórias sem design; migram na Fase 2).
-- Commit: (preenchido pelo orquestrador)
+- Commit: 8f29a49 feat: fase 0 — esqueleto Flask, tenancy, calc com paridade da planilha
 - ADRs criados: nenhum (ADR-0007 já cobria a fase).
 - Pendências e dívidas:
   - Feriados: `holidays.company_id` é NOT NULL (só feriados da empresa); feriados nacionais
@@ -72,3 +72,9 @@ critérios de pronto da anterior estiverem marcados.
   - Novo projeto usa 6 blocos fixos de etapa com atividades em texto (“Nome; minutos”);
     a tela definitiva (HTMX) vem na Fase 2/6.
   - Desfazer registro de peças (D13, supervisor+) não existe ainda (Fase 4).
+
+### Fase 1 — Identidade visual e telas
+- Status: concluída (aguarda aprovação da direção de marca pelo usuário)
+- Entregas: docs/design/ (marca “Prumo”, logo/favicon/OG SVG, tokens.css, contraste, design system, telas) e ADR-0008.
+- Commit: c873665 docs(design): fase 1 — marca Prumo, tokens e design system
+- Pendências: aprovar direção de marca; demonstrar “≤ 2 toques” na tela real (Fase 2).
