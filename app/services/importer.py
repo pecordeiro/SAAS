@@ -1,0 +1,549 @@
+"""Importação de projeto: CSV (modelo do site / exportação), XLSX exportado pelo site e a
+planilha de referência ``acompanhamento_montagem_v4.xlsx``.
+
+Fluxo: ``parse_upload`` (arquivo em memória → ``ImportResult`` com dados e erros por linha)
+→ pré-visualização → ``save`` grava TUDO numa transação só (quem chama faz o commit). Com
+qualquer erro, nada é gravado.
+
+Planilha de referência: o layout é descoberto pelos títulos da coluna A (como o teste de
+paridade): “Meta…” (quantidade em B), blocos “N. Nome” → “Unidades previstas” →
+“Subatividade” (cabeçalho) → atividades (A nome, B tempo ideal, D peças) → “Total da
+etapa…”. Na aba “Equipe”: “Pessoas montando” e “Horas de trabalho por dia”.
+
+Segurança: tamanho limitado (``IMPORT_MAX_BYTES``), tipo conferido pela extensão E pelo
+conteúdo (XLSX = zip; o tamanho descompactado é conferido antes de abrir, contra zip bomb),
+nada é gravado em disco, fórmulas não são avaliadas (só o valor em cache).
+"""
+
+from __future__ import annotations
+
+import csv
+import io
+import re
+import uuid
+import zipfile
+from dataclasses import asdict, dataclass, field
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
+
+from app.extensions import db
+from app.models import Company, Project
+from app.services import audit
+from app.services.exporter import (
+    COL_ACTIVITY,
+    COL_DUE,
+    COL_HOURS,
+    COL_MINUTES,
+    COL_PEOPLE,
+    COL_PROJECT,
+    COL_QUANTITY,
+    COL_STAGE,
+    COL_START,
+    COL_STATUS,
+    COL_UNITS,
+    COLUMNS,
+    STATUS_ACTIVE,
+    STATUS_ARCHIVED,
+    STATUS_STAGE_ARCHIVED,
+)
+from app.services.projects import NewActivity, NewStage, create_project, record_initial_progress
+
+MAX_ROWS = 2000
+MAX_STAGES = 100
+MAX_ACTIVITIES_PER_STAGE = 200
+MAX_MINUTES = Decimal("100000")
+MAX_QUANTITY = 100000
+MAX_UNCOMPRESSED = 30 * 1024 * 1024
+MAX_ZIP_ENTRIES = 500
+
+SOURCE_CSV = "csv"
+SOURCE_XLSX = "xlsx"
+SOURCE_REFERENCE = "planilha"
+
+REQUIRED = (COL_STAGE, COL_ACTIVITY, COL_MINUTES)
+TITULO_ETAPA = re.compile(r"^\s*\d+\.\s")
+
+
+class ImportError_(Exception):
+    """Arquivo recusado inteiro (tipo, tamanho, formato)."""
+
+
+@dataclass
+class RowError:
+    line: int
+    column: str
+    message: str
+
+    def __str__(self) -> str:
+        return f"Linha {self.line}, {self.column}: {self.message}"
+
+
+@dataclass
+class ImportResult:
+    source: str
+    name: str = ""
+    quantity: int = 0
+    start_date: date | None = None
+    due_date: date | None = None
+    people: int = 1
+    hours_per_day: Decimal = Decimal("8")
+    stages: list[NewStage] = field(default_factory=list)
+    errors: list[RowError] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return not self.errors
+
+    @property
+    def activity_count(self) -> int:
+        return sum(len(s.activities) for s in self.stages)
+
+    def error(self, line: int, column: str, message: str) -> None:
+        self.errors.append(RowError(line, column, message))
+
+
+# ---------------------------------------------------------------- conversões
+
+
+def _clean(value) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    # Desfaz a neutralização da exportação ('=..., '+..., '-..., '@...).
+    if len(text) > 1 and text[0] == "'" and text[1] in "=+-@\t\r":
+        text = text[1:]
+    return text
+
+
+def _decimal(value) -> Decimal:
+    if isinstance(value, bool):
+        raise ValueError
+    if isinstance(value, (int, float, Decimal)):
+        d = Decimal(str(value))
+    else:
+        text = _clean(value).replace(" ", "")
+        if "," in text:
+            text = text.replace(".", "").replace(",", ".")
+        try:
+            d = Decimal(text)
+        except InvalidOperation:
+            raise ValueError from None
+    if not d.is_finite():
+        raise ValueError
+    return d
+
+
+def _int(value) -> int:
+    d = _decimal(value)
+    if d != d.to_integral_value():
+        raise ValueError
+    return int(d)
+
+
+def _date(value) -> date | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    text = _clean(value)
+    if not text:
+        return None
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d/%m/%y"):
+        try:
+            return datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError
+
+
+def _norm_header(text) -> str:
+    return " ".join(_clean(text).split()).casefold()
+
+
+HEADER_KEYS = {_norm_header(c): c for c in COLUMNS}
+
+
+# ---------------------------------------------------------------- linhas planas (CSV / XLSX do site)
+
+
+def _parse_flat(result: ImportResult, header: list, data_rows) -> ImportResult:
+    """``data_rows``: iterável de (número da linha no arquivo, lista de valores)."""
+    index: dict[str, int] = {}
+    for pos, raw in enumerate(header):
+        key = HEADER_KEYS.get(_norm_header(raw))
+        if key and key not in index:
+            index[key] = pos
+    missing = [c for c in (COL_PROJECT, COL_QUANTITY, *REQUIRED) if c not in index]
+    if missing:
+        result.error(1, "cabeçalho", "faltam as colunas " + ", ".join(f"“{c}”" for c in missing))
+        return result
+
+    def get(values, column):
+        pos = index.get(column)
+        return values[pos] if pos is not None and pos < len(values) else None
+
+    stages: dict[str, NewStage] = {}
+    first = True
+    count = 0
+    for line, values in data_rows:
+        if all(_clean(v) == "" for v in values):
+            continue
+        count += 1
+        if count > MAX_ROWS:
+            result.error(line, "arquivo", f"mais de {MAX_ROWS} linhas")
+            break
+        if first:
+            first = False
+            _read_project_fields(result, line, lambda c: get(values, c))
+        stage_name = _clean(get(values, COL_STAGE))
+        if not stage_name:
+            result.error(line, COL_STAGE, "vazia")
+            continue
+        if len(stage_name) > 160:
+            result.error(line, COL_STAGE, "nome com mais de 160 caracteres")
+            continue
+        status = _clean(get(values, COL_STATUS)).casefold() or STATUS_ACTIVE
+        if status not in (STATUS_ACTIVE, STATUS_ARCHIVED, STATUS_STAGE_ARCHIVED):
+            result.error(line, COL_STATUS, "use ativa, arquivada ou etapa arquivada")
+            continue
+        stage = stages.get(stage_name)
+        if stage is None:
+            if len(stages) >= MAX_STAGES:
+                result.error(line, COL_STAGE, f"mais de {MAX_STAGES} etapas")
+                continue
+            stage = stages[stage_name] = NewStage(name=stage_name, activities=[])
+        if status == STATUS_STAGE_ARCHIVED:
+            stage.archived = True
+        activity_name = _clean(get(values, COL_ACTIVITY))
+        if not activity_name:
+            continue  # etapa sem atividade
+        activity = _read_activity(result, line, activity_name, get(values, COL_MINUTES), get(values, COL_UNITS))
+        if activity is None:
+            continue
+        activity.archived = status == STATUS_ARCHIVED
+        if len(stage.activities) >= MAX_ACTIVITIES_PER_STAGE:
+            result.error(line, COL_ACTIVITY, f"mais de {MAX_ACTIVITIES_PER_STAGE} atividades na etapa")
+            continue
+        stage.activities.append(activity)
+    if first:
+        result.error(2, "arquivo", "nenhuma linha de dados")
+    result.stages = list(stages.values())
+    return result
+
+
+def _read_project_fields(result: ImportResult, line: int, get) -> None:
+    result.name = _clean(get(COL_PROJECT))[:160]
+    if not result.name:
+        result.error(line, COL_PROJECT, "informe o nome do projeto na primeira linha")
+    try:
+        result.quantity = _int(get(COL_QUANTITY))
+        if not 1 <= result.quantity <= MAX_QUANTITY:
+            raise ValueError
+    except ValueError:
+        result.error(line, COL_QUANTITY, f"número inteiro entre 1 e {MAX_QUANTITY}")
+    for column, attr in ((COL_START, "start_date"), (COL_DUE, "due_date")):
+        try:
+            setattr(result, attr, _date(get(column)))
+        except ValueError:
+            result.error(line, column, "data inválida (use dd/mm/aaaa)")
+    if result.start_date and result.due_date and result.due_date < result.start_date:
+        result.error(line, COL_DUE, "antes do início")
+    raw_people = get(COL_PEOPLE)
+    if _clean(raw_people):
+        try:
+            result.people = _int(raw_people)
+            if not 1 <= result.people <= 1000:
+                raise ValueError
+        except ValueError:
+            result.error(line, COL_PEOPLE, "número inteiro entre 1 e 1000")
+    raw_hours = get(COL_HOURS)
+    if _clean(raw_hours):
+        try:
+            result.hours_per_day = _decimal(raw_hours).quantize(Decimal("0.01"))
+            if not Decimal("0.5") <= result.hours_per_day <= Decimal("24"):
+                raise ValueError
+        except (ValueError, InvalidOperation):
+            result.error(line, COL_HOURS, "número entre 0,5 e 24")
+
+
+def _read_activity(
+    result: ImportResult, line: int, name: str, raw_minutes, raw_units, blank_is_zero: bool = False
+) -> NewActivity | None:
+    """``blank_is_zero``: planilha de referência, onde tempo vazio vale 0 (N() do Excel)."""
+    ok = True
+    if blank_is_zero and raw_minutes in (None, ""):
+        raw_minutes = 0
+    if len(name) > 160:
+        result.error(line, COL_ACTIVITY, "nome com mais de 160 caracteres")
+        ok = False
+    minutes = Decimal("0")
+    try:
+        minutes = _decimal(raw_minutes)
+        if minutes < 0 or minutes > MAX_MINUTES:
+            raise ValueError
+        minutes = minutes.quantize(Decimal("0.01"))
+    except (ValueError, InvalidOperation):
+        result.error(line, "tempo ideal", "número inválido")
+        ok = False
+    units = 0
+    if _clean(raw_units):
+        try:
+            units = _int(raw_units)
+            if units < 0:
+                raise ValueError
+        except ValueError:
+            result.error(line, COL_UNITS, "número inteiro inválido")
+            ok = False
+    if result.quantity and units > result.quantity:
+        result.error(line, COL_UNITS, f"maior que a quantidade ({result.quantity})")
+        ok = False
+    return NewActivity(name=name, ideal_minutes=minutes, units_done=units) if ok else None
+
+
+def parse_csv(data: bytes) -> ImportResult:
+    result = ImportResult(source=SOURCE_CSV)
+    if b"\x00" in data:
+        raise ImportError_("O arquivo não parece um CSV de texto.")
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = data.decode("cp1252", errors="replace")
+    first_line = text.split("\n", 1)[0]
+    delimiter = max((";", ",", "\t"), key=first_line.count)
+    reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter)
+    try:
+        header = next(reader)
+    except StopIteration:
+        result.error(1, "arquivo", "vazio")
+        return result
+    rows = ((reader.line_num, row) for row in reader)
+    try:
+        return _parse_flat(result, header, rows)
+    except csv.Error as exc:  # pragma: no cover - CSV malformado raro
+        raise ImportError_(f"CSV inválido: {exc}") from None
+
+
+# ---------------------------------------------------------------- XLSX
+
+
+def _open_workbook(data: bytes):
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            infos = zf.infolist()
+            if len(infos) > MAX_ZIP_ENTRIES or sum(i.file_size for i in infos) > MAX_UNCOMPRESSED:
+                raise ImportError_("Planilha grande demais depois de descompactada.")
+    except zipfile.BadZipFile:
+        raise ImportError_("O arquivo não é uma planilha .xlsx válida.") from None
+    import warnings
+
+    from openpyxl import load_workbook
+
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return load_workbook(io.BytesIO(data), data_only=True)
+    except Exception:  # noqa: BLE001 - qualquer falha do openpyxl = arquivo inválido
+        raise ImportError_("Não foi possível ler a planilha .xlsx.") from None
+
+
+def parse_xlsx(data: bytes) -> ImportResult:
+    wb = _open_workbook(data)
+    # 1) XLSX exportado pelo site: primeira linha com os cabeçalhos conhecidos.
+    for ws in wb.worksheets:
+        header = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1), [])]
+        if {_norm_header(h) for h in header} >= {_norm_header(c) for c in (COL_STAGE, COL_ACTIVITY, COL_MINUTES)}:
+            rows = ((r_idx, list(values)) for r_idx, values in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2))
+            return _parse_flat(ImportResult(source=SOURCE_XLSX), header, rows)
+    # 2) Planilha de referência (layout pelos títulos da coluna A).
+    return parse_reference(wb)
+
+
+def _a(ws, row: int) -> str:
+    return _clean(ws.cell(row, 1).value)
+
+
+def parse_reference(wb) -> ImportResult:
+    result = ImportResult(source=SOURCE_REFERENCE)
+    ws = next((w for w in wb.worksheets if _find_blocks(w)), None)
+    if ws is None:
+        result.error(1, "A", "nenhum bloco de etapa encontrado (título “N. Nome” seguido de “Unidades previstas”)")
+        return result
+    result.name = (_a(ws, 1) or "Projeto importado")[:160]
+    meta_row = next((r for r in range(1, min(ws.max_row, 60) + 1) if _a(ws, r).casefold().startswith("meta")), None)
+    if meta_row is None:
+        result.error(1, "A", "linha “Meta…” (quantidade prevista) não encontrada")
+    else:
+        try:
+            result.quantity = _int(ws.cell(meta_row, 2).value)
+            if not 1 <= result.quantity <= MAX_QUANTITY:
+                raise ValueError
+        except ValueError:
+            result.error(meta_row, "B (meta)", f"número inteiro entre 1 e {MAX_QUANTITY}")
+    team = next((w for w in wb.worksheets if w.title.casefold() == "equipe"), None)
+    if team is not None:
+        for r in range(1, min(team.max_row, 60) + 1):
+            title = _a(team, r).casefold()
+            value = team.cell(r, 2).value
+            try:
+                if title.startswith("pessoas montando"):
+                    result.people = _int(value)
+                elif title.startswith("horas de trabalho por dia"):
+                    result.hours_per_day = _decimal(value).quantize(Decimal("0.01"))
+            except ValueError:
+                result.error(r, f"Equipe!B ({_a(team, r)})", "número inválido")
+    for title_row, first, total in _find_blocks(ws):
+        stage = NewStage(name=_a(ws, title_row)[:160], activities=[])
+        for r in range(first, total):
+            name = _a(ws, r)
+            if not name:
+                continue
+            activity = _read_activity(
+                result, r, name[:160], ws.cell(r, 2).value, ws.cell(r, 4).value, blank_is_zero=True
+            )
+            if activity is not None:
+                stage.activities.append(activity)
+        result.stages.append(stage)
+        if len(result.stages) > MAX_STAGES:
+            result.error(title_row, "A", f"mais de {MAX_STAGES} etapas")
+            break
+    return result
+
+
+def _find_blocks(ws) -> list[tuple[int, int, int]]:
+    """(linha do título, primeira linha de atividade, linha “Total da etapa”) de cada bloco."""
+    blocks = []
+    r = 1
+    max_row = min(ws.max_row, 5000)
+    while r <= max_row:
+        title = ws.cell(r, 1).value
+        if (
+            isinstance(title, str)
+            and TITULO_ETAPA.match(title)
+            and _a(ws, r + 1).startswith("Unidades previstas")
+            and _a(ws, r + 2).startswith("Subatividade")
+        ):
+            total = r + 3
+            while total <= max_row and not _a(ws, total).startswith("Total da etapa"):
+                total += 1
+            if total > max_row or total - r > MAX_ACTIVITIES_PER_STAGE:
+                break
+            blocks.append((r, r + 3, total))
+            r = total + 1
+        else:
+            r += 1
+    return blocks
+
+
+# ---------------------------------------------------------------- entrada única
+
+
+def parse_upload(filename: str, data: bytes, max_bytes: int) -> ImportResult:
+    """Confere tamanho e tipo (extensão + conteúdo) e lê o arquivo em memória."""
+    if not data:
+        raise ImportError_("Escolha um arquivo .csv ou .xlsx.")
+    if len(data) > max_bytes:
+        raise ImportError_(f"Arquivo maior que {max_bytes // (1024 * 1024)} MB.")
+    ext = (filename or "").rsplit(".", 1)[-1].lower() if "." in (filename or "") else ""
+    is_zip = data[:4] == b"PK\x03\x04"
+    if ext == "xlsx" and is_zip:
+        return parse_xlsx(data)
+    if ext == "csv" and not is_zip:
+        return parse_csv(data)
+    raise ImportError_("Envie um arquivo .csv ou .xlsx (o conteúdo precisa bater com a extensão).")
+
+
+# ---------------------------------------------------------------- pré-visualização ↔ gravação
+
+
+def to_payload(result: ImportResult) -> dict:
+    """Dados já validados, em JSON (vão assinados no formulário de confirmação)."""
+    data = asdict(result)
+    data.pop("errors")
+    data["start_date"] = result.start_date.isoformat() if result.start_date else None
+    data["due_date"] = result.due_date.isoformat() if result.due_date else None
+    data["hours_per_day"] = str(result.hours_per_day)
+    for stage in data["stages"]:
+        for activity in stage["activities"]:
+            activity["ideal_minutes"] = str(activity["ideal_minutes"])
+    return data
+
+
+def from_payload(data: dict) -> ImportResult:
+    """Reconstrói o resultado e REVALIDA (não confia só na assinatura)."""
+    result = ImportResult(source=str(data.get("source", SOURCE_CSV)))
+    result.name = str(data.get("name", ""))[:160]
+    try:
+        result.quantity = int(data.get("quantity", 0))
+        result.start_date = date.fromisoformat(data["start_date"]) if data.get("start_date") else None
+        result.due_date = date.fromisoformat(data["due_date"]) if data.get("due_date") else None
+        result.people = int(data.get("people", 1))
+        result.hours_per_day = Decimal(str(data.get("hours_per_day", "8")))
+        for s in data.get("stages", [])[: MAX_STAGES + 1]:
+            stage = NewStage(name=str(s["name"])[:160], activities=[], archived=bool(s.get("archived")))
+            for a in s.get("activities", [])[: MAX_ACTIVITIES_PER_STAGE + 1]:
+                stage.activities.append(
+                    NewActivity(
+                        name=str(a["name"])[:160],
+                        ideal_minutes=Decimal(str(a["ideal_minutes"])),
+                        units_done=int(a.get("units_done", 0)),
+                        archived=bool(a.get("archived")),
+                    )
+                )
+            result.stages.append(stage)
+    except (KeyError, TypeError, ValueError, InvalidOperation):
+        result.error(0, "dados", "pré-visualização inválida; envie o arquivo de novo")
+        return result
+    validate(result)
+    return result
+
+
+def validate(result: ImportResult) -> None:
+    if not result.name:
+        result.error(0, COL_PROJECT, "vazio")
+    if not 1 <= result.quantity <= MAX_QUANTITY:
+        result.error(0, COL_QUANTITY, "fora do limite")
+    if not 1 <= result.people <= 1000 or not Decimal("0.5") <= result.hours_per_day <= Decimal("24"):
+        result.error(0, "equipe", "pessoas ou horas por dia fora do limite")
+    if not result.stages or len(result.stages) > MAX_STAGES:
+        result.error(0, COL_STAGE, "nenhuma etapa ou etapas demais")
+    for stage in result.stages:
+        if not stage.name or len(stage.activities) > MAX_ACTIVITIES_PER_STAGE:
+            result.error(0, COL_STAGE, "etapa inválida")
+        for activity in stage.activities:
+            if (
+                not activity.name
+                or not Decimal("0") <= activity.ideal_minutes <= MAX_MINUTES
+                or not 0 <= activity.units_done <= result.quantity
+            ):
+                result.error(0, COL_ACTIVITY, f"atividade “{activity.name}” inválida")
+
+
+def save(company: Company, result: ImportResult, user_id: uuid.UUID | None, name: str | None = None) -> Project:
+    """Grava o projeto inteiro (sem commit: quem chama faz um commit só). Confere o limite
+    de projetos do plano como qualquer criação."""
+    if not result.ok:
+        raise ValueError("importação com erros não pode ser gravada")
+    project = create_project(
+        company,
+        name=(name or result.name)[:160],
+        quantity=result.quantity,
+        start_date=result.start_date,
+        due_date=result.due_date,
+        people=result.people,
+        hours_per_day=result.hours_per_day,
+        stages=result.stages,
+        source="import",
+    )
+    record_initial_progress(project, user_id)
+    audit.record(
+        audit.PROJECT_IMPORTED,
+        company_id=company.id,
+        actor_user_id=user_id,
+        object_type="project",
+        object_id=project.id,
+        details={"source": result.source, "stages": len(result.stages), "activities": result.activity_count},
+    )
+    db.session.flush()
+    return project

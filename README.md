@@ -14,7 +14,19 @@ fontes e HTMX locais, macros, layouts, tema claro/escuro, registro de peças em 
 Fase 3 (banco) entregue: schema completo do MVP em PostgreSQL 16 (modelos de etapas
 versionados, convites, tokens de conta, MFA, planos, assinaturas, cobranças, webhooks,
 auditoria, outbox, API), CHECK/UNIQUE, feriados nacionais, políticas RLS ligáveis e testes
-em PostgreSQL. Progresso por fase em [`docs/plano/progresso.md`](docs/plano/progresso.md).
+em PostgreSQL.
+Fase 4 (regras de negócio) entregue: modelos de etapas versionados (`/app/modelos`, novo
+projeto a partir de modelo, comparar/aplicar versão com confirmação), edição de projeto
+(renomear, ↑/↓, arquivar sem perder histórico, duplicar), desfazer registro (supervisor+,
+lançamento compensatório), importação CSV/XLSX e da planilha de referência com
+pré-visualização (`/app/importar`), exportação CSV/XLSX neutralizada, limites de plano e
+modo leitura (HTTP 402, `app/services/entitlements.py`), eventos de domínio
+(`services/events.py`) e auditoria (`services/audit.py::record`).
+Progresso por fase em [`docs/plano/progresso.md`](docs/plano/progresso.md).
+
+Variáveis da Fase 4 (opcionais): `READ_ONLY_ENFORCED` (padrão 1: sem assinatura ativa a
+empresa fica em modo leitura), `TRIAL_DAYS` (14, teste implícito de empresa sem assinatura),
+`DEFAULT_TRIAL_PLAN` (`profissional`), `PAST_DUE_GRACE_DAYS` (7).
 
 - Contexto para o Claude: [`CLAUDE.md`](CLAUDE.md)
 - Plano: [`docs/plano/`](docs/plano/) — PRD, arquitetura, ADRs, roadmap, backlog, riscos e progresso

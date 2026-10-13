@@ -14,6 +14,7 @@
   <div class="page-header__titles"><h1>Projetos</h1></div>
   {%- if can_create %}
   <div class="page-header__actions">
+    {{ button("Importar", "secondary", href=url_for('dados.import_upload'), class_="only-desktop") }}
     {{ button("Novo projeto", "primary", icon="plus", href=url_for('app.project_new'), class_="only-desktop") }}
     {{ button("Novo", "primary", icon="plus", href=url_for('app.project_new'), class_="only-mobile") }}
   </div>
@@ -35,7 +36,7 @@
       <td class="project-row__status is-plain">
         <span class="cluster">
           {{ status_badge(status) }}
-          {%- if deadline.late %}{{ badge("Atraso previsto", "danger", "alert") }}
+          {%- if deadline.late %}{{ badge("Atraso previsto" ~ (" · " ~ deadline.delay ~ " d.u." if deadline.delay else ""), "danger", "alert") }}
           {%- elif deadline.on_time %}<span class="text-success text-sm text-strong compact-only">no prazo</span>{% endif %}
         </span>
       </td>

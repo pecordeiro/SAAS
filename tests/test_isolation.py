@@ -90,7 +90,7 @@ def test_vinculo_desativado_perde_acesso(client, app, tenants):
 
 
 def test_toda_rota_com_uuid_tem_caso_de_isolamento(app):
-    cobertas = {template.replace("{id}", "") for _, template, _, _ in ROUTES}
+    cobertas = {template.replace("{id}", "") for _, template, _, _ in ROUTES + FASE4_ROUTES}
     for rule in app.url_map.iter_rules():
         if "<uuid:" not in rule.rule:
             continue
@@ -120,3 +120,181 @@ def test_registrar_pecas_valida_maximo_e_grava_historico(client, app, tenants):
         assert sorted(e.delta for e in entries) == [2, 3]
     history = client.get(f"/app/projetos/{a.project_id}/historico").get_data(as_text=True)
     assert "+3" in history and "+2" in history
+
+
+# ================================================================ Fase 4
+# Rotas novas (modelos, edição, desfazer, exportar). Mesmo contrato: owner de A pedindo
+# recurso de B → 404 e nada muda em B; na própria empresa a rota funciona.
+
+from dataclasses import dataclass  # noqa: E402
+from decimal import Decimal  # noqa: E402
+
+from app.models import AuditLog, Company, DomainEvent, Project, Template, TemplateVersion, User  # noqa: E402
+from app.services import projects as svc  # noqa: E402
+from app.services import templates as tsvc  # noqa: E402
+from tests.conftest import make_tenant  # noqa: E402
+
+FASE4_ROUTES = [
+    ("GET", "/app/modelos/{id}", "template_id", None),
+    ("POST", "/app/modelos/{id}", "template_id", {"name": "Invasor", "stages-0-name": "X", "stages-0-activities": "Y; 1"}),
+    ("GET", "/app/modelos/{id}/versoes", "template_id", None),
+    ("POST", "/app/modelos/{id}/arquivar", "template_id", {}),
+    ("GET", "/app/projetos/{id}/editar", "project_id", None),
+    ("POST", "/app/projetos/{id}/editar", "project_id", {"name": "Invasor", "quantity": 10, "people": 1, "hours_per_day": "8"}),
+    ("POST", "/app/projetos/{id}/duplicar", "project_id", {}),
+    ("POST", "/app/projetos/{id}/arquivar", "project_id", {"confirm": "y"}),
+    ("GET", "/app/projetos/{id}/modelo", "tpl_project_id", None),
+    ("POST", "/app/projetos/{id}/modelo/aplicar", "tpl_project_id", {"confirm": "y"}),
+    ("GET", "/app/projetos/{id}/exportar.csv", "project_id", None),
+    ("GET", "/app/projetos/{id}/exportar.xlsx", "project_id", None),
+    ("POST", "/app/etapas/{id}/renomear", "stage_id", {"name": "Invasora"}),
+    ("POST", "/app/etapas/{id}/mover", "stage_id", {"direction": "down"}),
+    ("POST", "/app/etapas/{id}/arquivar", "stage_id", {}),
+    ("POST", "/app/atividades/{id}/editar", "activity_id", {"name": "Invasora", "ideal_minutes": "1"}),
+    ("POST", "/app/atividades/{id}/mover", "activity_id", {"direction": "down"}),
+    ("POST", "/app/atividades/{id}/arquivar", "activity_id", {}),
+    ("GET", "/app/registros/{id}/desfazer", "entry_id", None),
+    ("POST", "/app/registros/{id}/desfazer", "entry_id", {"confirm": "y"}),
+]
+
+
+@dataclass
+class Tenant4:
+    company_id: object
+    owner_email: str
+    project_id: object
+    stage_id: object
+    activity_id: object
+    template_id: object
+    version_id: object
+    tpl_project_id: object
+    entry_id: object
+
+
+def _make_tenant4(label: str) -> Tenant4:
+    base = make_tenant(label)
+    company = db.session.get(Company, base.company_id)
+    owner = db.session.query(User).filter_by(email=base.owner_email).one()
+    template = tsvc.create_template(
+        company,
+        f"Modelo {label}",
+        [svc.NewStage("Etapa M", [svc.NewActivity("Atv M", Decimal("10"))])],
+        created_by_user_id=owner.id,
+    )
+    tpl_project = tsvc.create_project_from_template(
+        company, template, name=f"De modelo {label}", quantity=5, start_date=None, due_date=None,
+        people=1, hours_per_day=Decimal("8"),
+    )
+    # Versão nova do modelo: comparar/aplicar têm o que mostrar.
+    tsvc.update_template(
+        template, name=template.name, description=None, user_id=owner.id,
+        stages=[svc.NewStage("Etapa M", [svc.NewActivity("Atv M", Decimal("12"))])],
+    )
+    entry = svc.register_progress(db.session.get(Activity, base.activity_id), 2, None, owner.id)
+    db.session.commit()
+    return Tenant4(
+        company_id=base.company_id, owner_email=base.owner_email, project_id=base.project_id,
+        stage_id=base.stage_id, activity_id=base.activity_id, template_id=template.id,
+        version_id=template.current_version_id, tpl_project_id=tpl_project.id, entry_id=entry.id,
+    )
+
+
+@pytest.fixture()
+def tenants4(app):
+    with app.app_context():
+        return _make_tenant4("A"), _make_tenant4("B")
+
+
+def _snapshot(company_id) -> dict:
+    """Estado de uma empresa que nenhuma requisição de outra pode mudar."""
+    q = db.session.query
+    return {
+        "projects": sorted(
+            (p.name, p.quantity, p.archived_at is None, str(p.template_version_id))
+            for p in q(Project).filter_by(company_id=company_id)
+        ),
+        "stages": sorted((s.name, s.position, s.archived_at is None) for s in q(Stage).filter_by(company_id=company_id)),
+        "activities": sorted(
+            (a.name, str(a.ideal_minutes), a.position, a.units_done, a.archived_at is None)
+            for a in q(Activity).filter_by(company_id=company_id)
+        ),
+        "entries": q(ProgressEntry).filter_by(company_id=company_id).count(),
+        "templates": sorted(
+            (t.name, t.archived_at is None, str(t.current_version_id)) for t in q(Template).filter_by(company_id=company_id)
+        ),
+        "versions": q(TemplateVersion).filter_by(company_id=company_id).count(),
+        "events": q(DomainEvent).filter_by(company_id=company_id).count(),
+        "audit": q(AuditLog).filter_by(company_id=company_id).count(),
+    }
+
+
+@pytest.mark.parametrize("method,template,field,data", FASE4_ROUTES)
+def test_fase4_recurso_de_outra_empresa_responde_404(client, app, tenants4, method, template, field, data):
+    a, b = tenants4
+    with app.app_context():
+        before = _snapshot(b.company_id)
+    login(client, app, a.owner_email)
+    response = _call(client, app, method, template.format(id=getattr(b, field)), data)
+    assert response.status_code == 404
+    with app.app_context():
+        assert _snapshot(b.company_id) == before
+
+
+@pytest.mark.parametrize("method,template,field,data", FASE4_ROUTES)
+def test_fase4_mesma_rota_funciona_na_propria_empresa(client, app, tenants4, method, template, field, data):
+    a, _ = tenants4
+    login(client, app, a.owner_email)
+    response = _call(client, app, method, template.format(id=getattr(a, field)), data)
+    assert response.status_code in (200, 302, 303)
+
+
+def test_novo_projeto_com_modelo_de_outra_empresa_responde_404_e_nada_grava(client, app, tenants4):
+    a, b = tenants4
+    with app.app_context():
+        before_a, before_b = _snapshot(a.company_id), _snapshot(b.company_id)
+    login(client, app, a.owner_email)
+    base = {"name": "Roubado", "quantity": 3, "people": 1, "hours_per_day": "8"}
+    assert post(client, app, "/app/projetos/novo", {**base, "template_id": str(b.template_id)}).status_code == 404
+    # id de VERSÃO de B no lugar do modelo também não serve
+    assert post(client, app, "/app/projetos/novo", {**base, "template_id": str(b.version_id)}).status_code == 404
+    assert post(client, app, "/app/projetos/novo", {**base, "template_id": "nao-e-uuid"}).status_code == 404
+    with app.app_context():
+        assert _snapshot(a.company_id) == before_a and _snapshot(b.company_id) == before_b
+
+
+def test_modelos_da_outra_empresa_nao_aparecem(client, app, tenants4):
+    a, _ = tenants4
+    login(client, app, a.owner_email)
+    page = client.get("/app/modelos").get_data(as_text=True)
+    assert "Modelo A" in page and "Modelo B" not in page
+    page = client.get("/app/projetos/novo").get_data(as_text=True)
+    assert "Modelo A" in page and "Modelo B" not in page
+
+
+def test_previa_de_importacao_assinada_para_outra_empresa_e_recusada(client, app, tenants4):
+    """O payload assinado leva empresa e usuário: não serve em outra sessão."""
+    from itsdangerous import URLSafeTimedSerializer
+
+    from app.blueprints.dados import PAYLOAD_SALT
+
+    a, b = tenants4
+    payload = URLSafeTimedSerializer(app.secret_key, salt=PAYLOAD_SALT).dumps(
+        {"c": str(b.company_id), "u": "x", "d": {"name": "X", "quantity": 1, "stages": [{"name": "E", "activities": []}]}}
+    )
+    login(client, app, a.owner_email)
+    with app.app_context():
+        before = db.session.query(Project).count()
+    response = post(client, app, "/app/importar/confirmar", {"payload": payload, "name": "X"})
+    assert response.status_code == 400
+    with app.app_context():
+        assert db.session.query(Project).count() == before
+
+
+def test_historico_e_exportacao_de_outra_empresa_nao_vazam_registros(client, app, tenants4):
+    a, b = tenants4
+    login(client, app, a.owner_email)
+    page = client.get(f"/app/projetos/{a.project_id}/historico").get_data(as_text=True)
+    assert f"/app/registros/{a.entry_id}/desfazer" in page
+    assert str(b.entry_id) not in page
+    csv_text = client.get(f"/app/projetos/{a.project_id}/exportar.csv").get_data(as_text=True)
+    assert "Projeto A" in csv_text and "Projeto B" not in csv_text

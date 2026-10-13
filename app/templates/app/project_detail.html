@@ -24,12 +24,18 @@
     <h1>{{ project.name }}</h1>
     <p class="cluster page-header__meta">
       {{ status_badge(project_status) }}
-      {%- if deadline.late %}{{ badge("Atraso previsto", "danger", "alert") }}
+      {%- if deadline.late %}{{ badge("Atraso previsto" ~ (" · " ~ deadline.delay ~ (" dia útil" if deadline.delay == 1 else " dias úteis") if deadline.delay else ""), "danger", "alert") }}
       {%- elif deadline.on_time %}<span class="text-success text-sm text-strong">{{ icon("check", "sm") }} no prazo</span>{% endif %}
     </p>
   </div>
-  <div class="page-header__actions only-desktop">
-    {{ button("Histórico", "secondary", icon="history", href=url_for('app.project_history', project_id=project.id)) }}
+  <div class="page-header__actions">
+    {%- if can_edit %}
+    {{ button("Exportar CSV", "secondary", href=url_for('dados.export_csv', project_id=project.id)) }}
+    {{ button("Exportar XLSX", "secondary", href=url_for('dados.export_xlsx', project_id=project.id)) }}
+    {{ button("Editar", "secondary", href=url_for('edicao.project_edit', project_id=project.id)) }}
+    {%- if project.template_version_id %}{{ button("Comparar com o modelo", "ghost", href=url_for('edicao.project_compare', project_id=project.id)) }}{% endif %}
+    {%- endif %}
+    {{ button("Histórico", "secondary", icon="history", href=url_for('app.project_history', project_id=project.id), class_="only-desktop") }}
   </div>
 </header>
 

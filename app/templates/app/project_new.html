@@ -22,6 +22,14 @@
   <form class="stack--lg" method="post" action="{{ url_for('app.project_new') }}" novalidate>
     {{ form_errors(form, list_label="Etapa") }}
     {{ form.csrf_token }}
+    <section class="card stack" aria-labelledby="modelo-titulo">
+      <h2 class="section-title" id="modelo-titulo">Modelo de etapas</h2>
+      {%- if has_templates %}
+      {{ field(form.template_id, hint="Com modelo, as etapas são copiadas da versão atual e os blocos abaixo são ignorados.") }}
+      {%- else %}
+      <p class="muted text-sm">Nenhum modelo ainda. <a href="{{ url_for('modelos.new') }}">Criar modelo de etapas</a> ou digite as etapas abaixo.</p>
+      {%- endif %}
+    </section>
     <section class="card stack" aria-labelledby="dados-titulo">
       <h2 class="section-title" id="dados-titulo">Projeto</h2>
       {{ field(form.name, attrs={"required": true, "placeholder": "Lote 2026-017"}) }}
@@ -43,7 +51,7 @@
     <section class="card stack" aria-labelledby="etapas-titulo">
       <div>
         <h2 class="section-title" id="etapas-titulo">Etapas</h2>
-        <p class="muted text-sm">Preencha só as etapas que vai usar. Em cada uma, uma atividade por linha: <code>Nome; minutos por unidade</code>.</p>
+        <p class="muted text-sm">Sem modelo: preencha só as etapas que vai usar. Em cada uma, uma atividade por linha: <code>Nome; minutos por unidade</code>.</p>
       </div>
       {%- for error in form.stages.errors if error is string %}<p class="field__error">{{ icon("alert", "sm") }}<span>{{ error }}</span></p>{% endfor %}
       {%- for slot in form.stages %}

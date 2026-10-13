@@ -42,6 +42,15 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
     app.register_blueprint(app_bp)
     app.register_blueprint(dev_bp)  # /estilo: responde 404 fora de development
 
+    # Fase 4: modelos de etapas, edição de projeto (+ 402 e modo leitura), importar/exportar.
+    from app.blueprints.dados import bp as dados_bp
+    from app.blueprints.edicao import bp as edicao_bp
+    from app.blueprints.modelos import bp as modelos_bp
+
+    app.register_blueprint(modelos_bp)
+    app.register_blueprint(edicao_bp)
+    app.register_blueprint(dados_bp)
+
     from app.tenancy import load_company
 
     app.before_request(load_company)

@@ -1,0 +1,35 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/field.html" import checkbox %}
+{% set nav_current = "history" %}
+{% set nav_project = project %}
+{% block title %}Desfazer registro · {{ project.name }}{% endblock %}
+{% block content %}
+{# D13 (supervisor+): desfazer grava um lançamento compensatório; o original fica no histórico. #}
+{%- set history_url = url_for('app.project_history', project_id=project.id) %}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ history_url }}">{{ icon("chevron-left") }}Histórico</a>
+    <h1>Desfazer registro</h1>
+  </div>
+</header>
+
+{%- if entry.delta < 0 or entry.reverts_entry_id %}
+{{ alert("info", "Este lançamento já é um desfazer", action=("Voltar ao histórico", history_url)) }}
+{%- elif undone %}
+{{ alert("info", "Este registro já foi desfeito", action=("Voltar ao histórico", history_url)) }}
+{%- else %}
+<form class="card stack" method="post" action="{{ url_for('edicao.entry_undo', entry_id=entry.id) }}">
+  {{ form.csrf_token }}
+  <p class="text-strong">Desfazer {{ "%+d"|format(entry.delta) }} de {{ entry.user.name if entry.user else "—" }} em {{ activity.name }}?</p>
+  <p class="muted">{{ activity.stage.name }} › {{ activity.name }} · {{ entry.at|datahora }}. O total volta para {{ activity.units_done - entry.delta }} de {{ project.quantity }}. O registro original continua no histórico, marcado como desfeito.</p>
+  {{ checkbox("confirm", "Confirmo que quero desfazer este registro", value="y") }}
+  <div class="form-actions">
+    {{ button("Desfazer", "danger", size="lg") }}
+    {{ button("Cancelar", "secondary", size="lg", href=history_url) }}
+  </div>
+</form>
+{%- endif %}
+{% endblock %}

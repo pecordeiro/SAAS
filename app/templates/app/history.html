@@ -3,6 +3,7 @@
 {% from "components/table.html" import data_table %}
 {% from "components/chart.html" import bar_chart %}
 {% from "components/empty_state.html" import empty_state %}
+{% from "components/badge.html" import badge %}
 {% set nav_current = "history" %}
 {% set nav_project = project %}
 {% block title %}Histórico · {{ project.name }}{% endblock %}
@@ -21,16 +22,22 @@
   {{ bar_chart(per_day, "Peças por dia", orientation="vertical", table_headers=("Dia", "Peças")) }}
 </div>
 
-{% call data_table([("Quando", "is-nowrap"), ("Pessoa", ""), ("Etapa › atividade", ""), ("Qtd.", "is-num")], caption="Registros de peças", class_="history-table") %}
+{% call data_table([("Quando", "is-nowrap"), ("Pessoa", ""), ("Etapa › atividade", ""), ("Qtd.", "is-num"), ("", "")], caption="Registros de peças", class_="history-table") %}
   {%- for day, items in days.items() %}
   <tbody>
-    <tr class="table__group"><th scope="rowgroup" colspan="4">{{ day|dia_rotulo }}</th></tr>
+    <tr class="table__group"><th scope="rowgroup" colspan="5">{{ day|dia_rotulo }}</th></tr>
     {%- for e in items %}
     <tr class="history-row">
       <td class="history-row__when is-nowrap is-plain"><span class="wide-only">{{ e.at|datahora }}</span><span class="compact-only num">{{ e.at|hora }}</span></td>
       <td class="history-row__who is-plain">{{ e.user.name if e.user else "—" }}</td>
       <td class="history-row__where is-plain">{{ e.activity.stage.name }} › {{ e.activity.name }}</td>
-      <td class="history-row__qty is-num is-plain">{{ "%+d"|format(e.delta) }}</td>
+      <td class="history-row__qty is-num is-plain">{% if e.id in undone %}<s>{{ "%+d"|format(e.delta) }}</s>{% else %}{{ "%+d"|format(e.delta) }}{% endif %}</td>
+      <td class="is-plain">
+        {%- if e.reverts_entry_id %}{{ badge("desfazer", "neutral") }}
+        {%- elif e.id in undone %}{{ badge("desfeito", "neutral") }}
+        {%- elif can_undo and e.delta > 0 and not e.activity.archived_at and not e.activity.stage.archived_at and not project.archived_at %}<a class="btn btn--ghost" href="{{ url_for('edicao.entry_undo', entry_id=e.id) }}">Desfazer</a>
+        {%- endif %}
+      </td>
     </tr>
     {%- endfor %}
   </tbody>
@@ -40,5 +47,20 @@
 <div class="card">
   {{ empty_state("Nenhum registro ainda", "Os registros aparecem quando alguém soma peças.", ghost_action=("Ir para o projeto", url_for('app.project_detail', project_id=project.id)), icon="history") }}
 </div>
+{%- endif %}
+
+{%- if changes %}
+<section class="card mt-6 stack" aria-labelledby="alteracoes-titulo">
+  <h2 class="section-title" id="alteracoes-titulo">Alterações do projeto</h2>
+  <ul class="stack--sm">
+    {%- for c in changes %}
+    <li><span class="num muted text-sm">{{ c.at|datahora }}</span> · <span class="text-strong">{{ action_labels.get(c.action, c.action) }}</span>
+      {%- if c.details and c.details.get("to_version") %} (v{{ c.details.get("from_version") or "?" }} → v{{ c.details.get("to_version") }}){% endif %}
+      {%- if c.details and c.details.get("activity") %} · {{ c.details.get("activity") }}{% endif %}
+      {%- if c.details and c.details.get("stage") and not c.details.get("activity") %} · {{ c.details.get("stage") }}{% endif %}
+    </li>
+    {%- endfor %}
+  </ul>
+</section>
 {%- endif %}
 {% endblock %}

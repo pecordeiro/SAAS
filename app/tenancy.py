@@ -14,7 +14,7 @@ import uuid
 from functools import wraps
 from typing import Any, Callable, TypeVar
 
-from flask import abort, g, session
+from flask import abort, g, request, session
 from flask_login import current_user
 from sqlalchemy import Select, select
 
@@ -80,12 +80,20 @@ def first_active_membership(user_id: uuid.UUID) -> Membership | None:
     ).scalar_one_or_none()
 
 
-def tenant_required(min_role: str = ROLE_OPERATOR) -> Callable[[Callable[..., T]], Callable[..., T]]:
+SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
+def tenant_required(
+    min_role: str = ROLE_OPERATOR, *, allow_read_only: bool = False
+) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """Exige login, empresa ativa e papel mínimo (owner > supervisor > operator).
 
     Sem login → tela de login. Sem empresa válida na sessão → primeiro vínculo ativo do
     usuário (ou 403 se não houver).
     Papel insuficiente → 403.
+    Escrita (método que não é GET/HEAD/OPTIONS) com a empresa em modo leitura → 402
+    (``entitlements.ReadOnlyError``). ``allow_read_only=True`` libera a rota (ex.: pagar a
+    assinatura, sair).
     """
     if min_role not in ROLE_LEVEL:
         raise ValueError(f"Papel desconhecido: {min_role!r}")
@@ -103,6 +111,10 @@ def tenant_required(min_role: str = ROLE_OPERATOR) -> Callable[[Callable[..., T]
                 set_company(membership)
             if not g.membership.has_role(min_role):
                 abort(403)
+            if not allow_read_only and request.method not in SAFE_METHODS:
+                from app.services.entitlements import ensure_writable
+
+                ensure_writable(g.company)
             return view(*args, **kwargs)
 
         return wrapper
@@ -122,13 +134,28 @@ def scoped(model: type[T]) -> Select:
     return select(model).where(model.company_id == current_company_id())  # type: ignore[attr-defined]
 
 
-def get_or_404(model: type[T], obj_id: uuid.UUID | str) -> T:
-    """Busca por id DENTRO da empresa da sessão; de outra empresa (ou inexistente) → 404."""
+def is_archived(obj: Any) -> bool:
+    """Arquivado ele mesmo ou por herança (atividade de etapa arquivada, etapa/atividade de
+    projeto arquivado)."""
+    if getattr(obj, "archived_at", None) is not None:
+        return True
+    stage = getattr(obj, "stage", None)
+    if stage is not None and is_archived(stage):
+        return True
+    project = getattr(obj, "project", None)
+    return project is not None and getattr(project, "archived_at", None) is not None
+
+
+def get_or_404(model: type[T], obj_id: uuid.UUID | str, *, include_archived: bool = False) -> T:
+    """Busca por id DENTRO da empresa da sessão; de outra empresa (ou inexistente) → 404.
+
+    Arquivado (inclusive por herança) também responde 404, salvo ``include_archived=True``
+    (histórico e exportação continuam mostrando o que foi arquivado)."""
     try:
         obj_uuid = obj_id if isinstance(obj_id, uuid.UUID) else uuid.UUID(str(obj_id))
     except ValueError:
         abort(404)
     obj = db.session.execute(scoped(model).where(model.id == obj_uuid)).scalar_one_or_none()  # type: ignore[attr-defined]
-    if obj is None:
+    if obj is None or (not include_archived and is_archived(obj)):
         abort(404)
     return obj

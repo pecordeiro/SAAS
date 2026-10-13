@@ -236,3 +236,91 @@ critérios de pronto da anterior estiverem marcados.
   - Sem FK composta `(company_id, id)` entre pai e filho (a garantia de mesma empresa é do
     serviço + RLS); `project_members` fica para quando a tela de equipe existir.
   - Tabelas de convite/reset/confirmação/MFA/API ainda sem serviço (Fases 5 e 9).
+
+### Fase 4 — Backend e regras de negócio
+- Status: concluída (telas mínimas; capturas 375/768/1280 pendentes)
+- Datas: início 2026-10-13 · fim 2026-10-13
+- Entregas:
+  - `services/templates.py`: criar/editar modelo (etapas diferentes → nova versão imutável e
+    atual; nome repetido recusado sem diferenciar maiúsculas), arquivar, listar, uso por
+    projetos, projeto a partir de modelo (snapshot da versão atual), `compare` (etapa/atividade
+    entra ou sai, tempo muda, ordem muda — pareando por nome) e `apply_current_version` (só com
+    a versão confirmada; o que sai do modelo é ARQUIVADO, nunca apagado; auditoria com v1 → v2).
+  - `services/projects.py`: editar dados (quantidade não fica abaixo das peças registradas),
+    renomear, ↑/↓ (normaliza posições, pula arquivados), reordenar etapas, arquivar etapa,
+    atividade e projeto, duplicar (progresso zero), desfazer registro (D13) por lançamento
+    compensatório: `progress_entries.reverts_entry_id` (UNIQUE, CHECK delta < 0; migration
+    `c4f8a1d2e3b6`), status `done`/`active` sincronizado, “atraso previsto em N dias úteis”.
+  - `tenancy.get_or_404` agora devolve 404 para arquivado, inclusive por herança (atividade de
+    etapa arquivada, etapa de projeto arquivado) — pendência da Fase 0. Histórico e exportação
+    usam `include_archived=True`.
+  - `calc.dias_uteis_entre(inicio, fim, feriados, dias_semana)` (intervalo (inicio, fim]) com
+    5 testes conferidos à mão.
+  - `services/entitlements.py`: plano efetivo (assinatura ou teste implícito de `TRIAL_DAYS`
+    contado da criação da empresa no `DEFAULT_TRIAL_PLAN`), `max_projects` (ativos = não
+    arquivados e não concluídos), `max_users` (vínculos ativos + convites pendentes),
+    `has_feature`/`require_feature`, `usage`. Modo leitura: `tenant_required` barra todo método
+    não seguro com `ReadOnlyError` (402) — `allow_read_only=True` libera (ex.: pagar). Regra
+    ligável por `READ_ONLY_ENFORCED`. Erros viram página 402 amigável com “Ver planos”; aviso
+    “Assinatura em modo leitura — registros pausados” no layout.
+  - `services/events.py::emit` (`project.created`, `activity.progress_updated`,
+    `stage.completed`, `project.completed` na virada) e `services/audit.py::record` (ator, IP,
+    objeto, detalhes; constantes de ação para a Fase 5: papel, convite, plano, exclusão).
+  - `services/importer.py`: CSV (`;`/`,`/TAB, UTF-8 ou cp1252, vírgula decimal, dd/mm/aaaa),
+    XLSX exportado pelo site e a planilha de referência (layout pelos títulos da coluna A + aba
+    Equipe). Erros por linha (“Linha 7, tempo ideal: número inválido”); limites de linhas,
+    etapas e atividades; tipo por extensão + conteúdo; zip bomb barrado antes de abrir; fórmula
+    nunca avaliada. Pré-visualização → dados assinados (itsdangerous, empresa + usuário, 1 h)
+    → confirmação revalida e grava tudo num commit. Peças importadas viram 1 registro por
+    atividade no histórico.
+  - `services/exporter.py`: CSV (Excel BR, BOM) e XLSX com as colunas da tela + situação
+    (inclui arquivados); `= + - @ TAB CR` neutralizados com apóstrofo (a importação desfaz).
+  - Blueprints novos (sem inflar `app.py`): `modelos` (lista, novo, editar → versão, versões,
+    arquivar), `edicao` (editar projeto e estrutura, duplicar, arquivar, comparar/aplicar
+    modelo, desfazer registro; handler 402 e aviso de modo leitura), `dados` (exportar CSV/XLSX,
+    importar com pré-visualização, modelo CSV). `app.py`: novo projeto com seletor de modelo
+    (id resolvido por `get_or_404` na empresa da sessão), histórico com Desfazer/“desfeito” e
+    “Alterações do projeto” (auditoria), atraso em dias úteis. Menu “Modelos” (supervisor+).
+  - `MAX_CONTENT_LENGTH` = limite de importação + 256 KB (413 antes de ler o corpo).
+- Critérios de pronto:
+  - [x] Cobertura `pytest-cov` ≥ 90% em `app/services/` (98% no SQLite e no PostgreSQL).
+  - [x] Rota de criação chamada direto recebe 402 ao estourar `max_projects` (novo, duplicar,
+        importar); `max_users` testado no serviço (`check_can_add_user`, para a Fase 5 chamar
+        em convidar/aceitar); empresa sem assinatura ativa recebe 402 em escrita e lê normal.
+  - [x] Exportar → importar devolve os mesmos dados (CSV e XLSX, incluindo arquivados, datas,
+        equipe, peças e o resumo do calc).
+  - [x] CSV com 1 linha inválida não grava nada e devolve linha, coluna e motivo.
+  - [x] Célula exportada começando com `= + - @` (e TAB/CR) sai neutralizada (CSV e XLSX).
+  - [x] Cada mudança relevante gera exatamente 1 `domain_events` na mesma transação (teste com
+        rollback).
+  - [x] Editar modelo não altera projeto existente até a confirmação.
+  - [x] Isolamento A/B para cada rota nova (20 casos em `tests/test_isolation.py`, B intacto
+        conferido por snapshot) + modelo/versão de B no novo projeto → 404 e nada gravado +
+        prévia de importação assinada para outra empresa recusada.
+- Testes: SQLite `236 passed, 37 skipped (~2 min); cobertura de app/services 98%`; PostgreSQL 16 (`TEST_DATABASE_URL`) `273 passed (~4 min); cobertura de app/services 98%`.
+  `flask db upgrade`/`downgrade` da migration nova e `flask db check` sem drift no SQLite e no
+  PostgreSQL; `test_migrations` (ida e volta) verde nos dois.
+- /security-review: revisão manual — ids do formulário (modelo) sempre resolvidos na empresa
+  da sessão; toda rota nova com `tenant_required` no papel certo e POST com CSRF; upload
+  limitado e conferido por conteúdo; payload da prévia assinado e amarrado a empresa/usuário;
+  `Content-Disposition` só ASCII; sem `|safe`. Sem achados abertos.
+- Telas conferidas (375/768/1280, claro/escuro): não (só macros/tokens existentes;
+  `test_visual` verde). Fica para a Fase 6 junto com o editor HTMX.
+- Commit: “feat: fase 4 — backend e regras de negócio” (hash no histórico do branch).
+- ADRs criados: nenhum. Decisões registradas aqui: teste implícito sem assinatura (o cadastro
+  ainda não cria assinatura); projetos ativos = não arquivados e não concluídos; desfazer por
+  `reverts_entry_id`; importação cria PROJETO (não modelo).
+- Pendências e dívidas:
+  - Fase 5: chamar `entitlements.check_can_add_user` ao convidar/aceitar e `audit.record` em
+    papel/convite; criar assinatura `trialing` no cadastro (aí o teste implícito vira só
+    fallback).
+  - Migration `c4f8a1d2e3b6` sai de `a7c2d4e8f901`: se a Fase 5 criar migration em paralelo,
+    ajustar `down_revision` (ou `flask db merge`) no merge.
+  - Editor de modelo é de blocos “Nome; minutos” (sem ↑/↓ por etapa) e a edição do projeto usa
+    formulários pequenos sem HTMX; resumo calculado no novo projeto, filtros/paginação do
+    histórico e histórico geral (`/app/historico`) ficam para a Fase 6.
+  - Importar CSV como MODELO (tela de modelos) não existe; importação cria projeto.
+  - Desarquivar projeto não existe (precisará checar `max_projects`).
+  - `audit.client_ip` usa `request.remote_addr`: em produção atrás de proxy configurar ProxyFix.
+  - Werkzeug guarda upload > 500 KB em arquivo temporário anônimo durante a requisição (o
+    serviço lê em memória e não grava nada).

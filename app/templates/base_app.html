@@ -2,6 +2,7 @@
 {% from "components/icon.html" import icon %}
 {% from "components/nav.html" import sidebar_nav, bottom_nav, theme_switch %}
 {% from "components/toast.html" import toast_region %}
+{% from "components/alert.html" import alert %}
 {#
   Layout da área logada (telas.md, “Área logada”):
   - < 768 px: barra superior (logo, empresa, iniciais → folha “Mais”), conteúdo e navegação
@@ -12,6 +13,9 @@
 #}
 {%- set role_label = role_labels.get(current_membership.role, current_membership.role) if current_membership else "" -%}
 {%- set nav_items = [{"key": "projects", "label": "Projetos", "href": url_for("app.projects"), "icon": "projects"}] -%}
+{%- if current_membership and current_membership.has_role("supervisor") -%}
+  {%- set _ = nav_items.append({"key": "templates", "label": "Modelos", "href": url_for("modelos.index"), "icon": "folder"}) -%}
+{%- endif -%}
 {%- if nav_project is defined and nav_project -%}
   {%- set _ = nav_items.append({"key": "history", "label": "Histórico", "href": url_for("app.project_history", project_id=nav_project.id), "icon": "history"}) -%}
 {%- endif -%}
@@ -48,6 +52,9 @@
   </header>
 
   <main id="conteudo" class="app-main" tabindex="-1">
+    {%- if read_only | default(false) %}
+    <div class="mb-4">{{ alert("warning", "Assinatura em modo leitura — registros pausados", "Dá para ver e exportar tudo. Para voltar a gravar, regularize a assinatura.") }}</div>
+    {%- endif %}
     {% block content %}{% endblock %}
   </main>
 </div>

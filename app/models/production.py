@@ -104,13 +104,18 @@ class Activity(UUIDPk, Timestamps, TenantMixin, db.Model):
 
 
 class ProgressEntry(UUIDPk, TenantMixin, db.Model):
-    """Histórico append-only: nunca é alterado nem apagado."""
+    """Histórico append-only: nunca é alterado nem apagado.
+
+    Desfazer (D13, Fase 4) grava um lançamento COMPENSATÓRIO: delta negativo e
+    ``reverts_entry_id`` apontando para o registro desfeito (UNIQUE: desfaz uma vez só).
+    """
 
     __tablename__ = "progress_entries"
     __table_args__ = (
         Index("ix_progress_entries_company_activity_at", "company_id", "activity_id", "at"),
         Index("ix_progress_entries_company_at", "company_id", "at"),
         CheckConstraint("delta <> 0", name="delta_nonzero"),
+        CheckConstraint("reverts_entry_id IS NULL OR delta < 0", name="reversal_negative"),
     )
 
     activity_id: Mapped[uuid.UUID] = mapped_column(
@@ -119,6 +124,9 @@ class ProgressEntry(UUIDPk, TenantMixin, db.Model):
     user_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"))
     delta: Mapped[int] = mapped_column(Integer, nullable=False)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    reverts_entry_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("progress_entries.id", ondelete="RESTRICT"), unique=True
+    )
 
     activity: Mapped[Activity] = relationship()
     user = relationship("User")
