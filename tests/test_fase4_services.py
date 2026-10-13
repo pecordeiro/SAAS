@@ -735,3 +735,20 @@ def test_membership_inativo_nao_conta_usuario(ctx):
     membership.active = False
     db.session.flush()
     assert entitlements.count_users(company.id) == 2
+
+
+def test_desfazer_em_projeto_concluido_respeita_limite_do_plano(ctx):
+    """Concluir libera vaga; reativar (desfazendo) não pode furar max_projects."""
+    company, owner, _ = ctx
+    _subscribe(company, ESSENCIAL)
+    project = _project(company, quantity=1, stages=_stages(("E1", [("a", 10)])), name="Concluível")
+    entry = svc.register_progress(project.stages[0].activities[0], 1, None, owner.id)
+    db.session.commit()
+    assert project.status == PROJECT_DONE
+    # o ctx já tem 1 projeto ativo; com mais 2 o Essencial (3) fica cheio
+    _project(company, name="2")
+    _project(company, name="3")
+    assert entitlements.count_active_projects(company.id) == 3
+    db.session.commit()
+    with pytest.raises(entitlements.PlanLimitError):
+        svc.undo_progress(entry, owner.id)

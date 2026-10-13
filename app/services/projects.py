@@ -213,6 +213,10 @@ def _after_progress(activity: Activity, entry: ProgressEntry, stage_before: bool
 
 def _sync_status(project: Project, done: bool | None = None) -> None:
     done = _project_done(project) if done is None else done
+    if not done and project.status == PROJECT_DONE:
+        # Voltar de concluído para ativo ocupa uma vaga do plano: sem esta checagem,
+        # concluir e depois desfazer contornaria max_projects.
+        entitlements.check_can_create_project(db.session.get(Company, project.company_id))
     project.status = PROJECT_DONE if done else PROJECT_ACTIVE
 
 
