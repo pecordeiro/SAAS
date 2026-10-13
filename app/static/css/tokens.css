@@ -1,0 +1,232 @@
+/* =========================================================================
+   Controle de Produção — tokens do design system (direção "Prumo")
+   Fonte da verdade: docs/design/tokens.css  →  copiado para
+   app/static/css/tokens.css na Fase 2. NÃO renomeie variáveis: templates,
+   macros e o teste de "nenhuma cor solta" dependem destes nomes.
+   Contraste de todos os pares: docs/design/contraste.md (WCAG 2.1).
+   Regra: nenhuma cor, fonte ou espaçamento fora deste arquivo.
+   ========================================================================= */
+
+/* -------------------------------------------------------------------------
+   Breakpoints (documentação — CSS custom properties não funcionam dentro de
+   @media; use os valores literais abaixo SOMENTE nos arquivos de layout):
+     --bp-sm  480px   celular grande / celular deitado
+     --bp-md  768px   tablet; acima disso a navegação inferior vira menu lateral
+     --bp-lg  1024px  desktop compacto; tabela densa mostra todas as colunas
+     --bp-xl  1280px  desktop de referência das telas
+   Abordagem mobile-first: estilos base = 375 px; @media (min-width: …).
+   ------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  /* ---------- Cores: tema claro (padrão) ---------- */
+  --color-bg: #F3F5F6;              /* fundo da página */
+  --color-surface: #FFFFFF;         /* cards, tabelas, modais */
+  --color-surface-2: #E9EDF0;       /* cabeçalho de tabela, zebra, trilhos, hover de linha */
+  --color-text: #151A1F;            /* texto principal (grafite) */
+  --color-text-muted: #4D5964;      /* texto secundário, legendas, rótulos */
+  --color-border: #727F8A;          /* borda de componente (campo, botão secundário) ≥ 3:1 */
+  --color-border-subtle: #D5DBE0;   /* divisória decorativa (não identifica componente) */
+
+  --color-primary: #0B5D72;         /* azul petróleo: ação principal, links, progresso */
+  --color-primary-hover: #084A5B;
+  --color-primary-contrast: #FFFFFF;/* texto/ícone sobre --color-primary */
+  --color-primary-subtle: #E1EFF3;  /* item de menu ativo, destaque leve */
+
+  --color-accent: #F2B705;          /* amarelo sinalização: marca e destaques gráficos.
+                                       Nunca como texto sobre fundo claro. */
+  --color-accent-contrast: #151A1F; /* texto sobre --color-accent */
+
+  --color-success: #1D7238;
+  --color-success-subtle: #E2F1E6;
+  --color-warning: #8F5300;
+  --color-warning-subtle: #FBEFD9;
+  --color-danger: #B3261E;
+  --color-danger-hover: #8F1E18;
+  --color-danger-contrast: #FFFFFF;
+  --color-danger-subtle: #FBE6E4;
+  --color-neutral: #55616C;
+  --color-neutral-subtle: #E9EDF0;
+
+  --color-focus: #1B5FD1;           /* anel de foco (azul, distinto do primário) */
+  --color-inverse-surface: #151A1F; /* toast */
+  --color-inverse-text: #F3F5F6;
+  --color-track: #D5DBE0;           /* trilho da barra de progresso / gráfico */
+  --color-overlay: rgb(21 26 31 / 0.55); /* fundo atrás do modal */
+
+  /* ---------- Tipografia ---------- */
+  /* Fontes servidas pelo próprio site (woff2 em app/static/fonts/, licença OFL). */
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: "Barlow Semi Condensed", "IBM Plex Sans", system-ui, "Arial Narrow", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  /* Escala de 6 tamanhos (rem; 1rem = 16px) */
+  --font-size-sm: 0.875rem;   /* 14px — legendas, metadados, cabeçalho de tabela */
+  --font-size-md: 1rem;       /* 16px — texto base, campos (evita zoom no iOS) */
+  --font-size-lg: 1.25rem;    /* 20px — títulos de card, subtítulos */
+  --font-size-xl: 1.5rem;     /* 24px — título de página no celular */
+  --font-size-2xl: 2rem;      /* 32px — título de página desktop, número de indicador no celular */
+  --font-size-3xl: 3rem;      /* 48px — número de indicador desktop, valor do stepper */
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.1;   /* números grandes, display */
+  --line-height-snug: 1.3;    /* títulos */
+  --line-height-normal: 1.5;  /* texto corrido, tabelas */
+
+  --letter-spacing-caps: 0.04em; /* rótulos em caixa alta (indicadores, cabeçalho de tabela) */
+
+  /* Dados numéricos: aplicar em tabelas, indicadores, stepper, datas */
+  --font-numeric: tabular-nums;  /* uso: font-variant-numeric: var(--font-numeric); */
+
+  /* ---------- Espaçamento: escala de 4 px ---------- */
+  --space-1: 0.25rem;  /*  4px */
+  --space-2: 0.5rem;   /*  8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px — gutter lateral no celular */
+  --space-5: 1.25rem;  /* 20px */
+  --space-6: 1.5rem;   /* 24px */
+  --space-7: 1.75rem;  /* 28px */
+  --space-8: 2rem;     /* 32px */
+  --space-9: 2.25rem;  /* 36px */
+  --space-10: 2.5rem;  /* 40px */
+  --space-11: 2.75rem; /* 44px */
+  --space-12: 3rem;    /* 48px */
+
+  /* ---------- Raios ---------- */
+  --radius-sm: 4px;     /* selos, campos pequenos */
+  --radius-md: 6px;     /* botões, campos */
+  --radius-lg: 10px;    /* cards, modais */
+  --radius-pill: 999px; /* barra de progresso */
+
+  /* ---------- Bordas ---------- */
+  --border-width: 1px;
+  --border-width-strong: 2px; /* campo com erro, card selecionado */
+
+  /* ---------- Sombras ---------- */
+  --shadow-1: 0 1px 2px rgb(21 26 31 / 0.08);                                    /* card */
+  --shadow-2: 0 2px 4px rgb(21 26 31 / 0.08), 0 4px 12px rgb(21 26 31 / 0.08);   /* menu, toast */
+  --shadow-3: 0 8px 24px rgb(21 26 31 / 0.18), 0 2px 6px rgb(21 26 31 / 0.10);   /* modal, folha inferior */
+
+  /* ---------- Foco visível ---------- */
+  --focus-width: 3px;
+  --focus-offset: 2px;
+  --focus-ring: 0 0 0 var(--focus-offset) var(--color-bg), 0 0 0 calc(var(--focus-offset) + var(--focus-width)) var(--color-focus);
+  /* uso preferido: :focus-visible { outline: var(--focus-width) solid var(--color-focus); outline-offset: var(--focus-offset); } */
+
+  /* ---------- Alvos de toque e tamanhos de controle ---------- */
+  --touch-min: 44px;          /* mínimo absoluto para qualquer alvo clicável */
+  --touch-comfortable: 56px;  /* chão de fábrica: botões do stepper, navegação inferior, ação principal no celular */
+  --control-height: 44px;     /* botões e campos padrão */
+  --control-height-lg: 56px;  /* botões e campos grandes */
+  --icon-size: 20px;
+  --icon-size-lg: 24px;
+
+  /* ---------- Layout ---------- */
+  --gutter: var(--space-4);          /* 16px no celular */
+  --gutter-desktop: var(--space-8);  /* 32px a partir de 768px */
+  --content-max: 1200px;
+  --content-narrow: 440px;           /* formulários de autenticação */
+  --content-text: 720px;             /* termos, privacidade */
+  --sidebar-width: 248px;
+  --topbar-height: 56px;
+  --bottom-nav-height: 64px;
+
+  /* ---------- Camadas ---------- */
+  --z-sticky: 10;
+  --z-nav: 20;
+  --z-overlay: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+
+  /* ---------- Movimento ---------- */
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --easing-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* ---------- Tema escuro: automático, salvo se o usuário fixou o claro ---------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-bg: #0E1215;
+    --color-surface: #161B20;
+    --color-surface-2: #1F262C;
+    --color-text: #E7EBEE;
+    --color-text-muted: #A2ADB7;
+    --color-border: #6F7C87;
+    --color-border-subtle: #2C353D;
+    --color-primary: #5BBBD1;
+    --color-primary-hover: #82CDDF;
+    --color-primary-contrast: #0E1215;
+    --color-primary-subtle: #12333C;
+    --color-accent: #F5C030;
+    --color-accent-contrast: #0E1215;
+    --color-success: #5CC985;
+    --color-success-subtle: #16301F;
+    --color-warning: #F2B755;
+    --color-warning-subtle: #33260F;
+    --color-danger: #FF8A7F;
+    --color-danger-hover: #FFA59C;
+    --color-danger-contrast: #0E1215;
+    --color-danger-subtle: #3A1A18;
+    --color-neutral: #A2ADB7;
+    --color-neutral-subtle: #252D34;
+    --color-focus: #7DB0FF;
+    --color-inverse-surface: #E7EBEE;
+    --color-inverse-text: #0E1215;
+    --color-track: #2C353D;
+    --color-overlay: rgb(0 0 0 / 0.65);
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.40);
+    --shadow-2: 0 2px 4px rgb(0 0 0 / 0.40), 0 4px 12px rgb(0 0 0 / 0.35);
+    --shadow-3: 0 8px 24px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.40);
+  }
+}
+
+/* ---------- Tema escuro fixado pelo usuário ---------- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #0E1215;
+  --color-surface: #161B20;
+  --color-surface-2: #1F262C;
+  --color-text: #E7EBEE;
+  --color-text-muted: #A2ADB7;
+  --color-border: #6F7C87;
+  --color-border-subtle: #2C353D;
+  --color-primary: #5BBBD1;
+  --color-primary-hover: #82CDDF;
+  --color-primary-contrast: #0E1215;
+  --color-primary-subtle: #12333C;
+  --color-accent: #F5C030;
+  --color-accent-contrast: #0E1215;
+  --color-success: #5CC985;
+  --color-success-subtle: #16301F;
+  --color-warning: #F2B755;
+  --color-warning-subtle: #33260F;
+  --color-danger: #FF8A7F;
+  --color-danger-hover: #FFA59C;
+  --color-danger-contrast: #0E1215;
+  --color-danger-subtle: #3A1A18;
+  --color-neutral: #A2ADB7;
+  --color-neutral-subtle: #252D34;
+  --color-focus: #7DB0FF;
+  --color-inverse-surface: #E7EBEE;
+  --color-inverse-text: #0E1215;
+  --color-track: #2C353D;
+  --color-overlay: rgb(0 0 0 / 0.65);
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.40);
+  --shadow-2: 0 2px 4px rgb(0 0 0 / 0.40), 0 4px 12px rgb(0 0 0 / 0.35);
+  --shadow-3: 0 8px 24px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.40);
+}
+
+/* ---------- Movimento reduzido ---------- */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-normal: 0ms;
+  }
+}

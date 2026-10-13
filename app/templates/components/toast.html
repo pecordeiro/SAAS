@@ -1,0 +1,24 @@
+{% from "components/icon.html" import icon %}
+{#
+  Toast — design-system §9. Some em 5 s (animação CSS, funciona sem JS; pausa com foco ou
+  ponteiro). Nunca é o único lugar de informação crítica: erros vão em alerta.
+#}
+{% macro toast(message, kind="info") -%}
+<div class="toast toast--{{ kind }}" data-toast>
+  {{ icon("check" if kind == "success" else "info", class_="toast__icon") }}
+  <p class="toast__message">{{ message }}</p>
+  <button type="button" class="btn btn--ghost btn--icon toast__close js-only" data-toast-close aria-label="Fechar mensagem">{{ icon("x") }}</button>
+</div>
+{%- endmacro %}
+
+{# Região única (aria-live) com as mensagens flash da requisição. #}
+{% macro toast_region() -%}
+{%- set kinds = {"sucesso": "success", "success": "success", "info": "info", "message": "info"} -%}
+<div class="toast-region" aria-live="polite" aria-atomic="true">
+  {%- with messages = get_flashed_messages(with_categories=true) %}
+    {%- for category, message in messages[-1:] %}
+    {{ toast(message, kinds.get(category, "info")) }}
+    {%- endfor %}
+  {%- endwith %}
+</div>
+{%- endmacro %}

@@ -1,0 +1,4 @@
+{# Ícone do sprite (components/_icons.html). Com `label`, vira imagem acessível; sem, é decorativo. #}
+{% macro icon(name, size=None, label=None, class_="") -%}
+<svg class="icon{% if size %} icon--{{ size }}{% endif %}{% if class_ %} {{ class_ }}{% endif %}" {% if label %}role="img" aria-label="{{ label }}"{% else %}aria-hidden="true" focusable="false"{% endif %}><use href="#i-{{ name }}"></use></svg>
+{%- endmacro %}

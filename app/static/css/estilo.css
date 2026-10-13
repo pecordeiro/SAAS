@@ -1,0 +1,84 @@
+/* Só para /estilo (development): amostras de tokens. Só var(). */
+@layer components {
+  .styleguide section { scroll-margin-top: var(--space-6); }
+  .styleguide__toc { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); }
+  .styleguide__grid { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(var(--sidebar-width) - var(--space-8))), 1fr)); }
+  .styleguide__row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+  .swatch { display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--font-size-sm); }
+  .swatch__chip { height: var(--space-12); border-radius: var(--radius-md); border: var(--border-width) solid var(--color-border-subtle); }
+  .swatch code { overflow-wrap: anywhere; }
+  .space-demo { display: flex; align-items: center; gap: var(--space-3); font-size: var(--font-size-sm); }
+  .space-demo__bar { height: var(--space-3); background: var(--color-primary); border-radius: var(--radius-sm); }
+  .radius-demo, .shadow-demo { width: calc(2 * var(--space-12)); height: calc(1.5 * var(--space-12)); background: var(--color-surface); border: var(--border-width) solid var(--color-border); display: flex; align-items: center; justify-content: center; font-size: var(--font-size-sm); }
+  .shadow-demo { border-color: var(--color-border-subtle); border-radius: var(--radius-lg); }
+  .demo-frame { position: relative; border: var(--border-width) dashed var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4); background: var(--color-bg); overflow: hidden; }
+  .demo-frame .bottom-nav { position: static; display: flex; padding-bottom: 0; height: var(--bottom-nav-height); }
+  .demo-frame .app-sidebar { position: static; display: flex; flex-direction: column; gap: var(--space-4); height: auto; width: var(--sidebar-width); padding: var(--space-4) var(--space-3); background: var(--color-surface); border: var(--border-width) solid var(--color-border-subtle); border-radius: var(--radius-lg); }
+  .demo-frame .toast { animation: none; }
+  .demo-frame .register { position: static; display: block; }
+  .demo-frame .register .sheet__panel { animation: none; box-shadow: var(--shadow-3); border-radius: var(--radius-lg); max-height: none; }
+  .demo-frame .register .compact-only:not(.sheet__backdrop) { display: block !important; }
+  .demo-frame .register .sheet__backdrop { display: none !important; }
+  .demo-frame .register .register__head { display: flex; }
+  .demo-frame .register .register__meta, .demo-frame .register .register__hint { display: block; }
+  .demo-frame .register .register__label-long { display: inline; }
+  .demo-frame .register .register__label-short { display: none; }
+  .demo-frame .register .register__fields { display: block; }
+  .demo-frame .register .register__fields > * + * { margin-top: var(--space-4); }
+  .demo-frame .register .stepper { grid-template-columns: var(--touch-comfortable) minmax(0, 1fr) var(--touch-comfortable); }
+  .demo-frame .register .stepper__btn { width: var(--touch-comfortable); height: var(--touch-comfortable); }
+  .demo-frame .register .stepper__input { height: var(--touch-comfortable); font-size: var(--font-size-3xl); }
+  .demo-frame .register .register__submit { width: 100%; min-height: var(--control-height-lg); }
+  .swatch__chip--bg { background: var(--color-bg); }
+  .swatch__chip--surface { background: var(--color-surface); }
+  .swatch__chip--surface-2 { background: var(--color-surface-2); }
+  .swatch__chip--text { background: var(--color-text); }
+  .swatch__chip--text-muted { background: var(--color-text-muted); }
+  .swatch__chip--border { background: var(--color-border); }
+  .swatch__chip--border-subtle { background: var(--color-border-subtle); }
+  .swatch__chip--primary { background: var(--color-primary); }
+  .swatch__chip--primary-hover { background: var(--color-primary-hover); }
+  .swatch__chip--primary-contrast { background: var(--color-primary-contrast); }
+  .swatch__chip--primary-subtle { background: var(--color-primary-subtle); }
+  .swatch__chip--accent { background: var(--color-accent); }
+  .swatch__chip--accent-contrast { background: var(--color-accent-contrast); }
+  .swatch__chip--success { background: var(--color-success); }
+  .swatch__chip--success-subtle { background: var(--color-success-subtle); }
+  .swatch__chip--warning { background: var(--color-warning); }
+  .swatch__chip--warning-subtle { background: var(--color-warning-subtle); }
+  .swatch__chip--danger { background: var(--color-danger); }
+  .swatch__chip--danger-hover { background: var(--color-danger-hover); }
+  .swatch__chip--danger-contrast { background: var(--color-danger-contrast); }
+  .swatch__chip--danger-subtle { background: var(--color-danger-subtle); }
+  .swatch__chip--neutral { background: var(--color-neutral); }
+  .swatch__chip--neutral-subtle { background: var(--color-neutral-subtle); }
+  .swatch__chip--focus { background: var(--color-focus); }
+  .swatch__chip--inverse-surface { background: var(--color-inverse-surface); }
+  .swatch__chip--inverse-text { background: var(--color-inverse-text); }
+  .swatch__chip--track { background: var(--color-track); }
+  .space-demo__bar--1 { width: var(--space-1); }
+  .space-demo__bar--2 { width: var(--space-2); }
+  .space-demo__bar--3 { width: var(--space-3); }
+  .space-demo__bar--4 { width: var(--space-4); }
+  .space-demo__bar--5 { width: var(--space-5); }
+  .space-demo__bar--6 { width: var(--space-6); }
+  .space-demo__bar--7 { width: var(--space-7); }
+  .space-demo__bar--8 { width: var(--space-8); }
+  .space-demo__bar--9 { width: var(--space-9); }
+  .space-demo__bar--10 { width: var(--space-10); }
+  .space-demo__bar--11 { width: var(--space-11); }
+  .space-demo__bar--12 { width: var(--space-12); }
+  .radius-demo--sm { border-radius: var(--radius-sm); }
+  .radius-demo--md { border-radius: var(--radius-md); }
+  .radius-demo--lg { border-radius: var(--radius-lg); }
+  .radius-demo--pill { border-radius: var(--radius-pill); }
+  .shadow-demo--1 { box-shadow: var(--shadow-1); }
+  .shadow-demo--2 { box-shadow: var(--shadow-2); }
+  .shadow-demo--3 { box-shadow: var(--shadow-3); }
+  .fs-demo--sm { font-size: var(--font-size-sm); line-height: var(--line-height-snug); }
+  .fs-demo--md { font-size: var(--font-size-md); line-height: var(--line-height-snug); }
+  .fs-demo--lg { font-size: var(--font-size-lg); line-height: var(--line-height-snug); }
+  .fs-demo--xl { font-size: var(--font-size-xl); line-height: var(--line-height-snug); }
+  .fs-demo--2xl { font-size: var(--font-size-2xl); line-height: var(--line-height-snug); }
+  .fs-demo--3xl { font-size: var(--font-size-3xl); line-height: var(--line-height-snug); }
+}

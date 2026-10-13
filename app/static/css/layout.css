@@ -1,0 +1,324 @@
+/* Layout: contêineres, site público, casca da área logada e grades.
+   Breakpoints (tokens.css): 30em = 480, 48em = 768, 64em = 1024, 80em = 1280 (1em = 1rem, tamanho inicial do navegador).
+   Mobile-first: estilos base = 375; @media (min-width: …). */
+@layer layout {
+  .container {
+    width: 100%;
+    max-width: calc(var(--content-max) + 2 * var(--gutter));
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+  }
+
+  .stack > * + * { margin-top: var(--space-4); }
+  .stack--sm > * + * { margin-top: var(--space-2); }
+  .stack--lg > * + * { margin-top: var(--space-8); }
+
+  .cluster {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .skip-link {
+    position: absolute;
+    left: var(--space-2);
+    top: calc(-1 * var(--space-12) * 2);
+    z-index: var(--z-toast);
+    padding: var(--space-2) var(--space-4);
+    background: var(--color-surface);
+    color: var(--color-primary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-2);
+  }
+  .skip-link:focus { top: var(--space-2); }
+
+  /* ---------- Marca ---------- */
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--touch-min);
+    color: var(--color-text);
+    text-decoration: none;
+    font-family: var(--font-display);
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-lg);
+    line-height: var(--line-height-tight);
+  }
+  .brand:hover { color: var(--color-text); }
+  .brand__logo {
+    width: var(--space-8);
+    height: var(--space-8);
+    flex: none;
+    border-radius: var(--radius-md);
+    /* No tema escuro o bloco grafite precisa de contorno para não sumir (marca.md). */
+    box-shadow: 0 0 0 var(--border-width) var(--color-border-subtle);
+  }
+
+  /* ---------- Site público ---------- */
+  .site-header {
+    background: var(--color-surface);
+    border-bottom: var(--border-width) solid var(--color-border-subtle);
+  }
+  .site-header__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    min-height: var(--topbar-height);
+  }
+  .site-nav { display: none; }
+  .site-nav__link {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch-min);
+    padding-inline: var(--space-3);
+    color: var(--color-text);
+    font-weight: var(--font-weight-semibold);
+    text-decoration: none;
+    border-radius: var(--radius-md);
+  }
+  .site-nav__link:hover { background: var(--color-surface-2); color: var(--color-text); }
+
+  .site-main { padding-block: var(--space-8) var(--space-12); }
+
+  .site-footer {
+    border-top: var(--border-width) solid var(--color-border-subtle);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+  .site-footer__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-6);
+    padding-block: var(--space-6);
+  }
+  .site-footer a { color: var(--color-text-muted); }
+  .site-footer a:hover { color: var(--color-text); }
+
+  @media (min-width: 48em) {
+    .container { padding-inline: var(--gutter-desktop); max-width: calc(var(--content-max) + 2 * var(--gutter-desktop)); }
+    .site-nav { display: flex; align-items: center; gap: var(--space-2); }
+    .site-header__menu { display: none; }
+    .site-main { padding-block: var(--space-12); }
+  }
+
+  /* ---------- Autenticação (cartão estreito centralizado) ---------- */
+  .auth {
+    display: grid;
+    gap: var(--space-8);
+    justify-content: center;
+    grid-template-columns: minmax(0, var(--content-narrow));
+  }
+  .auth__aside { display: none; }
+  @media (min-width: 64em) {
+    .auth--with-aside { grid-template-columns: minmax(0, var(--content-narrow)) minmax(0, var(--content-narrow)); gap: var(--space-12); }
+    .auth--with-aside .auth__aside { display: block; align-self: center; }
+  }
+
+  /* ---------- Área logada ---------- */
+  .app-shell { min-height: 100vh; min-height: 100dvh; }
+
+  .app-topbar {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-nav);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    height: var(--topbar-height);
+    padding-inline: var(--gutter);
+    background: var(--color-surface);
+    border-bottom: var(--border-width) solid var(--color-border-subtle);
+  }
+  .app-topbar__company {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-display);
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-lg);
+  }
+
+  .app-sidebar { display: none; }
+
+  .app-main {
+    padding: var(--space-6) var(--gutter) calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + var(--space-8));
+    max-width: calc(var(--content-max) + 2 * var(--gutter-desktop));
+  }
+
+  .bottom-nav {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: var(--z-nav);
+    display: flex;
+    height: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--color-surface);
+    border-top: var(--border-width) solid var(--color-border-subtle);
+  }
+  .bottom-nav__item {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    min-width: var(--bottom-nav-height);
+    min-height: var(--touch-comfortable);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    text-decoration: none;
+    line-height: var(--line-height-tight);
+  }
+  .bottom-nav__item:hover { color: var(--color-text); }
+  .bottom-nav__item[aria-current="page"] { color: var(--color-primary); }
+  .bottom-nav__item[aria-current="page"]::before {
+    content: "";
+    position: absolute;
+    inset: 0 var(--space-4) auto;
+    height: calc(3 * var(--border-width));
+    background: var(--color-primary);
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+
+  @media (min-width: 48em) {
+    .app-shell {
+      display: grid;
+      grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+    }
+    .app-topbar,
+    .bottom-nav { display: none; }
+
+    .app-sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+      padding: var(--space-4) var(--space-3);
+      background: var(--color-surface);
+      border-right: var(--border-width) solid var(--color-border-subtle);
+      overflow-y: auto;
+    }
+    .app-main { padding: var(--space-8) var(--gutter-desktop) var(--space-12); }
+  }
+
+  .sidebar__company {
+    padding: 0 var(--space-3);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-snug);
+  }
+  .sidebar__nav { display: flex; flex-direction: column; gap: var(--space-1); }
+  .sidebar__item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: var(--touch-min);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    font-weight: var(--font-weight-semibold);
+    text-decoration: none;
+  }
+  .sidebar__item:hover { background: var(--color-surface-2); color: var(--color-text); }
+  .sidebar__item[aria-current="page"] {
+    background: var(--color-primary-subtle);
+    color: var(--color-primary);
+  }
+  .sidebar__item[aria-current="page"]::before {
+    content: "";
+    position: absolute;
+    inset: var(--space-2) auto var(--space-2) calc(-1 * var(--space-3));
+    width: calc(3 * var(--border-width));
+    background: var(--color-primary);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .sidebar__footer {
+    margin-top: auto;
+    padding: var(--space-4) var(--space-3) 0;
+    border-top: var(--border-width) solid var(--color-border-subtle);
+  }
+
+  /* ---------- Cabeçalho de página ---------- */
+  .page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-6);
+  }
+  .page-header__titles { min-width: 0; flex: 1 1 auto; }
+  .page-header__subtitle { color: var(--color-text-muted); margin-top: var(--space-1); }
+  .page-header__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .page-header__meta { margin-top: var(--space-2); }
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: var(--touch-min);
+    margin-bottom: var(--space-1);
+    font-weight: var(--font-weight-semibold);
+    text-decoration: none;
+  }
+
+  /* ---------- Grades ---------- */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+  @media (min-width: 64em) {
+    .kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); }
+  }
+
+  .split { display: grid; gap: var(--space-8); }
+  @media (min-width: 64em) {
+    .split { grid-template-columns: minmax(0, 1fr) calc(var(--sidebar-width) + var(--space-8)); align-items: start; }
+    .split--form { grid-template-columns: minmax(0, var(--content-text)) minmax(0, 1fr); }
+    .split__aside { position: sticky; top: var(--space-6); }
+  }
+
+  .section-title {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+    font-family: var(--font-sans);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: var(--letter-spacing-caps);
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  .form-row { display: grid; gap: var(--space-4); }
+  @media (min-width: 30em) {
+    .form-row--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+}
+
+/* Âncoras e foco não ficam escondidos atrás da barra superior / navegação inferior. */
+@layer layout {
+  html:has(body.app) {
+    scroll-padding-top: calc(var(--topbar-height) + var(--space-2));
+    scroll-padding-bottom: calc(var(--bottom-nav-height) + var(--space-4));
+  }
+  @media (min-width: 48em) {
+    html:has(body.app) { scroll-padding-top: var(--space-4); scroll-padding-bottom: var(--space-4); }
+  }
+}

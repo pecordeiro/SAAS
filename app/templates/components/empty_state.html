@@ -1,0 +1,16 @@
+{% from "components/icon.html" import icon as _icon %}
+{% from "components/button.html" import button %}
+{#
+  Estado vazio — design-system §13. Sempre diz o próximo passo.
+  action = (rótulo, href) → botão primário; ghost_action = (rótulo, href) → fantasma
+  (variante “sem resultado de filtro”: “Limpar filtros”).
+#}
+{% macro empty_state(title, body=None, action=None, icon="folder", ghost_action=None) -%}
+<div class="empty">
+  {{ _icon(icon, "xl", class_="empty__icon") }}
+  <p class="empty__title">{{ title }}</p>
+  {%- if body %}<p class="empty__body">{{ body }}</p>{% endif %}
+  {%- if action %}<div class="empty__action">{{ button(action[0], "primary", href=action[1]) }}</div>{% endif %}
+  {%- if ghost_action %}<div class="empty__action">{{ button(ghost_action[0], "ghost", href=ghost_action[1]) }}</div>{% endif %}
+</div>
+{%- endmacro %}

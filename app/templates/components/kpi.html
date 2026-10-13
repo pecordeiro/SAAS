@@ -1,0 +1,20 @@
+{% from "components/icon.html" import icon %}
+{#
+  Card de indicador — design-system §5. O número é o herói e fica sempre em --color-text;
+  `tone` (success | warning | danger) colore só a sublinha, com ícone.
+  Conteúdo extra (ex.: barra de progresso) via {% call %}. Sem dado: value=None → “—”.
+#}
+{% macro kpi(label, value, unit=None, sub=None, tone="neutral", href=None, empty_sub="sem dados ainda") -%}
+{%- set tag = "a" if href else "div" -%}
+{%- set ico = {"success": "check", "warning": "alert", "danger": "alert"}.get(tone) -%}
+<{{ tag }} class="kpi"{% if href %} href="{{ href }}"{% endif %}>
+  <span class="kpi__label">{{ label }}</span>
+  <span class="kpi__value">{% if value is none %}—{% else %}{{ value }}{% if unit %} <span class="kpi__unit">{{ unit }}</span>{% endif %}{% endif %}</span>
+  {%- if caller is defined %}{{ caller() }}{% endif %}
+  {%- if value is none %}
+  <span class="kpi__sub">{{ empty_sub }}</span>
+  {%- elif sub %}
+  <span class="kpi__sub{% if ico %} kpi__sub--{{ tone }}{% endif %}">{% if ico %}{{ icon(ico, "sm") }}{% endif %}<span>{{ sub }}</span></span>
+  {%- endif %}
+</{{ tag }}>
+{%- endmacro %}

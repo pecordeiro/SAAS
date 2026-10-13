@@ -1,0 +1,225 @@
+{% extends "base_publica.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/field.html" import field, checkbox, form_errors %}
+{% from "components/stepper.html" import stepper, piece_stepper %}
+{% from "components/table.html" import data_table %}
+{% from "components/kpi.html" import kpi %}
+{% from "components/progress.html" import progress %}
+{% from "components/badge.html" import status_badge, badge %}
+{% from "components/alert.html" import alert %}
+{% from "components/toast.html" import toast %}
+{% from "components/modal.html" import confirm_dialog %}
+{% from "components/empty_state.html" import empty_state %}
+{% from "components/pagination.html" import pagination %}
+{% from "components/chart.html" import bar_chart %}
+{% from "components/nav.html" import sidebar_nav, bottom_nav, theme_switch %}
+{% block title %}Estilo · Controle de Produção{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="{{ url_for('static', filename='css/estilo.css') }}">{% endblock %}
+{% block content %}
+{#- Vitrine do design system (só development). Cada seção = um item de design-system.md. -#}
+<div class="styleguide stack--lg">
+  <header class="stack--sm">
+    <h1>Design system</h1>
+    <p class="muted">Tokens (<code>static/css/tokens.css</code>) e macros (<code>templates/components/</code>). Troque o tema para conferir os dois.</p>
+    <div class="styleguide__theme">{{ theme_switch(theme, request.path, url_for("public.set_theme"), "tema-estilo") }}</div>
+    <nav class="styleguide__toc text-sm" aria-label="Seções">
+      {%- for anchor, name in [("cores", "Cores"), ("tipografia", "Tipografia"), ("espacos", "Espaço, raio, sombra"), ("botoes", "Botões"), ("campos", "Campos"), ("stepper", "Registrador de peças"), ("tabela", "Tabela"), ("indicadores", "Indicadores"), ("progresso", "Progresso"), ("selos", "Selos"), ("alertas", "Alertas"), ("toast", "Toast"), ("modal", "Modal"), ("vazio", "Estado vazio"), ("paginacao", "Paginação"), ("graficos", "Gráficos"), ("navegacao", "Navegação"), ("skeleton", "Carregando")] %}
+      <a href="#{{ anchor }}">{{ name }}</a>
+      {%- endfor %}
+    </nav>
+  </header>
+
+  <section id="cores" class="stack" aria-labelledby="h-cores">
+    <h2 id="h-cores">Cores</h2>
+    <div class="styleguide__grid">
+      {%- for c in color_tokens %}
+      <div class="swatch"><span class="swatch__chip swatch__chip--{{ c }}"></span><code>--color-{{ c }}</code></div>
+      {%- endfor %}
+    </div>
+  </section>
+
+  <section id="tipografia" class="stack" aria-labelledby="h-tipo">
+    <h2 id="h-tipo">Tipografia</h2>
+    <p class="muted text-sm">Títulos e números grandes: Barlow Semi Condensed (tnum). Texto, tabelas e campos: IBM Plex Sans (algarismos de largura fixa).</p>
+    {%- for size, px in font_sizes %}
+    <p class="fs-demo--{{ size }}"><code class="text-sm">--font-size-{{ size }} · {{ px }}</code><br><span class="{{ 'kpi__value' if size in ('2xl', '3xl') else '' }}">Lote 2026-014 · 1.234,5 h</span></p>
+    {%- endfor %}
+  </section>
+
+  <section id="espacos" class="stack" aria-labelledby="h-esp">
+    <h2 id="h-esp">Espaço, raio e sombra</h2>
+    <div class="stack--sm">
+      {%- for i in spaces %}
+      <div class="space-demo"><code>--space-{{ i }}</code><span class="space-demo__bar space-demo__bar--{{ i }}"></span></div>
+      {%- endfor %}
+    </div>
+    <div class="styleguide__row">
+      {%- for r in radii %}<div class="radius-demo radius-demo--{{ r }}">radius-{{ r }}</div>{% endfor %}
+    </div>
+    <div class="styleguide__row">
+      {%- for s in shadows %}<div class="shadow-demo shadow-demo--{{ s }}">shadow-{{ s }}</div>{% endfor %}
+    </div>
+  </section>
+
+  <section id="botoes" class="stack" aria-labelledby="h-bot">
+    <h2 id="h-bot">Botões</h2>
+    <div class="styleguide__row">
+      {{ button("Registrar", "primary") }}
+      {{ button("Exportar", "secondary") }}
+      {{ button("Excluir projeto", "danger") }}
+      {{ button("Ver histórico", "ghost") }}
+    </div>
+    <div class="styleguide__row">
+      {{ button("Criar projeto", "primary", size="lg", icon="plus") }}
+      {{ button("Salvando…", "primary", loading=True) }}
+      {{ button("Plano no limite", "primary", disabled=True) }}
+      {{ button("Fechar", "ghost", icon="x", icon_only=True, aria_label="Fechar") }}
+      {{ button("Aumentar", "secondary", size="lg", icon="plus", icon_only=True, aria_label="Aumentar quantidade") }}
+    </div>
+    {{ button("Ação principal no celular (bloco)", "primary", size="lg", block=True) }}
+  </section>
+
+  <section id="campos" class="stack" aria-labelledby="h-campos">
+    <h2 id="h-campos">Campos</h2>
+    {{ form_errors(form) }}
+    <div class="form-row form-row--2">
+      {{ field(form.name, required=True) }}
+      {{ field(form.email, attrs={"inputmode": "email"}) }}
+      {{ field(form.password, hint="Mín. 10 caracteres.") }}
+      {{ field(form.product, optional=True, attrs={"placeholder": "Equipamento compacto CX-10"}) }}
+      {{ field(form.role) }}
+      {{ field(form.disabled, attrs={"readonly": true}) }}
+    </div>
+    {{ field(form.notes, attrs={"rows": 3}) }}
+    {{ checkbox("manter", "Manter conectado neste aparelho") }}
+  </section>
+
+  <section id="stepper" class="stack" aria-labelledby="h-step">
+    <h2 id="h-step">Registrador de peças</h2>
+    <p class="muted text-sm">Folha de registro aberta (no celular aparece como folha inferior; no desktop fica na linha da atividade).</p>
+    <div class="demo-frame">
+      {{ piece_stepper("demo", "Alinhamento", "Montagem mecânica", 7, 10, "#stepper", 3, "#stepper") }}
+    </div>
+    <div class="styleguide__row">
+      <div class="field">{{ stepper("qtd-md", 10, 1, 100, id="qtd-md", label="Quantidade", size="md") }}</div>
+    </div>
+  </section>
+
+  <section id="tabela" class="stack" aria-labelledby="h-tab">
+    <h2 id="h-tab">Tabela densa</h2>
+    {% call data_table([("Projeto", ""), ("Unid.", "is-num"), ("Progresso", ""), ("Faltam", "is-num"), ("Status", "")], caption="Exemplo") %}
+      <tbody>
+        {%- for name, u, p, f, s in [("Lote 2026-014 · CX-10", "1/10", 0.56, "100 h 30", "Em andamento"), ("Encomenda 2026-009 · BT-2", "4/4", 1.0, "0 h", "Concluída"), ("Lote 2026-016 · MT-1", "0/20", 0, "460 h", "Não iniciada")] %}
+        <tr>
+          <td class="is-plain"><a class="row-link" href="#tabela">{{ name }}</a></td>
+          <td class="is-num" data-label="Unidades">{{ u }}</td>
+          <td class="is-plain">{{ progress(p, 1, size="sm") }}</td>
+          <td class="is-num" data-label="Faltam">{{ f }}</td>
+          <td class="is-plain">{{ status_badge(s) }}</td>
+        </tr>
+        {%- endfor %}
+      </tbody>
+    {% endcall %}
+  </section>
+
+  <section id="indicadores" class="stack" aria-labelledby="h-kpi">
+    <h2 id="h-kpi">Indicadores</h2>
+    <div class="kpi-grid">
+      {{ kpi("Unidades", "1/10", sub="concluídas") }}
+      {% call kpi("Progresso", "56%") %}{{ progress(0.56, 1, size="sm", show_text=False) }}{% endcall %}
+      {{ kpi("Faltam", "100 h 30", sub="de 230 h") }}
+      {{ kpi("Dias úteis", "4,2", sub="término 20/10 · no prazo", tone="success") }}
+      {{ kpi("Atraso", "2", unit="dias", sub="após o prazo", tone="danger") }}
+      {{ kpi("Aviso", "3", unit="dias", sub="vence em breve", tone="warning") }}
+      {{ kpi("Sem dado", None, empty_sub="sem etapas ainda") }}
+      {{ kpi("Card-link", "15", href="#indicadores", sub="projetos ativos") }}
+    </div>
+  </section>
+
+  <section id="progresso" class="stack" aria-labelledby="h-prog">
+    <h2 id="h-prog">Barra de progresso</h2>
+    {{ progress(0, 1, label="Zero") }}
+    {{ progress(0.56, 1, label="Em andamento") }}
+    {{ progress(7, 10, label="7 de 10", text="7 de 10") }}
+    {{ progress(1, 1, label="Concluída") }}
+    {{ progress(0.2, 1, label="Pequena", size="sm") }}
+  </section>
+
+  <section id="selos" class="stack" aria-labelledby="h-selos">
+    <h2 id="h-selos">Selos de status</h2>
+    <div class="styleguide__row">
+      {{ status_badge("Concluída") }}
+      {{ status_badge("Em andamento") }}
+      {{ status_badge("Não iniciada") }}
+      {{ status_badge("Atrasado") }}
+      {{ badge("Teste grátis", "info") }}
+      {{ badge("Ativa", "success") }}
+      {{ badge("Em carência", "warning") }}
+      {{ badge("Somente leitura", "danger") }}
+    </div>
+  </section>
+
+  <section id="alertas" class="stack" aria-labelledby="h-alertas">
+    <h2 id="h-alertas">Alertas</h2>
+    {{ alert("info", "Teste grátis: faltam 5 dias.", action=("Escolher plano", "#alertas"), role="status") }}
+    {{ alert("success", "Se houver conta com esse e-mail, enviamos um link válido por 1 hora.") }}
+    {{ alert("warning", "Fatura de 18/11 em atraso.", "Em 5 dias a conta entra em modo leitura (nada é apagado).", action=("Pagar agora", "#alertas"), dismiss_href="#alertas") }}
+    {{ alert("danger", "E-mail ou senha incorretos.", role="status") }}
+  </section>
+
+  <section id="toast" class="stack" aria-labelledby="h-toast">
+    <h2 id="h-toast">Toast</h2>
+    <div class="demo-frame stack--sm">
+      {{ toast("+1 em Alinhamento · 8 de 10", "success") }}
+      {{ toast("Você saiu.", "info") }}
+    </div>
+  </section>
+
+  <section id="modal" class="stack" aria-labelledby="h-modal">
+    <h2 id="h-modal">Modal de confirmação</h2>
+    <p>{{ button("Arquivar projeto…", "danger", href="#confirmar-demo", attrs={"aria-haspopup": "dialog"}) }}</p>
+    {{ confirm_dialog("confirmar-demo", "Arquivar o projeto Lote 2026-014?", "Ele sai da lista de ativos e para de receber registros. O histórico continua disponível.", "Arquivar projeto", "#modal") }}
+  </section>
+
+  <section id="vazio" class="stack" aria-labelledby="h-vazio">
+    <h2 id="h-vazio">Estado vazio</h2>
+    <div class="styleguide__grid">
+      <div class="card">{{ empty_state("Nenhum projeto ainda", "Crie um modelo de etapas e depois o primeiro lote.", action=("Novo projeto", "#vazio")) }}</div>
+      <div class="card">{{ empty_state("Nenhum projeto com esses filtros", ghost_action=("Limpar filtros", "#vazio")) }}</div>
+    </div>
+  </section>
+
+  <section id="paginacao" class="stack" aria-labelledby="h-pag">
+    <h2 id="h-pag">Paginação</h2>
+    {%- macro demo_page(n) %}#paginacao{% endmacro %}
+    {{ pagination(2, 6, 132, 25, demo_page) }}
+  </section>
+
+  <section id="graficos" class="stack" aria-labelledby="h-graf">
+    <h2 id="h-graf">Gráficos</h2>
+    <div class="styleguide__grid">
+      <div class="card">{{ bar_chart(stages, "Progresso por etapa", max=1, table_headers=("Etapa", "Progresso")) }}</div>
+      <div class="card">{{ bar_chart(per_day, "Peças por dia", orientation="vertical", table_headers=("Dia", "Peças")) }}</div>
+    </div>
+  </section>
+
+  <section id="navegacao" class="stack" aria-labelledby="h-nav">
+    <h2 id="h-nav">Navegação</h2>
+    {%- set demo_items = [{"key": "projects", "label": "Projetos", "href": "#navegacao", "icon": "projects"}, {"key": "history", "label": "Histórico", "href": "#navegacao", "icon": "history"}] %}
+    <div class="styleguide__row">
+      <div class="demo-frame"><div class="app-sidebar">{{ sidebar_nav(demo_items, "projects") }}</div></div>
+      <div class="demo-frame">{{ bottom_nav(demo_items, "projects", more_href="#navegacao") }}</div>
+    </div>
+  </section>
+
+  <section id="skeleton" class="stack" aria-labelledby="h-skel">
+    <h2 id="h-skel">Carregando</h2>
+    <div class="kpi-grid" aria-busy="true">
+      {%- for _ in range(4) %}
+      <div class="kpi"><span class="skeleton"></span><span class="skeleton skeleton--number"></span></div>
+      {%- endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

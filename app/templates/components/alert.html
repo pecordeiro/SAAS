@@ -1,0 +1,21 @@
+{% from "components/icon.html" import icon %}
+{#
+  Alerta — design-system §8. kind: info | success | warning | danger.
+  role="alert" só para erro que acabou de acontecer; o resto usa role="status".
+  action = (rótulo, href) vira botão fantasma.
+#}
+{% macro alert(kind="info", title=None, body=None, action=None, role=None, dismiss_href=None) -%}
+{%- set ico = {"info": "info", "success": "check", "warning": "alert", "danger": "alert"}[kind] -%}
+<div class="alert alert--{{ kind }}" role="{{ role or ('alert' if kind == 'danger' else 'status') }}">
+  {{ icon(ico, class_="alert__icon") }}
+  <div class="alert__content">
+    {%- if title %}<p class="alert__title">{{ title }}</p>{% endif %}
+    {%- if body %}<p class="alert__body">{{ body }}</p>{% endif %}
+    {%- if caller is defined %}<div class="alert__body">{{ caller() }}</div>{% endif %}
+    {%- if action %}<a class="btn btn--ghost alert__action" href="{{ action[1] }}">{{ action[0] }}</a>{% endif %}
+  </div>
+  {%- if dismiss_href %}
+  <a class="btn btn--ghost btn--icon alert__close" href="{{ dismiss_href }}" aria-label="Fechar aviso">{{ icon("x") }}</a>
+  {%- endif %}
+</div>
+{%- endmacro %}

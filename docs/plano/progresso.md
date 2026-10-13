@@ -79,6 +79,96 @@ critérios de pronto da anterior estiverem marcados.
 - Commit: c873665 docs(design): fase 1 — marca Prumo, tokens e design system
 - Pendências: aprovar direção de marca; demonstrar “≤ 2 toques” na tela real (Fase 2).
 
+### Fase 2 — Base visual no código
+- Status: concluída (lista de diferenças com o handoff abaixo, todas justificadas)
+- Datas: início 2026-10-13 · fim 2026-10-13
+- Entregas:
+  - `app/static/css/tokens.css` = cópia byte a byte de `docs/design/tokens.css` (claro padrão;
+    escuro por `prefers-color-scheme` e por `data-theme` no `<html>`).
+  - CSS próprio em camadas `@layer base, layout, components, utilities` (`base.css`,
+    `layout.css`, `components.css`, `pages.css`, `utilities.css`; `estilo.css` só na vitrine),
+    sem Bootstrap, só `var(--…)`; breakpoints em `em` (30/48/64em).
+  - Fontes woff2 servidas pelo site (`app/static/fonts`, subset latin do pacote
+    `@fontsource` 5.1.0, com `OFL-*.txt`): IBM Plex Sans 400/600/700 (algarismos já de
+    largura fixa) e Barlow Semi Condensed 600/700 (tem `tnum`; conferido com fontTools, então
+    `font-variant-numeric: tabular-nums` funciona nos números grandes).
+  - HTMX 2.0.4 local (`app/static/js/htmx.min.js`, de `npm pack htmx.org@2.0.4`, licença
+    junto), configurado por `<meta name="htmx-config">`: `allowEval:false`,
+    `allowScriptTags:false`, `includeIndicatorStyles:false`, `selfRequestsOnly:true`,
+    `attributesToSettle` sem `style`. Nenhum CDN; CSP continua `default-src 'self'` sem nonce
+    (não há script nem estilo inline; `app/static/js/app.js` faz as melhorias progressivas).
+  - Macros em `app/templates/components/`: `button`, `field`/`checkbox`/`form_errors`,
+    `stepper`/`piece_stepper`, `data_table`, `kpi`, `progress` (`<progress>` nativo, sem
+    estilo inline), `status_badge`/`badge`, `alert`, `toast`/`toast_region`,
+    `confirm_dialog`, `empty_state`, `pagination`, `bar_chart` (SVG no servidor, horizontal e
+    vertical, com tabela equivalente), `sidebar_nav`/`bottom_nav`/`theme_switch`, `icon`
+    (sprite SVG próprio).
+  - Layouts `_base.html` → `base_publica.html` (cabeçalho, ☰ em folha no celular, rodapé) e
+    `base_app.html` (menu lateral ≥ 768 px com empresa e papel; barra superior + navegação
+    inferior no celular; folha “Mais” com tema e Sair). Tema Sistema/Claro/Escuro persistido em
+    cookie `tema` (lido no servidor → sem piscar); com JS aplica na hora, sem JS faz
+    `POST /tema` (CSRF, `next` só interno).
+  - Telas migradas: início, entrar, cadastro, projetos, detalhe, histórico (agrupado por dia
+    + gráfico de peças por dia), novo projeto, erros 400/403/404/429/500 (logado mantém o
+    menu). Mensagens do WTForms em português (`Meta.locales`, `WTF_I18N_ENABLED=False`).
+  - **Registro em 2 toques no celular**: toque na atividade abre a folha inferior por âncora
+    (`#registrar-<id>`, funciona sem JS) já com +1 → toque em “Registrar +1 (→ 8 de 10)”.
+    Com JS o formulário vai por HTMX (`hx-boost`, sem recarregar a página), a folha fecha, a
+    linha pisca e o toast confirma; erro (400/409) reabre a folha com o alerta. Conferido com
+    Playwright a 375 px com e sem JS (`docs/design/capturas/fase2/fluxo-*.png`). No desktop
+    (≥ 1024 px) o stepper fica na linha da atividade.
+  - `/estilo` (só development; 404 em qualquer outro ambiente): tokens (cores, tipos,
+    espaços, raios, sombras) e todos os componentes com variantes e estados.
+  - Logo e favicon SVG, `favicon-32.png`, `apple-touch-icon.png` (180) e `og-image.png`
+    (1200×630) gerados dos SVGs de `docs/design` com Chromium headless e as fontes locais.
+- Critérios de pronto:
+  - [x] Teste que varre `app/templates/` (e o CSS fora de `tokens.css`) e falha com cor hex,
+        `rgb(`/`hsl(` ou valor em `px` (`tests/test_visual.py`).
+  - [x] Nenhuma referência a CDN (regex `https?://` em `<link>`/`<script>`), nem script/estilo
+        inline nos templates.
+  - [x] `/estilo` responde 404 em production, staging e test; 200 em development.
+  - [x] Capturas de cada tela em 375/768/1280, claro e escuro (`docs/design/capturas/fase2/`,
+        82 PNGs, 3,6 MB); diferenças com o handoff listadas abaixo (corrigidas ou justificadas).
+  - [x] Testes antigos verdes.
+- Testes: `90 passed` (65 antigos + 25 de `tests/test_visual.py`).
+- Contraste: script de `docs/design/contraste.md` rodado de novo (todos os pares passam) +
+  pares novos usados nas telas: sucesso/aviso/perigo sobre `--color-bg` e `--color-surface-2`,
+  texto secundário sobre `--color-primary-subtle` (pior: 5,07:1 claro, 5,88:1 escuro).
+- /security-review: revisão manual — sem `|safe`/`Markup`; `/tema` exige CSRF, valida o valor
+  e só redireciona para caminho interno; cookie de tema inválido é ignorado; nenhuma rota
+  nova com `<uuid>`.
+- Telas conferidas (375/768/1280, claro/escuro): sim (Playwright; sem rolagem horizontal).
+- Commit: ver `git log` (feat: fase 2 — base visual no código)
+- ADRs criados: nenhum.
+- Diferenças com `docs/design/telas.md` (justificadas):
+  - Menu: só Projetos (+ Histórico do projeto aberto). Modelos, Usuários, Empresa,
+    Assinatura e o histórico geral não têm rota ainda (Fases 4–6); entram nos itens de
+    `base_app.html` quando existirem. Faixa de teste grátis/carência fica para a Fase 5.
+  - Tablet (768 px): com o menu lateral, o conteúdo tem ~460 px; por isso tabelas viram cards
+    e o detalhe usa a folha de registro até 1023 px (o handoff só desenha 375 e 1280). O menu
+    lateral não recolhe para ícones.
+  - Lista de projetos: sem filtros/abas/busca e sem Exportar; “Atraso previsto” sem o número
+    de dias (falta função de dias úteis entre datas em `calc.py` — Fase 4).
+  - Detalhe: sem subtítulo de produto (não há campo), sem “prazo em N dias úteis/folga”
+    (mesma função de calc), sem Exportar/Editar/Arquivar e sem atualização a cada 30 s;
+    indicadores atualizam trocando o corpo da página via `hx-boost` (não `hx-swap-oob`);
+    sem coluna “#” (os nomes de etapa do seed já trazem o número). Formulários “Nova
+    atividade”/“Incluir etapa” da Fase 0 mantidos (supervisor+).
+  - Histórico: sem filtros, exportação, “6 → 7 de 10” e desfazer (Fase 4); mostra os 200
+    mais recentes sem paginação.
+  - Novo projeto: sem seletor de modelo, resumo calculado por HTMX e dias da semana; etapas
+    ainda digitadas em 6 blocos “Nome; minutos” (Fase 4/6). Quantidade usa o stepper.
+  - Entrar/cadastro: sem “Manter conectado”, “Esqueci a senha”, MFA, aceite de termos e tela
+    “Confirme seu e-mail” (Fase 5); cadastro mantém “Repita a senha”.
+  - Site público: “Preços” aponta para `/#precos` (não há `/precos`); rodapé sem Termos,
+    Privacidade e contato (páginas ainda não existem). 500 sem código de erro para suporte.
+- Pendências e dívidas:
+  - `favicon.ico` não gerado (navegadores usam o SVG e o PNG 32).
+  - `og:image` usa URL absoluta do host da requisição; em produção conferir `SERVER_NAME`/proxy.
+  - Só o último flash vira toast (design: 1 por vez).
+  - Campos de data mostram o formato do navegador (`input type=date`).
+  - Atualizar HTMX/fontes é manual (versões fixadas acima).
+
 ### Fase 3 — Banco de dados
 - Status: concluída
 - Datas: início 2026-10-13 · fim 2026-10-13

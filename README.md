@@ -8,7 +8,9 @@ e exportação. Site renderizado no servidor (Flask + Jinja + HTMX), em portugu�
 
 Fase 0 (esqueleto) entregue: app factory, modelos e primeira migration, isolamento por
 empresa (`app/tenancy.py`), regras de cálculo puras (`app/services/calc.py`) conferidas
-contra a planilha de referência, cadastro/login, telas provisórias sem design e testes.
+contra a planilha de referência, cadastro/login e testes.
+Fase 2 (base visual) entregue: design system “Prumo” no código (tokens, CSS em camadas,
+fontes e HTMX locais, macros, layouts, tema claro/escuro, registro de peças em 2 toques).
 Fase 3 (banco) entregue: schema completo do MVP em PostgreSQL 16 (modelos de etapas
 versionados, convites, tokens de conta, MFA, planos, assinaturas, cobranças, webhooks,
 auditoria, outbox, API), CHECK/UNIQUE, feriados nacionais, políticas RLS ligáveis e testes
@@ -65,6 +67,22 @@ migrations no PostgreSQL só rodam com `TEST_DATABASE_URL`; no SQLite aparecem c
   snapshot de modelo.
 - `tests/test_rls.py`: RLS ligado com um papel comum (não superusuário) criado no teste.
 - `tests/test_migrations.py`: upgrade → downgrade base → upgrade sem drift (SQLite e PG).
+
+### Interface (Fase 2)
+
+- Tokens: `app/static/css/tokens.css` é cópia de `docs/design/tokens.css` (o handoff do
+  design, ADR-0008). Mudou a marca? Troque os valores lá e copie; nomes não mudam.
+- CSS: `app/static/css/{base,layout,components,pages,utilities}.css` em `@layer`. Só
+  `var(--…)`: cor hex, `rgb(`/`hsl(` ou `px` fora de `tokens.css` quebram
+  `tests/test_visual.py`.
+- Componentes: macros em `app/templates/components/` (`{% from "components/button.html"
+  import button %}` etc.). Páginas estendem `base_publica.html` ou `base_app.html`.
+- Vitrine: `http://127.0.0.1:5000/estilo` (só com `APP_ENV=development`; 404 nos demais).
+- Sem CDN e sem script/estilo inline (CSP `default-src 'self'`): fontes woff2 (OFL) em
+  `app/static/fonts`, HTMX 2.0.4 em `app/static/js/htmx.min.js` (`allowEval:false`),
+  melhorias em `app/static/js/app.js`. Tudo funciona sem JS.
+- Tema: Sistema/Claro/Escuro no menu (cookie `tema`).
+- Capturas de referência: `docs/design/capturas/fase2/` (375/768/1280, claro e escuro).
 
 ### Migrations
 

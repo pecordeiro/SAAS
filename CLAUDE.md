@@ -15,9 +15,9 @@ Python 3.12, Flask 3, SQLAlchemy 2, Alembic (Flask-Migrate), PostgreSQL 16,
 Flask-Login, Flask-WTF (CSRF), Flask-Limiter, Gunicorn, pytest. Pagamento: Asaas.
 
 ## Estado atual
-Fase 0 (esqueleto) concluída: app factory, tenancy.py, services/calc.py (paridade com a
-planilha de referência), login/cadastro, telas provisórias, testes e CI. Ver
-docs/plano/progresso.md para a fase corrente.
+Fases 0–3 concluídas: esqueleto, calc.py com paridade da planilha, design system “Prumo”
+no código (tokens, macros, layouts), schema completo do MVP com migrations e RLS ligável.
+Testes em PostgreSQL via TEST_DATABASE_URL. Ver docs/plano/progresso.md.
 
 ## Regras invioláveis
 1. Multiempresa: toda tabela com dado de cliente tem company_id. A empresa vem da
