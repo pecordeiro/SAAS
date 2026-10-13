@@ -73,7 +73,11 @@
     </form>
     {%- else %}
     <p class="muted">Proteja a conta com um código do celular (Google Authenticator, Authy, 1Password…).</p>
+    {%- if current_user.email_confirmed_at %}
     <div>{{ button("Ativar verificação em duas etapas", "primary", href=url_for('account.mfa_setup')) }}</div>
+    {%- else %}
+    <p class="muted">Confirme seu e-mail para poder ativar.</p>
+    {%- endif %}
     {%- endif %}
   </section>
 

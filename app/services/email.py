@@ -74,6 +74,8 @@ class ConsoleEmailSender:
 
 
 class ResendEmailSender:
+    background = True  # rede: entregue fora da requisição (ver deliver)
+
     def __init__(self, api_key: str, sender: str, timeout: float):
         self.api_key = api_key
         self.sender = sender
@@ -157,7 +159,41 @@ def send_template(to: str, subject: str, template: str, **context) -> None:
         text=render_template(f"emails/{template}.txt", **context),
         html=render_template(f"emails/{template}.html", **context),
     )
-    get_sender().send(message)
+    deliver(message)
+
+
+def _safe_send(sender: EmailSender, message: EmailMessage) -> None:
+    try:
+        sender.send(message)
+    except EmailError:
+        pass  # já logado pelo backend (sem corpo)
+    except Exception as exc:  # noqa: BLE001 - falha de entrega nunca derruba a requisição
+        logger.error("falha inesperada ao enviar e-mail '%s' (%s)", message.subject, exc.__class__.__name__)
+
+
+def _executor(app: Flask):
+    from concurrent.futures import ThreadPoolExecutor
+
+    executor = app.extensions.get("email_executor")
+    if executor is None:
+        executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="email")
+        app.extensions["email_executor"] = executor
+    return executor
+
+
+def deliver(message: EmailMessage) -> None:
+    """Entrega sem bloquear a resposta nem vazar erro: backends de rede (``background =
+    True``, ex. Resend) vão para uma thread de fundo; assim o tempo e o resultado da
+    requisição não dependem de a mensagem existir/chegar (sem enumeração por tempo em
+    “esqueci a senha” e no cadastro). O console entrega na hora (testes leem a caixa).
+    Mensagem pendente na thread se perde se o processo cair: o outbox com worker (Fase 8)
+    substitui isto."""
+    app = current_app._get_current_object()  # type: ignore[attr-defined]
+    sender = get_sender(app)
+    if getattr(sender, "background", False):
+        _executor(app).submit(_safe_send, sender, message)
+    else:
+        _safe_send(sender, message)
 
 
 def _site_url() -> str:

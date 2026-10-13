@@ -233,6 +233,14 @@ def reset_password(token: str | None, new_password: str) -> tuple[str, User | No
     now = utcnow()
     user.password_hash = hash_password(new_password)
     bump_session_version(user)  # todas as sessões abertas caem
+    if user.email_confirmed_at is None:
+        # O link chegou no e-mail: o reset prova a posse. Numa conta nunca confirmada, quem a
+        # criou pode não ser o dono do e-mail (pre-account takeover): apaga o MFA dele e os
+        # códigos de recuperação, e marca o e-mail como confirmado.
+        from app.services import mfa
+
+        mfa.disable(user)
+        user.email_confirmed_at = now
     for pending in db.session.execute(
         select(PasswordReset).where(PasswordReset.user_id == user.id, PasswordReset.used_at.is_(None))
     ).scalars():
@@ -259,6 +267,10 @@ def request_email_change(user: User, password: str, new_email: str) -> None:
     endereço já tem conta, a resposta é a mesma (sem enumerar) e o aviso vai para ele."""
     if not verify_password(user.password_hash, password):
         raise AccountError("Senha atual incorreta.")
+    if user.email_confirmed_at is None:
+        # Sem provar a posse do e-mail atual, a conta pode ser de quem cadastrou o e-mail
+        # alheio (pre-account takeover): nada de mudar o e-mail antes de confirmar.
+        raise AccountError("Confirme o seu e-mail atual antes de trocar.")
     new_email = normalize_email(new_email)
     if new_email == normalize_email(user.email):
         raise AccountError("Este já é o seu e-mail.")
@@ -361,6 +373,9 @@ def invite(company: Company, actor: Membership, email: str, role: str) -> Invita
         ).scalar_one_or_none()
         if member is not None and member.active:
             raise AccountError("Esta pessoa já faz parte da empresa.")
+        if member is not None and actor.role != ROLE_OWNER:
+            # Aceitar reativaria um vínculo desativado: decisão só do proprietário.
+            raise AccountError("Esta pessoa foi desativada. Só o proprietário pode convidá-la de novo.")
     pending = db.session.execute(
         select(Invitation).where(*_pending_invites_filter(company.id), Invitation.email == email)
     ).scalar_one_or_none()
@@ -452,6 +467,9 @@ def _consume_invitation(invitation: Invitation, user: User) -> Membership:
         member = Membership(company_id=invitation.company_id, user_id=user.id, role=invitation.role)
         db.session.add(member)
     else:
+        # Reativar vínculo desativado só com convite criado por quem é proprietário ativo.
+        if not _is_active_owner(invitation.company_id, invitation.invited_by_user_id):
+            raise AccountError("Este convite não pode reativar o seu acesso. Fale com o proprietário da empresa.")
         member.active = True
         member.role = invitation.role
     locked.used_at = utcnow()
@@ -461,6 +479,22 @@ def _consume_invitation(invitation: Invitation, user: User) -> Membership:
         actor_user_id=user.id,
     )
     return member
+
+
+def _is_active_owner(company_id: uuid.UUID, user_id: uuid.UUID | None) -> bool:
+    if user_id is None:
+        return False
+    return (
+        db.session.execute(
+            select(Membership.id).where(
+                Membership.company_id == company_id,
+                Membership.user_id == user_id,
+                Membership.role == ROLE_OWNER,
+                Membership.active.is_(True),
+            )
+        ).first()
+        is not None
+    )
 
 
 def accept_invite_existing(invitation: Invitation, user: User) -> Membership:

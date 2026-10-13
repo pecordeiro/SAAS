@@ -126,7 +126,9 @@ def login():
     if form.validate_on_submit():
         email = form.email.data
         ip = request.remote_addr
-        locked = lockout.status(email, ip)
+        # Só o bloqueio da CONTA impede tentar: o do IP não barra a senha certa (atrás de
+        # NAT/proxy um atacante trancaria todo mundo); ele só faz a senha errada responder 429.
+        locked = lockout.status(email, None)
         if locked.locked:
             error, status_code = lock_message(locked), 429
         else:
@@ -183,7 +185,7 @@ def login_mfa():
     status_code = 400 if request.method == "POST" else 200
     if form.validate_on_submit():
         ip = request.remote_addr
-        locked = lockout.status(user.email, ip)
+        locked = lockout.status(user.email, None)
         if locked.locked:
             error, status_code = lock_message(locked), 429
         elif mfa.verify_user_totp(user, form.code.data) or mfa.use_recovery_code(user, form.code.data):

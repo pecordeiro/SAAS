@@ -161,7 +161,7 @@ def profile_email():
         try:
             accounts.request_email_change(current_user, form.current_password.data, form.email.data)
         except AccountError as exc:
-            form.current_password.errors.append(str(exc)) if "Senha" in str(exc) else form.email.errors.append(str(exc))
+            (form.current_password if "Senha" in str(exc) else form.email).errors.append(str(exc))
         else:
             flash(f"Enviamos um link de confirmação para {form.email.data}. O e-mail só muda depois de confirmar.", "sucesso")
             return redirect(url_for("account.profile"), code=303)
@@ -214,11 +214,23 @@ def _setup_secret(create: bool = True) -> str | None:
     return secret
 
 
+def _require_confirmed_email():
+    """MFA só depois de provar a posse do e-mail: senão quem cadastrou o e-mail de outra
+    pessoa ativaria um segundo fator que sobreviveria ao reset de senha do dono."""
+    if current_user.email_confirmed_at is None:
+        flash("Confirme seu e-mail antes de ativar a verificação em duas etapas.", "info")
+        return redirect(url_for("account.confirm_required"), code=303)
+    return None
+
+
 @bp.get("/mfa")
 @login_required
 def mfa_setup():
     if current_user.mfa_enabled:
         return redirect(url_for("account.profile"))
+    blocked = _require_confirmed_email()
+    if blocked:
+        return blocked
     secret = _setup_secret()
     response = make_response(render_template("account/mfa_setup.html", form=MfaSetupForm(formdata=None), secret=secret))
     response.headers["Cache-Control"] = "no-store"
@@ -229,7 +241,7 @@ def mfa_setup():
 @login_required
 def mfa_qr():
     secret = _setup_secret(create=False)
-    if secret is None or current_user.mfa_enabled:
+    if secret is None or current_user.mfa_enabled or current_user.email_confirmed_at is None:
         abort(404)
     response = make_response(mfa.qr_svg(mfa.provisioning_uri(secret, current_user.email)))
     response.headers["Content-Type"] = "image/svg+xml"
@@ -243,6 +255,9 @@ def mfa_qr():
 def mfa_enable():
     if current_user.mfa_enabled:
         return redirect(url_for("account.profile"), code=303)
+    blocked = _require_confirmed_email()
+    if blocked:
+        return blocked
     form = MfaSetupForm()
     secret = _setup_secret(create=False)
     if secret is None:

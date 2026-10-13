@@ -4,6 +4,11 @@
   exista ou não a conta — o comportamento não revela cadastro) e na chave do IP.
 - Ao atingir o limite (5 por conta, 20 por IP — escritórios dividem IP), a chave fica
   bloqueada por 1 min; cada falha seguinte aumenta para 5, 15, 60 min (o último se repete).
+- Só o bloqueio da CONTA impede o login (até com a senha certa). O bloqueio do IP NÃO
+  barra a senha correta — atrás de NAT/proxy um atacante trancaria todos os usuários do
+  mesmo IP; ele só faz cada senha errada vinda daquele IP responder 429 (atrasa e conta
+  tentativas em massa). O IP vem de ``request.remote_addr`` já corrigido pelo ProxyFix
+  (``TRUSTED_PROXY_COUNT``), igual ao Flask-Limiter.
 - Login certo zera a chave da conta. A do IP não zera (senão quem tem uma conta válida
   "limparia" o IP entre tentativas); ela expira sozinha após LOCKOUT_RESET_HOURS sem falha.
 - As chaves são guardadas só como SHA-256 (nada de e-mail ou IP em claro nesta tabela).

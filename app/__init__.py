@@ -20,6 +20,7 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
         app.config.update(overrides)
     finalize_config(app.config, config.ENV_NAME)
     app.config["ENV_NAME"] = config.ENV_NAME
+    _init_proxy(app)
 
     from app import models  # noqa: F401  (registra os modelos no metadata)
 
@@ -60,6 +61,16 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
 
     register_cli(app)
     return app
+
+
+def _init_proxy(app: Flask) -> None:
+    """ProxyFix só com proxies confiáveis declarados: o IP real (X-Forwarded-For) passa a
+    valer em ``request.remote_addr`` antes do bloqueio de login e do Flask-Limiter."""
+    count = int(app.config.get("TRUSTED_PROXY_COUNT") or 0)
+    if count > 0:
+        from werkzeug.middleware.proxy_fix import ProxyFix
+
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=count, x_proto=count)  # type: ignore[method-assign]
 
 
 def _init_login(app: Flask) -> None:

@@ -455,6 +455,7 @@ def test_logout_so_encerra_a_sessao_atual(client, app, tenants):
 def test_troca_de_email_com_reconfirmacao(client, app, tenants):
     a, _ = tenants
     login(client, app, a.owner_email)
+    _confirm_logged_user(client, app)
     wrong = post(client, app, "/conta/perfil/email", {"email": "novo@a.com", "current_password": "errada-00000"})
     assert wrong.status_code == 400
     assert post(client, app, "/conta/perfil/email", {"email": "novo@a.com", "current_password": PASSWORD}).status_code == 303
@@ -474,7 +475,19 @@ def test_troca_de_email_com_reconfirmacao(client, app, tenants):
 # --------------------------------------------------------------------------- MFA
 
 
+def _confirm_logged_user(client, app) -> None:
+    """MFA e troca de e-mail exigem e-mail confirmado (os usuários do fixture não são)."""
+    import uuid as _uuid
+
+    with client.session_transaction() as sess:
+        user_id = _uuid.UUID(sess["_user_id"].split(":")[0])
+    with app.app_context():
+        db.session.get(User, user_id).email_confirmed_at = utcnow()
+        db.session.commit()
+
+
 def _enable_mfa(client, app) -> tuple[str, list[str]]:
+    _confirm_logged_user(client, app)
     assert client.get("/conta/mfa").status_code == 200
     qr = client.get("/conta/mfa/qr.svg")
     assert qr.status_code == 200 and qr.headers["Content-Type"] == "image/svg+xml" and b"<svg" in qr.data
@@ -703,9 +716,157 @@ def test_paginas_de_conta_renderizam(client, app, tenants):
         assert client.get(url).status_code == 200, url
     assert "Esqueci a senha" in text_of(client.get("/entrar"))
     login(client, app, a.owner_email)
-    for url in ("/conta/perfil", "/conta/mfa", "/conta/empresas", "/conta/confirmar-email", "/app/usuarios"):
+    for url in ("/conta/perfil", "/conta/empresas", "/conta/confirmar-email", "/app/usuarios"):
         response = client.get(url)
         assert response.status_code == 200, url
         assert "app-sidebar" in response.get_data(as_text=True)
     nav = text_of(client.get("/app/projetos"))
     assert "Usuários" in nav and "Perfil" in nav and "Confirme seu e-mail" in nav
+    _confirm_logged_user(client, app)
+    assert client.get("/conta/mfa").status_code == 200
+
+
+# --------------------------------------------------------------------------- correções da revisão
+
+
+def test_bloqueio_por_ip_nao_barra_senha_certa(app_factory):
+    """Atrás de NAT/proxy, um atacante não tranca os demais: a senha certa entra mesmo com o
+    IP bloqueado; senha errada desse IP responde 429."""
+    from tests.conftest import make_tenant
+
+    app = app_factory({"LOCKOUT_IP_THRESHOLD": 3})
+    with app.app_context():
+        a = make_tenant("A")
+    attacker = app.test_client()
+    statuses = [login(attacker, app, f"alvo{i}@x.com", "errada-000000").status_code for i in range(3)]
+    assert statuses == [400, 400, 429]
+    victim = app.test_client()  # mesmo IP (127.0.0.1)
+    assert login(victim, app, a.owner_email).status_code == 302
+    assert victim.get("/app/projetos").status_code == 200
+    assert login(app.test_client(), app, a.operator_email, "errada-000000").status_code == 429
+
+
+def test_ip_do_proxy_so_com_trusted_proxy_count(app_factory):
+    def wrong(client, app, ip):
+        return post(client, app, "/entrar", {"email": "x@x.com", "password": "errada-000000"},
+                    headers={"X-Forwarded-For": ip}).status_code
+
+    trusted = app_factory({"TRUSTED_PROXY_COUNT": 1, "LOCKOUT_IP_THRESHOLD": 2, "LOCKOUT_ACCOUNT_THRESHOLD": 99})
+    c = trusted.test_client()
+    assert [wrong(c, trusted, "1.1.1.1"), wrong(c, trusted, "1.1.1.1")] == [400, 429]
+    assert wrong(c, trusted, "2.2.2.2") == 400  # outro IP real, outro contador
+    with trusted.app_context():
+        assert lockout.status(None, "1.1.1.1").locked and not lockout.status(None, "2.2.2.2").locked
+    # Sem proxy confiável o header é ignorado (forjável): conta tudo no IP da conexão.
+    plain = app_factory({"LOCKOUT_IP_THRESHOLD": 2, "LOCKOUT_ACCOUNT_THRESHOLD": 99})
+    c2 = plain.test_client()
+    assert [wrong(c2, plain, "1.1.1.1"), wrong(c2, plain, "9.9.9.9")] == [400, 429]
+
+
+def test_supervisor_nao_reativa_membro_desativado_por_convite(client, app, tenants):
+    a, _ = tenants
+    login(client, app, a.owner_email)
+    op_member = _membership_id(app, a.operator_id)
+    post(client, app, f"/app/usuarios/{op_member}/desativar")
+    post(client, app, "/sair")
+    sup = app.test_client()
+    login(sup, app, a.supervisor_email)
+    response = post(sup, app, "/app/usuarios/convidar", {"email": a.operator_email, "role": "operator"})
+    assert response.status_code == 400 and "Só o proprietário" in text_of(response)
+    with app.app_context():
+        assert db.session.query(Invitation).count() == 0
+    # Defesa no aceite: convite criado por não-owner (gravado direto) não reativa.
+    from app.services.tokens import new_token
+
+    token, token_hash = new_token()
+    with app.app_context():
+        sup_user = accounts.find_user_by_email(a.supervisor_email)
+        db.session.add(Invitation(company_id=a.company_id, email=a.operator_email, role="operator", token_hash=token_hash,
+                                  invited_by_user_id=sup_user.id, expires_at=utcnow() + timedelta(days=1)))
+        db.session.commit()
+    op = app.test_client()
+    login(op, app, a.operator_email)
+    assert post(op, app, f"/convite/{token}").status_code == 400
+    with app.app_context():
+        assert db.session.get(Membership, op_member).active is False
+    # Convite do owner reativa.
+    login(client, app, a.owner_email)
+    assert post(client, app, "/app/usuarios/convidar", {"email": a.operator_email, "role": "operator"}).status_code == 303
+    owner_token = last_token(app, a.operator_email, "convite")
+    assert post(op, app, f"/convite/{owner_token}").status_code == 303
+    with app.app_context():
+        assert db.session.get(Membership, op_member).active is True
+
+
+def test_reset_com_provedor_lento_ou_com_erro_responde_igual_e_rapido(client, app, tenants, monkeypatch):
+    import threading
+
+    import requests
+
+    a, _ = tenants
+    calls = []
+    done = threading.Event()
+
+    def slow_failing_post(*args, **kwargs):
+        time.sleep(1.0)
+        calls.append(kwargs["json"]["to"])
+        done.set()
+        raise requests.ConnectionError("fora do ar")
+
+    monkeypatch.setattr(requests, "post", slow_failing_post)
+    app.extensions["email_sender"] = ResendEmailSender("re_teste", "a@b.com", 5)
+    started = time.monotonic()
+    r1 = post(client, app, "/senha/esqueci", {"email": a.owner_email})
+    r2 = post(client, app, "/senha/esqueci", {"email": "ninguem@exemplo.com"})
+    elapsed = time.monotonic() - started
+    assert r1.status_code == r2.status_code == 200
+    assert no_csrf(r1.get_data(as_text=True)).replace(a.owner_email, "") == no_csrf(r2.get_data(as_text=True)).replace(
+        "ninguem@exemplo.com", ""
+    )
+    assert elapsed < 0.9  # o envio (1 s e com erro) não entrou no tempo da resposta
+    assert done.wait(5) and calls == [[a.owner_email]]  # só a conta existente gerou envio
+    with app.app_context():
+        assert db.session.query(PasswordReset).count() == 1
+
+
+def test_pre_account_takeover_mfa_e_email_so_depois_de_confirmar(client, app, tenants):
+    a, _ = tenants
+    # Atacante cadastra o e-mail da vítima (não confirmado) e entra.
+    post(client, app, "/cadastro", {**SIGNUP, "email": "vitima@x.com", "password": "senha-atacante1", "password_confirm": "senha-atacante1"})
+    login(client, app, "vitima@x.com", "senha-atacante1")
+    response = client.get("/conta/mfa")
+    assert response.status_code == 303 and response.headers["Location"].endswith("/conta/confirmar-email")
+    assert post(client, app, "/conta/mfa/ativar", {"code": "123456"}).status_code == 303
+    assert client.get("/conta/mfa/qr.svg").status_code == 404
+    changed = post(client, app, "/conta/perfil/email", {"email": "atacante@x.com", "current_password": "senha-atacante1"})
+    assert changed.status_code == 400 and "Confirme o seu e-mail atual" in text_of(changed)
+    with app.app_context():
+        user = accounts.find_user_by_email("vitima@x.com")
+        assert not user.mfa_enabled and user.email == "vitima@x.com"
+        # Mesmo que um MFA tenha sido ativado antes da correção, o reset da vítima o apaga.
+        mfa.enable(user, mfa.new_secret())
+        db.session.commit()
+    victim = app.test_client()
+    post(victim, app, "/senha/esqueci", {"email": "vitima@x.com"})
+    token = last_token(app, "vitima@x.com", "senha/redefinir")
+    assert post(victim, app, f"/senha/redefinir/{token}", {"password": NEW_PASSWORD, "password_confirm": NEW_PASSWORD}).status_code == 303
+    with app.app_context():
+        user = accounts.find_user_by_email("vitima@x.com")
+        assert not user.mfa_enabled and user.totp_secret_enc is None
+        assert user.email_confirmed_at is not None
+        assert db.session.query(MfaRecoveryCode).filter_by(user_id=user.id).count() == 0
+    assert client.get("/app/projetos").status_code == 302  # sessão do atacante caiu
+    assert login(victim, app, "vitima@x.com", NEW_PASSWORD).status_code == 302  # sem pedir MFA
+
+
+def test_reset_em_conta_confirmada_mantem_mfa(client, app, tenants):
+    a, _ = tenants
+    login(client, app, a.owner_email)
+    _enable_mfa(client, app)
+    post(client, app, "/sair")
+    post(client, app, "/senha/esqueci", {"email": a.owner_email})
+    token = last_token(app, a.owner_email, "senha/redefinir")
+    post(client, app, f"/senha/redefinir/{token}", {"password": NEW_PASSWORD, "password_confirm": NEW_PASSWORD})
+    with app.app_context():
+        assert db.session.get(User, a.owner_id).mfa_enabled
+    assert login(client, app, a.owner_email, NEW_PASSWORD).headers["Location"].endswith("/entrar/mfa")

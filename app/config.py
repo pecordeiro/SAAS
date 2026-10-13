@@ -80,6 +80,9 @@ class Config:
     APP_BASE_URL: str | None = None
     # Chave do Fernet que cifra o segredo TOTP (derivada por HKDF). Sem valor: SECRET_KEY.
     MFA_ENCRYPTION_KEY: str | None = None
+    # Quantos proxies confiáveis (Render = 1) põem X-Forwarded-For/Proto na frente do app.
+    # 0 = ignora esses headers (padrão; qualquer cliente poderia forjá-los).
+    TRUSTED_PROXY_COUNT = 0
 
     @classmethod
     def from_env(cls) -> dict:
@@ -101,6 +104,10 @@ class Config:
             "EMAIL_RESEND_RATE_LIMIT",
         ):
             values[key] = os.environ.get(key, getattr(cls, key))
+        try:
+            values["TRUSTED_PROXY_COUNT"] = max(0, int(os.environ.get("TRUSTED_PROXY_COUNT", cls.TRUSTED_PROXY_COUNT)))
+        except ValueError:
+            raise RuntimeError("TRUSTED_PROXY_COUNT precisa ser um número inteiro.") from None
         for key in ("MAIL_BACKEND", "MAIL_FROM", "RESEND_API_KEY", "APP_BASE_URL", "MFA_ENCRYPTION_KEY"):
             values[key] = os.environ.get(key) or getattr(cls, key)
         return values
