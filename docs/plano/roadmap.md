@@ -32,18 +32,21 @@ Entregáveis:
 - Modelos mínimos: `companies`, `users`, `memberships`, `projects`, `stages`, `activities`,
   `progress_entries`, `holidays` + primeira migration Alembic.
 - `app/tenancy.py` (load_company, tenant_required, scoped, get_or_404).
-- `app/services/calc.py` puro: progresso, unidades concluídas, horas restantes, dias úteis,
-  prazo previsto.
+- `app/services/calc.py` puro, reproduzindo as fórmulas da planilha de referência
+  (`arquitetura.md §1.1`): pesos, % por subatividade, progresso por tarefas, unidades por etapa e
+  do projeto, status, tempos, dias úteis restantes (horas ÷ pessoas × horas/dia) e progresso geral.
 - Cadastro de empresa + login/logout básicos (Flask-Login, Argon2id, CSRF, rate limit em memória).
 - Telas provisórias simples (sem design) para login, cadastro, projetos, detalhe, histórico,
   novo projeto e erro — serão migradas na fase 2.
-- `flask seed-demo`; `tests/` com conftest (SQLite agora, Postgres na fase 3);
+- `flask seed-demo` (etapas genéricas fictícias, ver D15); `tests/` com conftest (SQLite agora, Postgres na fase 3);
   `tests/test_calc.py`, `tests/test_isolation.py`; GitHub Actions rodando pytest.
 
 Critérios de pronto:
 - [ ] `python -m pytest -q` verde no CI e localmente.
-- [ ] `test_calc.py` com ≥ 15 casos conferidos à mão, incluindo feriado, fim de semana,
-      quantidade zero e atividade 100%.
+- [ ] `test_calc.py` com ≥ 15 casos conferidos à mão (quantidade zero, soma de tempos zero,
+      atividade 100%, peças acima da meta) **e** teste de paridade que lê
+      `docs/referencia/acompanhamento_montagem_v4.xlsx` e confere cada etapa com os valores
+      calculados pelo Excel.
 - [ ] `calc.py` não importa `flask` nem `sqlalchemy` (teste que verifica os imports).
 - [ ] Usuário da empresa A recebe 404 em GET/POST de projeto, etapa e atividade da empresa B.
 - [ ] Operador recebe 403 ao criar projeto; POST sem CSRF recebe 400.

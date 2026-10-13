@@ -9,9 +9,35 @@ roteiro trata como existentes nascem na **Fase 0** com estes contratos:
 
 | Módulo | Contrato | Por quê |
 |---|---|---|
-| `app/services/calc.py` | Funções puras: `progresso(atividades)`, `unidades_concluidas`, `horas_restantes`, `dias_uteis_entre(inicio, fim, feriados, dias_semana)`, `prazo_previsto(horas, capacidade_diaria, ...)`. Sem Flask, sem banco, só tipos simples/dataclasses. | Regra de negócio testável à mão e reaproveitável na API |
+| `app/services/calc.py` | Funções puras que reproduzem as fórmulas da planilha de referência (ver §1.1): `peso_atividade`, `pct_atividade`, `progresso_tarefas`, `unidades_etapa`, `unidades_projeto`, `tempo_total_min`, `tempo_restante_min`, `dias_uteis_restantes(horas, pessoas, horas_dia)`; e, acima da planilha, `prazo_em_data(inicio, dias, feriados, dias_semana)`. Sem Flask, sem banco, só tipos simples/dataclasses. | Regra de negócio testável contra a planilha e reaproveitável na API |
 | `app/tenancy.py` | `load_company()` (before_request: lê `company_id` da sessão, valida vínculo ativo, põe em `g.company`/`g.membership`), `tenant_required(min_role)`, `scoped(Model)` (query já filtrada por `company_id`), `get_or_404(Model, id)` escopado. | Isolamento num único lugar |
 | `tests/test_isolation.py` | Fixture com empresas A e B; cada rota com `<uuid>` testada com recurso de B logado em A → 404. | Regra inviolável 1 |
+
+### 1.1 Base funcional: planilha `acompanhamento_montagem_v4.xlsx` e repositório `Controle-de-atividades`
+
+A planilha de referência (cópia em `docs/referencia/`) e o painel Flask+Excel existente em
+`pecordeiro/controle-de-atividades` definem as regras de negócio que o SaaS substitui. O
+painel antigo roda só em Windows com Excel (COM), sem login nem histórico; **nada do seu
+código é reaproveitado**, só as regras e os dados de exemplo.
+
+| Conceito da planilha | Fórmula | Vira no SaaS |
+|---|---|---|
+| Meta de robôs | `B4` = unidades previstas de todas as etapas | `projects.quantity` |
+| Etapa (24 blocos, nº 3–26 no exemplo; até 8 subatividades cada) | — | `stages` / `activities` (sem limite fixo de 8) |
+| Tempo ideal (min) por subatividade | entrada | `activities.ideal_minutes` |
+| Peso na etapa | `tempo_ideal ÷ soma dos tempos da etapa` | `calc.peso_atividade` |
+| Peso da etapa no robô | `tempo da etapa ÷ tempo de 1 robô` | `calc.peso_etapa` |
+| % da subatividade | `min(1, peças_concluídas ÷ previstas)` | `calc.pct_atividade` |
+| Progresso da etapa (Tabela 1, tarefas) | `Σ(peso × %)`; se soma de tempos = 0, média simples | `calc.progresso_tarefas` |
+| Unidades concluídas da etapa (Tabela 2) | `round(min(%) × previstas)`; uma unidade só está pronta ao passar por todas as subatividades | `calc.unidades_etapa` |
+| Robôs concluídos | `min` das unidades concluídas entre todas as etapas | `calc.unidades_projeto` |
+| Status da etapa | Concluída se feitas ≥ previstas; Em andamento se feitas > 0 ou progresso > 0; senão Não iniciada | `calc.status_etapa` |
+| Tempo total / que falta | `ideal × previstas` / `ideal × (previstas − min(previstas, peças))` | `calc.tempo_*_min` |
+| Dias úteis restantes (aba Equipe) | `horas que faltam ÷ (pessoas × horas por dia)`, equipe em paralelo | `calc.dias_uteis_restantes`; pessoas e horas/dia vêm do projeto |
+| Progresso geral | `1 − tempo que falta ÷ tempo total` (ponderado por tempo) | `calc.progresso_geral` |
+
+Os casos de teste de `calc.py` na Fase 0 usam a própria planilha como **fonte de verdade**:
+valores calculados pelo Excel (cache do `.xlsx`) viram os resultados esperados.
 
 ## 2. Componentes
 
@@ -173,7 +199,7 @@ erDiagram
     uuid company_id FK
     uuid template_stage_id FK
     string name
-    numeric hours_per_unit
+    numeric ideal_minutes "tempo ideal por unidade (min)"
     int position
   }
   projects {
@@ -200,7 +226,7 @@ erDiagram
     uuid company_id FK
     uuid stage_id FK
     string name
-    numeric hours_per_unit
+    numeric ideal_minutes "tempo ideal por unidade (min)"
     int units_done
     int version
     timestamptz archived_at

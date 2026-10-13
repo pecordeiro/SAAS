@@ -28,8 +28,16 @@ Como proprietário, quero cadastrar minha empresa para começar a usar.
 - Dado +20 numa atividade com 5/10, quando envio, então recebo erro “máximo 5”.
 
 **F0-5 (M) Ver indicadores e prazo**
-- Dado um projeto com prazo e jornada de 8,8 h/dia seg–sex, quando abro o detalhe, então vejo
-  unidades concluídas, %, horas restantes e dias úteis até o prazo, descontando feriados.
+- Dado um projeto com 10 unidades, 1 pessoa e 8 h/dia, quando abro o detalhe, então vejo
+  unidades concluídas (menor nº de peças entre as subatividades), progresso pelas tarefas,
+  horas que faltam e dias úteis restantes = horas ÷ (pessoas × horas/dia), iguais aos da planilha.
+- Dado feriados cadastrados, quando peço a data prevista de término, então os dias não úteis
+  são pulados (melhoria sobre a planilha, que só divide).
+
+**F0-5b (M) Paridade com a planilha**
+- Dado o arquivo `docs/referencia/acompanhamento_montagem_v4.xlsx`, quando carrego as etapas
+  e peças dele no serviço de cálculo, então progresso, unidades, tempos e status de cada etapa
+  coincidem com os valores calculados no Excel (tolerância de 1e-9).
 
 **F0-6 (M) Isolamento**
 - Dado que estou na empresa A, quando acesso qualquer URL de recurso da empresa B, então
@@ -85,11 +93,14 @@ então recebo 0 linhas.
 **F4-4 (S) Duplicar projeto**
 - Dado um projeto, quando duplico, então nasce um projeto com as mesmas etapas e progresso zero.
 
-**F4-5 (M) Importar CSV**
+**F4-5 (M) Importar CSV (e a planilha de referência)**
 - Dado o modelo de CSV baixado do site, quando envio um arquivo válido, então vejo
   pré-visualização e, ao confirmar, tudo é gravado de uma vez.
-- Dado um arquivo com erro na linha 7, coluna “horas”, quando envio, então vejo “linha 7,
-  horas, número inválido” e nada é gravado.
+- Dado um arquivo com erro na linha 7, coluna “tempo ideal (min)”, quando envio, então vejo
+  “linha 7, tempo ideal, número inválido” e nada é gravado.
+- Dado a planilha `acompanhamento_montagem_v4.xlsx`, quando a envio na importação inicial,
+  então etapas, subatividades, tempos ideais e peças concluídas são lidos pelos títulos da
+  coluna A (não por linhas fixas) e mostrados na pré-visualização antes de gravar.
 
 **F4-6 (M) Exportar CSV e XLSX**
 - Dado um projeto, quando exporto CSV ou XLSX, então recebo as mesmas colunas da tela, com

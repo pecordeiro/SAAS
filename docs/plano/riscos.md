@@ -14,6 +14,7 @@ Escala: probabilidade e impacto em Baixo/Médio/Alto.
 | T6 | RLS complica pool de conexões e jobs | M | M | `SET LOCAL` por transação; papel de plataforma separado; flag `RLS_ENABLED` | 3 |
 | T7 | Design se afasta do código | M | B | mudanças visuais só pelo Claude Design + handoff; teste de cores/px soltos | 2, 6 |
 | T8 | Dependência vulnerável | M | M | versões fixadas, pip-audit no CI, Dependabot | 7 |
+| T10 | Divergência entre o SaaS e a planilha que a equipe confia | M | A | `calc.py` testado contra o Excel; importador da planilha; período de uso paralelo no piloto | 0, 4, 10 |
 | T9 | Repositório começou vazio: retrabalho na fase 2 sobre telas provisórias | A | B | telas da fase 0 deliberadamente mínimas | 0 |
 
 ## Produto
@@ -36,4 +37,5 @@ Escala: probabilidade e impacto em Baixo/Médio/Alto.
 | L4 | Incidente de segurança sem comunicação à ANPD/titulares | B | A | `incidentes.md` com prazos (comunicação à ANPD em até 3 dias úteis, Res. CD/ANPD 15/2024) | 7 |
 | L5 | Cobrança sem nota fiscal ou com enquadramento tributário errado | M | A | decisão D6 com contador antes da fase 8 | 8 |
 | L6 | Termos e privacidade sem revisão jurídica | A | M | marcados como rascunho; revisão é critério go/no-go | 7, 10 |
+| L8 | Nomes reais de etapas da SoBot em repositório que pode estar público (o clone anônimo do repositório antigo funcionou, embora o README o descreva como privado) | M | M | confirmar a visibilidade e a autorização da empresa; usar dados fictícios em seed e testes | 0 |
 | L7 | Logs com dados pessoais ou segredos | M | M | logs JSON filtrados; Sentry com scrub; retenção de 90 dias | 7 |

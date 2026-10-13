@@ -14,3 +14,8 @@ Fase de planejamento concluída (Prompt 0). Ainda não há código de produto.
 
 Próximo passo: aprovar as decisões pendentes em `docs/plano/prd.md` e iniciar a Fase 0
 (esqueleto) descrita em `docs/plano/roadmap.md`.
+
+## Base de referência
+
+- [`docs/referencia/acompanhamento_montagem_v4.xlsx`](docs/referencia/acompanhamento_montagem_v4.xlsx): planilha cujas regras de cálculo o SaaS reproduz.
+- Painel antigo (Flask + Excel/COM, só Windows): `pecordeiro/controle-de-atividades`. Só as regras são reaproveitadas.

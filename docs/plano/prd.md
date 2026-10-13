@@ -21,6 +21,16 @@ mobiliário técnico), que produzem por lotes ou encomendas com etapas repetíve
 Usam o sistema no escritório (desktop) e no chão de fábrica (celular, às vezes com luvas e
 luz forte).
 
+## 2.1 Base: o que já existe
+
+A equipe hoje usa a planilha `acompanhamento_montagem_v4.xlsx` (robô SoBot: 24 etapas,
+subatividades com tempo ideal em minutos, meta de robôs, peças concluídas) e um painel local
+em Flask que lê e grava esse Excel (`pecordeiro/controle-de-atividades`, só Windows + Excel,
+sem login nem histórico). O SaaS **mantém as regras de cálculo** (ver `arquitetura.md §1.1`),
+troca a planilha por banco de dados e acrescenta multiempresa, login, histórico, modelos
+de etapas editáveis, pagamento e hospedagem na nuvem. As “próximas atualizações” do README antigo
+(Postgres, login e perfis, histórico, etapas configuráveis) são exatamente o MVP aqui.
+
 ## 3. Personas
 
 | Persona | Quem é | O que precisa | Papel no sistema |
@@ -98,7 +108,8 @@ Só você pode decidir. Cada item já tem uma sugestão padrão, usada no plano 
 | D8 | E-mail transacional | Resend | API simples, SPF/DKIM guiados | Antes da Fase 5 |
 | D9 | Monitoramento de erros | Sentry (plano gratuito) com filtro de dados sensíveis | Padrão de mercado | Antes da Fase 7 |
 | D10 | Domínio | `controleproducao.com.br` (verificar disponibilidade no Registro.br) | Área logada em `/app` no mesmo domínio | Antes da Fase 10 |
-| D11 | Unidade de tempo das atividades | Horas-padrão por unidade (ex.: 1,5 h/unidade) | Permite calcular horas restantes | Antes da Fase 0 |
-| D12 | Jornada de trabalho padrão | 8,8 h/dia, seg–sex, configurável por empresa | Comum em indústria (44 h/semana) | Antes da Fase 0 |
+| D11 | Unidade de tempo das atividades | **Minutos por unidade (“tempo ideal”)**, como na planilha de referência | Mesmo dado que a equipe já preenche | Antes da Fase 0 |
+| D12 | Jornada e equipe padrão | **8 h/dia por pessoa**, 1 pessoa, seg–sex, por projeto (valores da aba Equipe); feriados opcionais por empresa | Igual à planilha; feriados são melhoria | Antes da Fase 0 |
 | D13 | Quem pode registrar progresso | Operador, supervisor e proprietário; só supervisor+ desfaz registros | Operador não apaga histórico | Antes da Fase 4 |
-| D14 | Pasta de referência “Pré-montagem de referencia base” | Enviar ao repositório em `docs/referencia/` para orientar etapas, campos e cálculos | O container na nuvem não acessa o disco local | Antes da Fase 0 |
+| D14 | Material de referência | **Resolvido**: planilha `acompanhamento_montagem_v4.xlsx` (em `docs/referencia/`) e repositório `pecordeiro/controle-de-atividades` são a base funcional. A pasta local “Pré-montagem de referencia base” continua inacessível ao ambiente na nuvem; envie-a se tiver algo além da planilha | Regras e dados reais já estão no plano | — |
+| D15 | Dados da SoBot nos exemplos e seed | Usar etapas genéricas fictícias no `seed-demo` e em testes públicos; manter os nomes reais só em `docs/referencia/` | O README do repositório antigo pede cautela sem autorização da empresa | Antes da Fase 0 |
