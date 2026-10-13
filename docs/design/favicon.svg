@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <!-- Versão em grade de 16 px, alinhada ao pixel. Bloco grafite funciona em abas claras e escuras. -->
+  <rect width="16" height="16" rx="3" fill="#151A1F"/>
+  <rect x="3" y="3" width="10" height="2" fill="#FFFFFF"/>
+  <rect x="3" y="7" width="7" height="2" fill="#FFFFFF"/>
+  <rect x="3" y="11" width="4" height="2" fill="#F2B705"/>
+</svg>
