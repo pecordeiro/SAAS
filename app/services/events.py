@@ -19,7 +19,12 @@ PROJECT_CREATED = "project.created"
 ACTIVITY_PROGRESS_UPDATED = "activity.progress_updated"
 STAGE_COMPLETED = "stage.completed"
 PROJECT_COMPLETED = "project.completed"
-EVENT_TYPES = (PROJECT_CREATED, ACTIVITY_PROGRESS_UPDATED, STAGE_COMPLETED, PROJECT_COMPLETED)
+# Etapa B: gancho da Etapa C (requisição de identidade visual ao contratar Empresa/Implantação).
+# Evento INTERNO da plataforma: não sai em webhook de cliente (ver PUBLIC_EVENT_TYPES).
+PLAN_VISUAL_CUSTOM_CONTRACTED = "plan.visual_custom_contracted"
+PUBLIC_EVENT_TYPES = (PROJECT_CREATED, ACTIVITY_PROGRESS_UPDATED, STAGE_COMPLETED, PROJECT_COMPLETED)
+INTERNAL_EVENT_TYPES = (PLAN_VISUAL_CUSTOM_CONTRACTED,)
+EVENT_TYPES = PUBLIC_EVENT_TYPES + INTERNAL_EVENT_TYPES
 
 
 def _jsonable(value):

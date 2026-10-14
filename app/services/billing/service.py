@@ -15,6 +15,10 @@ Estados locais (``subscriptions.status``), arquitetura.md §7:
   vencimento + ``PAST_DUE_GRACE_DAYS`` (7) e e-mail aos proprietários; passada a carência →
   ``expired`` = modo leitura (``entitlements``). Nada é apagado.
 - Cancelar vale até o fim do período pago; estorno/chargeback tira a cobertura daquele mês.
+- Etapa B: teste grátis só nos planos com teste (Essencial, Profissional). Empresa não tem
+  teste: a 1ª cobrança vence no dia da contratação. Plano sob consulta (Implantação, preço
+  NULL) não passa pelo autosserviço: ``admin_set_plan`` (CLI da plataforma, com motivo) é o
+  único caminho, e a empresa nele fica ``active`` sem cobrança recorrente no provedor.
 
 Nenhuma função aqui faz commit: quem chama (rota, webhook, CLI) fecha a transação.
 """
@@ -35,7 +39,8 @@ from app import rls
 from app.extensions import db
 from app.models import Company, Payment, Plan, Subscription
 from app.models.billing import SUB_ACTIVE, SUB_CANCELED, SUB_EXPIRED, SUB_PAST_DUE, SUB_TRIALING
-from app.services import audit, entitlements
+from app.services import audit, entitlements, events
+from app.services import plans as plan_catalog
 from app.services.billing import notify
 from app.services.billing.asaas import AsaasProvider, map_payment
 from app.services.billing.documents import is_valid_document, only_digits
@@ -63,6 +68,8 @@ BILLING_INFO_UPDATED = "subscription.billing_info_updated"
 TRIAL_EXTENDED = "subscription.trial_extended"
 DISCOUNT_GRANTED = "subscription.discount_granted"
 DOWNGRADE_CANCELED = "subscription.downgrade_canceled"
+ADMIN_PLAN_SET = "subscription.admin_plan_set"
+VISUAL_CUSTOM_CONTRACTED = events.PLAN_VISUAL_CUSTOM_CONTRACTED
 audit.ACTION_LABELS.update(
     {
         SUBSCRIBED: "Assinatura contratada",
@@ -71,6 +78,8 @@ audit.ACTION_LABELS.update(
         TRIAL_EXTENDED: "Teste grátis estendido",
         DISCOUNT_GRANTED: "Desconto concedido",
         DOWNGRADE_CANCELED: "Troca para plano menor não aplicada",
+        ADMIN_PLAN_SET: "Plano atribuído pela equipe da plataforma",
+        VISUAL_CUSTOM_CONTRACTED: "Identidade visual personalizada contratada",
     }
 )
 
@@ -196,7 +205,7 @@ def ensure_subscription(company: Company) -> Subscription:
     sub = subscription_for(company.id)
     if sub is not None:
         return sub
-    plan = db.session.execute(select(Plan).where(Plan.code == _setting("DEFAULT_TRIAL_PLAN"))).scalar_one()
+    plan = entitlements.trial_plan()  # só Essencial/Profissional têm teste
     created = _aware(company.created_at) or now_utc()
     sub = Subscription(
         company_id=company.id,
@@ -211,9 +220,82 @@ def ensure_subscription(company: Company) -> Subscription:
     return sub
 
 
-def price_for(sub: Subscription, plan: Plan) -> int:
+MANAGED_MESSAGE = "Plano sob consulta: fale conosco para contratar ou mudar."
+MANAGED_CURRENT_MESSAGE = "Seu plano é gerido pela nossa equipe: fale conosco para mudar ou cancelar."
+
+
+def price_for(sub: Subscription, plan: Plan) -> int | None:
+    """Valor mensal com desconto. None = plano sob consulta (sem cobrança no provedor);
+    quem chama trata o None (nunca há conta com preço nulo)."""
+    if plan.price_cents is None:
+        return None
     discount = sub.discount_percent or 0
     return plan.price_cents * (100 - discount) // 100
+
+
+def charge_for(sub: Subscription, plan: Plan) -> int:
+    """Valor a cobrar no provedor; plano sob consulta não tem cobrança → BillingError."""
+    value = price_for(sub, plan)
+    if value is None:
+        raise BillingError(MANAGED_MESSAGE)
+    return value
+
+
+# Resultado de ``compare_plans`` (explícito: preço igual ou nulo nunca vira downgrade imediato).
+SAME_PLAN = "same_plan"
+UPGRADE = "upgrade"
+SAME_PRICE = "same_price"
+DOWNGRADE = "downgrade"
+MANAGED = "managed"
+
+
+def compare_plans(sub: Subscription, new_plan: Plan) -> str:
+    """Compara o plano atual com ``new_plan``:
+
+    - ``same_plan``: é o mesmo plano;
+    - ``managed``: um dos dois é sob consulta (preço NULL) — fora do autosserviço, recusado;
+    - ``upgrade``: mais caro → só vale com fatura paga no valor novo;
+    - ``same_price``: outro plano com o mesmo preço → tratado como upgrade (só vale depois de
+      uma fatura paga após o pedido; nunca de graça e na hora);
+    - ``downgrade``: estritamente mais barato → vale no fim do período pago/teste."""
+    if new_plan.id == sub.plan_id:
+        return SAME_PLAN
+    current, new = price_for(sub, sub.plan), price_for(sub, new_plan)
+    if current is None or new is None:
+        return MANAGED
+    if new > current:
+        return UPGRADE
+    if new == current:
+        return SAME_PRICE
+    return DOWNGRADE
+
+
+def ensure_self_service(sub: Subscription, plan: Plan) -> None:
+    """Autosserviço só para plano com preço e fora de plano gerido pela equipe."""
+    if not plan_catalog.is_self_service(plan):
+        raise BillingError(MANAGED_MESSAGE)
+    if plan_catalog.is_managed(sub.plan) and sub.status not in (SUB_CANCELED, SUB_EXPIRED):
+        raise BillingError(MANAGED_CURRENT_MESSAGE)
+
+
+def _apply_plan(sub: Subscription, plan: Plan, actor_user_id=None) -> None:
+    """Troca o plano em vigor. Gancho da Etapa C: ao passar a ter ``visual_custom`` (Empresa,
+    Implantação) registra ``plan.visual_custom_contracted`` em audit_logs e domain_events
+    (a requisição de identidade visual é aberta a partir desse evento)."""
+    old = sub.plan
+    sub.plan_id, sub.plan = plan.id, plan
+    had = bool(old is not None and (old.features or {}).get("visual_custom"))
+    if (plan.features or {}).get("visual_custom") and not had:
+        details = {"plano": plan.code, "plano_anterior": old.code if old is not None else None}
+        events.emit(sub.company_id, VISUAL_CUSTOM_CONTRACTED, {"subscription_id": sub.id, **details})
+        audit.record(
+            VISUAL_CUSTOM_CONTRACTED,
+            company_id=sub.company_id,
+            actor_user_id=actor_user_id,
+            object_type="subscription",
+            object_id=sub.id,
+            details=details,
+        )
 
 
 def needs_checkout(sub: Subscription) -> bool:
@@ -298,17 +380,24 @@ def subscribe(company: Company, plan: Plan, info: BillingInfo, actor_user_id, no
     if not plan.active:
         raise BillingError("Plano indisponível.")
     sub = ensure_subscription(company)
+    ensure_self_service(sub, plan)
     if not needs_checkout(sub):
         raise BillingError("Sua assinatura já está ativa: use “Trocar plano”.")
     check_plan_fits(company, plan)
     provider = get_provider()
     data = _customer(company, info)
     start = local_date(now)
-    if sub.status == SUB_TRIALING and sub.trial_ends_at and _aware(sub.trial_ends_at) > now:
+    # Plano com teste: 1ª cobrança no fim do teste. Sem teste (Empresa): cobrança imediata.
+    if (
+        plan_catalog.has_trial(plan)
+        and sub.status == SUB_TRIALING
+        and sub.trial_ends_at
+        and _aware(sub.trial_ends_at) > now
+    ):
         start = max(start, local_date(sub.trial_ends_at))
     if sub.status == SUB_CANCELED and sub.current_period_end and _aware(sub.current_period_end) > now:
         start = max(start, local_date(sub.current_period_end))
-    value = price_for(sub, plan)
+    value = charge_for(sub, plan)
 
     customer_id = sub.provider_customer_id if sub.provider == provider.name else None
     created_customer = None
@@ -332,11 +421,13 @@ def subscribe(company: Company, plan: Plan, info: BillingInfo, actor_user_id, no
     covered = sub.status == SUB_TRIALING or (
         sub.status == SUB_CANCELED and sub.current_period_end is not None and _aware(sub.current_period_end) > now
     )
-    if covered and is_upgrade(sub, plan):
-        # Teste/período pago no plano atual: o plano mais caro só vale com a fatura paga.
+    kind = compare_plans(sub, plan)
+    if covered and kind in (UPGRADE, SAME_PRICE, MANAGED):
+        # Teste/período pago no plano atual: plano mais caro (ou de mesmo preço) só vale com
+        # a fatura paga; nunca de graça na hora.
         sub.pending_plan_id, sub.pending_plan_at = plan.id, now
     else:
-        sub.plan_id, sub.plan = plan.id, plan
+        _apply_plan(sub, plan, actor_user_id)
         sub.pending_plan_id = sub.pending_plan_at = None
     if sub.status == SUB_CANCELED:
         # Volta a assinar: sem nada pago, retoma o teste (se ainda vale); com período pago,
@@ -393,7 +484,8 @@ def update_billing_info(company: Company, info: BillingInfo, actor_user_id) -> N
 
 
 def is_upgrade(sub: Subscription, plan: Plan) -> bool:
-    return price_for(sub, plan) > price_for(sub, sub.plan)
+    """Troca que só vale após pagamento (mais caro ou de mesmo preço)."""
+    return compare_plans(sub, plan) in (UPGRADE, SAME_PRICE)
 
 
 def downgrade_effective_at(sub: Subscription, now: datetime) -> datetime:
@@ -409,6 +501,14 @@ def projection(company: Company, new_plan: Plan, now: datetime | None = None) ->
     sub = ensure_subscription(company)
     current = price_for(sub, sub.plan)
     new = price_for(sub, new_plan)
+    kind = compare_plans(sub, new_plan)
+    blocked = None
+    if not plan_catalog.is_self_service(new_plan):
+        blocked = MANAGED_MESSAGE
+    elif plan_catalog.is_managed(sub.plan) and sub.status not in (SUB_CANCELED, SUB_EXPIRED):
+        blocked = MANAGED_CURRENT_MESSAGE
+    elif sub.status == SUB_PAST_DUE:
+        blocked = "Pagamento em atraso: regularize antes de trocar de plano."
     payment = open_payment(sub)
     if payment is not None:
         next_due = payment.due_date
@@ -418,18 +518,19 @@ def projection(company: Company, new_plan: Plan, now: datetime | None = None) ->
         next_due = local_date(sub.trial_ends_at)
     else:
         next_due = None
-    upgrade = new > current
+    upgrade = kind in (UPGRADE, SAME_PRICE)
     return {
         "plan": new_plan,
         "current_plan": sub.plan,
         "current_cents": current,
         "new_cents": new,
-        "difference_cents": new - current,
+        "difference_cents": (new - current) if new is not None and current is not None else None,
         "next_due": next_due,
         "upgrade": upgrade,
         # upgrade: vale quando a fatura no valor novo for paga; downgrade: no fim do período.
         "effective_at": None if upgrade else downgrade_effective_at(sub, now),
-        "blocked": "Pagamento em atraso: regularize antes de trocar de plano." if sub.status == SUB_PAST_DUE else None,
+        "blocked": blocked,
+        "trial": plan_catalog.has_trial(new_plan),
         "discount_percent": sub.discount_percent or 0,
         "checkout": needs_checkout(sub),
         "projects": entitlements.count_active_projects(company.id),
@@ -449,6 +550,7 @@ def change_plan(company: Company, new_plan: Plan, actor_user_id, now: datetime |
     sub = ensure_subscription(company)
     if not new_plan.active:
         raise BillingError("Plano indisponível.")
+    ensure_self_service(sub, new_plan)
     if sub.status in (SUB_CANCELED, SUB_EXPIRED):
         raise BillingError("Assinatura encerrada: escolha o plano e assine de novo.")
     if sub.status == SUB_PAST_DUE:
@@ -458,10 +560,13 @@ def change_plan(company: Company, new_plan: Plan, actor_user_id, now: datetime |
             raise BillingError("Esse já é o seu plano.")
     else:
         check_plan_fits(company, new_plan)
-    upgrade = is_upgrade(sub, new_plan)
+    kind = compare_plans(sub, new_plan)
+    if kind == MANAGED:  # pragma: no cover - ensure_self_service já recusou
+        raise BillingError(MANAGED_MESSAGE)
+    upgrade = kind in (UPGRADE, SAME_PRICE)
     if sub.provider_subscription_id:
         provider = get_provider()
-        provider.change_plan(sub.provider_subscription_id, price_for(sub, new_plan), _description(new_plan))
+        provider.change_plan(sub.provider_subscription_id, charge_for(sub, new_plan), _description(new_plan))
         remote = provider.list_payments(sub.provider_subscription_id)
         _sync_payments(sub, remote)
     old_plan = sub.plan
@@ -498,7 +603,13 @@ def apply_pending_plan(sub: Subscription, now: datetime | None = None) -> bool:
         sub.pending_plan_id = sub.pending_plan_at = None
         return False
     since = _aware(sub.pending_plan_at) or now
-    if price_for(sub, plan) > price_for(sub, sub.plan):
+    kind = compare_plans(sub, plan)
+    if kind in (SAME_PLAN, MANAGED):
+        # Mesmo plano: nada a aplicar. Sob consulta nunca entra por troca pendente (só
+        # ``admin_set_plan``): descarta sem aplicar.
+        sub.pending_plan_id = sub.pending_plan_at = None
+        return False
+    if kind in (UPGRADE, SAME_PRICE):
         since_day = local_date(since)
         ready = any(
             p.status in PAID_STATUSES
@@ -516,7 +627,7 @@ def apply_pending_plan(sub: Subscription, now: datetime | None = None) -> bool:
             except BillingError as exc:
                 return _abort_downgrade(sub, company, plan, exc.message)
     if ready:
-        sub.plan_id, sub.plan = plan.id, plan
+        _apply_plan(sub, plan)
         sub.pending_plan_id = sub.pending_plan_at = None
     return ready
 
@@ -528,6 +639,8 @@ def cancel(company: Company, actor_user_id, now: datetime | None = None) -> Subs
     sub = ensure_subscription(company)
     if sub.status in (SUB_CANCELED, SUB_EXPIRED):
         raise BillingError("A assinatura já está cancelada.")
+    if plan_catalog.is_managed(sub.plan):
+        raise BillingError(MANAGED_CURRENT_MESSAGE)
     if sub.provider_subscription_id:
         get_provider().cancel(sub.provider_subscription_id)
     for payment in payments_for(sub):
@@ -563,9 +676,9 @@ def _abort_downgrade(sub: Subscription, company: Company, plan: Plan, reason: st
     if sub.provider_subscription_id and not needs_checkout(sub):
         provider = get_provider()
         try:
-            provider.change_plan(sub.provider_subscription_id, price_for(sub, sub.plan), _description(sub.plan))
+            provider.change_plan(sub.provider_subscription_id, charge_for(sub, sub.plan), _description(sub.plan))
             _sync_payments(sub, provider.list_payments(sub.provider_subscription_id))
-        except PaymentProviderError as exc:
+        except (PaymentProviderError, BillingError) as exc:
             logger.error("downgrade não aplicado; falha ao restaurar valor no provedor: %s", exc.message)
             return False
     sub.pending_plan_id = sub.pending_plan_at = None
@@ -657,6 +770,10 @@ def recompute(sub: Subscription, now: datetime | None = None) -> tuple[str, str]
     Idempotente e independente da ordem dos eventos. Avisa por e-mail ao entrar em atraso."""
     now = now or now_utc()
     old_status = sub.status
+    if plan_catalog.is_managed(sub.plan) and not sub.provider_subscription_id:
+        # Contrato sob consulta (Implantação): sem cobrança no provedor, o status é o que a
+        # equipe da plataforma definiu em ``admin_set_plan``.
+        return old_status, sub.status
     if sub.status not in (SUB_CANCELED, SUB_EXPIRED):
         apply_pending_plan(sub, now)
     payments = payments_for(sub)
@@ -823,6 +940,8 @@ def admin_extend_trial(company: Company, days: int, reason: str, now: datetime |
     if not 1 <= days <= 90:
         raise BillingError("Dias entre 1 e 90.")
     sub = ensure_subscription(company)
+    if not plan_catalog.has_trial(sub.plan):
+        raise BillingError(f"O plano {sub.plan.name} não tem teste grátis (só Essencial e Profissional).")
     if sub.status not in (SUB_TRIALING, SUB_EXPIRED) or any(p.status in PAID_STATUSES for p in payments_for(sub)):
         raise BillingError("Só dá para estender o teste grátis de quem ainda não pagou nenhuma mensalidade.")
     base = max(_aware(sub.trial_ends_at) or now, now)
@@ -846,11 +965,13 @@ def admin_discount(company: Company, percent: int, reason: str) -> Subscription:
     if not 0 <= percent <= MAX_DISCOUNT_PERCENT:
         raise BillingError(f"Desconto entre 0 e {MAX_DISCOUNT_PERCENT}%.")
     sub = ensure_subscription(company)
+    if plan_catalog.is_managed(sub.plan):
+        raise BillingError("Plano sob consulta: o valor é combinado no contrato, sem desconto aqui.")
     old = sub.discount_percent or 0
     sub.discount_percent = percent or None
     if sub.provider_subscription_id and not needs_checkout(sub):
         provider = get_provider()
-        provider.change_plan(sub.provider_subscription_id, price_for(sub, sub.plan), _description(sub.plan))
+        provider.change_plan(sub.provider_subscription_id, charge_for(sub, sub.plan), _description(sub.plan))
         _sync_payments(sub, provider.list_payments(sub.provider_subscription_id))
     audit.record(
         DISCOUNT_GRANTED,
@@ -859,6 +980,62 @@ def admin_discount(company: Company, percent: int, reason: str) -> Subscription:
         object_type="subscription",
         object_id=sub.id,
         details={"motivo": reason, "de_percentual": old, "para_percentual": percent, "por": "admin da plataforma"},
+    )
+    db.session.flush()
+    return sub
+
+
+def admin_set_plan(company: Company, code: str, reason: str, now: datetime | None = None) -> Subscription:
+    """Equipe da plataforma atribui um plano (único caminho para o sob consulta/Implantação).
+
+    - Plano sob consulta: a recorrência no provedor (se houver) é cancelada, cobranças em
+      aberto saem, e a assinatura fica ``active`` sem fim de período (contrato fora do Asaas).
+    - Plano com preço: só com assinatura viva no provedor (o valor muda lá na hora); sem ela o
+      cliente assina pelo autosserviço.
+    Motivo obrigatório; vai para audit_logs."""
+    now = now or now_utc()
+    reason = _reason(reason)
+    plan = db.session.execute(select(Plan).where(Plan.code == (code or "").strip())).scalar_one_or_none()
+    if plan is None or not plan.active:
+        raise BillingError("Plano inexistente ou inativo.")
+    sub = ensure_subscription(company)
+    old_plan, old_status = sub.plan, sub.status
+    if plan.id == sub.plan_id and sub.pending_plan_id is None:
+        raise BillingError(f"A empresa já está no plano {plan.name}.")
+    if plan_catalog.is_managed(plan):
+        if sub.provider_subscription_id and sub.status not in (SUB_CANCELED, SUB_EXPIRED):
+            get_provider().cancel(sub.provider_subscription_id)
+        for payment in payments_for(sub):
+            if payment.status in (PAY_PENDING, PAY_OVERDUE):
+                payment.status = PAY_CANCELED
+        sub.provider_subscription_id = None
+        sub.status = SUB_ACTIVE
+        sub.current_period_end = sub.grace_until = sub.canceled_at = None
+        sub.discount_percent = None
+    else:
+        if not sub.provider_subscription_id or needs_checkout(sub):
+            raise BillingError("Sem assinatura ativa no provedor: o cliente assina esse plano pela tela de assinatura.")
+        check_plan_fits(company, plan)
+        provider = get_provider()
+        provider.change_plan(sub.provider_subscription_id, charge_for(sub, plan), _description(plan))
+        _sync_payments(sub, provider.list_payments(sub.provider_subscription_id))
+    sub.pending_plan_id = sub.pending_plan_at = None
+    _apply_plan(sub, plan)
+    if not plan_catalog.is_managed(plan):
+        recompute(sub, now)
+    audit.record(
+        ADMIN_PLAN_SET,
+        company_id=company.id,
+        actor_user_id=None,
+        object_type="subscription",
+        object_id=sub.id,
+        details={
+            "motivo": reason,
+            "de": old_plan.code,
+            "para": plan.code,
+            "status_anterior": old_status,
+            "por": "admin da plataforma",
+        },
     )
     db.session.flush()
     return sub

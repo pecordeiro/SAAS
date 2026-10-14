@@ -6,6 +6,8 @@
   altera nada. Feito para rodar 1x/dia no worker (Fase 10) e depois de falha de webhook.
 - ``flask billing-admin extend-trial|discount --company <uuid> --reason "..."``: ações do
   admin da plataforma, sempre com motivo em ``audit_logs``.
+- ``flask billing-admin set-plan --company <uuid> --plan implantacao --reason "..."``: único
+  caminho para o plano sob consulta (Implantação); motivo obrigatório em ``audit_logs``.
 """
 
 from __future__ import annotations
@@ -79,5 +81,19 @@ def register_cli(app: Flask) -> None:
             f"Desconto de {sub.discount_percent or 0}% para {company.name}: "
             f"R$ {billing.price_for(sub, sub.plan) / 100:.2f}/mês."
         )
+
+    @admin.command("set-plan")
+    @click.option("--company", "company_id", required=True, help="Id (UUID) da empresa.")
+    @click.option("--plan", "plan_code", required=True, help="Código do plano (ex.: implantacao).")
+    @click.option("--reason", required=True, help="Motivo (obrigatório, vai para audit_logs).")
+    def set_plan(company_id: str, plan_code: str, reason: str) -> None:
+        company = _company(company_id)
+        try:
+            sub = billing.admin_set_plan(company, plan_code, reason)
+            db.session.commit()
+        except (billing.BillingError, PaymentProviderError) as exc:
+            db.session.rollback()
+            raise click.ClickException(exc.message) from None
+        click.echo(f"Plano de {company.name}: {sub.plan.name} ({sub.status}).")
 
     app.cli.add_command(admin)

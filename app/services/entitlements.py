@@ -3,8 +3,12 @@
 Plano efetivo da empresa:
 - com assinatura (``subscriptions``): o plano dela;
 - sem assinatura nenhuma: teste grátis implícito de ``TRIAL_DAYS`` dias contados da criação
-  da empresa, no plano ``DEFAULT_TRIAL_PLAN`` (o cadastro ainda não cria assinatura; a
-  Fase 8 passa a criar a de verdade).
+  da empresa, no plano de teste (``trial_plan``).
+
+Teste grátis só existe nos planos ``plans.TRIAL_PLAN_CODES`` (Essencial e Profissional, Etapa
+B). ``DEFAULT_TRIAL_PLAN`` fora deles é ignorado (cai no Profissional), e uma assinatura
+``trialing`` num plano sem teste (Empresa, Implantação) vale como o plano de teste: recurso
+de plano pago nunca sai de graça no teste.
 
 Escrita liberada (``writable``) quando a assinatura está:
 - ``trialing`` com ``trial_ends_at`` no futuro (ou sem data);
@@ -35,6 +39,7 @@ from sqlalchemy import func, select
 from app.extensions import db
 from app.models import PROJECT_ACTIVE, Company, Invitation, Membership, Plan, Project, Subscription
 from app.models.billing import SUB_ACTIVE, SUB_CANCELED, SUB_PAST_DUE, SUB_TRIALING
+from app.services import plans as plan_catalog
 
 DEFAULTS = {
     "READ_ONLY_ENFORCED": True,
@@ -96,14 +101,28 @@ def _plan_by_code(code: str) -> Plan:
     return db.session.execute(select(Plan).where(Plan.code == code)).scalar_one()
 
 
+def trial_plan_code() -> str:
+    """Código do plano do teste grátis: ``DEFAULT_TRIAL_PLAN`` se ele tiver teste; senão o
+    Profissional (teste só nos planos 1 e 2)."""
+    code = str(_setting("DEFAULT_TRIAL_PLAN") or "")
+    return code if code in plan_catalog.TRIAL_PLAN_CODES else plan_catalog.PROFISSIONAL
+
+
+def trial_plan() -> Plan:
+    return _plan_by_code(trial_plan_code())
+
+
 def access(company: Company, now: datetime | None = None) -> Access:
     now = now or datetime.now(timezone.utc)
     sub = subscription_for(company.id)
     if sub is None:
         until = _aware(company.created_at) + timedelta(days=int(_setting("TRIAL_DAYS")))
-        return Access(_plan_by_code(_setting("DEFAULT_TRIAL_PLAN")), "implicit_trial", now < until, until)
+        return Access(trial_plan(), "implicit_trial", now < until, until)
     if sub.status == SUB_TRIALING:
         until = _aware(sub.trial_ends_at)
+        if not plan_catalog.has_trial(sub.plan):
+            # Defesa: em teste, plano sem teste grátis vale como o plano de teste.
+            return Access(trial_plan(), sub.status, until is None or now < until, until)
     elif sub.status == SUB_ACTIVE:
         return Access(sub.plan, sub.status, True, _aware(sub.current_period_end))
     elif sub.status == SUB_PAST_DUE:
@@ -179,7 +198,7 @@ def check_can_create_project(company: Company, adding: int = 1) -> None:
 
 def check_can_add_user(company: Company, adding: int = 1) -> None:
     plan = effective_plan(company)
-    if plan.max_users is None:  # pragma: no cover - todos os planos do catálogo têm limite
+    if plan.max_users is None:
         return
     if count_users(company.id) + adding > plan.max_users:
         raise PlanLimitError(

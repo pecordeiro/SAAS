@@ -34,7 +34,6 @@ from app.models import (
     Invitation,
     Membership,
     PasswordReset,
-    Plan,
     Subscription,
     User,
 )
@@ -42,7 +41,6 @@ from app.services import audit, entitlements
 from app.services.email import external_url, send_template
 from app.services.passwords import hash_password, verify_password
 from app.models.billing import SUB_TRIALING
-from app.services.plans import PROFISSIONAL
 from app.services.tokens import aware, hash_token, is_expired, looks_valid, new_token, utcnow
 
 CONFIRMATION_TTL = timedelta(hours=24)
@@ -108,12 +106,13 @@ def signup(company_name: str, name: str, email: str, password: str) -> None:
 
 
 def _start_trial(company: Company) -> None:
-    """Teste grátis: assinatura trialing de TRIAL_DAYS no DEFAULT_TRIAL_PLAN (config da
-    Fase 4). O provedor de verdade (Asaas) entra na Fase 8."""
+    """Teste grátis: assinatura trialing de TRIAL_DAYS no plano de teste (DEFAULT_TRIAL_PLAN,
+    só Essencial ou Profissional; Etapa B). O provedor de verdade (Asaas) entra na Fase 8."""
     from flask import current_app
 
-    code = current_app.config.get("DEFAULT_TRIAL_PLAN", PROFISSIONAL)
-    plan = db.session.execute(select(Plan).where(Plan.code == code)).scalar_one()
+    from app.services.entitlements import trial_plan
+
+    plan = trial_plan()
     db.session.add(
         Subscription(
             company_id=company.id,
