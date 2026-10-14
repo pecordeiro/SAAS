@@ -430,9 +430,9 @@ def test_fase9_revogar_token_de_outra_empresa_responde_404_e_nada_muda(app_facto
     from app.services import api_tokens as tokens
     from tests.conftest import make_tenant
 
-    app = app_factory({"FEATURE_PUBLIC_API": True, "DEFAULT_TRIAL_PLAN": "empresa"})
+    app = app_factory({"FEATURE_PUBLIC_API": True})
     with app.app_context():
-        a, b = make_tenant("A"), make_tenant("B")
+        a, b = make_tenant("A", plan="empresa"), make_tenant("B", plan="empresa")
         company_b = db.session.get(Company, b.company_id)
         created = tokens.create_token(company_b, name="ERP B", scopes=["read:projects"], expires_in_days=30, user_id=None)
         db.session.commit()
@@ -467,9 +467,9 @@ def api_ab(app_factory):
     from app.services import api_tokens as tokens
     from tests.conftest import make_tenant
 
-    app = app_factory({"FEATURE_PUBLIC_API": True, "DEFAULT_TRIAL_PLAN": "empresa"})
+    app = app_factory({"FEATURE_PUBLIC_API": True})
     with app.app_context():
-        a, b = make_tenant("A"), make_tenant("B")
+        a, b = make_tenant("A", plan="empresa"), make_tenant("B", plan="empresa")
         created = tokens.create_token(
             db.session.get(Company, a.company_id), name="ERP A", scopes=["read:projects", "write:progress"],
             expires_in_days=30, user_id=None,

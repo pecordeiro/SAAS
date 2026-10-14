@@ -82,8 +82,8 @@ def test_admin_desconto_muda_valor_no_provedor_e_audita(bclient, bapp, btenants)
     result = run(bapp, "billing-admin", "discount", "--company", str(a.company_id), "--percent", "20",
                  "--reason", "Cliente piloto (contrato 2026)")
     assert result.exit_code == 0, result.output
-    assert "R$ 279.20/mês" in result.output
-    assert fake(bapp).store.subscriptions["sub_fake_0001"]["value_cents"] == 27920
+    assert "R$ 397.60/mês" in result.output
+    assert fake(bapp).store.subscriptions["sub_fake_0001"]["value_cents"] == 39760
     with bapp.app_context():
         log = db.session.query(AuditLog).filter_by(company_id=a.company_id, action=billing.DISCOUNT_GRANTED).one()
         assert log.details["motivo"] == "Cliente piloto (contrato 2026)" and log.details["para_percentual"] == 20

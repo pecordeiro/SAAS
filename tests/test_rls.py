@@ -234,7 +234,7 @@ def test_cadastro_com_rls_ligado(app, rls_app):
 @pytest.fixture()
 def rls_api_app(rls_url):
     app = create_app(
-        "test", {"SQLALCHEMY_DATABASE_URI": rls_url, "RLS_ENABLED": True, "FEATURE_PUBLIC_API": True, "DEFAULT_TRIAL_PLAN": "empresa"}
+        "test", {"SQLALCHEMY_DATABASE_URI": rls_url, "RLS_ENABLED": True, "FEATURE_PUBLIC_API": True}
     )
     yield app
     with app.app_context():
@@ -245,11 +245,14 @@ def rls_api_app(rls_url):
 def test_token_da_api_autentica_com_rls_forcado_so_pelo_hash(app, rls_api_app, tenants, raw):
     """Política api_tokens_by_token: o token é achado pelo hash antes de saber a empresa;
     sem o hash no contexto nada é lido; com o token de A, B continua invisível."""
-    from app.models import Company
+    from app.models import Company, Subscription
     from app.services import api_tokens
+    from app.services.plans import get_plan
 
     a, b = tenants
     with app.app_context():
+        # A assina o Empresa (feature api); teste grátis não dá API (só planos 1 e 2 têm teste).
+        db.session.add(Subscription(company_id=a.company_id, plan_id=get_plan("empresa").id, provider="fake", status="active"))
         created = api_tokens.create_token(db.session.get(Company, a.company_id), name="ERP", scopes=["read:projects"], expires_in_days=1, user_id=None)
         db.session.commit()
         token_hash = created.token.token_hash

@@ -32,7 +32,7 @@ from app.models import (
 from app.services import audit, entitlements, events, exporter, importer
 from app.services import projects as svc
 from app.services import templates as tsvc
-from app.services.plans import ESSENCIAL, EMPRESA, get_plan
+from app.services.plans import EMPRESA, ESSENCIAL, PROFISSIONAL, get_plan
 from tests.conftest import make_tenant
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -402,7 +402,7 @@ def test_plano_empresa_sem_limite_de_projetos_e_features(ctx):
 
 def test_limite_de_usuarios_conta_convites_pendentes(ctx):
     company, owner, _ = ctx
-    _subscribe(company, ESSENCIAL)  # 5 usuários; o tenant tem 3 vínculos
+    _subscribe(company, PROFISSIONAL)  # 20 pessoas; o tenant tem 3 vínculos
     now = datetime.now(timezone.utc)
     db.session.add(Invitation(company_id=company.id, email="a@x.com", role="operator", token_hash="1" * 64,
                               expires_at=now + timedelta(days=3)))
@@ -410,9 +410,9 @@ def test_limite_de_usuarios_conta_convites_pendentes(ctx):
                               expires_at=now - timedelta(days=1)))  # vencido não conta
     db.session.flush()
     assert entitlements.count_users(company.id) == 4
-    entitlements.check_can_add_user(company)
+    entitlements.check_can_add_user(company, adding=16)
     with pytest.raises(entitlements.PlanLimitError):
-        entitlements.check_can_add_user(company, adding=2)
+        entitlements.check_can_add_user(company, adding=17)
     assert not entitlements.has_feature(company, "api")
     with pytest.raises(entitlements.PlanLimitError):
         entitlements.require_feature(company, "api", "API")

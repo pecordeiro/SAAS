@@ -176,7 +176,10 @@ class Tenant:
     activity_id: object
 
 
-def make_tenant(label: str, quantity: int = 10) -> Tenant:
+def make_tenant(label: str, quantity: int = 10, plan: str | None = None) -> Tenant:
+    """Empresa com 3 pessoas (owner, supervisor, operador) e 1 projeto. Sem ``plan``: sem
+    assinatura (teste grátis implícito no plano de teste). Com ``plan``: assinatura ativa
+    (paga) nesse plano — ex.: ``plan="empresa"`` para ter a feature ``api``."""
     company = Company(name=f"Empresa {label}")
     _db.session.add(company)
     _db.session.flush()
@@ -205,6 +208,11 @@ def make_tenant(label: str, quantity: int = 10) -> Tenant:
             )
         ],
     )
+    if plan is not None:
+        from app.models import Subscription
+        from app.services.plans import get_plan
+
+        _db.session.add(Subscription(company_id=company.id, plan_id=get_plan(plan).id, provider="fake", status="active"))
     _db.session.commit()
     stage = project.stages[0]
     activity = stage.activities[0]

@@ -344,9 +344,9 @@ def test_api_token_invalido_usa_chave_por_ip(app_factory):
     from app.models import Company
     from app.services import api_tokens
 
-    app = app_factory({"FEATURE_PUBLIC_API": True, "DEFAULT_TRIAL_PLAN": "empresa"})
+    app = app_factory({"FEATURE_PUBLIC_API": True})
     with app.app_context():
-        a = make_tenant("A")
+        a = make_tenant("A", plan="empresa")
         created = api_tokens.create_token(db.session.get(Company, a.company_id), name="X", scopes=["read:projects"], expires_in_days=1, user_id=None)
         db.session.commit()
         token_id = created.token.id
@@ -364,7 +364,7 @@ def test_api_token_invalido_usa_chave_por_ip(app_factory):
 
 
 def test_api_rate_limit_com_tokens_inventados_conta_no_mesmo_balde(app_factory):
-    app = app_factory({"FEATURE_PUBLIC_API": True, "DEFAULT_TRIAL_PLAN": "empresa", "RATELIMIT_ENABLED": True, "API_RATE_LIMIT": "3 per minute"})
+    app = app_factory({"FEATURE_PUBLIC_API": True, "RATELIMIT_ENABLED": True, "API_RATE_LIMIT": "3 per minute"})
     client = app.test_client()
     codes = [client.get("/api/v1/projects", headers={"Authorization": f"Bearer cp_chute{i:040d}"}).status_code for i in range(4)]
     assert codes == [401, 401, 401, 429]
@@ -380,9 +380,9 @@ def test_reset_em_conta_nao_confirmada_revoga_tokens_e_convites(app_factory):
     from app.services import api_tokens
     from app.services.email import outbox
 
-    app = app_factory({"FEATURE_PUBLIC_API": True, "DEFAULT_TRIAL_PLAN": "empresa"})
+    app = app_factory({"FEATURE_PUBLIC_API": True})
     with app.app_context():
-        a = make_tenant("A")
+        a = make_tenant("A", plan="empresa")
         owner = db.session.get(User, a.owner_id)
         owner.email_confirmed_at = None  # conta criada por quem não é dono do e-mail
         created = api_tokens.create_token(db.session.get(Company, a.company_id), name="Atacante", scopes=["read:projects"], expires_in_days=30, user_id=owner.id)

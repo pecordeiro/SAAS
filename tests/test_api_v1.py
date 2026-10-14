@@ -26,8 +26,8 @@ PROBLEM = "application/problem+json"
 
 @pytest.fixture()
 def api_app(app_factory):
-    """Flag ligada e plano de teste = Empresa (único com a feature ``api``)."""
-    return app_factory({"FEATURE_PUBLIC_API": True, "DEFAULT_TRIAL_PLAN": "empresa"})
+    """Flag ligada; as empresas de ``api_tenants`` assinam o Empresa (feature ``api``)."""
+    return app_factory({"FEATURE_PUBLIC_API": True})
 
 
 @pytest.fixture()
@@ -40,7 +40,7 @@ def client(request):
 @pytest.fixture()
 def api_tenants(api_app):
     with api_app.app_context():
-        return make_tenant("A"), make_tenant("B")
+        return make_tenant("A", plan="empresa"), make_tenant("B", plan="empresa")
 
 
 def new_token(app, company_id, scopes=("read:projects",), days=30, name="Integração"):
@@ -289,10 +289,10 @@ def test_token_invalido_nao_vai_para_o_log(client, api_app, api_tenants, caplog)
 
 def test_rate_limit_por_token(app_factory):
     app = app_factory(
-        {"FEATURE_PUBLIC_API": True, "DEFAULT_TRIAL_PLAN": "empresa", "RATELIMIT_ENABLED": True, "API_RATE_LIMIT": "2 per minute"}
+        {"FEATURE_PUBLIC_API": True, "RATELIMIT_ENABLED": True, "API_RATE_LIMIT": "2 per minute"}
     )
     with app.app_context():
-        a = make_tenant("A")
+        a = make_tenant("A", plan="empresa")
     raw1, _ = new_token(app, a.company_id, name="um")
     raw2, _ = new_token(app, a.company_id, name="dois")
     client = app.test_client()

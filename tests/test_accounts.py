@@ -354,13 +354,15 @@ def test_supervisor_nao_convida_owner_e_operador_nao_ve_usuarios(client, app, te
 
 def test_convites_pendentes_contam_no_limite_de_usuarios(client, app, tenants):
     a, _ = tenants
-    _set_plan(app, a.company_id, "essencial")  # 5 usuários; A já tem 3
+    _set_plan(app, a.company_id, "essencial")  # 3 pessoas; A já tem 3
     login(client, app, a.owner_email)
+    blocked = post(client, app, "/app/usuarios/convidar", {"email": "u0@x.com", "role": "operator"})
+    assert blocked.status_code == 402 and "permite 3 usuários" in text_of(blocked)
+    assert post(client, app, f"/app/usuarios/{_membership_id(app, a.operator_id)}/desativar").status_code == 303
     assert post(client, app, "/app/usuarios/convidar", {"email": "u1@x.com", "role": "operator"}).status_code == 303
-    assert post(client, app, "/app/usuarios/convidar", {"email": "u2@x.com", "role": "operator"}).status_code == 303
     blocked = post(client, app, "/app/usuarios/convidar", {"email": "u3@x.com", "role": "operator"})
-    assert blocked.status_code == 402 and "permite 5 usuários" in text_of(blocked)
-    assert "5 de 5 usuários" in text_of(client.get("/app/usuarios"))
+    assert blocked.status_code == 402 and "permite 3 usuários" in text_of(blocked)
+    assert "3 de 3 usuários" in text_of(client.get("/app/usuarios"))
     with app.app_context():
         u1 = db.session.execute(select(Invitation.id).where(Invitation.email == "u1@x.com")).scalar_one()
     post(client, app, f"/app/usuarios/convites/{u1}/revogar")
@@ -916,24 +918,25 @@ def test_cadastro_cria_assinatura_trialing(client, app):
 
 def test_limite_de_usuarios_no_convite_e_no_aceite_responde_402(client, app, tenants):
     a, _ = tenants
-    _set_plan(app, a.company_id, "essencial")  # 5 usuários; A tem 3
+    _set_plan(app, a.company_id, "essencial")  # 3 pessoas; A tem 3
     login(client, app, a.owner_email)
-    post(client, app, "/app/usuarios/convidar", {"email": "v1@x.com", "role": "operator"})
-    post(client, app, "/app/usuarios/convidar", {"email": "v2@x.com", "role": "operator"})
+    assert post(client, app, "/app/usuarios/convidar", {"email": "v0@x.com", "role": "operator"}).status_code == 402
+    post(client, app, f"/app/usuarios/{_membership_id(app, a.operator_id)}/desativar")
+    assert post(client, app, "/app/usuarios/convidar", {"email": "v1@x.com", "role": "operator"}).status_code == 303
     assert post(client, app, "/app/usuarios/convidar", {"email": "v3@x.com", "role": "operator"}).status_code == 402
     token = last_token(app, "v1@x.com", "convite")
     # O plano encolhe depois do convite: o aceite também é barrado (402) e nada é gravado.
     with app.app_context():
         from app.models import Plan
 
-        db.session.execute(select(Plan).where(Plan.code == "essencial")).scalar_one().max_users = 3
+        db.session.execute(select(Plan).where(Plan.code == "essencial")).scalar_one().max_users = 2
         db.session.commit()
     guest = app.test_client()
     response = post(guest, app, f"/convite/{token}", {"name": "V", "password": "senha-forte-v1x", "password_confirm": "senha-forte-v1x"})
     assert response.status_code == 402
     with app.app_context():
         assert accounts.find_user_by_email("v1@x.com") is None
-        db.session.execute(select(Plan).where(Plan.code == "essencial")).scalar_one().max_users = 5
+        db.session.execute(select(Plan).where(Plan.code == "essencial")).scalar_one().max_users = 3
         db.session.commit()
 
 
