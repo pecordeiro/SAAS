@@ -49,6 +49,16 @@ menu não mostra a tela. Variáveis: `FEATURE_PUBLIC_API`, `API_RATE_LIMIT` (`12
 por token) e `API_RATE_LIMIT_IP` (`600 per minute`). Com RLS ligado, a busca do token antes de
 saber a empresa precisa de papel de plataforma (ver progresso.md, Fase 9).
 
+Fase 7 (segurança e LGPD) entregue: CSP estrita com nonce, HSTS e cabeçalhos
+(`app/security.py`), cookies `__Host-`, rate limit em Redis obrigatório em produção, uploads
+em memória com proteção a zip bomb/XXE, logs JSON com `request_id` e Sentry opcional com filtro
+(`app/logging_config.py`), exportação ZIP e exclusão da empresa com carência de 30 dias em
+`/app/privacidade` (proprietário), `flask lgpd-purge`, `flask lgpd-retencao`, acesso de
+suporte auditado (`flask suporte ...`), rotação de chaves (`SECRET_KEY_FALLBACKS`,
+`MFA_ENCRYPTION_KEY` com MultiFernet + `flask mfa-rotacionar`), `pip-audit` no CI e Dependabot.
+Docs: [`seguranca.md`](docs/plano/seguranca.md) (STRIDE), [`lgpd.md`](docs/plano/lgpd.md),
+[`incidentes.md`](docs/plano/incidentes.md); textos-rascunho em `docs/legal/`.
+
 - Contexto para o Claude: [`CLAUDE.md`](CLAUDE.md)
 - Plano: [`docs/plano/`](docs/plano/) — PRD, arquitetura, ADRs, roadmap, backlog, riscos e progresso
 - Guia de segurança: [`.claude/claude-security-guidance.md`](.claude/claude-security-guidance.md)
@@ -195,8 +205,17 @@ Telas em `/app/assinatura` (só proprietário). Roteiro do ciclo real no sandbox
 
 ### Produção
 
-`APP_ENV=production` exige `SECRET_KEY` e `DATABASE_URL` (o app não sobe sem eles); para
-mandar e-mail, também `APP_BASE_URL`, `RESEND_API_KEY` e `MAIL_FROM`.
+`APP_ENV=production` exige `SECRET_KEY`, `DATABASE_URL` e `REDIS_URL` (ou
+`RATELIMIT_STORAGE_URI=redis://...`) — o app não sobe sem eles nem com cookie inseguro; para
+mandar e-mail, também `APP_BASE_URL`, `RESEND_API_KEY` e `MAIL_FROM`. Atrás do proxy do
+Render, `TRUSTED_PROXY_COUNT=1`. Opcionais: `SENTRY_DSN`, `LOG_LEVEL`, `SECRET_KEY_FALLBACKS`.
+Não ligue o access log do Gunicorn (ele grava o caminho, que pode ter token): o app já
+registra cada requisição em JSON com o molde da rota.
+
+Rotinas agendadas (cron): `flask lgpd-purge --operador cron` e `flask lgpd-retencao
+--operador cron` (diárias), `flask suporte expirar` (de hora em hora). Acesso de suporte:
+`flask suporte conceder EMAIL --empresa UUID --motivo "..." --horas 4 --autorizado-por "..."`.
+Auditoria de dependências: `pip-audit -r requirements-dev.txt`.
 Servidor: `gunicorn run:app`. Variáveis em [`.env.example`](.env.example) e em
 `docs/plano/arquitetura.md` §10.
 

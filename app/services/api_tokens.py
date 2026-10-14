@@ -117,7 +117,13 @@ def find_by_raw(raw: str) -> ApiToken | None:
     """Token pelo texto recebido (busca por hash, ainda sem empresa). None se não existe."""
     if not raw.startswith(TOKEN_PREFIX) or len(raw) > TOKEN_MAX_LENGTH:
         return None
-    return db.session.execute(select(ApiToken).where(ApiToken.token_hash == hash_token(raw))).scalar_one_or_none()
+    token_hash = hash_token(raw)
+    # RLS (Fase 7, política api_tokens_by_token): antes de saber a empresa, o banco só deixa
+    # ler a linha cujo hash é o do token apresentado — ter o token é a autorização.
+    from app import rls
+
+    rls.set_context(token_hash=token_hash)
+    return db.session.execute(select(ApiToken).where(ApiToken.token_hash == token_hash)).scalar_one_or_none()
 
 
 def check_usable(token: ApiToken, now: datetime | None = None) -> None:

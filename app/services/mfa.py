@@ -1,8 +1,9 @@
 """MFA TOTP (pyotp) com segredo cifrado e códigos de recuperação.
 
 - Segredo TOTP cifrado com Fernet; a chave é derivada por HKDF-SHA256 de
-  ``MFA_ENCRYPTION_KEY`` (ou, sem ela, de ``SECRET_KEY``). Trocar a chave invalida os
-  segredos gravados (os usuários precisam reativar o MFA) — rotação fica documentada.
+  ``MFA_ENCRYPTION_KEY`` (ou, sem ela, de ``SECRET_KEY``). Fase 7: MultiFernet — a lista
+  "nova,antiga" decifra com as duas e cifra com a nova; ``flask mfa-rotacionar`` recifra
+  tudo e depois a antiga pode sair (docs/plano/incidentes.md, rotação de segredos).
 - QR code em SVG gerado no servidor (segno), sem serviço de terceiros.
 - Códigos de recuperação: 10 códigos aleatórios, mostrados uma vez; no banco só o SHA-256;
   uso único.
@@ -18,7 +19,7 @@ import secrets
 import time
 
 import pyotp
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from flask import current_app
@@ -33,8 +34,7 @@ RECOVERY_CODES = 10
 _RECOVERY_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"  # sem 0/o/1/l/i
 
 
-def _fernet() -> Fernet:
-    secret = current_app.config.get("MFA_ENCRYPTION_KEY") or current_app.config["SECRET_KEY"]
+def _derive(secret: str) -> Fernet:
     key = HKDF(
         algorithm=hashes.SHA256(),
         length=32,
@@ -42,6 +42,39 @@ def _fernet() -> Fernet:
         info=b"totp-secret-v1",
     ).derive(secret.encode("utf-8"))
     return Fernet(base64.urlsafe_b64encode(key))
+
+
+def _secrets() -> list[str]:
+    """Chaves em ordem: a PRIMEIRA cifra; as outras só decifram (rotação, Fase 7).
+
+    ``MFA_ENCRYPTION_KEY`` aceita lista separada por vírgula ("nova,antiga"). Sem ela, usa
+    ``SECRET_KEY`` seguida de ``SECRET_KEY_FALLBACKS``."""
+    configured = current_app.config.get("MFA_ENCRYPTION_KEY")
+    if configured:
+        keys = [k.strip() for k in str(configured).split(",") if k.strip()]
+    else:
+        keys = [current_app.config["SECRET_KEY"], *reversed(current_app.config.get("SECRET_KEY_FALLBACKS") or [])]
+    return keys
+
+
+def _fernet() -> MultiFernet:
+    return MultiFernet([_derive(k) for k in _secrets()])
+
+
+def rotate_all() -> int:
+    """Recifra todo segredo TOTP com a chave primária (``flask mfa-rotacionar``). Commit."""
+    count = 0
+    fernet = _fernet()
+    for user in db.session.execute(select(User).where(User.totp_secret_enc.is_not(None))).scalars():
+        try:
+            rotated = fernet.rotate(user.totp_secret_enc.encode("ascii")).decode("ascii")
+        except (InvalidToken, ValueError):
+            continue  # chave antiga já removida: o usuário precisa reativar o MFA
+        if rotated != user.totp_secret_enc:
+            user.totp_secret_enc = rotated
+            count += 1
+    db.session.commit()
+    return count
 
 
 def new_secret() -> str:

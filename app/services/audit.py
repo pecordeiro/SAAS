@@ -47,6 +47,13 @@ PROGRESS_UNDONE = "progress.undone"
 COMPANY_UPDATED = "company.updated"
 HOLIDAY_ADDED = "holiday.added"
 HOLIDAY_REMOVED = "holiday.removed"
+# Fase 7 — LGPD e suporte (constantes usadas por app/services/lgpd.py e support.py).
+COMPANY_DELETION_CANCELLED = "company.deletion_cancelled"
+COMPANY_DATA_EXPORTED = "company.data_exported"
+SUPPORT_ACCESS_GRANTED = "support.access_granted"
+SUPPORT_ACCESS_REVOKED = "support.access_revoked"
+SUPPORT_ACCESS_EXPIRED = "support.access_expired"
+ACCOUNT_CLAIMED_BY_RESET = "account.claimed_by_reset"
 
 ACTION_LABELS = {
     ROLE_CHANGED: "Papel alterado",
@@ -72,6 +79,12 @@ ACTION_LABELS = {
     COMPANY_UPDATED: "Dados da empresa alterados",
     HOLIDAY_ADDED: "Feriado incluído",
     HOLIDAY_REMOVED: "Feriado removido",
+    COMPANY_DELETION_CANCELLED: "Exclusão da empresa cancelada",
+    COMPANY_DATA_EXPORTED: "Dados da empresa exportados",
+    SUPPORT_ACCESS_GRANTED: "Acesso de suporte concedido",
+    SUPPORT_ACCESS_REVOKED: "Acesso de suporte revogado",
+    SUPPORT_ACCESS_EXPIRED: "Acesso de suporte expirado",
+    ACCOUNT_CLAIMED_BY_RESET: "Conta retomada pelo dono do e-mail",
 }
 
 

@@ -152,7 +152,7 @@ def count_users(company_id: uuid.UUID, now: datetime | None = None) -> int:
     members = db.session.execute(
         select(func.count())
         .select_from(Membership)
-        .where(Membership.company_id == company_id, Membership.active.is_(True))
+        .where(Membership.company_id == company_id, Membership.active.is_(True), Membership.is_support.is_(False))
     ).scalar_one()
     pending = db.session.execute(
         select(func.count())

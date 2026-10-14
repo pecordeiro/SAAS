@@ -594,3 +594,110 @@ critérios de pronto da anterior estiverem marcados.
   - Migration `f6a1b2c3d4e5` a reencadear após a Fase 7. Rebuild de `dist/` ao mesclar CSS/JS de outras fases.
   - `/estilo` não mostra os componentes novos (radio card, abas, menu de ações, plan_card).
   - Sem Playwright o teste e2e é pulado; CI precisa instalar `playwright==1.55.0` e o Chromium.
+### Fase 7 — Segurança e LGPD
+- Status: concluída (telas não capturadas em 375/768/1280 — só a página nova de Privacidade, com macros existentes; Fase 6)
+- Datas: início 2026-10-14 · fim 2026-10-14
+- Entregas:
+  - `app/security.py`: CSP com nonce por requisição (`script-src 'self' 'nonce-…'`,
+    `style-src 'self'`, `object-src 'none'`, `base-uri 'none'`, `form-action 'self'`,
+    `frame-ancestors 'none'`, sem `unsafe-inline`), `csp_nonce()` no Jinja, HSTS fora de
+    dev/test, Permissions-Policy, COOP/CORP, `no-store` em página logada; produção recusa
+    subir com cookie inseguro; multipart lido em `BytesIO` (nada em disco); rate limit
+    automático para blueprint com “webhook” no nome (`WEBHOOK_RATE_LIMIT`, Fase 8 só registra);
+    `signing_keys()` para rotação (`SECRET_KEY_FALLBACKS`).
+  - Cookies: `__Host-session`, `__Host-remember` (novo), `__Host-dispositivo`, Secure, HttpOnly,
+    SameSite=Lax; tema continua sem HttpOnly.
+  - Rate limit: `REDIS_URL` → `RATELIMIT_STORAGE_URI`; produção sem Redis falha no boot com
+    mensagem clara; limites novos em importar (upload e confirmação) e LGPD. API: chave por
+    token só para token EXISTENTE (inválido cai no IP — nota da revisão).
+  - Uploads: zip conferido pelo tamanho REAL descompactado em streaming (não só o declarado),
+    zip cifrado recusado, XML com DOCTYPE/ENTITY recusado; `defusedxml==0.7.1` (o openpyxl
+    passa a usá-lo — conferido: `openpyxl.xml.DEFUSEDXML is True`).
+  - `app/logging_config.py`: logs JSON em stdout, `request_id` (aceita `X-Request-ID` só
+    `[A-Za-z0-9._-]{8,64}`, devolve no header), log de acesso com o MOLDE da rota (nunca o
+    caminho com token), filtro de e-mail/token/chaves sensíveis; Sentry opcional
+    (`sentry-sdk==2.72.0`, `send_default_pii=False`, sem corpo, sem variáveis locais,
+    `before_send` remove cookies/Authorization/senhas/tokens/e-mails/IP).
+  - LGPD (`app/services/lgpd.py`, `app/blueprints/lgpd.py`, `/app/privacidade`, só owner,
+    vale em modo leitura): exportação ZIP de CSVs (todas as tabelas com `company_id` + empresa
+    + usuários vinculados; sem hashes/segredo TOTP; células neutralizadas; auditada);
+    exclusão com senha + nome da empresa, carência de 30 dias, cancelável, e-mail aos
+    proprietários; `flask lgpd-purge [--dry-run]` (idempotente, só empresa com carência
+    vencida, apaga usuários sem outro vínculo e nunca a conta de suporte; registro em
+    `platform_audit_logs`); `flask lgpd-retencao` (tokens 30 d, throttles 30 d, eventos
+    publicados 90 d, `api.request` 6 meses, auditoria 5 anos). Menu “Privacidade” (owner).
+  - Suporte (`app/services/support.py`, `flask suporte conceder|revogar|listar|expirar`):
+    motivo ≥ 15, “autorizado por”, ≤ 72 h, papel ≤ supervisor, conta com e-mail confirmado e
+    MFA; vínculo `memberships.is_support` + `expires_at` — `tenancy` ignora vencido na hora
+    (expira sozinho); não conta no plano; não vira owner; não convida ninguém; e-mail aos
+    proprietários; tudo em `audit_logs`.
+  - Pre-account takeover (nota da revisão): reset que confirma conta nunca confirmada também
+    revoga tokens da API e convites pendentes das empresas em que ela é owner
+    (`account.claimed_by_reset`); sessões já caíam pelo `session_version`. Risco residual
+    (convidados que já aceitaram) documentado em `seguranca.md`.
+  - MFA: `MFA_ENCRYPTION_KEY` aceita “nova,antiga” (MultiFernet) + `flask mfa-rotacionar`
+    (resolve a pendência da Fase 5).
+  - RLS (ADR-0003 atualizado): política `api_tokens_by_token` (resolve a pendência da Fase 9);
+    LGPD/retenção/suporte rodam empresa a empresa no próprio contexto; decisão de não usar
+    `SECURITY DEFINER` (com FORCE o dono também passa pelo RLS) nem BYPASSRLS no web.
+  - Stubs 501 da API resolvem o id na empresa antes (B → 404).
+  - Migration `228fffa5a2d8` (cadeia linear depois de `d8b2e6f4a1c7` da Fase 8, após o merge com
+    `c5d1ecc`; `flask db heads` = um único head): `platform_audit_logs`,
+    `memberships.is_support/expires_at`, política `api_tokens_by_token`.
+  - Dependências: `redis==8.0.1`, `sentry-sdk==2.72.0`, `defusedxml==0.7.1`,
+    `pip-audit==2.10.1` (dev); job `audit` no CI; `.github/dependabot.yml` (pip semanal,
+    actions mensal).
+  - Docs: `seguranca.md` (STRIDE com código/teste), `lgpd.md`, `incidentes.md` (ANPD em 3 dias
+    úteis, rotação de segredos), `docs/legal/termos.md` e `privacidade.md` (RASCUNHO — as
+    rotas `/termos` e `/privacidade` não existiam; layout na Fase 6), README, `.env.example`.
+- Critérios de pronto:
+  - [x] Testes: CSP com nonce e sem `unsafe-inline`, HSTS, cookies Secure/HttpOnly/SameSite/
+        `__Host-` em produção, upload acima do limite → 413, zip bomb (real e com tamanho
+        declarado falso) e XXE recusados, rate limit 429 (importar, LGPD, webhook, API)
+        (`tests/test_fase7_security.py`, `tests/test_lgpd.py`).
+  - [x] Teste do `url_map` agora roda com e sem `FEATURE_PUBLIC_API` e exige caso A/B para toda
+        rota `<uuid:>` (inclui as 4 da API, com casos A/B novos no fim de `test_isolation.py`).
+        Rotas novas da Fase 7 não têm `<uuid:>` (empresa da sessão) e têm teste A/B próprio
+        (exportação só com dados de A; exclusão só da empresa da sessão).
+  - [x] `pip-audit -r requirements-dev.txt`: “No known vulnerabilities found” (sem exceções).
+  - [x] Exportação LGPD gera ZIP só com dados da empresa (teste A/B, também com RLS forçado).
+  - [x] Migration reversível a partir de `d8b2e6f4a1c7` (upgrade → downgrade → upgrade →
+        `flask db check` sem drift no PostgreSQL 16 e no SQLite; `downgrade base` ida e volta).
+  - [x] Revisão de segurança do próprio diff (abaixo).
+- Testes (depois do merge com a Fase 8, `c5d1ecc`): SQLite `463 passed, 44 skipped, 3 xfailed`
+  + PostgreSQL 16 (`controle_test_f7`) `507 passed, 3 xfailed`; a única falha nas duas
+  (`test_billing_asaas::test_provedor_em_producao_exige_chave`, app de produção sem Redis — regra
+  nova da Fase 7) foi corrigida no teste e o arquivo reroda verde. Antes do merge: SQLite
+  `389 passed, 42 skipped, 3 xfailed`, PostgreSQL `431 passed, 3 xfailed`, cobertura de `app/`
+  94% (lgpd 90%, support 92%, security 96%, logging_config 91%).
+- /security-review (revisão manual do diff, achados ≥ 8 corrigidos):
+  - Suporte supervisor podia convidar alguém e transformar acesso temporário em permanente →
+    `can_manage_invite_role` recusa vínculo de suporte (teste).
+  - Expurgo apagaria a conta da equipe de suporte junto com a empresa → vínculos de suporte
+    excluídos da lista de usuários a apagar (teste).
+  - Expurgo com RLS poderia apagar usuário que tem vínculo em outra empresa (vínculos de outras
+    empresas invisíveis no contexto da empresa) → checagem pelo contexto de usuário
+    (`memberships_own_user`) (teste com RLS forçado).
+  - Retenção/expiração com RLS: `flush` dentro do contexto de cada empresa (senão o UPDATE
+    sairia sem contexto e afetaria 0 linhas).
+  - Log de acesso gravaria `/convite/<token real>` → só o molde da rota; log do Werkzeug em
+    WARNING; README pede para não ligar o access log do Gunicorn.
+  - Abaixo do limiar / aceitos: exportação em memória (empresa muito grande); `usuarios.csv`
+    inclui o nome/e-mail da pessoa de suporte que teve acesso (transparência); o dono pode
+    reativar um vínculo de suporte vencido, mas a validade continua valendo.
+- Telas conferidas (375/768/1280, claro/escuro): não (página nova só com macros/tokens;
+  `test_visual` verde). Fase 6.
+- Commit: “feat: fase 7 — segurança e LGPD” (hash no histórico do branch).
+- ADRs criados: ADR-0009 (backend é a única fonte de regras; front é só painel — regra 9 em
+  `CLAUDE.md`); ADR-0003 atualizado (fluxos entre empresas sem papel de plataforma, incluindo a
+  política da Fase 8).
+- Pendências e dívidas:
+  - Sessão ainda em cookie assinado (logout não revoga cópia do cookie); sessões no Redis
+    ficam para depois do go-live se o risco justificar.
+  - Fase 8: webhook do Asaas e worker do outbox decidem entre política estreita por id externo
+    ou papel de plataforma só no worker (ADR-0003); usar `ASAAS_*` como em `incidentes.md`.
+  - Fase 6: rotas `/termos` e `/privacidade` com o texto de `docs/legal/` (RASCUNHO) e link no
+    rodapé; página 500 mostrar o `X-Request-ID`; captura da página de Privacidade.
+  - Revisão jurídica (termos, privacidade, `lgpd.md`), DPAs e região do Render (go/no-go).
+  - Cron no Render: `flask lgpd-purge`, `flask lgpd-retencao` (diários), `flask suporte expirar`.
+  - Produção: definir `REDIS_URL`, `TRUSTED_PROXY_COUNT=1`, `MFA_ENCRYPTION_KEY` própria.

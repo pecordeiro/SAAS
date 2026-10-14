@@ -40,6 +40,9 @@ class Config:
     SESSION_COOKIE_NAME = "__Host-session"
     REMEMBER_COOKIE_HTTPONLY = True
     REMEMBER_COOKIE_SECURE = True
+    # Fase 7: prefixo __Host- (só HTTPS, Path=/, sem Domain) e SameSite em todo cookie de sessão.
+    REMEMBER_COOKIE_NAME = "__Host-remember"
+    REMEMBER_COOKIE_SAMESITE = "Lax"
     PERMANENT_SESSION_LIFETIME = 60 * 60 * 12  # 12 h
 
     # CSRF em todo POST
@@ -113,6 +116,30 @@ class Config:
     # Werkzeug recusa com 413 antes de ler o corpo (inclusive antes do CSRF).
     MAX_CONTENT_LENGTH = IMPORT_MAX_BYTES + 256 * 1024
 
+    # Fase 7 — segurança e LGPD (app/security.py, app/logging_config.py, app/services/lgpd.py)
+    # Rotação: chaves antigas que ainda VALIDAM (sessão, prévia de importação, dispositivo
+    # confiável); só SECRET_KEY assina. Lista separada por vírgula no env.
+    SECRET_KEY_FALLBACKS: list = []
+    IMPORT_RATE_LIMIT = "10 per minute; 60 per hour"
+    WEBHOOK_RATE_LIMIT = "120 per minute"
+    LGPD_EXPORT_RATE_LIMIT = "3 per hour"
+    LGPD_DELETE_RATE_LIMIT = "5 per hour"
+    # Logs JSON em stdout (LOG_JSON=0 volta ao texto simples, útil no terminal de dev).
+    LOG_JSON = True
+    LOG_LEVEL = "INFO"
+    # Sentry opcional (sem DSN = desligado). Nunca manda PII (ver app/logging_config.py).
+    SENTRY_DSN: str | None = None
+    SENTRY_TRACES_SAMPLE_RATE = 0.0
+    # LGPD: carência da exclusão da empresa e retenção (dias). Ver docs/plano/lgpd.md.
+    LGPD_DELETION_GRACE_DAYS = 30
+    RETENTION_API_REQUEST_DAYS = 183  # registros de acesso (Marco Civil, art. 15: 6 meses)
+    RETENTION_AUDIT_DAYS = 5 * 365
+    RETENTION_EVENTS_DAYS = 90  # domain_events já publicados
+    RETENTION_TOKENS_DAYS = 30  # convites/resets/confirmações usados ou vencidos
+    RETENTION_THROTTLE_DAYS = 30
+    # Acesso de suporte (flask suporte conceder): teto de horas por concessão.
+    SUPPORT_ACCESS_MAX_HOURS = 72
+
     @classmethod
     def from_env(cls) -> dict:
         """Lê as variáveis de ambiente na hora de criar o app (não na importação)."""
@@ -120,7 +147,11 @@ class Config:
             "SECRET_KEY": os.environ.get("SECRET_KEY") or cls.SECRET_KEY,
             "SQLALCHEMY_DATABASE_URI": _database_url(cls.DEFAULT_DATABASE_URL),
             "RATELIMIT_ENABLED": _bool("RATELIMIT_ENABLED", cls.RATELIMIT_ENABLED),
-            "RATELIMIT_STORAGE_URI": os.environ.get("RATELIMIT_STORAGE_URI", cls.RATELIMIT_STORAGE_URI),
+            # Produção: Redis (REDIS_URL do Render/compose) — memória não é compartilhada entre
+            # workers do Gunicorn. finalize_config recusa memory:// fora de dev/test.
+            "RATELIMIT_STORAGE_URI": os.environ.get("RATELIMIT_STORAGE_URI")
+            or os.environ.get("REDIS_URL")
+            or cls.RATELIMIT_STORAGE_URI,
             "RLS_ENABLED": _bool("RLS_ENABLED", cls.RLS_ENABLED),
             "FEATURE_PUBLIC_API": _bool("FEATURE_PUBLIC_API", cls.FEATURE_PUBLIC_API),
             "API_RATE_LIMIT": os.environ.get("API_RATE_LIMIT", cls.API_RATE_LIMIT),
@@ -151,6 +182,17 @@ class Config:
             raise RuntimeError("TRUSTED_PROXY_COUNT precisa ser um número inteiro.") from None
         for key in ("MAIL_BACKEND", "MAIL_FROM", "RESEND_API_KEY", "APP_BASE_URL", "MFA_ENCRYPTION_KEY", "CONTACT_EMAIL"):
             values[key] = os.environ.get(key) or getattr(cls, key)
+        # Fase 7
+        fallbacks = os.environ.get("SECRET_KEY_FALLBACKS", "")
+        values["SECRET_KEY_FALLBACKS"] = [k.strip() for k in fallbacks.split(",") if k.strip()]
+        for key in ("IMPORT_RATE_LIMIT", "WEBHOOK_RATE_LIMIT", "LGPD_EXPORT_RATE_LIMIT", "LGPD_DELETE_RATE_LIMIT", "LOG_LEVEL"):
+            values[key] = os.environ.get(key) or getattr(cls, key)
+        values["LOG_JSON"] = _bool("LOG_JSON", cls.LOG_JSON)
+        values["SENTRY_DSN"] = os.environ.get("SENTRY_DSN") or None
+        try:
+            values["SENTRY_TRACES_SAMPLE_RATE"] = float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", cls.SENTRY_TRACES_SAMPLE_RATE))
+        except ValueError:
+            raise RuntimeError("SENTRY_TRACES_SAMPLE_RATE precisa ser um número entre 0 e 1.") from None
         return values
 
 
@@ -162,6 +204,8 @@ class DevelopmentConfig(Config):
     SESSION_COOKIE_SECURE = False
     SESSION_COOKIE_NAME = "session"
     REMEMBER_COOKIE_SECURE = False
+    REMEMBER_COOKIE_NAME = "remember_token"
+    LOG_JSON = False
 
 
 class TestConfig(Config):
@@ -172,7 +216,9 @@ class TestConfig(Config):
     SESSION_COOKIE_SECURE = False
     SESSION_COOKIE_NAME = "session"
     REMEMBER_COOKIE_SECURE = False
+    REMEMBER_COOKIE_NAME = "remember_token"
     RATELIMIT_ENABLED = False
+    LOG_JSON = False
 
     @classmethod
     def from_env(cls) -> dict:
@@ -183,6 +229,9 @@ class TestConfig(Config):
         # Testes nunca mandam e-mail de verdade: backend console (caixa em memória).
         values["MAIL_BACKEND"] = "console"
         values["RESEND_API_KEY"] = None
+        # Testes nunca mandam erro para o Sentry nem usam o Redis do ambiente.
+        values["SENTRY_DSN"] = None
+        values["RATELIMIT_STORAGE_URI"] = "memory://"
         return values
 
 
@@ -222,3 +271,8 @@ def finalize_config(app_config: dict, env_name: str) -> None:
         raise RuntimeError("SECRET_KEY é obrigatório fora de development/test.")
     if not app_config.get("SQLALCHEMY_DATABASE_URI"):
         raise RuntimeError("DATABASE_URL é obrigatório fora de development/test.")
+    storage = str(app_config.get("RATELIMIT_STORAGE_URI") or "")
+    if app_config.get("RATELIMIT_ENABLED") and not storage.startswith(("redis://", "rediss://", "redis+sentinel://")):
+        # Em memória cada worker do Gunicorn tem o próprio contador (o limite vira N vezes
+        # maior) e reiniciar zera tudo: produção sem Redis é erro de configuração.
+        raise RuntimeError("Rate limit em produção exige Redis: defina REDIS_URL (ou RATELIMIT_STORAGE_URI=redis://...).")

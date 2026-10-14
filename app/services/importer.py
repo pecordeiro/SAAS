@@ -328,14 +328,48 @@ def parse_csv(data: bytes) -> ImportResult:
 # ---------------------------------------------------------------- XLSX
 
 
-def _open_workbook(data: bytes):
+_DTD_MARKERS = tuple(
+    marker.encode(enc) for marker in ("<!DOCTYPE", "<!ENTITY") for enc in ("utf-8", "utf-16-le", "utf-16-be")
+)
+_SCAN_CHUNK = 64 * 1024
+
+
+def _inspect_zip(data: bytes) -> None:
+    """Fase 7: confere o zip pelo que REALMENTE sai da descompressão (não pelo tamanho
+    declarado no cabeçalho, que o atacante escolhe) e recusa XML com DTD/entidades (XXE e
+    "billion laughs" — uma planilha legítima nunca tem DOCTYPE)."""
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as zf:
             infos = zf.infolist()
             if len(infos) > MAX_ZIP_ENTRIES or sum(i.file_size for i in infos) > MAX_UNCOMPRESSED:
                 raise ImportError_("Planilha grande demais depois de descompactada.")
-    except zipfile.BadZipFile:
+            total = 0
+            for info in infos:
+                if info.is_dir():
+                    continue
+                if info.flag_bits & 0x1:
+                    raise ImportError_("Planilha protegida por senha não é aceita.")
+                tail = b""
+                with zf.open(info) as member:
+                    while True:
+                        chunk = member.read(_SCAN_CHUNK)
+                        if not chunk:
+                            break
+                        total += len(chunk)
+                        if total > MAX_UNCOMPRESSED:
+                            raise ImportError_("Planilha grande demais depois de descompactada.")
+                        window = tail + chunk
+                        if any(marker in window for marker in _DTD_MARKERS):
+                            raise ImportError_("Planilha com definição de documento (DTD) não é aceita.")
+                        tail = window[-32:]
+    except (zipfile.BadZipFile, zipfile.LargeZipFile, EOFError, NotImplementedError, RuntimeError, ValueError, OSError) as exc:
+        if isinstance(exc, ImportError_):
+            raise
         raise ImportError_("O arquivo não é uma planilha .xlsx válida.") from None
+
+
+def _open_workbook(data: bytes):
+    _inspect_zip(data)
     import warnings
 
     from openpyxl import load_workbook
