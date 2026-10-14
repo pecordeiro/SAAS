@@ -402,3 +402,27 @@ def test_convite_aceito_so_vincula_a_empresa_do_convite(client, app, tenants):
         sess["company_id"] = str(b.company_id)
     assert guest.get(f"/app/projetos/{b.project_id}").status_code == 404
     assert "Projeto B" not in guest.get("/app/projetos").get_data(as_text=True)
+
+# ---------------------------------------------------------------- Fase 9: API pública (atrás de FEATURE_PUBLIC_API)
+
+
+def test_fase9_revogar_token_de_outra_empresa_responde_404_e_nada_muda(app_factory):
+    from app.models import ApiToken, Company
+    from app.services import api_tokens as tokens
+    from tests.conftest import make_tenant
+
+    app = app_factory({"FEATURE_PUBLIC_API": True, "DEFAULT_TRIAL_PLAN": "empresa"})
+    with app.app_context():
+        a, b = make_tenant("A"), make_tenant("B")
+        company_b = db.session.get(Company, b.company_id)
+        created = tokens.create_token(company_b, name="ERP B", scopes=["read:projects"], expires_in_days=30, user_id=None)
+        db.session.commit()
+        token_id, prefix = created.token.id, created.token.token_prefix
+    client = app.test_client()
+    login(client, app, a.owner_email)
+    assert post(client, app, f"/app/integracoes/api/{token_id}/revogar").status_code == 404
+    assert post(client, app, "/app/integracoes/api/nao-e-uuid/revogar").status_code == 404
+    page = client.get("/app/integracoes/api").get_data(as_text=True)
+    assert "ERP B" not in page and prefix not in page
+    with app.app_context():
+        assert db.session.get(ApiToken, token_id).revoked_at is None

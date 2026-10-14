@@ -180,9 +180,9 @@ tokens com escopo; `GET /projects` e `GET /projects/{id}/summary`; demais rotas 
 501; tela de tokens atrás da flag.
 
 Critérios de pronto:
-- [ ] Flag desligada: `/api/v1/*` → 404 e tela de tokens invisível (teste).
-- [ ] Flag ligada: token de A não lê B (404), sem escopo → 403, revogado → 401, expirado → 401.
-- [ ] `openapi.yaml` validado (openapi-spec-validator) e rotas implementadas batem com o contrato (teste).
+- [x] Flag desligada: `/api/v1/*` → 404 e tela de tokens invisível (teste).
+- [x] Flag ligada: token de A não lê B (404), sem escopo → 403, revogado → 401, expirado → 401.
+- [x] `openapi.yaml` validado (openapi-spec-validator) e rotas implementadas batem com o contrato (teste).
 
 ## Fase 10 — Deploy e lançamento
 

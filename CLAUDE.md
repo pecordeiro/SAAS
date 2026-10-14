@@ -15,8 +15,9 @@ Python 3.12, Flask 3, SQLAlchemy 2, Alembic (Flask-Migrate), PostgreSQL 16,
 Flask-Login, Flask-WTF (CSRF), Flask-Limiter, Gunicorn, pytest. Pagamento: Asaas.
 
 ## Estado atual
-Fases 0–3 concluídas: esqueleto, calc.py com paridade da planilha, design system “Prumo”
-no código (tokens, macros, layouts), schema completo do MVP com migrations e RLS ligável.
+Fases 0–5 e 9 concluídas: esqueleto, calc.py com paridade da planilha, design “Prumo”,
+schema completo com RLS ligável, regras de negócio (modelos, importação/exportação, limites
+de plano), contas (convites, MFA, bloqueio) e API v1 atrás de FEATURE_PUBLIC_API.
 Testes em PostgreSQL via TEST_DATABASE_URL. Ver docs/plano/progresso.md.
 
 ## Regras invioláveis

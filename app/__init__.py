@@ -56,6 +56,14 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
     app.register_blueprint(edicao_bp)
     app.register_blueprint(dados_bp)
 
+    # Fase 9: API pública e tela de tokens só existem com FEATURE_PUBLIC_API (desligada → 404).
+    if app.config.get("FEATURE_PUBLIC_API"):
+        from app.blueprints.api_v1 import bp as api_v1_bp
+        from app.blueprints.api_v1 import ui_bp as api_tokens_bp
+
+        app.register_blueprint(api_v1_bp)
+        app.register_blueprint(api_tokens_bp)
+
     from app.tenancy import load_company
 
     app.before_request(load_company)

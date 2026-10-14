@@ -32,6 +32,17 @@ Fase 5 (contas) entregue: confirmação de e-mail, esqueci a senha, convites, ge
 membros, perfil, “sair de todos os dispositivos”, MFA TOTP, bloqueio progressivo de login e
 troca de empresa (ver “Contas (Fase 5)” abaixo).
 
+Fase 9 (API de publicação, reservada) desenhada e mínima, **desligada por padrão**: contrato
+OpenAPI 3.1 em [`docs/api/openapi.yaml`](docs/api/openapi.yaml), desenho de webhooks em
+[`docs/api/webhooks.md`](docs/api/webhooks.md). Com `FEATURE_PUBLIC_API=1` o app registra
+`/api/v1` (token Bearer `cp_...` por empresa, escopos `read:projects` e `write:progress`, erros
+RFC 9457, auditoria de cada chamada) e a tela `/app/integracoes/api` (só proprietário; plano
+Empresa) para criar/revogar tokens. Implementados: `GET /projects` e
+`GET /projects/{id}/summary`; as demais rotas respondem 501. Sem a flag, `/api/v1/*` é 404 e o
+menu não mostra a tela. Variáveis: `FEATURE_PUBLIC_API`, `API_RATE_LIMIT` (`120 per minute`
+por token) e `API_RATE_LIMIT_IP` (`600 per minute`). Com RLS ligado, a busca do token antes de
+saber a empresa precisa de papel de plataforma (ver progresso.md, Fase 9).
+
 - Contexto para o Claude: [`CLAUDE.md`](CLAUDE.md)
 - Plano: [`docs/plano/`](docs/plano/) — PRD, arquitetura, ADRs, roadmap, backlog, riscos e progresso
 - Guia de segurança: [`.claude/claude-security-guidance.md`](.claude/claude-security-guidance.md)

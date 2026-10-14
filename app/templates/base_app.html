@@ -16,6 +16,9 @@
 {%- if current_membership and current_membership.has_role("supervisor") -%}
   {%- set _ = nav_items.append({"key": "templates", "label": "Modelos", "href": url_for("modelos.index"), "icon": "folder"}) -%}
 {%- endif -%}
+{%- if config.get("FEATURE_PUBLIC_API") and current_membership and current_membership.has_role("owner") -%}
+  {%- set _ = nav_items.append({"key": "api", "label": "API", "href": url_for("api_tokens_ui.tokens_index"), "icon": "chart"}) -%}
+{%- endif -%}
 {%- if nav_project is defined and nav_project -%}
   {%- set _ = nav_items.append({"key": "history", "label": "Histórico", "href": url_for("app.project_history", project_id=nav_project.id), "icon": "history"}) -%}
 {%- endif -%}
