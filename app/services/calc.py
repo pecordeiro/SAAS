@@ -233,6 +233,30 @@ def prazo_em_data(
         atual += timedelta(days=1)
 
 
+def dias_uteis_entre(
+    inicio: date,
+    fim: date,
+    feriados: Iterable[date] = (),
+    dias_semana: Iterable[int] = DIAS_SEMANA_PADRAO,
+) -> int:
+    """Dias úteis depois de `inicio` até `fim` (inclusive): intervalo (inicio, fim].
+
+    Serve para “atraso previsto em N dias úteis” (prazo → término previsto). Com
+    `fim` ≤ `inicio` devolve 0. Fins de semana (fora de `dias_semana`) e feriados não contam.
+    """
+    if fim <= inicio:
+        return 0
+    uteis = set(dias_semana)
+    nao_uteis = set(feriados)
+    total = 0
+    atual = inicio + timedelta(days=1)
+    while atual <= fim:
+        if atual.weekday() in uteis and atual not in nao_uteis:
+            total += 1
+        atual += timedelta(days=1)
+    return total
+
+
 # ---------------------------------------------------------------------------
 # Resumos
 # ---------------------------------------------------------------------------

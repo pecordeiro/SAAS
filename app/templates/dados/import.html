@@ -1,0 +1,86 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/field.html" import field %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/table.html" import data_table %}
+{% from "components/badge.html" import badge %}
+{% set nav_current = "projects" %}
+{% block title %}Importar projeto · Controle de Produção{% endblock %}
+{% block content %}
+{#
+  F4-5: upload (.csv do modelo do site, .xlsx exportado ou a planilha de referência) →
+  pré-visualização com erros por linha → confirmar grava tudo de uma vez.
+#}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('app.projects') }}">{{ icon("chevron-left") }}Projetos</a>
+    <h1>Importar projeto</h1>
+  </div>
+  <div class="page-header__actions">
+    {{ button("Baixar modelo CSV", "secondary", href=url_for('dados.import_template')) }}
+  </div>
+</header>
+
+{%- if upload_error %}<div class="mb-4">{{ alert("danger", upload_error, role="alert") }}</div>{% endif %}
+
+{%- if result and result.errors %}
+<div class="mb-4">
+{% call alert("danger", "Nada foi gravado: corrija o arquivo e envie de novo", role="alert") %}
+<ul>
+  {%- for e in result.errors[:50] %}
+  <li>Linha {{ e.line }}, {{ e.column }}: {{ e.message }}</li>
+  {%- endfor %}
+  {%- if result.errors|length > 50 %}<li>… e mais {{ result.errors|length - 50 }} erro(s).</li>{% endif %}
+</ul>
+{% endcall %}
+</div>
+{%- endif %}
+
+{%- if result and result.ok and confirm %}
+<section class="card stack mb-4" aria-labelledby="previa-titulo">
+  <h2 class="section-title" id="previa-titulo">Pré-visualização</h2>
+  <p class="cluster">
+    {{ badge({"csv": "CSV", "xlsx": "XLSX", "planilha": "Planilha de referência"}.get(result.source, result.source), "info") }}
+    <span class="text-sm">{{ result.quantity }} unidades · {{ result.stages|length }} etapas · {{ result.activity_count }} atividades · {{ result.people }} pessoa(s) × {{ result.hours_per_day|num(1) }} h/dia</span>
+  </p>
+  {%- if usage.max_projects is not none and usage.projects >= usage.max_projects %}
+  {{ alert("warning", "Limite do plano", "Seu plano " ~ usage.plan.name ~ " permite " ~ usage.max_projects ~ " projetos ativos. Arquive um projeto ou mude de plano.") }}
+  {%- endif %}
+  {% call data_table([("Etapa", ""), ("Atividade", ""), ("Tempo ideal (min)", "is-num"), ("Peças", "is-num")], caption="Etapas e atividades lidas") %}
+  <tbody>
+    {%- for stage in result.stages %}
+    {%- for a in stage.activities %}
+    <tr>
+      <td class="is-plain">{{ stage.name }}{% if stage.archived %} {{ badge("arquivada", "neutral") }}{% endif %}</td>
+      <td class="is-plain">{{ a.name }}{% if a.archived %} {{ badge("arquivada", "neutral") }}{% endif %}</td>
+      <td class="is-num" data-label="Tempo ideal">{{ a.ideal_minutes|num(0) }}</td>
+      <td class="is-num" data-label="Peças">{{ a.units_done }}/{{ result.quantity }}</td>
+    </tr>
+    {%- else %}
+    <tr><td class="is-plain">{{ stage.name }}</td><td class="is-plain muted" colspan="3">sem atividades</td></tr>
+    {%- endfor %}
+    {%- endfor %}
+  </tbody>
+  {% endcall %}
+  <form class="stack" method="post" action="{{ url_for('dados.import_confirm') }}">
+    {{ confirm.csrf_token }}
+    {{ confirm.payload }}
+    {{ field(confirm.name, attrs={"required": true}) }}
+    <div class="form-actions">
+      {{ button("Confirmar e gravar", "primary", size="lg") }}
+      {{ button("Cancelar", "secondary", size="lg", href=url_for('dados.import_upload')) }}
+    </div>
+  </form>
+</section>
+{%- endif %}
+
+<form class="card stack" method="post" action="{{ url_for('dados.import_upload') }}" enctype="multipart/form-data">
+  {{ form.csrf_token }}
+  <h2 class="section-title">Enviar arquivo</h2>
+  <p class="muted text-sm">CSV no formato do modelo (separador ; ou ,), XLSX exportado por aqui, ou a planilha de acompanhamento (etapas lidas pelos títulos da coluna A). Até 2 MB.</p>
+  {{ field(form.file, attrs={"accept": ".csv,.xlsx", "required": true}) }}
+  {{ field(form.name, optional=True, hint="Se vazio, usa o nome que vem no arquivo.") }}
+  <div class="form-actions">{{ button("Ver pré-visualização", "primary") }}</div>
+</form>
+{% endblock %}

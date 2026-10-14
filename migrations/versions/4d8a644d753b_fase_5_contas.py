@@ -10,7 +10,7 @@
   token é a autorização; sem ele nada é lido. Gravar continua exigindo app.company_id.
 
 Revision ID: 4d8a644d753b
-Revises: a7c2d4e8f901
+Revises: c4f8a1d2e3b6
 Create Date: 2026-10-13 13:37:41.261782
 
 """
@@ -20,7 +20,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '4d8a644d753b'
-down_revision = 'a7c2d4e8f901'
+down_revision = 'c4f8a1d2e3b6'
 branch_labels = None
 depends_on = None
 

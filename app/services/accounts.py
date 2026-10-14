@@ -17,6 +17,8 @@ import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 
+from flask import has_request_context
+from flask_login import current_user
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
@@ -36,9 +38,10 @@ from app.models import (
     Subscription,
     User,
 )
-from app.services import audit_accounts as audit
+from app.services import audit, entitlements
 from app.services.email import external_url, send_template
 from app.services.passwords import hash_password, verify_password
+from app.models.billing import SUB_TRIALING
 from app.services.plans import PROFISSIONAL
 from app.services.tokens import aware, hash_token, is_expired, looks_valid, new_token, utcnow
 
@@ -91,6 +94,7 @@ def signup(company_name: str, name: str, email: str, password: str) -> None:
     # RLS: o vínculo novo só pode ser gravado com a empresa recém-criada no contexto.
     rls.set_context(company_id=company.id, user_id=user.id)
     db.session.add(Membership(company_id=company.id, user_id=user.id, role=ROLE_OWNER))
+    _start_trial(company)
     try:
         db.session.flush()
     except IntegrityError:  # corrida: outro cadastro com o mesmo e-mail entre a busca e o insert
@@ -101,6 +105,24 @@ def signup(company_name: str, name: str, email: str, password: str) -> None:
         return
     send_email_confirmation(user, email)
     db.session.commit()
+
+
+def _start_trial(company: Company) -> None:
+    """Teste grátis: assinatura trialing de TRIAL_DAYS no DEFAULT_TRIAL_PLAN (config da
+    Fase 4). O provedor de verdade (Asaas) entra na Fase 8."""
+    from flask import current_app
+
+    code = current_app.config.get("DEFAULT_TRIAL_PLAN", PROFISSIONAL)
+    plan = db.session.execute(select(Plan).where(Plan.code == code)).scalar_one()
+    db.session.add(
+        Subscription(
+            company_id=company.id,
+            plan_id=plan.id,
+            provider="fake",
+            status=SUB_TRIALING,
+            trial_ends_at=utcnow() + timedelta(days=int(current_app.config.get("TRIAL_DAYS", 14))),
+        )
+    )
 
 
 def _notify_signup_attempt(user: User) -> None:
@@ -285,24 +307,6 @@ def request_email_change(user: User, password: str, new_email: str) -> None:
 # --------------------------------------------------------------------------- plano
 
 
-def max_users_for(company_id: uuid.UUID) -> int | None:
-    """Limite de usuários do plano da empresa (None = ilimitado). Sem assinatura ainda: o
-    plano do teste grátis (Profissional). Provisório até ``entitlements.py`` (Fase 4)."""
-    plan = db.session.execute(
-        select(Plan).join(Subscription, Subscription.plan_id == Plan.id).where(Subscription.company_id == company_id)
-    ).scalar_one_or_none()
-    if plan is None:
-        plan = db.session.execute(select(Plan).where(Plan.code == PROFISSIONAL)).scalar_one_or_none()
-    return plan.max_users if plan is not None else None
-
-
-def plan_allows_mfa_requirement(company_id: uuid.UUID) -> bool:
-    plan = db.session.execute(
-        select(Plan).join(Subscription, Subscription.plan_id == Plan.id).where(Subscription.company_id == company_id)
-    ).scalar_one_or_none()
-    return bool(plan and (plan.features or {}).get("mfa_required"))
-
-
 def _pending_invites_filter(company_id: uuid.UUID):
     return (
         Invitation.company_id == company_id,
@@ -312,19 +316,18 @@ def _pending_invites_filter(company_id: uuid.UUID):
     )
 
 
-def seats_used(company_id: uuid.UUID) -> int:
-    """Vínculos ativos + convites pendentes (convite pendente reserva vaga)."""
-    members = db.session.execute(
-        select(func.count()).select_from(Membership).where(Membership.company_id == company_id, Membership.active.is_(True))
-    ).scalar_one()
-    invites = db.session.execute(select(func.count()).select_from(Invitation).where(*_pending_invites_filter(company_id))).scalar_one()
-    return int(members) + int(invites)
+def _ensure_seat(company: Company, adding: int = 1) -> None:
+    """Limite de usuários do plano (vínculos ativos + convites pendentes): fonte única em
+    ``entitlements.check_can_add_user`` (PlanLimitError → HTTP 402)."""
+    entitlements.check_can_add_user(company, adding=adding)
 
 
-def _ensure_seat(company_id: uuid.UUID) -> None:
-    limit = max_users_for(company_id)
-    if limit is not None and seats_used(company_id) >= limit:
-        raise AccountError(f"Limite do plano atingido: {limit} usuários (convites pendentes contam). Revogue um convite ou mude de plano.")
+def _audit(action, company_id, object_type=None, object_id=None, details=None, actor_user_id=None):
+    if actor_user_id is None and has_request_context() and current_user.is_authenticated:
+        actor_user_id = current_user.id
+    audit.record(
+        action, company_id=company_id, actor_user_id=actor_user_id, object_type=object_type, object_id=object_id, details=details
+    )
 
 
 # --------------------------------------------------------------------------- convites
@@ -380,7 +383,7 @@ def invite(company: Company, actor: Membership, email: str, role: str) -> Invita
         select(Invitation).where(*_pending_invites_filter(company.id), Invitation.email == email)
     ).scalar_one_or_none()
     if pending is None:
-        _ensure_seat(company.id)
+        _ensure_seat(company)
     else:  # reconvidar o mesmo e-mail troca o convite pendente (não ocupa outra vaga)
         if not can_manage_invite_role(actor, pending.role):
             raise AccountError("Você não pode alterar este convite.")
@@ -396,7 +399,7 @@ def invite(company: Company, actor: Membership, email: str, role: str) -> Invita
     )
     db.session.add(invitation)
     db.session.flush()
-    audit.record(company.id, "invitation.created", "invitation", invitation.id, {"email": email, "role": role})
+    _audit(audit.INVITATION_CREATED, company.id, "invitation", invitation.id, {"email": email, "role": role})
     _send_invite(invitation, company, actor.user, token)
     db.session.commit()
     return invitation
@@ -409,11 +412,11 @@ def resend_invite(company: Company, actor: Membership, invitation: Invitation) -
     if not can_manage_invite_role(actor, invitation.role):
         raise AccountError("Você não pode alterar este convite.")
     if is_expired(invitation.expires_at):
-        _ensure_seat(company.id)  # vencido não ocupava vaga
+        _ensure_seat(company)  # vencido não ocupava vaga
     token, token_hash = new_token()
     invitation.token_hash = token_hash
     invitation.expires_at = utcnow() + INVITE_TTL
-    audit.record(company.id, "invitation.resent", "invitation", invitation.id, {"email": invitation.email})
+    _audit(audit.INVITATION_RESENT, company.id, "invitation", invitation.id, {"email": invitation.email})
     _send_invite(invitation, company, actor.user, token)
     db.session.commit()
 
@@ -424,7 +427,7 @@ def revoke_invite(company: Company, actor: Membership, invitation: Invitation) -
     if not can_manage_invite_role(actor, invitation.role):
         raise AccountError("Você não pode alterar este convite.")
     invitation.revoked_at = utcnow()
-    audit.record(company.id, "invitation.revoked", "invitation", invitation.id, {"email": invitation.email})
+    _audit(audit.INVITATION_REVOKED, company.id, "invitation", invitation.id, {"email": invitation.email})
     db.session.commit()
 
 
@@ -458,6 +461,10 @@ def _consume_invitation(invitation: Invitation, user: User) -> Membership:
     ).scalar_one_or_none()
     if locked is None:
         raise AccountError("Este convite já foi usado.")
+    # O convite pendente já ocupa vaga (adding=0); se o plano encolheu nesse meio-tempo, 402.
+    company = db.session.get(Company, invitation.company_id)
+    entitlements.ensure_writable(company)  # empresa em modo leitura não ganha gente (402)
+    _ensure_seat(company, adding=0)
     member = db.session.execute(
         select(Membership).where(Membership.company_id == invitation.company_id, Membership.user_id == user.id)
     ).scalar_one_or_none()
@@ -474,9 +481,9 @@ def _consume_invitation(invitation: Invitation, user: User) -> Membership:
         member.role = invitation.role
     locked.used_at = utcnow()
     db.session.flush()
-    audit.record(
-        invitation.company_id, "invitation.accepted", "membership", member.id, {"email": invitation.email, "role": invitation.role},
-        actor_user_id=user.id,
+    _audit(
+        audit.INVITATION_ACCEPTED, invitation.company_id, "membership", member.id,
+        {"email": invitation.email, "role": invitation.role}, actor_user_id=user.id,
     )
     return member
 
@@ -563,7 +570,7 @@ def change_role(member: Membership, role: str) -> None:
         _guard_last_owner(member)
     old = member.role
     member.role = role
-    audit.record(member.company_id, "membership.role_changed", "membership", member.id, {"from": old, "to": role})
+    _audit(audit.ROLE_CHANGED, member.company_id, "membership", member.id, {"from": old, "to": role})
     db.session.commit()
 
 
@@ -581,16 +588,16 @@ def deactivate_member(member: Membership) -> None:
     ).scalar_one()
     if not others:
         bump_session_version(member.user)
-    audit.record(member.company_id, "membership.deactivated", "membership", member.id, {"user_id": str(member.user_id)})
+    _audit(audit.MEMBER_DEACTIVATED, member.company_id, "membership", member.id, {"user_id": str(member.user_id)})
     db.session.commit()
 
 
 def reactivate_member(member: Membership) -> None:
     if member.active:
         return
-    _ensure_seat(member.company_id)
+    _ensure_seat(db.session.get(Company, member.company_id))
     member.active = True
-    audit.record(member.company_id, "membership.reactivated", "membership", member.id, {"user_id": str(member.user_id)})
+    _audit(audit.MEMBER_REACTIVATED, member.company_id, "membership", member.id, {"user_id": str(member.user_id)})
     db.session.commit()
 
 

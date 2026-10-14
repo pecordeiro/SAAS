@@ -15,7 +15,7 @@ from app.extensions import db, limiter
 from app.forms_accounts import AcceptInviteNewForm, InviteForm, RoleForm, TokenActionForm
 from app.models import ROLE_OWNER, ROLE_SUPERVISOR, Company, Invitation, Membership
 from app.services import accounts
-from app.services import audit_accounts as audit
+from app.services import audit, entitlements
 from app.services.accounts import AccountError
 from app.tenancy import get_or_404, tenant_required
 
@@ -31,10 +31,10 @@ def _page(status: int = 200, invite_form: InviteForm | None = None, error: str |
         invites=accounts.list_pending_invites(company.id),
         invite_form=invite_form or InviteForm(formdata=None),
         action_form=TokenActionForm(formdata=None),
-        seats=accounts.seats_used(company.id),
-        max_users=accounts.max_users_for(company.id),
+        seats=entitlements.count_users(company.id),
+        max_users=entitlements.effective_plan(company).max_users,
         is_owner=g.membership.role == ROLE_OWNER,
-        can_require_mfa=accounts.plan_allows_mfa_requirement(company.id),
+        can_require_mfa=entitlements.has_feature(company, "mfa_required"),
         error=error,
     ), status
 
@@ -81,7 +81,7 @@ def resend_invite(invitation_id):
 
 
 @bp.post("/app/usuarios/convites/<uuid:invitation_id>/revogar")
-@tenant_required(ROLE_SUPERVISOR)
+@tenant_required(ROLE_SUPERVISOR, allow_read_only=True)
 def revoke_invite(invitation_id):
     failed = _invite_action(invitation_id, accounts.revoke_invite)
     if failed:
@@ -91,7 +91,7 @@ def revoke_invite(invitation_id):
 
 
 @bp.post("/app/usuarios/<uuid:membership_id>/papel")
-@tenant_required(ROLE_OWNER)
+@tenant_required(ROLE_OWNER, allow_read_only=True)
 def change_role(membership_id):
     member = get_or_404(Membership, membership_id)
     form = RoleForm()
@@ -106,7 +106,7 @@ def change_role(membership_id):
 
 
 @bp.post("/app/usuarios/<uuid:membership_id>/desativar")
-@tenant_required(ROLE_OWNER)
+@tenant_required(ROLE_OWNER, allow_read_only=True)
 def deactivate(membership_id):
     member = get_or_404(Membership, membership_id)
     try:
@@ -130,16 +130,19 @@ def reactivate(membership_id):
 
 
 @bp.post("/app/usuarios/seguranca/mfa")
-@tenant_required(ROLE_OWNER)
+@tenant_required(ROLE_OWNER, allow_read_only=True)
 def require_mfa():
     company = g.company
-    if not accounts.plan_allows_mfa_requirement(company.id):
+    if not entitlements.has_feature(company, "mfa_required"):
         return _page(403, error="Exigir MFA é um recurso do plano Empresa.")
     turn_on = request.form.get("exigir") == "1"
     if turn_on and not current_user.mfa_enabled:
         return _page(400, error="Ative a verificação em duas etapas na sua conta antes de exigir dos proprietários.")
     company.mfa_required = turn_on
-    audit.record(company.id, "company.mfa_required", "company", company.id, {"value": turn_on})
+    audit.record(
+        audit.MFA_REQUIREMENT_CHANGED, company_id=company.id, actor_user_id=current_user.id,
+        object_type="company", object_id=company.id, details={"value": turn_on},
+    )
     db.session.commit()
     flash("Exigência de MFA para proprietários " + ("ligada." if turn_on else "desligada."), "sucesso")
     return redirect(url_for("team.users"), code=303)

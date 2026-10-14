@@ -9,11 +9,13 @@ from flask import Blueprint, flash, g, redirect, render_template, url_for
 from flask_login import current_user
 
 from app.extensions import db
-from app.forms import ActivityForm, ProgressForm, ProjectForm, StageForm
-from app.models import ROLE_OPERATOR, ROLE_SUPERVISOR, Activity, Project, Stage
+from app.forms import ActivityForm, ProgressForm, StageForm
+from app.forms_production import ProjectFromTemplateForm
+from app.models import ROLE_OPERATOR, ROLE_SUPERVISOR, Activity, Project, Stage, Template
 from app.formatting import local_dt
-from app.services import calc
+from app.services import audit, calc
 from app.services import projects as svc
+from app.services import templates as tsvc
 from app.services.projects import ConflictError, NewActivity, ProgressError
 from app.tenancy import get_or_404, tenant_required
 
@@ -38,7 +40,8 @@ def _deadline(project: Project, result: calc.ResultadoProjeto, status: str) -> d
         status != calc.STATUS_CONCLUIDA and forecast and project.due_date and forecast > project.due_date
     )
     on_time = bool(status != calc.STATUS_CONCLUIDA and forecast and project.due_date and not late)
-    return {"forecast": forecast, "late": late, "on_time": on_time}
+    delay = svc.delay_workdays(project, forecast, g.company) if late else 0
+    return {"forecast": forecast, "late": late, "on_time": on_time, "delay": delay}
 
 
 @bp.get("/projetos")
@@ -55,23 +58,31 @@ def projects():
 @bp.route("/projetos/novo", methods=["GET", "POST"])
 @tenant_required(ROLE_SUPERVISOR)
 def project_new():
-    form = ProjectForm()
+    form = ProjectFromTemplateForm()
+    templates = tsvc.list_templates()
+    form.template_id.choices = [("", "Sem modelo (digitar as etapas)")] + [
+        (str(t.id), f"{t.name} · v{t.current_version.number if t.current_version else 1}") for t in templates
+    ]
     if form.validate_on_submit():
-        project = svc.create_project(
-            g.company,
+        fields = dict(
             name=form.name.data,
             quantity=form.quantity.data,
             start_date=form.start_date.data,
             due_date=form.due_date.data,
             people=form.people.data,
             hours_per_day=form.hours_per_day.data,
-            stages=form.new_stages(),
         )
+        if form.template_id.data:
+            # Id do formulário SEMPRE resolvido na empresa da sessão (outra empresa → 404).
+            template = get_or_404(Template, form.template_id.data)
+            project = tsvc.create_project_from_template(g.company, template, **fields)
+        else:
+            project = svc.create_project(g.company, stages=form.new_stages(), **fields)
         db.session.commit()
         flash("Projeto criado.", "sucesso")
         return redirect(url_for("app.project_detail", project_id=project.id), 303)
     status = 400 if form.is_submitted() else 200
-    return render_template("app/project_new.html", form=form), status
+    return render_template("app/project_new.html", form=form, has_templates=bool(templates)), status
 
 
 def _render_detail(project: Project, *, errors: dict | None = None, status: int = 200):
@@ -117,8 +128,10 @@ def project_detail(project_id):
 @bp.get("/projetos/<uuid:project_id>/historico")
 @tenant_required(ROLE_OPERATOR)
 def project_history(project_id):
-    project = get_or_404(Project, project_id)
+    project = get_or_404(Project, project_id, include_archived=True)
     entries = svc.history(project)
+    undone = svc.undone_ids(entries)
+    changes = audit.for_object(g.company.id, "project", project.id)
     # Agrupa por dia (fuso da empresa) para a lista e para o gráfico “peças por dia”.
     days: OrderedDict = OrderedDict()
     for entry in entries:
@@ -127,7 +140,17 @@ def project_history(project_id):
         {"label": day.strftime("%d/%m"), "value": sum(e.delta for e in items)}
         for day, items in list(days.items())[:14][::-1]
     ]
-    return render_template("app/history.html", project=project, entries=entries, days=days, per_day=per_day)
+    return render_template(
+        "app/history.html",
+        project=project,
+        entries=entries,
+        days=days,
+        per_day=per_day,
+        undone=undone,
+        changes=changes,
+        action_labels=audit.ACTION_LABELS,
+        can_undo=g.membership.has_role(ROLE_SUPERVISOR),
+    )
 
 
 @bp.post("/projetos/<uuid:project_id>/etapas")

@@ -359,7 +359,7 @@ def test_convites_pendentes_contam_no_limite_de_usuarios(client, app, tenants):
     assert post(client, app, "/app/usuarios/convidar", {"email": "u1@x.com", "role": "operator"}).status_code == 303
     assert post(client, app, "/app/usuarios/convidar", {"email": "u2@x.com", "role": "operator"}).status_code == 303
     blocked = post(client, app, "/app/usuarios/convidar", {"email": "u3@x.com", "role": "operator"})
-    assert blocked.status_code == 400 and "Limite do plano" in text_of(blocked)
+    assert blocked.status_code == 402 and "permite 5 usuários" in text_of(blocked)
     assert "5 de 5 usuários" in text_of(client.get("/app/usuarios"))
     with app.app_context():
         u1 = db.session.execute(select(Invitation.id).where(Invitation.email == "u1@x.com")).scalar_one()
@@ -729,21 +729,50 @@ def test_paginas_de_conta_renderizam(client, app, tenants):
 # --------------------------------------------------------------------------- correções da revisão
 
 
-def test_bloqueio_por_ip_nao_barra_senha_certa(app_factory):
-    """Atrás de NAT/proxy, um atacante não tranca os demais: a senha certa entra mesmo com o
-    IP bloqueado; senha errada desse IP responde 429."""
+def test_ip_bloqueado_so_libera_conta_conhecida_no_dispositivo(app_factory, monkeypatch):
+    """IP bloqueado: conta que já entrou neste navegador entra; conta desconhecida recebe
+    bloqueio SEM verificar a senha (barra password spraying); conta bloqueada sempre bloqueada."""
+    from app.blueprints import auth as auth_bp
     from tests.conftest import make_tenant
 
     app = app_factory({"LOCKOUT_IP_THRESHOLD": 3})
     with app.app_context():
         a = make_tenant("A")
-    attacker = app.test_client()
+    victim = app.test_client()
+    assert login(victim, app, a.owner_email).status_code == 302  # emite o cookie de dispositivo
+    cookie = victim.get_cookie("dispositivo")
+    assert cookie is not None and str(a.owner_id) not in cookie.value
+    post(victim, app, "/sair")
+
+    attacker = app.test_client()  # mesmo IP (127.0.0.1)
     statuses = [login(attacker, app, f"alvo{i}@x.com", "errada-000000").status_code for i in range(3)]
     assert statuses == [400, 400, 429]
-    victim = app.test_client()  # mesmo IP (127.0.0.1)
+
+    # 1) conta conhecida neste navegador entra mesmo com o IP bloqueado
     assert login(victim, app, a.owner_email).status_code == 302
     assert victim.get("/app/projetos").status_code == 200
-    assert login(app.test_client(), app, a.operator_email, "errada-000000").status_code == 429
+    post(victim, app, "/sair")
+
+    # 2) conta desconhecida no dispositivo: bloqueio genérico e a senha nem é verificada
+    checked = []
+    original = auth_bp.verify_password
+    monkeypatch.setattr(auth_bp, "verify_password", lambda h, p: checked.append(1) or original(h, p))
+    for client in (attacker, app.test_client()):
+        response = login(client, app, a.operator_email)  # senha CERTA
+        assert response.status_code == 429 and "Muitas tentativas" in text_of(response)
+    assert checked == []
+    # cookie forjado/de outra chave não vale
+    forged = app.test_client()
+    forged.set_cookie("dispositivo", "abc.def.ghi")
+    assert login(forged, app, a.operator_email).status_code == 429
+
+    # 3) conta bloqueada é bloqueada mesmo no dispositivo confiável e com a senha certa
+    monkeypatch.setattr(auth_bp, "verify_password", original)
+    with app.app_context():
+        for _ in range(5):
+            lockout.register_failure(a.owner_email, None)
+    locked = login(victim, app, a.owner_email)
+    assert locked.status_code == 429
 
 
 def test_ip_do_proxy_so_com_trusted_proxy_count(app_factory):
@@ -870,3 +899,56 @@ def test_reset_em_conta_confirmada_mantem_mfa(client, app, tenants):
     with app.app_context():
         assert db.session.get(User, a.owner_id).mfa_enabled
     assert login(client, app, a.owner_email, NEW_PASSWORD).headers["Location"].endswith("/entrar/mfa")
+
+
+# --------------------------------------------------------------------------- integração Fase 4
+
+
+def test_cadastro_cria_assinatura_trialing(client, app):
+    post(client, app, "/cadastro", SIGNUP)
+    with app.app_context():
+        company = db.session.execute(select(Company).where(Company.name == "Indústria Nova")).scalar_one()
+        sub = db.session.execute(select(Subscription).where(Subscription.company_id == company.id)).scalar_one()
+        assert sub.status == "trialing" and sub.plan.code == app.config["DEFAULT_TRIAL_PLAN"]
+        days = (sub.trial_ends_at.replace(tzinfo=None) - utcnow().replace(tzinfo=None)).days
+        assert days in (app.config["TRIAL_DAYS"] - 1, app.config["TRIAL_DAYS"])
+
+
+def test_limite_de_usuarios_no_convite_e_no_aceite_responde_402(client, app, tenants):
+    a, _ = tenants
+    _set_plan(app, a.company_id, "essencial")  # 5 usuários; A tem 3
+    login(client, app, a.owner_email)
+    post(client, app, "/app/usuarios/convidar", {"email": "v1@x.com", "role": "operator"})
+    post(client, app, "/app/usuarios/convidar", {"email": "v2@x.com", "role": "operator"})
+    assert post(client, app, "/app/usuarios/convidar", {"email": "v3@x.com", "role": "operator"}).status_code == 402
+    token = last_token(app, "v1@x.com", "convite")
+    # O plano encolhe depois do convite: o aceite também é barrado (402) e nada é gravado.
+    with app.app_context():
+        from app.models import Plan
+
+        db.session.execute(select(Plan).where(Plan.code == "essencial")).scalar_one().max_users = 3
+        db.session.commit()
+    guest = app.test_client()
+    response = post(guest, app, f"/convite/{token}", {"name": "V", "password": "senha-forte-v1x", "password_confirm": "senha-forte-v1x"})
+    assert response.status_code == 402
+    with app.app_context():
+        assert accounts.find_user_by_email("v1@x.com") is None
+        db.session.execute(select(Plan).where(Plan.code == "essencial")).scalar_one().max_users = 5
+        db.session.commit()
+
+
+def test_modo_leitura_bloqueia_convite_mas_deixa_revogar_e_desativar(client, app, tenants):
+    a, _ = tenants
+    login(client, app, a.owner_email)
+    post(client, app, "/app/usuarios/convidar", {"email": "w@x.com", "role": "operator"})
+    with app.app_context():
+        db.session.add(Subscription(company_id=a.company_id, plan_id=get_plan("essencial").id, provider="fake", status="expired"))
+        db.session.commit()
+        inv_id = db.session.execute(select(Invitation.id).where(Invitation.email == "w@x.com")).scalar_one()
+    assert client.get("/app/usuarios").status_code == 200
+    assert post(client, app, "/app/usuarios/convidar", {"email": "w2@x.com", "role": "operator"}).status_code == 402
+    assert post(client, app, f"/app/usuarios/convites/{inv_id}/reenviar").status_code == 402
+    assert post(client, app, f"/app/usuarios/convites/{inv_id}/revogar").status_code == 303
+    assert post(client, app, f"/app/usuarios/{_membership_id(app, a.operator_id)}/desativar").status_code == 303
+    # perfil (conta, não empresa) continua gravando
+    assert post(client, app, "/conta/perfil/nome", {"name": "Dona"}).status_code == 303

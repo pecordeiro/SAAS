@@ -342,3 +342,36 @@ def test_paridade_com_planilha_de_referencia():
     assert calc.dias_uteis_restantes(resultado.tempo_total_h, pessoas, horas_dia) == pytest.approx(
         equipe["B9"].value, abs=TOL
     )
+
+
+# ---------------------------------------------------------------- dias úteis entre datas (Fase 4)
+
+
+def test_dias_uteis_entre_conta_intervalo_aberto_no_inicio():
+    # Prazo sexta 16/10/2026, término previsto terça 20/10: seg 19 e ter 20 → 2 dias úteis
+    assert calc.dias_uteis_entre(date(2026, 10, 16), date(2026, 10, 20)) == 2
+
+
+def test_dias_uteis_entre_pula_fim_de_semana_e_feriado():
+    # Sexta 30/10 → quarta 04/11 com feriado na segunda 02/11: ter 03, qua 04 → 2
+    assert calc.dias_uteis_entre(date(2026, 10, 30), date(2026, 11, 4), [date(2026, 11, 2)]) == 2
+    # Sexta → domingo: nenhum dia útil
+    assert calc.dias_uteis_entre(date(2026, 10, 16), date(2026, 10, 18)) == 0
+
+
+def test_dias_uteis_entre_fim_antes_ou_igual_ao_inicio():
+    assert calc.dias_uteis_entre(date(2026, 10, 20), date(2026, 10, 20)) == 0
+    assert calc.dias_uteis_entre(date(2026, 10, 20), date(2026, 10, 1)) == 0
+
+
+def test_dias_uteis_entre_com_sabado_util():
+    # seg–sáb úteis: sexta 16/10 → segunda 19/10 = sáb 17 + seg 19 → 2
+    assert calc.dias_uteis_entre(date(2026, 10, 16), date(2026, 10, 19), dias_semana=range(6)) == 2
+
+
+def test_dias_uteis_entre_e_inverso_de_prazo_em_data():
+    # Começando na segunda 12/10, 5 dias úteis terminam na sexta 16/10;
+    # do domingo 11/10 (véspera) até a sexta há exatamente 5 dias úteis.
+    fim = calc.prazo_em_data(date(2026, 10, 12), 5)
+    assert fim == date(2026, 10, 16)
+    assert calc.dias_uteis_entre(date(2026, 10, 11), fim) == 5

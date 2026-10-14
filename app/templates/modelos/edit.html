@@ -1,0 +1,68 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/field.html" import field, form_errors %}
+{% from "components/button.html" import button %}
+{% from "components/badge.html" import badge %}
+{% from "components/alert.html" import alert %}
+{% from "components/modal.html" import confirm_dialog %}
+{% set nav_current = "templates" %}
+{% block title %}{{ template.name if template else "Novo modelo" }} · Modelos{% endblock %}
+{% block content %}
+{#
+  telas.md §11 (editor). Versão mínima da Fase 4: cada etapa é um bloco com as atividades
+  em linhas “Nome; minutos”. Salvar com etapas diferentes cria a próxima versão; projetos
+  existentes continuam na versão antiga. O editor com ↑/↓ e HTMX vem na Fase 6.
+#}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('modelos.index') }}">{{ icon("chevron-left") }}Modelos</a>
+    <h1>{{ template.name if template else "Novo modelo" }}</h1>
+    {%- if template and template.current_version %}
+    <p class="cluster page-header__meta">{{ badge("v" ~ template.current_version.number, "info") }}<span class="muted text-sm">{{ template.current_version.stages|length }} etapas</span></p>
+    {%- endif %}
+  </div>
+  {%- if template %}
+  <div class="page-header__actions">
+    {{ button("Versões", "secondary", icon="history", href=url_for('modelos.versions', template_id=template.id)) }}
+    {{ button("Arquivar", "ghost", href="#arquivar-modelo") }}
+  </div>
+  {%- endif %}
+</header>
+
+<form class="stack--lg" method="post" action="{{ url_for('modelos.edit', template_id=template.id) if template else url_for('modelos.new') }}" novalidate>
+  {{ form_errors(form, list_label="Etapa") }}
+  {{ form.csrf_token }}
+  <section class="card stack" aria-labelledby="dados-titulo">
+    <h2 class="section-title" id="dados-titulo">Modelo</h2>
+    {{ field(form.name, attrs={"required": true}) }}
+    {{ field(form.description, optional=True, attrs={"rows": 2}) }}
+  </section>
+
+  <section class="card stack" aria-labelledby="etapas-titulo">
+    <div>
+      <h2 class="section-title" id="etapas-titulo">Etapas</h2>
+      <p class="muted text-sm">Na ordem de montagem. Em cada etapa, uma atividade por linha: <code>Nome; minutos por unidade</code>. Etapa com nome vazio é ignorada.</p>
+    </div>
+    {%- for error in form.stages.errors if error is string %}<p class="field__error">{{ icon("alert", "sm") }}<span>{{ error }}</span></p>{% endfor %}
+    {%- for slot in form.stages %}
+    <fieldset class="fieldset stack--sm">
+      <legend>Etapa {{ loop.index }}</legend>
+      {{ field(slot.form.name, label="Nome da etapa") }}
+      {{ field(slot.form.activities, label="Atividades", attrs={"rows": 4}) }}
+    </fieldset>
+    {%- endfor %}
+  </section>
+
+  {%- if template %}
+  {{ alert("info", body=(using ~ " projeto(s) usam este modelo. Ao salvar com etapas diferentes criamos a versão " ~ ((template.current_version.number if template.current_version else 0) + 1) ~ "; eles não mudam.")) }}
+  {%- endif %}
+  <div class="form-actions">
+    {{ button("Salvar como nova versão" if template else "Criar modelo", "primary", size="lg") }}
+    {{ button("Cancelar", "secondary", size="lg", href=url_for('modelos.index')) }}
+  </div>
+</form>
+
+{%- if template %}
+{% call confirm_dialog("arquivar-modelo", "Arquivar o modelo?", "Ele some da lista e do novo projeto. Projetos criados dele não mudam.", "Arquivar", url_for('modelos.archive', template_id=template.id)) %}{% endcall %}
+{%- endif %}
+{% endblock %}

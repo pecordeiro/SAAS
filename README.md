@@ -14,9 +14,23 @@ fontes e HTMX locais, macros, layouts, tema claro/escuro, registro de peças em 
 Fase 3 (banco) entregue: schema completo do MVP em PostgreSQL 16 (modelos de etapas
 versionados, convites, tokens de conta, MFA, planos, assinaturas, cobranças, webhooks,
 auditoria, outbox, API), CHECK/UNIQUE, feriados nacionais, políticas RLS ligáveis e testes
-em PostgreSQL. Fase 5 (contas) entregue: confirmação de e-mail, esqueci a senha,
-convites, gestão de membros, perfil, “sair de todos os dispositivos”, MFA TOTP, bloqueio
-progressivo de login e troca de empresa. Progresso por fase em [`docs/plano/progresso.md`](docs/plano/progresso.md).
+em PostgreSQL.
+Fase 4 (regras de negócio) entregue: modelos de etapas versionados (`/app/modelos`, novo
+projeto a partir de modelo, comparar/aplicar versão com confirmação), edição de projeto
+(renomear, ↑/↓, arquivar sem perder histórico, duplicar), desfazer registro (supervisor+,
+lançamento compensatório), importação CSV/XLSX e da planilha de referência com
+pré-visualização (`/app/importar`), exportação CSV/XLSX neutralizada, limites de plano e
+modo leitura (HTTP 402, `app/services/entitlements.py`), eventos de domínio
+(`services/events.py`) e auditoria (`services/audit.py::record`).
+Progresso por fase em [`docs/plano/progresso.md`](docs/plano/progresso.md).
+
+Variáveis da Fase 4 (opcionais): `READ_ONLY_ENFORCED` (padrão 1: sem assinatura ativa a
+empresa fica em modo leitura), `TRIAL_DAYS` (14, teste implícito de empresa sem assinatura),
+`DEFAULT_TRIAL_PLAN` (`profissional`), `PAST_DUE_GRACE_DAYS` (7).
+
+Fase 5 (contas) entregue: confirmação de e-mail, esqueci a senha, convites, gestão de
+membros, perfil, “sair de todos os dispositivos”, MFA TOTP, bloqueio progressivo de login e
+troca de empresa (ver “Contas (Fase 5)” abaixo).
 
 - Contexto para o Claude: [`CLAUDE.md`](CLAUDE.md)
 - Plano: [`docs/plano/`](docs/plano/) — PRD, arquitetura, ADRs, roadmap, backlog, riscos e progresso
@@ -125,6 +139,8 @@ lá o RLS não tem efeito — os testes criam um papel comum para provar o isola
   Owner de empresa com “Exigir MFA” (plano Empresa) é levado a ativar.
 - Bloqueio progressivo (`app/services/lockout.py`, tabela `login_throttles`): 5 falhas na
   conta ou 20 no IP → espera 1, 5, 15, 60 min (`LOCKOUT_*` na config), além do Flask-Limiter.
+  Com o IP bloqueado só entra quem já entrou naquele navegador (cookie de dispositivo
+  confiável). Atrás de proxy, defina `TRUSTED_PROXY_COUNT` (Render: 1) para o IP real valer.
 - Usuários e convites: `/app/usuarios` (supervisor convida supervisor/operador; owner muda
   papel, desativa/reativa; último owner protegido; convites pendentes contam no limite do plano).
 - Testes: `tests/test_accounts.py` e os casos A/B no fim de `tests/test_isolation.py`.

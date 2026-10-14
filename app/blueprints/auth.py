@@ -13,7 +13,7 @@ from app.extensions import db, limiter
 from app.forms import LoginForm, LogoutForm, SignupForm
 from app.forms_accounts import ForgotPasswordForm, MfaLoginForm, ResetPasswordForm, TokenActionForm
 from app.models import User
-from app.services import accounts, lockout, mfa
+from app.services import accounts, lockout, mfa, trusted_device
 from app.services.passwords import hash_password, needs_rehash, verify_password
 from app.services.tokens import utcnow
 from app.tenancy import first_active_membership, set_company
@@ -47,6 +47,11 @@ def _limit(key: str):
     return lambda: current_app.config[key]
 
 
+@bp.after_app_request
+def _trusted_device_cookie(response):
+    return trusted_device.apply(response)
+
+
 def lock_message(status: lockout.LockStatus) -> str:
     unit = "minuto" if status.minutes == 1 else "minutos"
     return f"Muitas tentativas. Tente de novo em {status.minutes} {unit}."
@@ -65,6 +70,7 @@ def start_session(user: User) -> None:
     login_user(user)
     session.permanent = True
     user.last_login_at = utcnow()
+    trusted_device.remember(user.id)  # cookie de dispositivo confiável (after_app_request)
     membership = first_active_membership(user.id)
     if membership is not None:
         set_company(membership)
@@ -126,13 +132,17 @@ def login():
     if form.validate_on_submit():
         email = form.email.data
         ip = request.remote_addr
-        # Só o bloqueio da CONTA impede tentar: o do IP não barra a senha certa (atrás de
-        # NAT/proxy um atacante trancaria todo mundo); ele só faz a senha errada responder 429.
+        # Conta bloqueada: nunca verifica. IP bloqueado: só verifica para conta que já entrou
+        # neste navegador (cookie de dispositivo confiável) — barra password spraying sem
+        # trancar quem já usa o sistema atrás do mesmo NAT/proxy.
         locked = lockout.status(email, None)
+        ip_locked = lockout.status(None, ip)
+        user = accounts.find_user_by_email(email) if not locked.locked else None
         if locked.locked:
             error, status_code = lock_message(locked), 429
+        elif ip_locked.locked and (user is None or not trusted_device.is_trusted(user.id)):
+            error, status_code = lock_message(ip_locked), 429
         else:
-            user = accounts.find_user_by_email(email)
             valid = verify_password(user.password_hash if user else None, form.password.data)
             if user is not None and valid and user.active:
                 if needs_rehash(user.password_hash):

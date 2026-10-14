@@ -84,6 +84,19 @@ class Config:
     # 0 = ignora esses headers (padrão; qualquer cliente poderia forjá-los).
     TRUSTED_PROXY_COUNT = 0
 
+    # Assinatura/planos (app/services/entitlements.py). Sem assinatura ativa a empresa fica
+    # em modo leitura (402 em escrita) — READ_ONLY_ENFORCED=0 desliga a regra.
+    READ_ONLY_ENFORCED = True
+    TRIAL_DAYS = 14
+    DEFAULT_TRIAL_PLAN = "profissional"
+    PAST_DUE_GRACE_DAYS = 7
+
+    # Importação (app/services/importer.py): arquivo lido em memória, nunca gravado em disco.
+    IMPORT_MAX_BYTES = 2 * 1024 * 1024
+    # Teto de qualquer corpo de requisição (o maior é o upload da importação): acima disso o
+    # Werkzeug recusa com 413 antes de ler o corpo (inclusive antes do CSRF).
+    MAX_CONTENT_LENGTH = IMPORT_MAX_BYTES + 256 * 1024
+
     @classmethod
     def from_env(cls) -> dict:
         """Lê as variáveis de ambiente na hora de criar o app (não na importação)."""
@@ -94,6 +107,10 @@ class Config:
             "RATELIMIT_STORAGE_URI": os.environ.get("RATELIMIT_STORAGE_URI", cls.RATELIMIT_STORAGE_URI),
             "RLS_ENABLED": _bool("RLS_ENABLED", cls.RLS_ENABLED),
             "FEATURE_PUBLIC_API": _bool("FEATURE_PUBLIC_API", cls.FEATURE_PUBLIC_API),
+            "READ_ONLY_ENFORCED": _bool("READ_ONLY_ENFORCED", cls.READ_ONLY_ENFORCED),
+            "TRIAL_DAYS": int(os.environ.get("TRIAL_DAYS", cls.TRIAL_DAYS)),
+            "DEFAULT_TRIAL_PLAN": os.environ.get("DEFAULT_TRIAL_PLAN", cls.DEFAULT_TRIAL_PLAN),
+            "PAST_DUE_GRACE_DAYS": int(os.environ.get("PAST_DUE_GRACE_DAYS", cls.PAST_DUE_GRACE_DAYS)),
         }
         for key in (
             "LOGIN_RATE_LIMIT",

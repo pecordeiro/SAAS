@@ -25,7 +25,10 @@ from tests.test_isolation import ROUTES
 
 pytestmark = requires_postgres
 
-ROLE = "controle_app_rls_test"
+# Papel é global no cluster: o nome leva o banco de teste para dois bancos (ex.: duas suítes
+# rodando em paralelo no mesmo servidor) não brigarem pelo mesmo papel.
+_DB_SUFFIX = "".join(ch if ch.isalnum() else "_" for ch in (make_url(get_test_database_url() or "sqlite://").database or ""))[:30]
+ROLE = f"controle_app_rls_test_{_DB_SUFFIX}".rstrip("_")
 
 
 def _drop_role(conn) -> None:
