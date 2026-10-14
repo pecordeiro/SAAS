@@ -44,6 +44,13 @@ ACTIVITY_ARCHIVED = "activity.archived"
 TEMPLATE_VERSION_APPLIED = "template.version_applied"
 TEMPLATE_ARCHIVED = "template.archived"
 PROGRESS_UNDONE = "progress.undone"
+# Fase 7 — LGPD e suporte (constantes usadas por app/services/lgpd.py e support.py).
+COMPANY_DELETION_CANCELLED = "company.deletion_cancelled"
+COMPANY_DATA_EXPORTED = "company.data_exported"
+SUPPORT_ACCESS_GRANTED = "support.access_granted"
+SUPPORT_ACCESS_REVOKED = "support.access_revoked"
+SUPPORT_ACCESS_EXPIRED = "support.access_expired"
+ACCOUNT_CLAIMED_BY_RESET = "account.claimed_by_reset"
 
 ACTION_LABELS = {
     ROLE_CHANGED: "Papel alterado",
@@ -66,6 +73,12 @@ ACTION_LABELS = {
     TEMPLATE_VERSION_APPLIED: "Versão do modelo aplicada",
     TEMPLATE_ARCHIVED: "Modelo arquivado",
     PROGRESS_UNDONE: "Registro desfeito",
+    COMPANY_DELETION_CANCELLED: "Exclusão da empresa cancelada",
+    COMPANY_DATA_EXPORTED: "Dados da empresa exportados",
+    SUPPORT_ACCESS_GRANTED: "Acesso de suporte concedido",
+    SUPPORT_ACCESS_REVOKED: "Acesso de suporte revogado",
+    SUPPORT_ACCESS_EXPIRED: "Acesso de suporte expirado",
+    ACCOUNT_CLAIMED_BY_RESET: "Conta retomada pelo dono do e-mail",
 }
 
 

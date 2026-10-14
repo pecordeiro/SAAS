@@ -2,3 +2,5 @@
 pytest==9.1.1
 pytest-cov==7.1.0
 openapi-spec-validator==0.9.0
+# Fase 7: auditoria de dependências (o CI roda com esta versão).
+pip-audit==2.10.1

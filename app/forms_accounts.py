@@ -99,3 +99,13 @@ class AcceptInviteNewForm(BaseForm):
 
 class SwitchCompanyForm(BaseForm):
     company_id = HiddenField(validators=[DataRequired()])
+
+
+# ---------------------------------------------------------------- Fase 7 (LGPD)
+
+
+class CompanyDeletionForm(BaseForm):
+    """Pedir a exclusão da empresa: senha do proprietário + nome da empresa digitado."""
+
+    password = PasswordField("Sua senha", validators=[DataRequired(), Length(max=128)])
+    company_name = StringField("Digite o nome da empresa para confirmar", filters=[_strip], validators=[DataRequired(), Length(max=120)])

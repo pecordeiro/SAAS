@@ -18,7 +18,9 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     Uuid,
+    and_,
     func,
+    or_,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -114,6 +116,10 @@ class Membership(UUIDPk, Timestamps, TenantMixin, db.Model):
     user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Fase 7 — acesso de suporte da plataforma (flask suporte conceder): vínculo temporário,
+    # nunca owner, não conta no limite do plano e deixa de valer sozinho em expires_at.
+    is_support: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     company: Mapped[Company] = relationship(back_populates="memberships")
     user: Mapped[User] = relationship(back_populates="memberships")
@@ -124,6 +130,14 @@ class Membership(UUIDPk, Timestamps, TenantMixin, db.Model):
 
     def has_role(self, min_role: str) -> bool:
         return self.level >= ROLE_LEVEL[min_role]
+
+    @classmethod
+    def usable(cls, now: datetime | None = None):
+        """Condição SQL de vínculo que vale agora: ativo e (sem validade ou ainda no prazo)."""
+        from app.models.base import utcnow
+
+        now = now or utcnow()
+        return and_(cls.active.is_(True), or_(cls.expires_at.is_(None), cls.expires_at > now))
 
 
 class Invitation(UUIDPk, Timestamps, TenantMixin, db.Model):

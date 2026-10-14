@@ -263,6 +263,7 @@ def reset_password(token: str | None, new_password: str) -> tuple[str, User | No
 
         mfa.disable(user)
         user.email_confirmed_at = now
+        _revoke_pre_confirmation_access(user)
     for pending in db.session.execute(
         select(PasswordReset).where(PasswordReset.user_id == user.id, PasswordReset.used_at.is_(None))
     ).scalars():
@@ -273,6 +274,57 @@ def reset_password(token: str | None, new_password: str) -> tuple[str, User | No
     db.session.commit()
     send_template(user.email, "Sua senha foi trocada", "password_changed", name=user.name, reset_url=external_url("auth.forgot_password"))
     return VALID, user
+
+
+def _revoke_pre_confirmation_access(user: User) -> None:
+    """Fase 7 — conta tomada de volta pelo dono do e-mail (reset numa conta nunca confirmada).
+
+    Quem cadastrou o e-mail alheio pode ter deixado acessos que sobrevivem à troca de senha
+    (as sessões já caem pelo ``session_version``): tokens da API e convites pendentes das
+    empresas em que a conta é proprietária. Revoga os dois e audita. Vínculos de terceiros
+    que já aceitaram convite ficam visíveis em Usuários para o dono revisar (documentado em
+    docs/plano/seguranca.md)."""
+    from app import rls
+    from app.models import ApiToken, Invitation
+    from app.services import api_tokens
+
+    rls.set_context(user_id=user.id)
+    owned = list(
+        db.session.execute(
+            select(Membership.company_id).where(
+                Membership.user_id == user.id, Membership.role == ROLE_OWNER, Membership.active.is_(True)
+            )
+        ).scalars()
+    )
+    now = utcnow()
+    for company_id in owned:
+        rls.set_context(company_id=company_id)
+        revoked_tokens = 0
+        for token in db.session.execute(
+            select(ApiToken).where(ApiToken.company_id == company_id, ApiToken.revoked_at.is_(None))
+        ).scalars():
+            if api_tokens.revoke(token, user.id):
+                revoked_tokens += 1
+        revoked_invites = 0
+        for invitation in db.session.execute(
+            select(Invitation).where(
+                Invitation.company_id == company_id,
+                Invitation.used_at.is_(None),
+                Invitation.revoked_at.is_(None),
+            )
+        ).scalars():
+            invitation.revoked_at = now
+            revoked_invites += 1
+        if revoked_tokens or revoked_invites:
+            _audit(
+                audit.ACCOUNT_CLAIMED_BY_RESET,
+                company_id,
+                "user",
+                user.id,
+                {"api_tokens_revoked": revoked_tokens, "invitations_revoked": revoked_invites},
+            )
+        db.session.flush()
+    rls.set_context(company_id=None)
 
 
 def change_password(user: User, current: str, new_password: str) -> None:
@@ -336,6 +388,9 @@ def _audit(action, company_id, object_type=None, object_id=None, details=None, a
 def can_manage_invite_role(actor: Membership, role: str) -> bool:
     """Owner convida qualquer papel; supervisor convida supervisor/operador (nunca owner)."""
     if role not in ROLES:
+        return False
+    if actor.is_support:
+        # Fase 7: acesso de suporte é temporário — não pode criar acesso permanente (convite).
         return False
     if actor.role == ROLE_OWNER:
         return True
@@ -566,6 +621,8 @@ def change_role(member: Membership, role: str) -> None:
         raise AccountError("Papel inválido.")
     if role == member.role:
         return
+    if role == ROLE_OWNER and member.is_support:
+        raise AccountError("Acesso de suporte não pode virar proprietário.")
     if role != ROLE_OWNER:
         _guard_last_owner(member)
     old = member.role
@@ -607,7 +664,7 @@ def active_memberships(user_id: uuid.UUID) -> list[Membership]:
         db.session.execute(
             select(Membership)
             .join(Company, Company.id == Membership.company_id)
-            .where(Membership.user_id == user_id, Membership.active.is_(True))
+            .where(Membership.user_id == user_id, Membership.usable())
             .order_by(Company.name)
         ).scalars()
     )

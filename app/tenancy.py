@@ -50,7 +50,7 @@ def load_company() -> None:
         .where(
             Membership.company_id == company_id,
             Membership.user_id == current_user.id,
-            Membership.active.is_(True),
+            Membership.usable(),  # ativo e, se for acesso de suporte, ainda no prazo (Fase 7)
         )
     ).scalar_one_or_none()
     if membership is None:
@@ -74,7 +74,7 @@ def first_active_membership(user_id: uuid.UUID) -> Membership | None:
     rls.set_context(user_id=user_id)
     return db.session.execute(
         select(Membership)
-        .where(Membership.user_id == user_id, Membership.active.is_(True))
+        .where(Membership.user_id == user_id, Membership.usable())
         .order_by(Membership.created_at)
         .limit(1)
     ).scalar_one_or_none()

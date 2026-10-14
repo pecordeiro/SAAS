@@ -283,7 +283,7 @@ def _owner_requires_mfa() -> bool:
             .join(Company, Company.id == Membership.company_id)
             .where(
                 Membership.user_id == current_user.id,
-                Membership.active.is_(True),
+                Membership.usable(),
                 Membership.role == ROLE_OWNER,
                 Company.mfa_required.is_(True),
             )

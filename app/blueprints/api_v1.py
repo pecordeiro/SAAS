@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import base64
 import binascii
-import hashlib
 import logging
 import uuid
 from datetime import date, datetime, timezone
@@ -35,7 +34,7 @@ from wtforms.validators import DataRequired, Length
 from app import rls
 from app.extensions import csrf, db, limiter
 from app.forms import BaseForm
-from app.models import ROLE_OWNER, ApiClient, ApiToken, Company, Project
+from app.models import ROLE_OWNER, Activity, ApiClient, ApiToken, Company, Project
 from app.services import api_tokens as tokens
 from app.services import calc, entitlements
 from app.services import projects as svc
@@ -122,12 +121,28 @@ def _presented_token() -> str | None:
     return value.strip()
 
 
-def token_key() -> str:
-    """Chave do limite: SHA-256 do token apresentado (nunca o texto puro); sem token, o IP."""
+_LOOKUP_MISS = object()
+
+
+def _lookup_token():
+    """Token apresentado → ``ApiToken`` (ou None), uma consulta por requisição (cache em ``g``)."""
+    cached = g.get("api_token_lookup", _LOOKUP_MISS)
+    if cached is not _LOOKUP_MISS:
+        return cached
     raw = _presented_token()
-    if raw is None:
+    token = tokens.find_by_raw(raw) if raw is not None else None
+    g.api_token_lookup = token
+    return token
+
+
+def token_key() -> str:
+    """Chave do limite: id do token EXISTENTE (nunca o texto puro). Sem token ou com token
+    inválido, o IP — senão cada string inventada ganharia um balde novo e o limite por
+    token não serviria contra força bruta (Fase 7)."""
+    token = _lookup_token()
+    if token is None:
         return "ip:" + (request.remote_addr or "?")
-    return "tok:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    return "tok:" + str(token.id)
 
 
 def ip_key() -> str:
@@ -152,7 +167,7 @@ def authenticate():
     raw = _presented_token()
     if raw is None:
         return _unauthorized("missing_token", "Envie o cabeçalho Authorization: Bearer <token>.")
-    token = tokens.find_by_raw(raw)
+    token = _lookup_token()
     if token is None:
         return _unauthorized(tokens.INVALID, "Token inválido.")
     g.api_token = token
@@ -384,18 +399,21 @@ def _not_implemented():
 @bp.get("/projects/<uuid:project_id>")
 @require_scope(tokens.SCOPE_READ_PROJECTS)
 def project_detail(project_id):
+    get_or_404(Project, project_id)  # Fase 7: id de outra empresa → 404 já no stub (A/B)
     return _not_implemented()
 
 
 @bp.get("/projects/<uuid:project_id>/events")
 @require_scope(tokens.SCOPE_READ_PROJECTS)
 def project_events(project_id):
+    get_or_404(Project, project_id)
     return _not_implemented()
 
 
 @bp.post("/activities/<uuid:activity_id>/progress")
 @require_scope(tokens.SCOPE_WRITE_PROGRESS)
 def activity_progress(activity_id):
+    get_or_404(Activity, activity_id)
     return _not_implemented()
 
 

@@ -20,3 +20,10 @@ pyotp==2.9.0
 cryptography==50.0.1
 segno==1.6.6
 requests==2.34.2
+# Fase 7 — segurança e LGPD
+# defusedxml: o openpyxl passa a usá-lo sozinho ao ler XLSX (sem entidades/DTD).
+defusedxml==0.7.1
+# Rate limit compartilhado entre workers (RATELIMIT_STORAGE_URI=redis://... via REDIS_URL).
+redis==8.0.1
+# Erros 500 no Sentry (opcional: só com SENTRY_DSN), sem PII.
+sentry-sdk==2.72.0

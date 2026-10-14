@@ -18,6 +18,8 @@ import uuid
 from flask import current_app, g, request
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
+from app.security import signing_keys
+
 MAX_AGE_SECONDS = 90 * 24 * 3600
 MAX_ACCOUNTS = 5
 _SALT = "dispositivo-confiavel-v1"
@@ -28,7 +30,7 @@ def cookie_name() -> str:
 
 
 def _serializer() -> URLSafeTimedSerializer:
-    return URLSafeTimedSerializer(current_app.secret_key, salt=_SALT)
+    return URLSafeTimedSerializer(signing_keys(), salt=_SALT)
 
 
 def _hash(user_id: uuid.UUID | str) -> str:

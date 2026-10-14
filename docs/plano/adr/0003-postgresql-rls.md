@@ -62,6 +62,34 @@ como esse papel e `RLS_ENABLED=1`.
 - (−) Pool de conexões exige `SET LOCAL` por transação (nunca `SET` de sessão) — feito pelo
   hook; código que abrir conexão fora do `db.session` precisa chamar o mesmo `set_config`.
 
+## Atualização da Fase 7 — fluxos entre empresas (papel de plataforma)
+
+Decisão: **nenhum fluxo do app usa papel com `BYPASSRLS`**. Cada fluxo que começa antes de
+saber a empresa ganha uma política SELECT estreita, ligada a um segredo que só quem tem o
+direito conhece, ou roda empresa a empresa no próprio contexto.
+
+| Fluxo | Caminho | Onde |
+|---|---|---|
+| Aceitar convite | política `invitations_by_token` (`token_hash = app.token_hash`) | migration `4d8a644d753b`, Fase 5 |
+| Autenticar token da API | política `api_tokens_by_token` (mesmo padrão); depois `app.company_id` = empresa do token | migration `228fffa5a2d8`, `services/api_tokens.py::find_by_raw`; `tests/test_rls.py::test_token_da_api_autentica_com_rls_forcado_so_pelo_hash` |
+| Login (vínculos do usuário) | `memberships_own_user` | Fase 3 |
+| Exportação LGPD | contexto da empresa da sessão (rota comum) | `tests/test_rls.py::test_lgpd_exportar_e_expurgar_com_rls_forcado` |
+| Expurgo LGPD | contexto da empresa expurgada para apagar; para saber se um usuário tem vínculo em OUTRA empresa usa `memberships_own_user` (contexto de usuário) — nunca apaga quem ainda pertence a outra empresa | `services/lgpd.py::purge_company`; mesmo teste |
+| Retenção, suporte (`flask suporte ...`) | laço por empresa (`companies` não tem RLS), `set_context(company_id=…)` em cada uma e `flush` dentro do contexto | `services/lgpd.py::apply_retention`, `services/support.py`; `test_retencao_e_suporte_com_rls_forcado` |
+| Worker do outbox (Fase 8) | mesmo laço por empresa (o índice parcial `ix_domain_events_unpublished` continua útil por empresa) **ou** papel de plataforma dedicado só ao worker | a decidir na Fase 8 |
+| Webhook/reconciliação do Asaas (Fase 8) | política estreita pelo id externo (ex.: `subscriptions_by_provider_id` com `app.provider_subscription_id`) **ou** papel de plataforma dedicado ao worker de reconciliação | a decidir na Fase 8 |
+| `flask seed-holidays` (nacionais, `company_id` NULL) | rodar com o papel dono **antes** de `flask rls enable` ou com papel de plataforma no deploy | Fase 10 (runbook) |
+
+Por que não `SECURITY DEFINER`: com `FORCE ROW LEVEL SECURITY` (necessário porque no Render
+o app conecta como dono das tabelas) o RLS vale também para o dono da função; a função só
+escaparia se o dono fosse superusuário ou tivesse `BYPASSRLS`, o que reintroduz o papel
+privilegiado que queremos evitar. A política estreita dá a mesma garantia (só a linha cujo
+hash foi apresentado; somente leitura) sem papel especial e é testada com o papel comum.
+
+Se algum fluxo precisar mesmo de papel de plataforma (worker), ele terá: papel separado
+(`controle_platform`, `BYPASSRLS`, só as tabelas necessárias), `DATABASE_URL` própria
+usada só pelo processo do worker/CLI, nunca pelo processo web.
+
 ## Alternativas
 Schema por empresa (migrations N vezes, não escala para muitos clientes pequenos); banco por
 empresa (caro). Rejeitadas. Ligar o RLS dentro da própria migration (sempre ativo) foi

@@ -26,6 +26,10 @@
 {%- if current_membership and current_membership.has_role("supervisor") -%}
   {%- set _ = nav_items.append({"key": "users", "label": "Usuários", "href": url_for("team.users"), "icon": "team"}) -%}
 {%- endif -%}
+{#- Fase 7: Privacidade e dados (LGPD) — só proprietário. -#}
+{%- if current_membership and current_membership.has_role("owner") -%}
+  {%- set _ = nav_items.append({"key": "privacy", "label": "Privacidade", "href": url_for("lgpd.index"), "icon": "info"}) -%}
+{%- endif -%}
 {%- set name_parts = (current_user.name or "?").split() -%}
 {%- set initials = (name_parts[0][0] ~ (name_parts[-1][0] if name_parts|length > 1 else ""))|upper -%}
 {%- set here = request.full_path.rstrip("?") -%}

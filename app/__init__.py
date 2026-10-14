@@ -21,6 +21,9 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
     finalize_config(app.config, config.ENV_NAME)
     app.config["ENV_NAME"] = config.ENV_NAME
     _init_proxy(app)
+    from app import logging_config
+
+    logging_config.init_app(app)  # Fase 7: logs JSON com request_id (+ Sentry opcional)
 
     from app import models  # noqa: F401  (registra os modelos no metadata)
 
@@ -64,6 +67,11 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
         app.register_blueprint(api_v1_bp)
         app.register_blueprint(api_tokens_bp)
 
+    # Fase 7: LGPD (exportar dados da empresa, exclusão com carência).
+    from app.blueprints.lgpd import bp as lgpd_bp
+
+    app.register_blueprint(lgpd_bp)
+
     from app.tenancy import load_company
 
     app.before_request(load_company)
@@ -71,7 +79,9 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
 
     register_guards(app)  # depois de load_company: confirmação de e-mail e MFA obrigatório
     _register_errors(app)
-    _register_security_headers(app)
+    from app import security
+
+    security.init_app(app)  # Fase 7: CSP com nonce, HSTS, cookies, uploads em memória
     _register_template_helpers(app)
 
     from app.cli import register_cli
@@ -144,22 +154,6 @@ def _register_errors(app: Flask) -> None:
     def server_error(err):
         db.session.rollback()
         return page("errors/500.html", 500)
-
-
-def _register_security_headers(app: Flask) -> None:
-    @app.after_request
-    def headers(response):
-        response.headers.setdefault(
-            "Content-Security-Policy",
-            "default-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; "
-            "form-action 'self'; frame-ancestors 'none'",
-        )
-        response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "DENY")
-        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-        if app.config.get("SESSION_COOKIE_SECURE"):
-            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-        return response
 
 
 def _register_template_helpers(app: Flask) -> None:

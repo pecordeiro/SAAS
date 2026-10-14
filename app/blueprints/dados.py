@@ -13,7 +13,8 @@ from flask import Blueprint, Response, current_app, flash, g, redirect, render_t
 from flask_login import current_user
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
-from app.extensions import db
+from app.extensions import db, limiter
+from app.security import signing_keys
 from app.forms_production import ImportConfirmForm, ImportForm
 from app.models import ROLE_SUPERVISOR, Project
 from app.services import entitlements, exporter, importer
@@ -26,7 +27,7 @@ PAYLOAD_MAX_AGE = 60 * 60
 
 
 def _serializer() -> URLSafeTimedSerializer:
-    return URLSafeTimedSerializer(current_app.secret_key, salt=PAYLOAD_SALT)
+    return URLSafeTimedSerializer(signing_keys(), salt=PAYLOAD_SALT)
 
 
 @bp.app_errorhandler(413)
@@ -73,7 +74,12 @@ def _page(form, status=200, **ctx):
     return render_template("dados/import.html", form=form, **ctx), status
 
 
+def _import_limit():
+    return current_app.config.get("IMPORT_RATE_LIMIT", "10 per minute; 60 per hour")
+
+
 @bp.route("/importar", methods=["GET", "POST"])
+@limiter.limit(_import_limit, methods=["POST"])  # Fase 7: upload é caro (parse em memória)
 @tenant_required(ROLE_SUPERVISOR)
 def import_upload():
     form = ImportForm()
@@ -103,6 +109,7 @@ def import_upload():
 
 
 @bp.post("/importar/confirmar")
+@limiter.limit(_import_limit)
 @tenant_required(ROLE_SUPERVISOR)
 def import_confirm():
     form = ImportConfirmForm()

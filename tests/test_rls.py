@@ -226,3 +226,98 @@ def test_cadastro_com_rls_ligado(app, rls_app):
     assert client.get("/app/projetos").status_code == 200
     with app.app_context():
         assert db.session.query(Membership).count() == 1
+
+
+# ---------------------------------------------------------------- Fase 7: fluxos entre empresas com RLS forçado
+
+
+@pytest.fixture()
+def rls_api_app(rls_url):
+    app = create_app(
+        "test", {"SQLALCHEMY_DATABASE_URI": rls_url, "RLS_ENABLED": True, "FEATURE_PUBLIC_API": True, "DEFAULT_TRIAL_PLAN": "empresa"}
+    )
+    yield app
+    with app.app_context():
+        db.session.remove()
+        db.engine.dispose()
+
+
+def test_token_da_api_autentica_com_rls_forcado_so_pelo_hash(app, rls_api_app, tenants, raw):
+    """Política api_tokens_by_token: o token é achado pelo hash antes de saber a empresa;
+    sem o hash no contexto nada é lido; com o token de A, B continua invisível."""
+    from app.models import Company
+    from app.services import api_tokens
+
+    a, b = tenants
+    with app.app_context():
+        created = api_tokens.create_token(db.session.get(Company, a.company_id), name="ERP", scopes=["read:projects"], expires_in_days=1, user_id=None)
+        db.session.commit()
+        token_hash = created.token.token_hash
+        raw_token = created.raw
+    with raw.begin() as conn:
+        assert conn.execute(text("SELECT count(*) FROM api_tokens")).scalar_one() == 0
+        conn.execute(text("SELECT set_config('app.token_hash', :h, true)"), {"h": token_hash})
+        assert conn.execute(text("SELECT count(*) FROM api_tokens")).scalar_one() == 1
+        assert conn.execute(text("UPDATE api_tokens SET scopes = '[]'")).rowcount == 0  # só leitura
+    client = rls_api_app.test_client()
+    auth = {"Authorization": f"Bearer {raw_token}"}
+    response = client.get("/api/v1/projects", headers=auth)
+    assert response.status_code == 200, response.get_data(as_text=True)
+    assert [p["name"] for p in response.get_json()["data"]] == ["Projeto A"]
+    assert client.get(f"/api/v1/projects/{b.project_id}/summary", headers=auth).status_code == 404
+    assert client.get("/api/v1/projects", headers={"Authorization": "Bearer cp_" + "x" * 43}).status_code == 401
+
+
+def test_lgpd_exportar_e_expurgar_com_rls_forcado(app, rls_app, tenants):
+    import io
+    import zipfile
+    from datetime import timedelta
+
+    from app.models import Company, User
+    from app.models.base import utcnow
+    from app.services import lgpd
+
+    a, b = tenants
+    with app.app_context():
+        # operador de A também é membro de B: não pode ser apagado com A
+        db.session.add(Membership(company_id=b.company_id, user_id=a.operator_id, role="operator"))
+        db.session.commit()
+    client = rls_app.test_client()
+    login(client, rls_app, a.owner_email)
+    response = post(client, rls_app, "/app/privacidade/exportar")
+    assert response.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(response.data)) as zf:
+        projects = zf.read("projects.csv").decode()
+    assert "Projeto A" in projects and "Projeto B" not in projects
+    with app.app_context():
+        db.session.get(Company, a.company_id).deletion_requested_at = utcnow() - timedelta(days=31)
+        db.session.commit()
+    with rls_app.app_context():
+        [result] = lgpd.purge_due(operator="teste-rls")
+        assert result.users_deleted == 2
+    with app.app_context():
+        assert db.session.get(Company, a.company_id) is None
+        assert db.session.get(User, a.operator_id) is not None
+        assert db.session.query(Project).filter_by(company_id=a.company_id).count() == 0
+        assert db.session.query(Project).filter_by(company_id=b.company_id).count() == 1
+        assert db.session.query(Membership).filter_by(company_id=b.company_id).count() == 4
+
+
+def test_retencao_e_suporte_com_rls_forcado(app, rls_app, tenants):
+    from app.models import User
+    from app.models.base import utcnow
+    from app.services import lgpd, support
+    from app.services.passwords import hash_password
+
+    a, _ = tenants
+    with app.app_context():
+        db.session.add(User(email="sup@plataforma.com", name="Sup", password_hash=hash_password("x" * 12), email_confirmed_at=utcnow(), mfa_enabled=True))
+        db.session.commit()
+    with rls_app.app_context():
+        member = support.grant(email="sup@plataforma.com", company_id=a.company_id, reason="Chamado 999 de teste com RLS", hours=1, role="operator", operator="t")
+        assert member.company_id == a.company_id
+        assert len(support.active_grants()) == 1
+        assert support.expire() == 0
+        lgpd.apply_retention(operator="t")
+    with app.app_context():
+        assert db.session.query(Membership).filter_by(company_id=a.company_id, is_support=True).count() == 1

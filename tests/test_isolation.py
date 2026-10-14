@@ -89,13 +89,23 @@ def test_vinculo_desativado_perde_acesso(client, app, tenants):
     assert client.get(f"/app/projetos/{a.project_id}").status_code == 403
 
 
-def test_toda_rota_com_uuid_tem_caso_de_isolamento(app):
-    cobertas = {template.replace("{id}", "") for _, template, _, _ in ROUTES + FASE4_ROUTES + ROUTES_CONTAS}
+@pytest.mark.parametrize("flags", [{}, {"FEATURE_PUBLIC_API": True}], ids=["padrao", "api_ligada"])
+def test_toda_rota_com_uuid_tem_caso_de_isolamento(app_factory, flags):
+    """Varre o url_map (com e sem as flags que registram blueprints) e falha se alguma rota
+    com <uuid:> não tiver caso A/B. Rota com dois <uuid:> também precisa estar listada."""
+    app = app_factory(flags)
+    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_API + ROUTES_API_UI
+    cobertas = {template.replace("{id}", "") for _, template, _, _ in todas}
+    vistas = 0
     for rule in app.url_map.iter_rules():
         if "<uuid:" not in rule.rule:
             continue
-        sem_parametro = rule.rule.split("<")[0] + rule.rule.split(">", 1)[1]
+        vistas += 1
+        import re as _re
+
+        sem_parametro = _re.sub(r"<uuid:[^>]+>", "", rule.rule)
         assert sem_parametro in cobertas, f"rota {rule.rule} sem teste de isolamento A/B"
+    assert vistas > 0
 
 
 def test_registrar_pecas_valida_maximo_e_grava_historico(client, app, tenants):
@@ -426,3 +436,96 @@ def test_fase9_revogar_token_de_outra_empresa_responde_404_e_nada_muda(app_facto
     assert "ERP B" not in page and prefix not in page
     with app.app_context():
         assert db.session.get(ApiToken, token_id).revoked_at is None
+
+
+# ---------------------------------------------------------------- Fase 7: API com a flag ligada
+# Toda rota <uuid:> da API: token de A pedindo id de B → 404 (problem+json) e B intacto; o
+# mesmo id da própria empresa passa do 404 (200 ou 501 dos stubs reservados).
+
+ROUTES_API = [
+    ("GET", "/api/v1/projects/{id}", "project_id", None),
+    ("GET", "/api/v1/projects/{id}/summary", "project_id", None),
+    ("GET", "/api/v1/projects/{id}/events", "project_id", None),
+    ("POST", "/api/v1/activities/{id}/progress", "activity_id", {"delta": 1}),
+]
+# Tela de tokens: coberta por test_fase9_revogar_token_de_outra_empresa_responde_404_e_nada_muda.
+ROUTES_API_UI = [("POST", "/app/integracoes/api/{id}/revogar", "token_id", None)]
+
+
+@pytest.fixture()
+def api_ab(app_factory):
+    from app.models import Company
+    from app.services import api_tokens as tokens
+    from tests.conftest import make_tenant
+
+    app = app_factory({"FEATURE_PUBLIC_API": True, "DEFAULT_TRIAL_PLAN": "empresa"})
+    with app.app_context():
+        a, b = make_tenant("A"), make_tenant("B")
+        created = tokens.create_token(
+            db.session.get(Company, a.company_id), name="ERP A", scopes=["read:projects", "write:progress"],
+            expires_in_days=30, user_id=None,
+        )
+        db.session.commit()
+    return app, a, b, created.raw
+
+
+def _api_call(client, method, url, raw, data):
+    headers = {"Authorization": f"Bearer {raw}", "If-Match": '"1"'}
+    if method == "GET":
+        return client.get(url, headers=headers)
+    return client.post(url, headers=headers, json=data)
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_API)
+def test_api_recurso_de_outra_empresa_responde_404(api_ab, method, template, field, data):
+    app, a, b, raw = api_ab
+    response = _api_call(app.test_client(), method, template.format(id=getattr(b, field)), raw, data)
+    assert response.status_code == 404
+    assert "Projeto B" not in response.get_data(as_text=True)
+    with app.app_context():
+        activity = db.session.get(Activity, b.activity_id)
+        assert activity.units_done == 0 and activity.version == 1
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_API)
+def test_api_mesma_rota_na_propria_empresa_passa_do_404(api_ab, method, template, field, data):
+    app, a, _, raw = api_ab
+    response = _api_call(app.test_client(), method, template.format(id=getattr(a, field)), raw, data)
+    assert response.status_code in (200, 201, 501)
+
+
+# ---------------------------------------------------------------- Fase 7: LGPD (sem <uuid:>; empresa da sessão)
+
+
+def test_lgpd_exportacao_so_tem_dados_da_propria_empresa(client, app, tenants):
+    import io
+    import zipfile
+
+    a, b = tenants
+    login(client, app, a.owner_email)
+    response = post(client, app, "/app/privacidade/exportar")
+    assert response.status_code == 200 and response.mimetype == "application/zip"
+    content = ""
+    with zipfile.ZipFile(io.BytesIO(response.data)) as zf:
+        for name in zf.namelist():
+            content += zf.read(name).decode("utf-8")
+    assert "Projeto A" in content and str(a.company_id) in content and a.operator_email in content
+    assert "Projeto B" not in content and "Empresa B" not in content
+    assert str(b.company_id) not in content and str(b.project_id) not in content and b.operator_email not in content
+
+
+def test_lgpd_pedido_de_exclusao_so_afeta_a_empresa_da_sessao(client, app, tenants):
+    from app.models import Company
+    from tests.conftest import PASSWORD
+
+    a, b = tenants
+    login(client, app, a.owner_email)
+    with client.session_transaction() as sess:
+        sess["company_id"] = str(b.company_id)  # forjado: sem vínculo com B → volta para A
+    response = post(client, app, "/app/privacidade/excluir", {"company_name": "Empresa B", "password": PASSWORD})
+    assert response.status_code == 400  # o nome digitado não é o da empresa da sessão (A)
+    response = post(client, app, "/app/privacidade/excluir", {"company_name": "Empresa A", "password": PASSWORD})
+    assert response.status_code == 303
+    with app.app_context():
+        assert db.session.get(Company, a.company_id).deletion_requested_at is not None
+        assert db.session.get(Company, b.company_id).deletion_requested_at is None
