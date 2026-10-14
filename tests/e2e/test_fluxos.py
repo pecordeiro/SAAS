@@ -87,6 +87,12 @@ def test_fluxo_completo(live, make_page, width, height):
     # registrar peças sem recarregar: etapa e indicadores mudam, toast avisa
     page.evaluate("window.__marcador = 'sem-recarregar'")
     expect(page.locator("#indicadores")).to_contain_text("0/10")
+    if not mobile:  # o rótulo do botão vem do servidor (HTMX), não de conta no navegador
+        row = page.locator("li.activity", has_text="Serra").first
+        row.locator(".stepper__input").fill("3")
+        expect(row.locator("[data-register-label]")).to_contain_text("+3 (→ 3 de 10)")
+        row.locator(".stepper__input").fill("1")
+        expect(row.locator("[data-register-label]")).to_contain_text("+1 (→ 1 de 10)")
     _register(page, "Serra", mobile)
     expect(page.locator("#toast-region")).to_contain_text("+1 em Serra · 1 de 10")
     expect(page.locator("#indicadores")).to_contain_text("Progresso")

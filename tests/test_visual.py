@@ -201,7 +201,7 @@ def test_detalhe_tem_registro_em_dois_toques(client, app, tenants):
     assert 'name="delta" value="1"' in html
     # toque 2: botão Registrar do formulário POST (HTMX só melhora)
     assert f'action="/app/atividades/{a.activity_id}/registrar"' in html
-    assert "Registrar <span data-register-label>+1" in html
+    assert "data-register-label" in html and "+1 <span" in html
     assert f'hx-post="/app/atividades/{a.activity_id}/registrar"' in html and 'hx-swap="none"' in html
 
 

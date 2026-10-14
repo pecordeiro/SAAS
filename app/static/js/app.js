@@ -33,7 +33,8 @@
     if (input && input.name === "tema" && input.closest("[data-theme-form]")) applyTheme(input.value);
   });
 
-  /* ---------- Stepper (− / +) e rótulo “Registrar +N (→ X de Y)” ---------- */
+  /* ---------- Stepper (− / +): só mexe no campo; min/max são dica visual.
+     O texto “+N (→ X de Y)” e qualquer limite vêm do servidor (HTMX), nunca do navegador. ---------- */
   function clampInput(input) {
     var min = parseInt(input.min || "1", 10);
     var max = input.max ? parseInt(input.max, 10) : Infinity;
@@ -52,31 +53,6 @@
     var inc = group.querySelector('[data-step="1"]');
     if (dec) dec.disabled = !(value > min);
     if (inc) inc.disabled = !(value < max);
-    var sheet = group.closest("[data-register]");
-    if (sheet) updateRegisterLabel(sheet, value);
-  }
-
-  function updateRegisterLabel(sheet, value) {
-    var label = sheet.querySelector("[data-register-label]");
-    var done = parseInt(sheet.getAttribute("data-done"), 10);
-    var planned = parseInt(sheet.getAttribute("data-planned"), 10);
-    var faltam = planned - done;
-    var input = sheet.querySelector(".stepper__input");
-    var error = sheet.querySelector("[data-register-live]");
-    if (!label) return;
-    if (isNaN(value) || value < 1) {
-      label.textContent = "";
-      return;
-    }
-    if (value > faltam) {
-      label.textContent = "";
-      if (input) input.setAttribute("aria-invalid", "true");
-      if (error) error.textContent = "Faltam só " + faltam + " peças nesta atividade.";
-      return;
-    }
-    if (input) input.removeAttribute("aria-invalid");
-    if (error) error.textContent = "";
-    label.textContent = "+" + value + " (→ " + (done + value) + " de " + planned + ")";
   }
 
   document.addEventListener("click", function (event) {
@@ -92,6 +68,7 @@
       var clamped = clampInput(input);
       if (clamped !== null) input.value = String(clamped);
       syncStepper(group);
+      input.dispatchEvent(new Event("input", { bubbles: true })); // o servidor refaz o rótulo
       return;
     }
     var toggle = event.target.closest && event.target.closest("[data-password-toggle]");

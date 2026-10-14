@@ -543,3 +543,22 @@ def activity_progress(activity_id):
         return _render_detail(project, only_activity=activity.id, toast=message, fragment=True)
     flash(message, "sucesso")
     return redirect(url_for("app.project_detail", project_id=project.id, _anchor=f"atividade-{activity.id}"), 303)
+
+
+@bp.get("/atividades/<uuid:activity_id>/previa")
+@tenant_required(ROLE_OPERATOR)
+def activity_preview(activity_id):
+    """Texto do botão de registro (“+2 (→ 5 de 10)”) calculado no servidor, em fragmento HTMX.
+    Só leitura; o navegador não decide nada (a gravação revalida tudo em register_progress)."""
+    activity = get_or_404(Activity, activity_id)
+    quantity = activity.stage.project.quantity
+    faltam = max(0, quantity - activity.units_done)
+    try:
+        delta = int(request.args.get("delta", ""))
+    except ValueError:
+        return ""
+    if delta < 1:
+        return ""
+    if delta > faltam:
+        return f"+{delta} (faltam só {faltam})"
+    return f"+{delta} (→ {activity.units_done + delta} de {quantity})"

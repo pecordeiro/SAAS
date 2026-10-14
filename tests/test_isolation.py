@@ -22,6 +22,7 @@ ROUTES = [
     ("POST", "/app/atividades/{id}/registrar", "activity_id", {"delta": 1}),
     # Fase 6
     ("GET", "/app/projetos/{id}/atualizar", "project_id", None),
+    ("GET", "/app/atividades/{id}/previa", "activity_id", None),
 ]
 
 # Fase 6: rotas que precisam de ids que o Tenant não traz (feriado) — casos A/B em tests/test_fase6.py.

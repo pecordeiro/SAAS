@@ -111,6 +111,22 @@ migrations no PostgreSQL só rodam com `TEST_DATABASE_URL`; no SQLite aparecem c
 - Tema: Sistema/Claro/Escuro no menu (cookie `tema`).
 - Capturas de referência: `docs/design/capturas/fase2/` (375/768/1280, claro e escuro).
 
+### Front-end completo (Fase 6)
+
+- Site público: `/`, `/precos` (planos lidos da tabela `plans`), `/termos` e `/privacidade`
+  (RASCUNHO para revisão jurídica), `/contato` (e-mail de `CONTACT_EMAIL`, só texto),
+  `/sitemap.xml`, `/robots.txt`.
+- Área logada: lista com abas/busca/prazo/exportar, detalhe com registro por HTMX
+  (`hx-swap-oob`, sem recarregar), conflito 409 com confirmação, atualização a cada 30 s
+  (só aba visível), histórico paginado e geral (`/app/historico`), novo projeto com resumo via
+  HTMX, editor de modelo com ↑/↓/remover/adicionar etapa, `/app/empresa` (dados, jornada, dias,
+  feriados). Tudo funciona sem JavaScript (fallback por formulário). O navegador não calcula
+  nada: textos como “+2 (→ 5 de 10)” vêm do servidor.
+- Assets minificados com hash: `python scripts/build_assets.py` (gera `app/static/dist/`;
+  `--check` confere). Rode depois de mexer em CSS/JS e commite o resultado.
+- Testes de navegador (opcionais): `pip install playwright==1.55.0`; `RUN_E2E=1 python -m pytest tests/e2e -q`
+  (axe: `E2E_AXE_JS=/caminho/axe.min.js`). Capturas: `python scripts/capturar_telas.py docs/design/capturas/fase6`.
+
 ### Migrations
 
 ```bash

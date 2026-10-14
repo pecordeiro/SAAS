@@ -476,3 +476,52 @@ critérios de pronto da anterior estiverem marcados.
   - Atrás de proxy, `request.remote_addr` (teto por IP e auditoria) exige ProxyFix.
   - Tela: sem rotação de token nem edição de escopos (revoga e cria outro); fase 6 confere as
     capturas responsivas.
+
+
+### Fase 6 — Front-end completo do site
+- Status: concluída
+- Datas: início 2026-10-14 · fim 2026-10-14
+- Entregas:
+  - Site público (início com planos de `plans`, `/precos` com tabela e FAQ, `/termos` e `/privacidade` marcados
+    RASCUNHO, `/contato`, `sitemap.xml`, `robots.txt`, canonical/Open Graph, rodapé com links); área logada com
+    `noindex`.
+  - Lista de projetos: abas (ativos/concluídos/todos com contagem), busca (nome/produto), prazo (atraso, 7 dias, sem
+    prazo), paginação, exportar CSV da lista (supervisor+). Campo opcional **produto** (migration `f6a1b2c3d4e5`,
+    só ADD COLUMN; parte de c90a35f e precisa ser reencadeada no merge).
+  - Detalhe: produto, prazo em N dias úteis, folga/atraso (`calc.dias_uteis_entre`), menu Ações (exportar, editar,
+    arquivar), gráficos SVG (progresso e horas por etapa). Registro via HTMX com `hx-swap="none"` + `hx-swap-oob`
+    (atividade, resumo da etapa, indicadores, selos, lateral, gráficos, toast); 409 mostra o valor atual e pede
+    “Confirmar e somar”; `/atualizar` a cada 30 s só com aba visível (`data-refresh-url` em `app.js`, sem inline).
+  - Histórico paginado (25/pág.) com filtros (atividade, pessoa; projeto no geral), “6 → 7 de 10” (soma acumulada),
+    gráfico por dia; `/app/historico` geral.
+  - Novo projeto: cartões de modelo, produto, resumo calculado via HTMX (`/app/projetos/novo/resumo`,
+    `services.projects.plan_summary` usando só `calc.py`). Editor de modelo: ↑/↓/remover/adicionar etapa
+    (`/app/modelos/linhas`, `/<id>/linhas`) com fallback sem JS. `/app/empresa` (proprietário): nome, CNPJ validado,
+    jornada, dias de trabalho, feriados da empresa (auditados).
+  - Regra “front é só painel”: o rótulo “+N (→ X de Y)” vem do servidor (`/app/atividades/<id>/previa`); `app.js` não
+    calcula nem decide limites (min/max só como dica).
+  - Assets: `scripts/build_assets.py` (rcssmin/rjsmin fixados) → `static/dist/*.<hash>` + manifesto, cache de 1 ano
+    para `dist/` e fontes, fallback para os fontes sem build; teste `--check`.
+  - A11y: `aria-label` nos campos de quantidade, sem `role` indevido no formulário de registro, ordem de títulos em
+    `/precos`; toasts em região `role=status aria-live`.
+- Critérios de pronto:
+  - [x] Playwright (`tests/e2e`, marker `e2e`): cadastro → confirmar e-mail (outbox) → modelo → projeto → registrar →
+        histórico → exportar em 375 e 1280 px; operador sem botões e com 403; conflito 409; registro sem JS;
+        atualização de 30 s (aba oculta não requisita); **7 passed** (+ axe 4 passed com `E2E_AXE_JS`).
+  - [x] Nenhuma requisição a outro domínio (monitor de rede em toda página do e2e).
+  - [x] Lighthouse 12.3.0 nas páginas públicas (/, /precos, /termos, /privacidade, /contato, /entrar, /cadastro):
+        acessibilidade 100, boas práticas 100, SEO 100, desempenho 97–100. axe-core 4.10.2 (wcag2a/aa, 21a/aa,
+        best-practice) sem violações nas telas públicas e logadas, claro/escuro, 375/1280.
+  - [x] Capturas em `docs/design/capturas/fase6/` (21 telas × 3 larguras × 2 temas = 126 PNGs, 6,1 MB).
+  - [x] Isolamento A/B para cada rota nova (`atualizar`, `previa`, `feriados/<id>/remover`, `modelos/<id>/linhas`,
+        resumo com modelo de B, filtros de histórico com ids de B → 404).
+  - [x] Suíte: SQLite e PostgreSQL 16 verdes (números no relatório do commit final).
+- Diferenças com `telas.md` (justificadas): histórico sem filtro de período nem “Carregar mais” (paginação numerada);
+  novo projeto sem checkboxes de dias da semana por projeto (dias vêm da empresa; não há campo no projeto);
+  empresa só com Dados/Calendário/Feriados (segurança e LGPD ficam para as Fases 7/8); sem “Assinatura” no menu
+  (Fase 8); lista sem faixa de assinatura (Fase 8); menu lateral não recolhe em ícones.
+- Pendências:
+  - Termos/privacidade são rascunho; razão social/CNPJ do operador e `CONTACT_EMAIL` reais antes do lançamento.
+  - Migration `f6a1b2c3d4e5` a reencadear após a Fase 7. Rebuild de `dist/` ao mesclar CSS/JS de outras fases.
+  - `/estilo` não mostra os componentes novos (radio card, abas, menu de ações, plan_card).
+  - Sem Playwright o teste e2e é pulado; CI precisa instalar `playwright==1.55.0` e o Chromium.

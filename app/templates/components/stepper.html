@@ -4,11 +4,11 @@
   Campo numérico grande com − / + (design-system §3). Os botões só aparecem com JS;
   sem JS, digita-se o número. `size`: lg (56 px, chão de fábrica) | md (44 px).
 #}
-{% macro stepper(name, value=1, min=1, max=None, id=None, label=None, size="lg", describedby=None, invalid=False) -%}
+{% macro stepper(name, value=1, min=1, max=None, id=None, label=None, size="lg", describedby=None, invalid=False, preview_url=None, preview_target=None) -%}
 {%- set input_id = id or name -%}
 <div class="stepper stepper--{{ size }}" role="group"{% if label %} aria-label="{{ label }}"{% endif %} data-stepper>
   <button type="button" class="btn btn--secondary btn--icon stepper__btn js-only" data-step="-1" aria-controls="{{ input_id }}" aria-label="Diminuir quantidade">{{ icon("minus", "lg") }}</button>
-  <input class="stepper__input" type="number" id="{{ input_id }}" name="{{ name }}" value="{{ value }}" min="{{ min }}"{% if max is not none %} max="{{ max }}"{% endif %} step="1" inputmode="numeric" pattern="[0-9]*" required{% if label %} aria-label="{{ label }}"{% endif %}{% if describedby %} aria-describedby="{{ describedby }}"{% endif %}{% if invalid %} aria-invalid="true"{% endif %}>
+  <input class="stepper__input" type="number" id="{{ input_id }}" name="{{ name }}" value="{{ value }}" min="{{ min }}"{% if max is not none %} max="{{ max }}"{% endif %} step="1" inputmode="numeric" pattern="[0-9]*" required{% if preview_url %} hx-get="{{ preview_url }}" hx-trigger="input changed delay:200ms" hx-target="{{ preview_target }}" hx-swap="innerHTML" hx-include="this"{% endif %}{% if label %} aria-label="{{ label }}"{% endif %}{% if describedby %} aria-describedby="{{ describedby }}"{% endif %}{% if invalid %} aria-invalid="true"{% endif %}>
   <button type="button" class="btn btn--secondary btn--icon stepper__btn js-only" data-step="1" aria-controls="{{ input_id }}" aria-label="Aumentar quantidade">{{ icon("plus", "lg") }}</button>
 </div>
 {%- endmacro %}
@@ -40,12 +40,12 @@
     <fieldset class="fieldset register__fields">
       <legend class="visually-hidden">Quantidade a somar em {{ activity_name }}</legend>
       <div class="register__stepper{% if error %} field--error{% endif %}">
-        {{ stepper("delta", delta, 1, faltam, id=sid ~ "-qtd", label="Quantidade a somar em " ~ activity_name, describedby=sid ~ "-dica", invalid=error is not none) }}
+        {{ stepper("delta", delta, 1, faltam, id=sid ~ "-qtd", preview_url=url_for("app.activity_preview", activity_id=activity_id), preview_target="#" ~ sid ~ "-rotulo", label="Quantidade a somar em " ~ activity_name, describedby=sid ~ "-dica", invalid=error is not none) }}
         <p class="register__hint muted text-sm" id="{{ sid }}-dica">quantidade a somar (editável)</p>
       </div>
       <button class="btn btn--primary btn--lg btn--block register__submit" type="submit">
         <span class="btn__spinner" aria-hidden="true"></span>
-        <span class="register__label-long">{{ "Confirmar e somar" if conflict else "Registrar" }} <span data-register-label>+{{ delta }} <span class="register__preview">(→ {{ done + delta }} de {{ planned }})</span></span></span>
+        <span class="register__label-long">{{ "Confirmar e somar" if conflict else "Registrar" }} <span data-register-label id="{{ sid }}-rotulo">+{{ delta }} <span class="register__preview">(→ {{ done + delta }} de {{ planned }})</span></span></span>
         <span class="register__label-short">{{ "Confirmar" if conflict else "Registrar" }}</span>
       </button>
     </fieldset>

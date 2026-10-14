@@ -369,3 +369,14 @@ def test_editor_linhas_modelo_de_outra_empresa_404(client, app, tenants):
     assert post(client, app, f"/app/modelos/{tid_b}/linhas", {**ROWS_FORM, "acao": "add"}).status_code == 404
     tid_a = _template(app, a.company_id, a.owner_id, "Meu")
     assert post(client, app, f"/app/modelos/{tid_a}/linhas", {**ROWS_FORM, "acao": "add"}, headers=HX).status_code == 200
+
+
+def test_previa_do_registro_vem_do_servidor(client, app, tenants):
+    a, _ = tenants
+    login(client, app, a.operator_email)
+    url = f"/app/atividades/{a.activity_id}/previa"
+    assert client.get(url + "?delta=3").get_data(as_text=True) == "+3 (→ 3 de 10)"
+    assert "faltam só 10" in client.get(url + "?delta=11").get_data(as_text=True)
+    assert client.get(url + "?delta=abc").get_data(as_text=True) == ""
+    html = client.get(f"/app/projetos/{a.project_id}").get_data(as_text=True)
+    assert f'hx-get="{url}"' in html
