@@ -1,0 +1,7 @@
+{% extends "emails/_base.html" %}
+{% block body %}
+  <p>A troca do plano <strong>{{ kept_plan }}</strong> para o <strong>{{ refused_plan }}</strong> da empresa {{ company_name }} não foi aplicada: o uso atual não cabe no plano menor.</p>
+  <p>{{ reason }}</p>
+  <p>Vocês continuam no plano {{ kept_plan }}, com o mesmo valor. Para rebaixar, ajuste o uso e peça a troca de novo.</p>
+  <p><a href="{{ billing_url }}">Ver assinatura</a></p>
+{% endblock %}

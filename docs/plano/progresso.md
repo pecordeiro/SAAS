@@ -495,8 +495,9 @@ critérios de pronto da anterior estiverem marcados.
     `hmac.compare_digest` do `asaas-access-token` (401), `webhook_events` UNIQUE commitado antes
     de processar (duplicado → 200 sem efeito), falha → `status=failed` + `error` e 200.
   - Troca de plano sem “upgrade grátis”: `subscriptions.pending_plan_id/pending_plan_at`;
-    upgrade vale após pagar a fatura no valor novo, downgrade no fim do período pago, troca
-    bloqueada em `past_due`. Assinar: todas as chamadas ao provedor antes de mudar o estado
+    upgrade vale após pagar a fatura no valor novo, downgrade no fim do período pago (recusado
+    se o uso não couber, ao pedir e ao aplicar — aí mantém plano/preço, audita e avisa por
+    e-mail), troca bloqueada em `past_due`. Assinar: todas as chamadas ao provedor antes de mudar o estado
     local; em falha, rollback e só o `provider_customer_id` criado é gravado à parte.
   - Telas `/app/assinatura` (owner; `allow_read_only`): assinatura atual com uso × limites e
     fatura em aberto, planos, troca com projeção, dados de cobrança (→ redireciona 303 para a
@@ -519,7 +520,7 @@ critérios de pronto da anterior estiverem marcados.
         valor novo; downgrade no fim do período pago (testes dos dois e do bloqueio em atraso).
   - [ ] Ciclo real no sandbox, do teste grátis ao cancelamento, documentado com prints —
         roteiro em `pagamentos.md` §5; a rede do ambiente bloqueia `*.asaas.com`.
-- Testes: SQLite `408 passed, 41 skipped, 3 xfailed`; PostgreSQL 16 (`TEST_DATABASE_URL`, RLS incluso) `449 passed, 3 xfailed`.
+- Testes: SQLite `410 passed, 41 skipped, 3 xfailed`; PostgreSQL 16 (`TEST_DATABASE_URL`, RLS incluso) `451 passed, 3 xfailed` (após a correção do downgrade).
   `flask db upgrade`/`downgrade 4d8a644d753b`/`upgrade` + `flask db check` sem drift no SQLite;
   `test_migrations` (ida e volta + compare_metadata) verde no SQLite e no PostgreSQL.
 - /security-review: revisão manual — token do webhook em tempo constante e sem token

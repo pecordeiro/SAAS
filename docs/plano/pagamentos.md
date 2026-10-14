@@ -75,8 +75,11 @@ estorno sair; `deleted: true` → `canceled`.
     limites sobem na requisição seguinte ao pagamento confirmado (“vale após o pagamento”).
     Pedir upgrade e cancelar não libera nada (a troca pendente é descartada);
   - **downgrade** (mais barato): vale no fim do período já pago ou do teste
-    (`pending_plan_at`; aplicado pelo recálculo/`billing-reconcile`); o uso atual precisa caber
-    no plano menor;
+    (`pending_plan_at`; aplicado pelo recálculo/`billing-reconcile`). O uso atual precisa caber
+    no plano menor ao pedir (a mensagem diz quantos projetos arquivar/usuários remover) e de
+    novo na hora de aplicar: se não couber mais, a troca NÃO é aplicada — plano e preço atuais
+    ficam (o valor no Asaas volta ao do plano atual), o pendente é limpo, a recusa vai para
+    `audit_logs` (`subscription.downgrade_canceled`) e os proprietários recebem e-mail;
   - **bloqueado** com pagamento em atraso (`past_due`), cancelada ou encerrada;
   - assinar durante o teste/período pago num plano mais caro segue a mesma regra do upgrade;
   - sem cobrança proporcional.

@@ -590,8 +590,46 @@ def test_rebaixar_plano_com_uso_acima_do_limite_e_recusado(bclient, bapp, btenan
     for _ in range(3):
         post(bclient, bapp, "/app/projetos/novo", NEW_PROJECT)
     response = post(bclient, bapp, "/app/assinatura/planos/essencial")
-    assert response.status_code == 400 and "você tem 4" in text_of(response)
-    assert sub_state(bapp, a.company_id)["plan"] == "profissional"
+    assert response.status_code == 400
+    assert "você tem 4" in text_of(response) and "Arquive ou conclua 1 projeto(s)" in text_of(response)
+    state = sub_state(bapp, a.company_id)
+    assert state["plan"] == "profissional" and state["pending_plan"] is None
+    assert fake(bapp).store.subscriptions["sub_fake_0001"]["value_cents"] == 34900
+
+
+def test_downgrade_agendado_que_nao_cabe_mais_nao_e_aplicado(bclient, bapp, btenants):
+    from app.services import email
+    from app.services.billing.notify import DOWNGRADE_CANCELED_SUBJECT
+
+    a, _ = btenants
+    subscribe(bclient, bapp, a, plan="profissional")
+    pay(bclient, bapp, a)
+    period_end = sub_state(bapp, a.company_id)["current_period_end"]
+    provider = fake(bapp)
+    next_pid = provider.add_payment("sub_fake_0001")
+    login(bclient, bapp, a.owner_email)
+    for _ in range(2):
+        post(bclient, bapp, "/app/projetos/novo", NEW_PROJECT)  # 3 ativos: cabe no Essencial
+    assert post(bclient, bapp, "/app/assinatura/planos/essencial").status_code == 302
+    assert provider.store.payments[next_pid]["value_cents"] == 14900
+    # depois de agendar, o uso cresce (ainda no Profissional)
+    assert post(bclient, bapp, "/app/projetos/novo", NEW_PROJECT).status_code == 303  # 4 ativos
+    with bapp.app_context():
+        billing.reconcile_all(now=period_end + timedelta(seconds=1))
+    state = sub_state(bapp, a.company_id)
+    assert state["plan"] == "profissional" and state["pending_plan"] is None
+    # preço volta ao do plano mantido, no provedor e na fatura em aberto
+    assert provider.store.subscriptions["sub_fake_0001"]["value_cents"] == 34900
+    assert provider.store.payments[next_pid]["value_cents"] == 34900
+    with bapp.app_context():
+        log = db.session.query(AuditLog).filter_by(company_id=a.company_id, action=billing.DOWNGRADE_CANCELED).one()
+        assert log.details["plano_mantido"] == "profissional" and "Arquive ou conclua 1 projeto(s)" in log.details["motivo"]
+        sent = [m for m in email.outbox(bapp) if m.subject == DOWNGRADE_CANCELED_SUBJECT]
+    assert [m.to for m in sent] == [a.owner_email] and "não foi aplicada" in sent[0].text
+    # idempotente: rodar de novo não audita nem avisa outra vez
+    with bapp.app_context():
+        billing.reconcile_all(now=period_end + timedelta(minutes=5))
+        assert db.session.query(AuditLog).filter_by(company_id=a.company_id, action=billing.DOWNGRADE_CANCELED).count() == 1
 
 
 def test_escolher_plano_sem_assinatura_vai_para_dados_de_cobranca(bclient, bapp, btenants):

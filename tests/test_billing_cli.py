@@ -91,3 +91,19 @@ def test_admin_desconto_muda_valor_no_provedor_e_audita(bclient, bapp, btenants)
                "--reason", "Muito desconto").exit_code != 0
     # a tela mostra o desconto
     assert "20% de desconto" in bclient.get("/app/assinatura").get_data(as_text=True)
+
+
+def test_aviso_de_atraso_sai_tambem_pela_reconciliacao(bclient, bapp, btenants):
+    """Fora de requisição (CLI) o e-mail de carência também é enviado."""
+    from app.services import email
+    from app.services.billing.notify import PAST_DUE_SUBJECT
+
+    a, _ = btenants
+    subscribe(bclient, bapp, a)
+    pay(bclient, bapp, a)
+    period_end = sub_state(bapp, a.company_id)["current_period_end"]
+    with bapp.app_context():
+        billing.reconcile_all(now=period_end + timedelta(hours=1))  # período acabou, sem fatura nova paga
+        sent = [m for m in email.outbox(bapp) if m.subject == PAST_DUE_SUBJECT]
+    assert sub_state(bapp, a.company_id)["status"] == "past_due"
+    assert [m.to for m in sent] == [a.owner_email] and "/app/assinatura" in sent[0].text

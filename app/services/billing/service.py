@@ -62,6 +62,7 @@ CANCELED = "subscription.canceled"
 BILLING_INFO_UPDATED = "subscription.billing_info_updated"
 TRIAL_EXTENDED = "subscription.trial_extended"
 DISCOUNT_GRANTED = "subscription.discount_granted"
+DOWNGRADE_CANCELED = "subscription.downgrade_canceled"
 audit.ACTION_LABELS.update(
     {
         SUBSCRIBED: "Assinatura contratada",
@@ -69,6 +70,7 @@ audit.ACTION_LABELS.update(
         BILLING_INFO_UPDATED: "Dados de cobrança atualizados",
         TRIAL_EXTENDED: "Teste grátis estendido",
         DISCOUNT_GRANTED: "Desconto concedido",
+        DOWNGRADE_CANCELED: "Troca para plano menor não aplicada",
     }
 )
 
@@ -268,12 +270,12 @@ def check_plan_fits(company: Company, plan: Plan) -> None:
     if plan.max_projects is not None and projects > plan.max_projects:
         raise BillingError(
             f"O plano {plan.name} permite {plan.max_projects} projetos ativos e você tem {projects}. "
-            "Arquive ou conclua projetos antes de trocar."
+            f"Arquive ou conclua {projects - plan.max_projects} projeto(s) antes de trocar."
         )
     if plan.max_users is not None and users > plan.max_users:
         raise BillingError(
             f"O plano {plan.name} permite {plan.max_users} usuários e você tem {users} (com convites pendentes). "
-            "Remova alguém antes de trocar."
+            f"Desative ou revogue {users - plan.max_users} usuário(s)/convite(s) antes de trocar."
         )
 
 
@@ -507,6 +509,12 @@ def apply_pending_plan(sub: Subscription, now: datetime | None = None) -> bool:
         )
     else:
         ready = since <= now
+        if ready:
+            company = db.session.get(Company, sub.company_id)
+            try:
+                check_plan_fits(company, plan)
+            except BillingError as exc:
+                return _abort_downgrade(sub, company, plan, exc.message)
     if ready:
         sub.plan_id, sub.plan = plan.id, plan
         sub.pending_plan_id = sub.pending_plan_at = None
@@ -546,6 +554,31 @@ def _mark_canceled(sub: Subscription, now: datetime) -> None:
     sub.canceled_at = sub.canceled_at or now
     sub.grace_until = None
     sub.pending_plan_id = sub.pending_plan_at = None
+
+
+def _abort_downgrade(sub: Subscription, company: Company, plan: Plan, reason: str) -> bool:
+    """Downgrade agendado que não cabe mais no uso atual: NÃO aplica. Mantém plano e preço
+    atuais (o valor no provedor volta ao do plano atual), limpa o pendente, audita e avisa
+    os proprietários. Se o provedor falhar, o pendente fica para a próxima tentativa."""
+    if sub.provider_subscription_id and not needs_checkout(sub):
+        provider = get_provider()
+        try:
+            provider.change_plan(sub.provider_subscription_id, price_for(sub, sub.plan), _description(sub.plan))
+            _sync_payments(sub, provider.list_payments(sub.provider_subscription_id))
+        except PaymentProviderError as exc:
+            logger.error("downgrade não aplicado; falha ao restaurar valor no provedor: %s", exc.message)
+            return False
+    sub.pending_plan_id = sub.pending_plan_at = None
+    audit.record(
+        DOWNGRADE_CANCELED,
+        company_id=company.id,
+        actor_user_id=None,
+        object_type="subscription",
+        object_id=sub.id,
+        details={"plano_mantido": sub.plan.code, "plano_recusado": plan.code, "motivo": reason},
+    )
+    notify.downgrade_canceled(company, sub.plan, plan, reason)
+    return False
 
 
 # ------------------------------------------------------------------ cobranças e estado
