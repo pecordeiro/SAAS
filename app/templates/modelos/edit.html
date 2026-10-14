@@ -11,7 +11,7 @@
 {#
   telas.md §11 (editor). Versão mínima da Fase 4: cada etapa é um bloco com as atividades
   em linhas “Nome; minutos”. Salvar com etapas diferentes cria a próxima versão; projetos
-  existentes continuam na versão antiga. O editor com ↑/↓ e HTMX vem na Fase 6.
+  existentes continuam na versão antiga. Fase 6: ↑/↓/remover/adicionar etapa por HTMX, com fallback sem JS (modelos/_stages.html).
 #}
 <header class="page-header">
   <div class="page-header__titles">
@@ -30,6 +30,8 @@
 </header>
 
 <form class="stack--lg" method="post" action="{{ url_for('modelos.edit', template_id=template.id) if template else url_for('modelos.new') }}" novalidate>
+  {#- Enter nos campos envia ESTE botão (o primeiro submit), nunca ↑/↓/remover das etapas. -#}
+  <button class="visually-hidden" type="submit" tabindex="-1" aria-hidden="true">Salvar</button>
   {{ form_errors(form, list_label="Etapa") }}
   {{ form.csrf_token }}
   <section class="card stack" aria-labelledby="dados-titulo">
@@ -43,14 +45,7 @@
       <h2 class="section-title" id="etapas-titulo">Etapas</h2>
       <p class="muted text-sm">Na ordem de montagem. Em cada etapa, uma atividade por linha: <code>Nome; minutos por unidade</code>. Etapa com nome vazio é ignorada.</p>
     </div>
-    {%- for error in form.stages.errors if error is string %}<p class="field__error">{{ icon("alert", "sm") }}<span>{{ error }}</span></p>{% endfor %}
-    {%- for slot in form.stages %}
-    <fieldset class="fieldset stack--sm">
-      <legend>Etapa {{ loop.index }}</legend>
-      {{ field(slot.form.name, label="Nome da etapa") }}
-      {{ field(slot.form.activities, label="Atividades", attrs={"rows": 4}) }}
-    </fieldset>
-    {%- endfor %}
+    {% include "modelos/_stages.html" %}
   </section>
 
   {%- if template %}

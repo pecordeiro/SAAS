@@ -1,0 +1,11 @@
+{% from "components/icon.html" import icon %}
+{% from "components/progress.html" import progress %}
+{% from "components/badge.html" import status_badge %}
+{# Linha-resumo da etapa (<summary>): unidades, progresso, faltam e situação. Troca por id no fragmento. #}
+<summary class="stage__summary" id="etapa-resumo-{{ stage.id }}"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <span class="stage__name">{{ icon("chevron-down", class_="stage__chevron") }}<span>{{ stage.name }}</span></span>
+  <span class="stage__units num">{{ sr.unidades }}/{{ sr.previstas }}<span class="compact-only"> un.</span></span>
+  <span class="stage__progress">{{ progress(sr.progresso, 1, label="Progresso de " ~ stage.name, size="sm", value_text=sr.progresso|pct) }}</span>
+  <span class="stage__left num">{{ (sr.tempo_restante_min / 60)|horas(true) }}</span>
+  <span class="stage__status">{{ status_badge(sr.status) }}</span>
+</summary>

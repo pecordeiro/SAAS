@@ -20,6 +20,15 @@ ROUTES = [
     ("POST", "/app/etapas/{id}/atividades", "stage_id", {"name": "Invasora", "ideal_minutes": "5"}),
     ("GET", "/app/atividades/{id}", "activity_id", None),
     ("POST", "/app/atividades/{id}/registrar", "activity_id", {"delta": 1}),
+    # Fase 6
+    ("GET", "/app/projetos/{id}/atualizar", "project_id", None),
+    ("GET", "/app/atividades/{id}/previa", "activity_id", None),
+]
+
+# Fase 6: rotas que precisam de ids que o Tenant não traz (feriado) — casos A/B em tests/test_fase6.py.
+ROUTES_FASE6_EXTRA = [
+    ("POST", "/app/empresa/feriados/{id}/remover", "holiday_id", None),
+    ("POST", "/app/modelos/{id}/linhas", "template_id", None),
 ]
 
 
@@ -90,7 +99,7 @@ def test_vinculo_desativado_perde_acesso(client, app, tenants):
 
 
 def test_toda_rota_com_uuid_tem_caso_de_isolamento(app):
-    cobertas = {template.replace("{id}", "") for _, template, _, _ in ROUTES + FASE4_ROUTES + ROUTES_CONTAS}
+    cobertas = {template.replace("{id}", "") for _, template, _, _ in ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA}
     for rule in app.url_map.iter_rules():
         if "<uuid:" not in rule.rule:
             continue

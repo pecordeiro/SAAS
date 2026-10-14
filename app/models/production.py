@@ -46,6 +46,7 @@ class Project(UUIDPk, Timestamps, TenantMixin, db.Model):
         Uuid, ForeignKey("template_versions.id", ondelete="RESTRICT")
     )
     name: Mapped[str] = mapped_column(String(160), nullable=False)
+    product: Mapped[str | None] = mapped_column(String(160))  # Fase 6: subtítulo opcional
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     start_date: Mapped[date | None] = mapped_column(Date)
     due_date: Mapped[date | None] = mapped_column(Date)

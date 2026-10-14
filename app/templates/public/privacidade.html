@@ -1,0 +1,35 @@
+{% extends "public/_legal.html" %}
+{% set doc_title = "Política de privacidade" %}
+{% set sections = [("quem", "Quem somos"), ("coletamos", "Dados que coletamos"), ("usamos", "Para que usamos"), ("compartilhamos", "Com quem compartilhamos"), ("direitos", "Seus direitos"), ("seguranca", "Segurança e retenção"), ("contato", "Contato do encarregado (DPO)")] %}
+{% block title %}Política de privacidade · Controle de Produção{% endblock %}
+{% block description %}Como o Controle de Produção trata dados pessoais conforme a LGPD: o que coletamos, para quê, com quem compartilhamos e como exercer seus direitos. Rascunho para revisão jurídica.{% endblock %}
+{% block legal_body %}
+<section class="legal__section" id="quem">
+  <h2>1. Quem somos</h2>
+  <p>O Controle de Produção é operado por uma empresa brasileira (razão social e CNPJ a preencher antes do lançamento). Somos controladores dos dados de conta e cobrança e operadores dos dados de produção que cada empresa-cliente registra.</p>
+</section>
+<section class="legal__section" id="coletamos">
+  <h2>2. Dados que coletamos</h2>
+  <p>Conta: nome, e-mail, senha (guardada só como hash) e vínculo com a empresa. Uso: quem registrou cada peça, quando e em qual atividade. Cobrança: dados de faturamento da empresa, tratados pelo provedor de pagamento. Técnicos: endereço IP e registros de acesso para segurança.</p>
+</section>
+<section class="legal__section" id="usamos">
+  <h2>3. Para que usamos</h2>
+  <p>Para prestar o serviço, autenticar acessos, calcular e exibir o andamento da produção, cobrar a assinatura, prevenir abuso e cumprir obrigações legais. Não vendemos dados pessoais.</p>
+</section>
+<section class="legal__section" id="compartilhamos">
+  <h2>4. Com quem compartilhamos</h2>
+  <p>Apenas com fornecedores necessários à operação: hospedagem, envio de e-mail e processamento de pagamentos. Cada fornecedor recebe o mínimo necessário.</p>
+</section>
+<section class="legal__section" id="direitos">
+  <h2>5. Seus direitos</h2>
+  <p>Você pode pedir confirmação do tratamento, acesso, correção, portabilidade, eliminação e informações sobre compartilhamento, conforme a LGPD. Escreva para o contato abaixo.</p>
+</section>
+<section class="legal__section" id="seguranca">
+  <h2>6. Segurança e retenção</h2>
+  <p>Isolamos os dados de cada empresa, protegemos o acesso com senha e, opcionalmente, verificação em duas etapas, e mantemos os dados enquanto a conta existir. Ao excluir a empresa, os dados são apagados após um prazo de carência.</p>
+</section>
+<section class="legal__section" id="contato">
+  <h2>7. Contato do encarregado (DPO)</h2>
+  <p>Fale com o encarregado pelo e-mail <strong>{{ contact_email }}</strong>.</p>
+</section>
+{% endblock %}

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, flash, g, redirect, render_template, url_for
+import re
+
+from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 from flask_login import current_user
 
 from app.extensions import db
-from app.forms_production import ConfirmForm, TemplateForm
+from app.forms_production import MAX_TEMPLATE_STAGES, ConfirmForm, TemplateForm
 from app.models import ROLE_SUPERVISOR, Template
 from app.services import templates as tsvc
 from app.services.exporter import br_decimal
@@ -111,3 +113,72 @@ def archive(template_id):
     db.session.commit()
     flash("Modelo arquivado. Os projetos criados dele continuam iguais.", "sucesso")
     return redirect(url_for("modelos.index"), 303)
+
+
+# ---------------------------------------------------------------- linhas do editor (HTMX + sem JS)
+
+MAX_ROW_ACTION_LEN = 20
+
+
+def _slots_from_request() -> list[dict]:
+    """Etapas como chegaram no formulário (nome + atividades), na ordem dos índices."""
+    indexes = sorted(
+        {int(m.group(1)) for key in request.form for m in [re.fullmatch(r"stages-(\d+)-name", key)] if m}
+    )
+    return [
+        {"name": request.form.get(f"stages-{i}-name", ""), "activities": request.form.get(f"stages-{i}-activities", "")}
+        for i in indexes
+    ]
+
+
+def _apply_row_action(slots: list[dict], action: str) -> list[dict]:
+    """add | remove-N | up-N | down-N sobre a lista de etapas (sem validar nem gravar nada)."""
+    kind, _, raw = action[:MAX_ROW_ACTION_LEN].partition("-")
+    if kind == "add":
+        if len(slots) < MAX_TEMPLATE_STAGES:
+            slots.append({"name": "", "activities": ""})
+        return slots
+    try:
+        index = int(raw)
+    except ValueError:
+        return slots
+    if not 0 <= index < len(slots):
+        return slots
+    if kind == "remove":
+        slots.pop(index)
+    elif kind in {"up", "down"}:
+        other = index - 1 if kind == "up" else index + 1
+        if 0 <= other < len(slots):
+            slots[index], slots[other] = slots[other], slots[index]
+    return slots
+
+
+def _rows_response(template: Template | None):
+    slots = _apply_row_action(_slots_from_request(), request.form.get("acao", ""))
+    if not slots:
+        slots = [{"name": "", "activities": ""}]
+    form = TemplateForm(
+        formdata=None,
+        data={"name": request.form.get("name", ""), "description": request.form.get("description", ""), "stages": slots},
+    )
+    htmx = request.headers.get("HX-Request") == "true" and not request.headers.get("HX-Boosted")
+    ctx = dict(form=form, template=template, using=tsvc.projects_using(template) if template else 0)
+    if htmx:
+        return render_template("modelos/_stages.html", **ctx)
+    if template is not None:
+        ctx["archive_form"] = ConfirmForm(formdata=None)
+    return render_template("modelos/edit.html", **ctx)
+
+
+@bp.post("/linhas")
+@tenant_required(ROLE_SUPERVISOR)
+def rows_new():
+    """Adicionar/remover/mover etapas no editor de um modelo novo (nada é gravado)."""
+    return _rows_response(None)
+
+
+@bp.post("/<uuid:template_id>/linhas")
+@tenant_required(ROLE_SUPERVISOR)
+def rows(template_id):
+    """Idem para um modelo existente (o id é resolvido na empresa da sessão)."""
+    return _rows_response(get_or_404(Template, template_id))

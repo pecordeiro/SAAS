@@ -72,6 +72,7 @@ def project_edit(project_id):
                 due_date=form.due_date.data,
                 people=form.people.data,
                 hours_per_day=form.hours_per_day.data,
+                product=form.product.data,
                 user_id=current_user.id,
             )
         except svc.EditError as exc:

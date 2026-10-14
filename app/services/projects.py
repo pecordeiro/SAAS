@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import select, update
+from sqlalchemy import func, or_, select, update
 
 from app.extensions import db
 from app.models import PROJECT_ACTIVE, PROJECT_DONE, Activity, Company, Project, ProgressEntry, Stage
@@ -68,6 +68,7 @@ def create_project(
     template_version_id: uuid.UUID | None = None,
     source: str = "manual",
     check_limits: bool = True,
+    product: str | None = None,
 ) -> Project:
     """Cria o projeto com as etapas dadas. Vindas de um modelo (``template_version_id``),
     as etapas já são a cópia (snapshot) da versão: ver ``services.templates``.
@@ -80,6 +81,7 @@ def create_project(
         company_id=company.id,
         template_version_id=template_version_id,
         name=name,
+        product=(product or "").strip() or None,
         quantity=quantity,
         start_date=start_date,
         due_date=due_date,
@@ -314,6 +316,7 @@ def update_project(
     people: int,
     hours_per_day: Decimal,
     user_id: uuid.UUID | None,
+    product: str | None = None,
 ) -> None:
     """Edita os dados do projeto. A quantidade não pode ficar abaixo das peças já
     registradas em alguma atividade."""
@@ -324,6 +327,7 @@ def update_project(
         raise EditError("O prazo não pode ser antes do início.")
     before = {"name": project.name, "quantity": project.quantity}
     project.name = name
+    project.product = (product or "").strip() or None
     project.quantity = quantity
     project.start_date = start_date
     project.due_date = due_date
@@ -455,6 +459,7 @@ def duplicate_project(project: Project, user_id: uuid.UUID | None, name: str | N
     copy = create_project(
         company,
         name=(name or f"Cópia de {project.name}")[:160],
+        product=project.product,
         quantity=project.quantity,
         start_date=project.start_date,
         due_date=project.due_date,
@@ -531,22 +536,182 @@ def delay_workdays(project: Project, forecast: date | None, company: Company) ->
     return calc.dias_uteis_entre(project.due_date, forecast, holidays_for(company.id), company.workdays())
 
 
-def list_projects() -> list[Project]:
-    return list(
-        db.session.execute(
-            scoped(Project).where(Project.archived_at.is_(None)).order_by(Project.created_at.desc())
-        ).scalars()
+PROJECT_FILTERS = ("ativos", "concluidos", "todos")
+LIKE_ESCAPE = "\\"
+
+
+def _like(term: str) -> str:
+    """Padrão LIKE com barra invertida, % e _ digitados pelo usuário escapados (busca literal)."""
+    for char in (LIKE_ESCAPE, "%", "_"):
+        term = term.replace(char, LIKE_ESCAPE + char)
+    return "%" + term + "%"
+
+
+def list_projects(status: str = "todos", q: str | None = None) -> list[Project]:
+    """Projetos não arquivados da empresa. ``status``: ativos | concluidos | todos;
+    ``q`` busca (sem diferenciar maiúsculas) no nome e no produto."""
+    stmt = scoped(Project).where(Project.archived_at.is_(None))
+    if status == "ativos":
+        stmt = stmt.where(Project.status == PROJECT_ACTIVE)
+    elif status == "concluidos":
+        stmt = stmt.where(Project.status == PROJECT_DONE)
+    term = (q or "").strip()[:80]
+    if term:
+        pattern = _like(term)
+        stmt = stmt.where(
+            or_(Project.name.ilike(pattern, escape=LIKE_ESCAPE), Project.product.ilike(pattern, escape=LIKE_ESCAPE))
+        )
+    return list(db.session.execute(stmt.order_by(Project.created_at.desc())).scalars())
+
+
+def count_projects_by_status() -> dict[str, int]:
+    """Contagem para as abas da lista (ativos, concluídos, todos), sem arquivados."""
+    rows = db.session.execute(
+        select(Project.status, func.count())
+        .where(Project.company_id == current_company_id(), Project.archived_at.is_(None))
+        .group_by(Project.status)
+    ).all()
+    counts = {status: n for status, n in rows}
+    active, done = counts.get(PROJECT_ACTIVE, 0), counts.get(PROJECT_DONE, 0)
+    return {"ativos": active, "concluidos": done, "todos": active + done}
+
+
+def _history_stmt(project: Project | None, activity_id, user_id):
+    stmt = (
+        scoped(ProgressEntry)
+        .join(Activity, Activity.id == ProgressEntry.activity_id)
+        .join(Stage, Stage.id == Activity.stage_id)
+        .where(Activity.company_id == current_company_id())
     )
+    if project is not None:
+        stmt = stmt.where(Stage.project_id == project.id)
+    if activity_id is not None:
+        stmt = stmt.where(ProgressEntry.activity_id == activity_id)
+    if user_id is not None:
+        stmt = stmt.where(ProgressEntry.user_id == user_id)
+    return stmt
 
 
 def history(project: Project, limit: int = 200) -> list[ProgressEntry]:
     return list(
         db.session.execute(
-            scoped(ProgressEntry)
-            .join(Activity, Activity.id == ProgressEntry.activity_id)
-            .join(Stage, Stage.id == Activity.stage_id)
-            .where(Stage.project_id == project.id, Activity.company_id == project.company_id)
-            .order_by(ProgressEntry.at.desc())
-            .limit(limit)
+            _history_stmt(project, None, None).order_by(ProgressEntry.at.desc(), ProgressEntry.id.desc()).limit(limit)
         ).scalars()
     )
+
+
+def history_page(
+    project: Project | None = None,
+    *,
+    activity_id=None,
+    user_id=None,
+    page: int = 1,
+    per_page: int = 25,
+) -> tuple[list[ProgressEntry], int]:
+    """Uma página do histórico (mais recente primeiro) e o total com os mesmos filtros.
+    ``project=None`` = todos os projetos da empresa. Tudo pela empresa da sessão."""
+    stmt = _history_stmt(project, activity_id, user_id)
+    total = db.session.execute(select(func.count()).select_from(stmt.order_by(None).subquery())).scalar_one()
+    page = max(1, page)
+    entries = list(
+        db.session.execute(
+            stmt.order_by(ProgressEntry.at.desc(), ProgressEntry.id.desc()).limit(per_page).offset((page - 1) * per_page)
+        ).scalars()
+    )
+    return entries, total
+
+
+def running_totals(entries: list[ProgressEntry]) -> dict[uuid.UUID, tuple[int, int]]:
+    """{id do registro: (antes, depois)} = peças da atividade antes e depois do lançamento
+    (soma acumulada dos lançamentos, desfazeres incluídos). Para o “6 → 7 de 10”."""
+    if not entries:
+        return {}
+    activity_ids = {e.activity_id for e in entries}
+    rows = db.session.execute(
+        select(ProgressEntry.id, ProgressEntry.activity_id, ProgressEntry.delta)
+        .where(ProgressEntry.company_id == current_company_id(), ProgressEntry.activity_id.in_(activity_ids))
+        .order_by(ProgressEntry.at.asc(), ProgressEntry.id.asc())
+    ).all()
+    totals: dict[uuid.UUID, int] = {}
+    out: dict[uuid.UUID, tuple[int, int]] = {}
+    wanted = {e.id for e in entries}
+    for entry_id, activity_id, delta in rows:
+        before = totals.get(activity_id, 0)
+        totals[activity_id] = before + delta
+        if entry_id in wanted:
+            out[entry_id] = (before, before + delta)
+    return out
+
+
+def history_users(project: Project | None = None) -> list:
+    """Pessoas que já registraram (para o filtro do histórico)."""
+    from app.models import User
+
+    stmt = (
+        select(User)
+        .join(ProgressEntry, ProgressEntry.user_id == User.id)
+        .join(Activity, Activity.id == ProgressEntry.activity_id)
+        .join(Stage, Stage.id == Activity.stage_id)
+        .where(ProgressEntry.company_id == current_company_id())
+        .distinct()
+        .order_by(User.name)
+    )
+    if project is not None:
+        stmt = stmt.where(Stage.project_id == project.id)
+    return list(db.session.execute(stmt).scalars())
+
+
+def pieces_per_day(
+    project: Project | None, *, activity_id=None, user_id=None, tz: str, days: int = 14
+) -> list[tuple[date, int]]:
+    """Saldo de peças por dia (fuso da empresa) nos últimos ``days`` dias com registro,
+    do mais antigo ao mais novo. Desfazeres entram com sinal negativo."""
+    from app.formatting import local_dt
+
+    stmt = _history_stmt(project, activity_id, user_id).order_by(ProgressEntry.at.desc(), ProgressEntry.id.desc()).limit(2000)
+    totals: dict[date, int] = {}
+    for entry in db.session.execute(stmt).scalars():
+        day = local_dt(entry.at, tz).date()
+        totals[day] = totals.get(day, 0) + entry.delta
+    return sorted(totals.items())[-days:]
+
+
+# ---------------------------------------------------------------- resumo do novo projeto
+
+
+@dataclass(frozen=True)
+class PlanSummary:
+    """Prévia do projeto antes de criar (tempo, dias úteis, término e se cabe no prazo)."""
+
+    total_hours: float
+    workdays: float | None  # dias úteis necessários (None = equipe sem capacidade)
+    end_date: date | None
+    fits: bool | None  # None = sem prazo informado
+    margin: int  # dias úteis de folga (fits) ou de atraso (not fits)
+
+
+def plan_summary(
+    *,
+    minutes_per_unit: Decimal,
+    quantity: int,
+    people: int,
+    hours_per_day: Decimal,
+    start: date | None,
+    due: date | None,
+    company: Company,
+    today: date,
+) -> PlanSummary:
+    """Mesmas contas do projeto criado (calc.py), a partir do tempo por unidade do modelo."""
+    total_hours = float(minutes_per_unit) * quantity / 60
+    workdays = calc.dias_uteis_restantes(total_hours, people, float(hours_per_day))
+    if workdays is None:
+        return PlanSummary(total_hours, None, None, None, 0)
+    holidays = holidays_for(company.id)
+    days = company.workdays()
+    begin = max(today, start) if start else today
+    end = calc.prazo_em_data(begin, workdays, holidays, days)
+    if due is None:
+        return PlanSummary(total_hours, workdays, end, None, 0)
+    if end <= due:
+        return PlanSummary(total_hours, workdays, end, True, calc.dias_uteis_entre(end, due, holidays, days))
+    return PlanSummary(total_hours, workdays, end, False, calc.dias_uteis_entre(due, end, holidays, days))

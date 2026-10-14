@@ -1,0 +1,9 @@
+{% from "components/icon.html" import icon %}
+{% from "components/badge.html" import status_badge, badge %}
+{# Selos do cabeçalho do detalhe: situação e prazo (atraso/folga em dias úteis). #}
+<p class="cluster page-header__meta" id="detalhe-meta"{% if oob %} hx-swap-oob="true"{% endif %}>
+  {{ status_badge(project_status) }}
+  {%- if deadline.late %}{{ badge("Atraso previsto · " ~ deadline.delay ~ (" dia útil" if deadline.delay == 1 else " dias úteis"), "danger", "alert") }}
+  {%- elif deadline.on_time %}<span class="text-success text-sm text-strong">{{ icon("check", "sm") }} no prazo · folga de {{ deadline.slack }} {{ "dia útil" if deadline.slack == 1 else "dias úteis" }}</span>
+  {%- elif deadline.overdue %}{{ badge("Prazo passou há " ~ deadline.overdue ~ (" dia útil" if deadline.overdue == 1 else " dias úteis"), "danger", "alert") }}{% endif %}
+</p>

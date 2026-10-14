@@ -1,4 +1,5 @@
 {% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
 {% from "components/button.html" import button %}
 {% from "components/table.html" import data_table %}
 {% from "components/progress.html" import progress %}
@@ -8,12 +9,13 @@
 {% set nav_current = "projects" %}
 {% block title %}Projetos · Controle de Produção{% endblock %}
 {% block content %}
-{# telas.md §7: projetos ativos com progresso, unidades e prazo; Novo projeto (supervisor+). #}
-{%- set can_create = current_membership and current_membership.has_role("supervisor") %}
+{# telas.md §7: abas de status + busca + prazo; projetos com progresso, unidades e prazo; Novo/Exportar (supervisor+). #}
+{%- macro page_url(n) %}{{ url_for('app.projects', status=filters.status, prazo=filters.prazo or None, q=filters.q or None, page=n if n > 1 else None) }}{% endmacro %}
 <header class="page-header">
   <div class="page-header__titles"><h1>Projetos</h1></div>
   {%- if can_create %}
   <div class="page-header__actions">
+    {{ button("Exportar", "secondary", icon="download", href=url_for('app.projects_export', status=filters.status, prazo=filters.prazo or None, q=filters.q or None), class_="only-desktop") }}
     {{ button("Importar", "secondary", href=url_for('dados.import_upload'), class_="only-desktop") }}
     {{ button("Novo projeto", "primary", icon="plus", href=url_for('app.project_new'), class_="only-desktop") }}
     {{ button("Novo", "primary", icon="plus", href=url_for('app.project_new'), class_="only-mobile") }}
@@ -21,13 +23,41 @@
   {%- endif %}
 </header>
 
+<form class="filters" method="get" action="{{ url_for('app.projects') }}" role="search" aria-label="Filtrar projetos"
+      hx-get="{{ url_for('app.projects') }}" hx-target="#lista-projetos" hx-select="#lista-projetos" hx-swap="outerHTML"
+      hx-push-url="true" hx-trigger="input changed delay:300ms, change">
+  <nav class="tabs" aria-label="Situação">
+    {%- for key, label in status_tabs %}
+    <a class="tabs__item" href="{{ url_for('app.projects', status=key, prazo=filters.prazo or None, q=filters.q or None) }}"{% if key == filters.status %} aria-current="page"{% endif %}>{{ label }} <span class="tabs__count num">{{ counts[key] }}</span></a>
+    {%- endfor %}
+  </nav>
+  <input type="hidden" name="status" value="{{ filters.status }}">
+  <div class="filters__row">
+    <div class="field filters__search">
+      <label class="field__label" for="busca">Buscar lote ou produto</label>
+      <input class="field__input" id="busca" type="search" name="q" value="{{ filters.q }}" maxlength="80" autocomplete="off" placeholder="Ex.: 2026-014">
+    </div>
+    <div class="field filters__select">
+      <label class="field__label" for="prazo">Prazo</label>
+      <select class="field__input" id="prazo" name="prazo">
+        {%- for key, label in deadline_filters %}<option value="{{ key }}"{% if key == filters.prazo %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    {{ button("Filtrar", "secondary", class_="no-js-only") }}
+    {%- if filtered %}{{ button("Limpar", "ghost", href=url_for('app.projects', status=filters.status)) }}{% endif %}
+  </div>
+</form>
+
+<div id="lista-projetos">
 {%- if items %}
-{% call data_table([("Projeto", ""), ("Unid.", "is-num"), ("Progresso", ""), ("Faltam", "is-num"), ("Prazo", "is-num"), ("Status", "")], caption="Projetos ativos", class_="projects-table") %}
+{% call data_table([("Projeto", ""), ("Unid.", "is-num"), ("Progresso", ""), ("Faltam", "is-num"), ("Prazo", "is-num"), ("Status", "")], caption="Projetos", class_="projects-table") %}
   <tbody>
-  {%- for project, r, status, deadline in items %}
+  {%- for it in items %}
+  {%- set project = it.project %}{% set r = it.result %}{% set status = it.status %}{% set deadline = it.deadline %}
     <tr class="project-row">
       <td class="project-row__name is-plain">
         <a class="row-link" href="{{ url_for('app.project_detail', project_id=project.id) }}">{{ project.name }}</a>
+        {%- if project.product %}<span class="project-row__product muted text-sm">{{ project.product }}</span>{% endif %}
       </td>
       <td class="project-row__units is-num" data-label="Unidades">{{ r.unidades_concluidas }}/{{ project.quantity }}<span class="compact-only"> un.</span></td>
       <td class="project-row__progress is-plain">{{ progress(r.progresso_geral, 1, label="Progresso de " ~ project.name, size="sm", value_text=r.progresso_geral|pct) }}</td>
@@ -44,15 +74,17 @@
   {%- endfor %}
   </tbody>
 {% endcall %}
-{%- macro page_url(n) %}{{ url_for('app.projects', page=n) }}{% endmacro %}
-{{ pagination(1, 1, items|length, items|length or 1, page_url) }}
+{{ pagination(page, pages, total, per_page, page_url) }}
 {%- else %}
 <div class="card">
-  {%- if can_create %}
+  {%- if filtered or filters.status != "todos" and counts["todos"] %}
+  {{ empty_state("Nenhum projeto encontrado", "Nada combina com estes filtros. Tente outra busca ou veja todos os projetos.", ghost_action=("Ver todos", url_for('app.projects', status='todos'))) }}
+  {%- elif can_create %}
   {{ empty_state("Nenhum projeto ainda", "Crie o primeiro lote com as etapas, a quantidade e o prazo.", action=("Novo projeto", url_for('app.project_new'))) }}
   {%- else %}
   {{ empty_state("Nenhum projeto para você", "Quando um supervisor criar um projeto, ele aparece aqui.") }}
   {%- endif %}
 </div>
 {%- endif %}
+</div>
 {% endblock %}

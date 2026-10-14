@@ -1,0 +1,27 @@
+{% from "components/icon.html" import icon %}
+{#
+  Resumo calculado do novo projeto (fragmento HTMX de /app/projetos/novo/resumo).
+  Mesmas contas do projeto criado (calc.py); nada é gravado aqui.
+#}
+{%- if state == "no_template" %}
+<p class="muted text-sm">Escolha um modelo de etapas para ver o tempo total, os dias úteis e o término previsto. Sem modelo, os números aparecem depois de criar.</p>
+{%- elif state == "invalid" %}
+<p class="muted text-sm">Informe quantidade, equipe e horas por dia válidas para calcular o resumo.</p>
+{%- else %}
+<dl class="summary">
+  <div class="summary__row"><dt>Trabalho total</dt><dd class="num">{{ summary.total_hours|horas }}</dd></div>
+  {%- if summary.workdays is none %}
+  <div class="summary__row"><dt>Dias úteis</dt><dd class="muted">informe a equipe</dd></div>
+  {%- else %}
+  <div class="summary__row"><dt>Dias úteis</dt><dd class="num">{{ summary.workdays|num }}</dd></div>
+  <div class="summary__row"><dt>Término previsto</dt><dd class="num">{{ summary.end_date|data }}</dd></div>
+  {%- endif %}
+</dl>
+{%- if summary.fits is true %}
+<p class="summary__verdict summary__verdict--ok text-strong">{{ icon("check", "sm") }} Cabe no prazo{% if summary.margin %} · folga de {{ summary.margin }} {{ "dia útil" if summary.margin == 1 else "dias úteis" }}{% endif %}</p>
+{%- elif summary.fits is false %}
+<p class="summary__verdict summary__verdict--late text-strong">{{ icon("alert", "sm") }} Passa do prazo em {{ summary.margin }} {{ "dia útil" if summary.margin == 1 else "dias úteis" }}</p>
+{%- elif summary.workdays is not none %}
+<p class="muted text-sm">Informe o prazo para ver se cabe.</p>
+{%- endif %}
+{%- endif %}

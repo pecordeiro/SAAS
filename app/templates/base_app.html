@@ -12,9 +12,16 @@
   Itens de Modelos, Usuários, Empresa e Assinatura entram quando as rotas existirem (Fases 4–6).
 #}
 {%- set role_label = role_labels.get(current_membership.role, current_membership.role) if current_membership else "" -%}
-{%- set nav_items = [{"key": "projects", "label": "Projetos", "href": url_for("app.projects"), "icon": "projects"}] -%}
+{%- set nav_items = [
+  {"key": "projects", "label": "Projetos", "href": url_for("app.projects"), "icon": "projects"},
+  {"key": "history", "label": "Histórico", "href": url_for("app.history"), "icon": "history"},
+] -%}
 {%- if current_membership and current_membership.has_role("supervisor") -%}
   {%- set _ = nav_items.append({"key": "templates", "label": "Modelos", "href": url_for("modelos.index"), "icon": "folder"}) -%}
+  {%- set _ = nav_items.append({"key": "users", "label": "Usuários", "href": url_for("team.users"), "icon": "team"}) -%}
+{%- endif -%}
+{%- if current_membership and current_membership.has_role("owner") -%}
+  {%- set _ = nav_items.append({"key": "company", "label": "Empresa", "href": url_for("empresa.settings"), "icon": "building"}) -%}
 {%- endif -%}
 {%- if current_membership and current_membership.role == "owner" -%}
   {%- set _ = nav_items.append({"key": "billing", "label": "Assinatura", "href": url_for("billing.overview"), "icon": "check"}) -%}
@@ -22,16 +29,11 @@
 {%- if config.get("FEATURE_PUBLIC_API") and current_membership and current_membership.has_role("owner") -%}
   {%- set _ = nav_items.append({"key": "api", "label": "API", "href": url_for("api_tokens_ui.tokens_index"), "icon": "chart"}) -%}
 {%- endif -%}
-{%- if nav_project is defined and nav_project -%}
-  {%- set _ = nav_items.append({"key": "history", "label": "Histórico", "href": url_for("app.project_history", project_id=nav_project.id), "icon": "history"}) -%}
-{%- endif -%}
-{#- Fase 5: Usuários (supervisor+) e Perfil. -#}
-{%- if current_membership and current_membership.has_role("supervisor") -%}
-  {%- set _ = nav_items.append({"key": "users", "label": "Usuários", "href": url_for("team.users"), "icon": "team"}) -%}
-{%- endif -%}
 {%- set name_parts = (current_user.name or "?").split() -%}
 {%- set initials = (name_parts[0][0] ~ (name_parts[-1][0] if name_parts|length > 1 else ""))|upper -%}
 {%- set here = request.full_path.rstrip("?") -%}
+{% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block canonical %}{% endblock %}
 {% block body_class %}app{% endblock %}
 {% block body %}
 <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
@@ -90,6 +92,9 @@
       <a class="btn btn--ghost btn--icon sheet__close" href="#fechar" aria-label="Fechar" data-dialog-cancel>{{ icon("x") }}</a>
     </div>
     <nav class="menu-list" aria-label="Conta">
+      {%- for item in nav_items[3:] %}
+      <a class="menu-list__item" href="{{ item.href }}"{% if item.key == nav_current | default("") %} aria-current="page"{% endif %}>{{ item.label }}</a>
+      {%- endfor %}
       <a class="menu-list__item" href="{{ url_for('account.profile') }}">Perfil</a>
       {%- if company_count and company_count > 1 %}
       <a class="menu-list__item" href="{{ url_for('account.companies') }}">Trocar empresa</a>

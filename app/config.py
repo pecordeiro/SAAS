@@ -104,6 +104,9 @@ class Config:
     # Hosts aceitos no redirecionamento para a página de pagamento (anti open redirect).
     BILLING_CHECKOUT_HOSTS = ("www.asaas.com", "asaas.com", "sandbox.asaas.com", "pagamento.fake.invalid")
 
+    # E-mail público de contato mostrado em /contato (só texto; não há formulário).
+    CONTACT_EMAIL = "contato@controledeproducao.example"
+
     # Importação (app/services/importer.py): arquivo lido em memória, nunca gravado em disco.
     IMPORT_MAX_BYTES = 2 * 1024 * 1024
     # Teto de qualquer corpo de requisição (o maior é o upload da importação): acima disso o
@@ -146,7 +149,7 @@ class Config:
             values["TRUSTED_PROXY_COUNT"] = max(0, int(os.environ.get("TRUSTED_PROXY_COUNT", cls.TRUSTED_PROXY_COUNT)))
         except ValueError:
             raise RuntimeError("TRUSTED_PROXY_COUNT precisa ser um número inteiro.") from None
-        for key in ("MAIL_BACKEND", "MAIL_FROM", "RESEND_API_KEY", "APP_BASE_URL", "MFA_ENCRYPTION_KEY"):
+        for key in ("MAIL_BACKEND", "MAIL_FROM", "RESEND_API_KEY", "APP_BASE_URL", "MFA_ENCRYPTION_KEY", "CONTACT_EMAIL"):
             values[key] = os.environ.get(key) or getattr(cls, key)
         return values
 

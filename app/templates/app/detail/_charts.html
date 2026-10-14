@@ -1,0 +1,10 @@
+{% from "components/chart.html" import bar_chart %}
+{# Gráficos SVG do servidor: progresso por etapa e horas que faltam por etapa. #}
+<div class="stack" id="graficos"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <div class="card">
+    {{ bar_chart(progress_series, "Progresso por etapa", max=1, table_headers=("Etapa", "Progresso")) }}
+  </div>
+  <div class="card">
+    {{ bar_chart(hours_series, "Horas que faltam por etapa", table_headers=("Etapa", "Faltam")) }}
+  </div>
+</div>

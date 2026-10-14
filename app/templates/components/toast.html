@@ -12,13 +12,17 @@
 {%- endmacro %}
 
 {# Região única (aria-live) com as mensagens flash da requisição. #}
-{% macro toast_region() -%}
+{% macro toast_region(message=None, oob=False) -%}
 {%- set kinds = {"sucesso": "success", "success": "success", "info": "info", "message": "info"} -%}
-<div class="toast-region" aria-live="polite" aria-atomic="true">
+<div class="toast-region" id="toast-region" role="status" aria-live="polite" aria-atomic="true"{% if oob %} hx-swap-oob="true"{% endif %}>
+  {%- if message %}
+    {{ toast(message, "success") }}
+  {%- else %}
   {%- with messages = get_flashed_messages(with_categories=true) %}
-    {%- for category, message in messages[-1:] %}
-    {{ toast(message, kinds.get(category, "info")) }}
+    {%- for category, text in messages[-1:] %}
+    {{ toast(text, kinds.get(category, "info")) }}
     {%- endfor %}
   {%- endwith %}
+  {%- endif %}
 </div>
 {%- endmacro %}
