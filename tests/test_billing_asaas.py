@@ -131,11 +131,11 @@ def test_provedor_em_producao_exige_chave():
     from app import create_app
     from app.services.billing import service as billing
 
-    app = create_app("production", {"SQLALCHEMY_DATABASE_URI": "sqlite://", "SECRET_KEY": "x" * 32, "RATELIMIT_STORAGE_URI": "redis://127.0.0.1:6399/0"})
+    app = create_app("production", {"SQLALCHEMY_DATABASE_URI": "sqlite://", "SECRET_KEY": "x" * 32, "RATELIMIT_STORAGE_URI": "redis://127.0.0.1:6399/0", "APP_BASE_URL": "https://app.exemplo.com.br"})
     with app.app_context():
         with pytest.raises(PaymentProviderError):
             billing.get_provider(app)
-    app2 = create_app("production", {"SQLALCHEMY_DATABASE_URI": "sqlite://", "SECRET_KEY": "x" * 32, "RATELIMIT_STORAGE_URI": "redis://127.0.0.1:6399/0", "ASAAS_API_KEY": KEY})
+    app2 = create_app("production", {"SQLALCHEMY_DATABASE_URI": "sqlite://", "SECRET_KEY": "x" * 32, "RATELIMIT_STORAGE_URI": "redis://127.0.0.1:6399/0", "APP_BASE_URL": "https://app.exemplo.com.br", "ASAAS_API_KEY": KEY})
     with app2.app_context():
         prov = billing.get_provider(app2)
         assert isinstance(prov, AsaasProvider) and prov.base_url == SANDBOX_URL

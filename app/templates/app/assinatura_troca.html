@@ -25,16 +25,19 @@
   {{ form.csrf_token }}
   <h2 class="card__title">Projeção</h2>
   <dl class="meta-list">
-    <div><dt>Hoje ({{ p.current_plan.name }})</dt><dd>R$ {{ p.current_cents|reais }}/mês</dd></div>
-    <div><dt>Novo ({{ p.plan.name }})</dt><dd class="text-strong">R$ {{ p.new_cents|reais }}/mês</dd></div>
+    <div><dt>Hoje ({{ p.current_plan.name }})</dt><dd>{% if p.current_cents is none %}Sob consulta{% else %}R$ {{ p.current_cents|reais }}/mês{% endif %}</dd></div>
+    <div><dt>Novo ({{ p.plan.name }})</dt><dd class="text-strong">{% if p.new_cents is none %}Sob consulta{% else %}R$ {{ p.new_cents|reais }}/mês{% endif %}</dd></div>
+    {%- if p.difference_cents is not none %}
     <div><dt>Diferença por mês</dt><dd>{{ "+" if p.difference_cents > 0 else ("−" if p.difference_cents < 0 else "") }}R$ {{ (p.difference_cents|abs)|reais }}</dd></div>
+    {%- endif %}
     {%- if p.next_due %}
     <div><dt>Próxima fatura</dt><dd>{{ p.next_due|data }} · R$ {{ p.new_cents|reais }}</dd></div>
     {%- endif %}
     <div><dt>Projetos ativos</dt><dd>{{ p.projects }} de {{ p.plan.max_projects if p.plan.max_projects is not none else "ilimitados" }}</dd></div>
-    <div><dt>Usuários</dt><dd>{{ p.users }} de {{ p.plan.max_users }}</dd></div>
+    <div><dt>Pessoas</dt><dd>{{ p.users }} de {{ p.plan.max_users if p.plan.max_users is not none else "ilimitadas" }}</dd></div>
   </dl>
-  {%- if p.upgrade %}
+  {%- if p.blocked %}
+  {%- elif p.upgrade %}
   <p class="text-strong">Vale após o pagamento: a fatura em aberto passa a R$ {{ p.new_cents|reais }} e os limites do {{ p.plan.name }} valem assim que ela for paga (dá para pagar antes do vencimento).</p>
   {%- else %}
   <p class="text-strong">Vale a partir de {{ p.effective_at|datahora }}: até lá você continua com os limites do {{ p.current_plan.name }}, que já estão pagos.</p>

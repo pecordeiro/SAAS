@@ -261,7 +261,8 @@ def get_config(name: str | None = None) -> type[Config]:
 
 
 def finalize_config(app_config: dict, env_name: str) -> None:
-    """Valida o que é obrigatório. Fora de development/test, SECRET_KEY e DATABASE_URL são exigidos."""
+    """Valida o que é obrigatório. Fora de development/test, SECRET_KEY, DATABASE_URL e
+    APP_BASE_URL (https) são exigidos."""
     if env_name in {"development", "test"}:
         if not app_config.get("SECRET_KEY"):
             # Chave efêmera só em desenvolvimento: as sessões caem a cada reinício.
@@ -271,6 +272,11 @@ def finalize_config(app_config: dict, env_name: str) -> None:
         raise RuntimeError("SECRET_KEY é obrigatório fora de development/test.")
     if not app_config.get("SQLALCHEMY_DATABASE_URI"):
         raise RuntimeError("DATABASE_URL é obrigatório fora de development/test.")
+    base_url = str(app_config.get("APP_BASE_URL") or "").strip()
+    if not base_url.startswith("https://") or len(base_url) <= len("https://"):
+        # Links de e-mail, canonical e retorno do pagamento não podem vir do host da
+        # requisição (host header é do cliente): sem APP_BASE_URL o app não sobe.
+        raise RuntimeError("APP_BASE_URL é obrigatório fora de development/test (ex.: https://app.exemplo.com.br).")
     storage = str(app_config.get("RATELIMIT_STORAGE_URI") or "")
     if app_config.get("RATELIMIT_ENABLED") and not storage.startswith(("redis://", "rediss://", "redis+sentinel://")):
         # Em memória cada worker do Gunicorn tem o próprio contador (o limite vira N vezes

@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import date
 
 from flask import Blueprint, Response, abort, current_app, jsonify, redirect, render_template, request, url_for
-from sqlalchemy import select, text
+from sqlalchemy import text
 
 from app.extensions import db, limiter
-from app.models import Plan
+from app.services import plans as plan_catalog
 
 bp = Blueprint("public", __name__)
 
@@ -30,26 +30,35 @@ SITEMAP_PAGES = (
 # Texto dos documentos legais: RASCUNHO até a revisão jurídica (ver docs/plano/progresso.md).
 LEGAL_UPDATED = date(2026, 10, 14)
 FEATURED_PLAN = "profissional"
+PLAN_EXTRAS = (
+    ("mfa_required", "MFA obrigatório"),
+    ("api", "API de integração"),
+    ("visual_custom", "Identidade visual personalizada"),
+    ("implantacao", "Implantação por técnicos nossos"),
+)
 
 
 def public_plans() -> list[dict]:
     """Planos ativos da tabela ``plans`` (preço e limites vêm do banco, nunca do template)."""
-    plans = db.session.execute(select(Plan).where(Plan.active.is_(True)).order_by(Plan.price_cents)).scalars()
+    def price(cents):
+        if cents is None:
+            return None  # sob consulta
+        return cents // 100 if cents % 100 == 0 else cents / 100
+
     return [
         {
             "code": plan.code,
             "name": plan.name,
-            "price": plan.price_cents // 100 if plan.price_cents % 100 == 0 else plan.price_cents / 100,
+            "price": price(plan.price_cents),
             "projects": "Projetos ilimitados" if plan.max_projects is None else f"{plan.max_projects} projetos ativos",
-            "users": f"{plan.max_users} usuários" if plan.max_users else "Usuários ilimitados",
-            "extras": [
-                label
-                for key, label in (("mfa_required", "MFA obrigatório"), ("api", "API"))
-                if (plan.features or {}).get(key)
-            ],
+            "users": f"{plan.max_users} pessoas" if plan.max_users else "Pessoas ilimitadas",
+            "extras": [label for key, label in PLAN_EXTRAS if (plan.features or {}).get(key)],
+            "features": {key: bool((plan.features or {}).get(key)) for key, _ in PLAN_EXTRAS},
+            "trial": plan_catalog.has_trial(plan),
+            "self_service": plan_catalog.is_self_service(plan),
             "featured": plan.code == FEATURED_PLAN,
         }
-        for plan in plans
+        for plan in plan_catalog.active_plans()
     ]
 
 

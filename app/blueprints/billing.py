@@ -18,6 +18,7 @@ from app.extensions import db
 from app.forms import BaseForm
 from app.models import ROLE_OWNER, Plan
 from app.services import entitlements
+from app.services import plans as plan_catalog
 from app.services.billing import service as billing
 from app.services.billing.documents import is_valid_document
 from app.services.billing.provider import PaymentProviderError
@@ -71,12 +72,14 @@ def inject_billing_banner():
 
 
 def _plans() -> list[Plan]:
-    return list(db.session.execute(select(Plan).where(Plan.active.is_(True)).order_by(Plan.price_cents)).scalars())
+    """Todos os planos ativos para exibir (sob consulta por último, sem botão de contratar)."""
+    return plan_catalog.active_plans()
 
 
 def _plan_or_404(code: str | None) -> Plan:
+    """Só plano de autosserviço (com preço) pode ser escolhido pela tela; sob consulta → 404."""
     plan = db.session.execute(select(Plan).where(Plan.code == (code or ""), Plan.active.is_(True))).scalar_one_or_none()
-    if plan is None:
+    if plan is None or not plan_catalog.is_self_service(plan):
         abort(404)
     return plan
 
@@ -114,7 +117,9 @@ def overview():
         payment_labels=billing.PAYMENT_LABELS,
         payment_tones=billing.PAYMENT_TONES,
         checkout=billing.needs_checkout(sub),
-        can_cancel=sub.status not in ("canceled", "expired"),
+        managed=plan_catalog.is_managed(sub.plan),
+        pending_upgrade=bool(sub.pending_plan and billing.is_upgrade(sub, sub.pending_plan)),
+        can_cancel=sub.status not in ("canceled", "expired") and not plan_catalog.is_managed(sub.plan),
         confirm_form=ConfirmForm(formdata=None),
     )
 
@@ -124,12 +129,16 @@ def overview():
 def plans():
     sub = billing.ensure_subscription(g.company)
     db.session.commit()
+    plans = _plans()
     return render_template(
         "app/assinatura_planos.html",
         sub=sub,
-        plans=_plans(),
+        plans=plans,
         checkout=billing.needs_checkout(sub),
-        prices={p.id: billing.price_for(sub, p) for p in _plans()},
+        managed_current=plan_catalog.is_managed(sub.plan) and sub.status not in ("canceled", "expired"),
+        self_service={p.id: plan_catalog.is_self_service(p) for p in plans},
+        trial={p.id: plan_catalog.has_trial(p) for p in plans},
+        prices={p.id: billing.price_for(sub, p) for p in plans},
     )
 
 
@@ -215,7 +224,15 @@ def billing_info():
             sub = billing.ensure_subscription(company)
     status = 400 if (error or form.errors) else 200
     return (
-        render_template("app/assinatura_cobranca.html", form=form, plan=plan, checkout=checkout, error=error, sub=sub),
+        render_template(
+            "app/assinatura_cobranca.html",
+            form=form,
+            plan=plan,
+            plan_trial=bool(plan and plan_catalog.has_trial(plan)),
+            checkout=checkout,
+            error=error,
+            sub=sub,
+        ),
         status,
     )
 

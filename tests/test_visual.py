@@ -131,7 +131,8 @@ def test_arquivos_estaticos_servidos(client):
 
 
 def _app(env: str):
-    overrides = {"SQLALCHEMY_DATABASE_URI": "sqlite://", "SECRET_KEY": "x" * 32, "RATELIMIT_ENABLED": False}
+    overrides = {"SQLALCHEMY_DATABASE_URI": "sqlite://", "SECRET_KEY": "x" * 32, "RATELIMIT_ENABLED": False,
+                 "APP_BASE_URL": "https://app.exemplo.com.br"}
     return create_app(env, overrides)
 
 

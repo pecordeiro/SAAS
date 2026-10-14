@@ -4,12 +4,12 @@
 {% from "components/icon.html" import icon %}
 {% from "components/button.html" import button %}
 {% block title %}Preços · Controle de Produção{% endblock %}
-{% block description %}Planos por empresa a partir de R$ {{ plans[0].price|num(0) if plans else 149 }}/mês, com {{ trial_days }} dias grátis sem cartão. Projetos ativos, usuários, histórico e exportação.{% endblock %}
+{% block description %}{%- set first = plans|selectattr("price")|first %}Planos por empresa{% if first %} a partir de R$ {{ first.price|num(0) if first.price == first.price|int else first.price|num(2) }}/mês{% endif %}, com {{ trial_days }} dias grátis sem cartão no Essencial e no Profissional. Projetos ativos, pessoas, histórico e exportação.{% endblock %}
 {% block main %}
-{# telas.md §2: três planos (Profissional primeiro no celular), tabela comparativa, perguntas frequentes. #}
+{# telas.md §2: quatro planos (preço e limites da tabela plans; Implantação sob consulta), tabela comparativa, perguntas frequentes. #}
 <section class="container pricing-hero" aria-labelledby="precos-titulo">
   <h1 class="page-title" id="precos-titulo">Preços simples, por empresa</h1>
-  <p class="landing-lead">{{ trial_days }} dias grátis no Profissional, sem cartão. Troque de plano quando quiser.</p>
+  <p class="landing-lead">{{ trial_days }} dias grátis no Essencial e no Profissional, sem cartão. Empresa sem teste grátis; Implantação sob consulta. Troque de plano quando quiser.</p>
   <div class="plans mt-8">
     {%- for plan in plans %}
     {{ plan_card(plan, url_for('auth.signup'), 'h2') }}
@@ -24,9 +24,13 @@
   {% call data_table(cols, caption="Comparação dos planos", cards=False) %}
   <tbody>
     <tr><th scope="row">Projetos ativos</th>{% for plan in plans %}<td class="is-num">{{ plan.projects.replace(" projetos ativos", "") }}</td>{% endfor %}</tr>
-    <tr><th scope="row">Usuários</th>{% for plan in plans %}<td class="is-num">{{ plan.users.replace(" usuários", "") }}</td>{% endfor %}</tr>
-    <tr><th scope="row">MFA obrigatório para proprietários</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if "MFA obrigatório" in plan.extras else "—" }}</td>{% endfor %}</tr>
-    <tr><th scope="row">API de integração</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if "API" in plan.extras else "—" }}</td>{% endfor %}</tr>
+    <tr><th scope="row">Pessoas</th>{% for plan in plans %}<td class="is-num">{{ plan.users.replace(" pessoas", "") }}</td>{% endfor %}</tr>
+    <tr><th scope="row">Preço mensal</th>{% for plan in plans %}<td class="is-num">{% if plan.price is none %}Sob consulta{% else %}R$ {{ plan.price|num(0) if plan.price == plan.price|int else plan.price|num(2) }}{% endif %}</td>{% endfor %}</tr>
+    <tr><th scope="row">Teste grátis de {{ trial_days }} dias</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.trial else "—" }}</td>{% endfor %}</tr>
+    <tr><th scope="row">MFA obrigatório para proprietários</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.mfa_required else "—" }}</td>{% endfor %}</tr>
+    <tr><th scope="row">API de integração</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.api else "—" }}</td>{% endfor %}</tr>
+    <tr><th scope="row">Identidade visual personalizada</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.visual_custom else "—" }}</td>{% endfor %}</tr>
+    <tr><th scope="row">Implantação por técnicos nossos</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.implantacao else "—" }}</td>{% endfor %}</tr>
     <tr><th scope="row">Modelos de etapas, histórico e exportação CSV/XLSX</th>{% for plan in plans %}<td class="is-num">Sim</td>{% endfor %}</tr>
   </tbody>
   {% endcall %}
@@ -47,7 +51,7 @@
   <div class="faq">
     <details class="faq__item">
       <summary>Como pago?</summary>
-      <p class="muted">Depois do teste, você escolhe o plano e paga por Pix, boleto ou cartão. A cobrança é mensal e por empresa, não por usuário.</p>
+      <p class="muted">Depois do teste (Essencial ou Profissional), você escolhe o plano e paga por Pix, boleto ou cartão. A cobrança é mensal e por empresa, não por usuário.</p>
     </details>
     <details class="faq__item">
       <summary>E se eu atrasar o pagamento?</summary>

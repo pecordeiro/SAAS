@@ -3,7 +3,8 @@
 {% from "components/button.html" import button %}
 {#
   Card de plano — telas.md §2. `plan` vem de public.public_plans() (tabela plans). O plano
-  destacado é o do teste grátis (borda primária, selo “Mais escolhido”).
+  destacado é o do teste grátis (borda primária, selo “Mais escolhido”). Preço None = sob
+  consulta: sem checkout, o botão leva ao contato (o servidor recusa o plano no autosserviço).
 #}
 {% macro plan_card(plan, signup_url, heading="h3") -%}
 <article class="card plan{% if plan.featured %} plan--featured{% endif %}" aria-labelledby="plano-{{ plan.code }}">
@@ -11,13 +12,20 @@
     <{{ heading }} class="plan__name" id="plano-{{ plan.code }}">{{ plan.name }}</{{ heading }}>
     {%- if plan.featured %}{{ badge("Mais escolhido", "info") }}{% endif %}
   </div>
+  {%- if plan.price is none %}
+  <p class="plan__price">Sob consulta</p>
+  {%- else %}
   <p class="plan__price"><span class="plan__currency">R$</span> {{ plan.price|num(0) if plan.price == plan.price|int else plan.price|num(2) }} <span class="kpi__unit">/mês</span></p>
+  {%- endif %}
   <ul class="plan__list">
     <li>{{ icon("check", "sm") }} {{ plan.projects }}</li>
     <li>{{ icon("check", "sm") }} {{ plan.users }}</li>
     {%- for extra in plan.extras %}<li>{{ icon("check", "sm") }} {{ extra }}</li>{% endfor %}
+    <li>{{ icon("check" if plan.trial else "info", "sm") }} {{ (trial_days ~ " dias grátis, sem cartão") if plan.trial else ("Sob consulta — fale conosco" if not plan.self_service else "Sem teste grátis: cobrança ao contratar") }}</li>
   </ul>
-  {%- if plan.featured %}
+  {%- if not plan.self_service %}
+  {{ button("Fale conosco", "secondary", block=True, href=url_for('public.contact')) }}
+  {%- elif plan.featured %}
   {{ button("Começar teste grátis", "primary", block=True, href=signup_url) }}
   {%- else %}
   {{ button("Começar com o " ~ plan.name, "secondary", block=True, href=signup_url) }}

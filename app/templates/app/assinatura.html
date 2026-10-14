@@ -12,11 +12,15 @@
 <header class="page-header">
   <div class="page-header__titles">
     <h1>Assinatura</h1>
-    <p class="page-header__subtitle">Plano {{ sub.plan.name }} · R$ {{ price|reais }}/mês{% if sub.discount_percent %} ({{ sub.discount_percent }}% de desconto){% endif %}</p>
+    <p class="page-header__subtitle">Plano {{ sub.plan.name }} · {% if price is none %}sob consulta{% else %}R$ {{ price|reais }}/mês{% endif %}{% if sub.discount_percent %} ({{ sub.discount_percent }}% de desconto){% endif %}</p>
     <div class="page-header__meta">{{ badge(status_label, status_tone) }}</div>
   </div>
   <div class="page-header__actions">
+    {%- if managed and not checkout %}
+    {{ button("Fale conosco", "secondary", href=url_for('public.contact')) }}
+    {%- else %}
     {{ button("Trocar plano" if not checkout else "Escolher plano", "primary", href=url_for('billing.plans')) }}
+    {%- endif %}
     {%- if sub.provider_customer_id %}
     {{ button("Dados de cobrança", "secondary", href=url_for('billing.billing_info')) }}
     {%- endif %}
@@ -29,7 +33,7 @@
 
 {%- if sub.pending_plan %}
 <div class="mb-4">{{ alert("info", "Troca para o plano " ~ sub.pending_plan.name ~ " pendente",
-  ("Vale após o pagamento da fatura no valor novo." if (sub.pending_plan.price_cents > sub.plan.price_cents) else ("Vale a partir de " ~ (sub.pending_plan_at|datahora) ~ ", fim do período já pago."))) }}</div>
+  ("Vale após o pagamento da fatura no valor novo." if pending_upgrade else ("Vale a partir de " ~ (sub.pending_plan_at|datahora) ~ ", fim do período já pago."))) }}</div>
 {%- endif %}
 {%- if open_payment and open_payment.invoice_url %}
 <div class="mb-4">{{ alert("warning" if open_payment.status == "overdue" else "info",
