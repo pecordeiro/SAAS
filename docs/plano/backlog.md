@@ -175,7 +175,10 @@ então sou levado ao pagamento do Asaas (Pix, boleto ou cartão).
 `active` e o período é estendido; repetido → 200 sem efeito; token inválido → 401.
 **F8-4 (M) Atraso e carência** — Dado pagamento vencido, então status `past_due`, carência de
 7 dias com aviso por e-mail e faixa no topo; depois modo leitura sem perda de dados.
-**F8-5 (M) Trocar plano** — com projeção de valor; limites mudam na hora.
+**F8-5 (M) Trocar plano** — com projeção de valor; upgrade (ou mesmo preço) vale após o
+pagamento, downgrade no fim do período. Etapa B: 4 planos (Essencial, Profissional, Empresa,
+Implantação); teste grátis só nos 2 primeiros; Empresa com cobrança imediata; Implantação sob
+consulta, fora do autosserviço (só `flask billing-admin set-plan`).
 **F8-6 (M) Cancelar** — vale até o fim do período pago.
 **F8-7 (S) Faturas** — lista com status e link de pagamento.
 **F8-8 (S) Admin da plataforma** — estender teste ou dar desconto com motivo auditado.

@@ -701,3 +701,67 @@ critérios de pronto da anterior estiverem marcados.
   - Revisão jurídica (termos, privacidade, `lgpd.md`), DPAs e região do Render (go/no-go).
   - Cron no Render: `flask lgpd-purge`, `flask lgpd-retencao` (diários), `flask suporte expirar`.
   - Produção: definir `REDIS_URL`, `TRUSTED_PROXY_COUNT=1`, `MFA_ENCRYPTION_KEY` própria.
+
+### Etapa B — Planos novos e cobrança
+- Status: concluída (PostgreSQL pendente de rodar, ver pendências)
+- Datas: início 2026-10-14 · fim 2026-10-14
+- Entregas:
+  - `app/services/plans.py`: 4 planos (ids uuid5 mantidos) — Essencial R$ 249,90 (3 projetos,
+    3 pessoas), Profissional R$ 497,00 (10, 20), Empresa R$ 997,00 (ilimitado; MFA, API,
+    identidade visual), Implantação sob consulta (`price_cents` NULL; tudo do Empresa +
+    `implantacao`). `features`: `mfa_required`, `api`, `visual_custom`, `implantacao`.
+    `TRIAL_PLAN_CODES`, `has_trial`, `is_self_service`, `is_managed`, `active_plans`.
+  - Migration `b1e7c9d2a4f6` (depois de `f6a1b2c3d4e5`): `plans.price_cents` anulável, CHECK
+    `price_cents IS NULL OR price_cents >= 0`, atualiza os 3 planos e insere `implantacao`;
+    downgrade volta os valores da Fase 3 (recusa se houver assinatura em plano sob consulta).
+    `flask seed-plans` continua idempotente (sincroniza também `active`).
+  - Teste grátis só no Essencial/Profissional: `entitlements.trial_plan()` (config fora dos
+    planos com teste cai no Profissional), `trialing` em plano sem teste vale como o plano de
+    teste; cadastro e `ensure_subscription` usam o mesmo plano.
+  - Cobrança: Empresa sem teste (1ª fatura vence no dia; upgrade pendente até pagar);
+    `compare_plans` explícito (upgrade, mesmo preço = só após pagamento, downgrade só se
+    estritamente mais barato, preço nulo = recusado); `price_for` devolve None e `charge_for`
+    levanta `BillingError` para sob consulta (nunca conta com None); autosserviço recusa
+    Implantação (404 nas rotas, `BillingError` no serviço) e troca/cancelamento de quem está
+    nela; `recompute` não mexe em plano sob consulta sem assinatura no provedor.
+  - `flask billing-admin set-plan --company --plan --reason` (motivo obrigatório,
+    `subscription.admin_plan_set` em audit_logs); `extend-trial` recusado em plano sem teste;
+    `discount` recusado em sob consulta.
+  - Gancho da Etapa C: `plan.visual_custom_contracted` em `audit_logs` e `domain_events`
+    (evento interno, `events.INTERNAL_EVENT_TYPES`) quando o plano com `visual_custom` passa a
+    valer (pago ou atribuído).
+  - Telas: `/` e `/precos` com os 4 planos do banco (Implantação “Sob consulta — fale
+    conosco” com CTA para `/contato`; linha de teste grátis por plano; comparação com
+    identidade visual e implantação); `/app/assinatura/planos` com os 4 planos, sem botão de
+    contratar no 4; assinatura/troca/cobrança tratam preço e pessoas ilimitadas. Só macros e
+    tokens existentes (CSS/JS não mudaram; sem `build_assets`).
+  - `APP_BASE_URL` (https) obrigatório fora de development/test em `finalize_config`.
+- Critérios de pronto:
+  - [x] Testes novos e antigos verdes em SQLite
+  - [ ] Suíte em PostgreSQL (cluster `/tmp/pgfase3` fora do ar; não deu para religar daqui)
+  - [x] `flask db heads` com um head; upgrade → downgrade → upgrade e `flask db check` sem
+    drift (SQLite; `test_migrations` em SQLite verde)
+  - [x] Revisão de segurança do diff
+  - [ ] Telas conferidas em 375/768/1280 claro/escuro (só macros/tokens; `test_visual` verde)
+  - [x] README, prd.md (D2–D5 + tabela de planos), pagamentos.md, backlog.md (F8-5)
+- Testes: SQLite `528 passed, 57 skipped, 3 xfailed`; novos em `tests/test_etapa_b_planos.py`
+  (31 casos: limites dos 4 planos pelas rotas, trial só 1/2, Empresa sem trial, Implantação
+  fora do autosserviço e só por `set-plan` com motivo, preço/limite do banco, telas 200,
+  preço igual/nulo, `APP_BASE_URL`). Testes de API passam a assinar o Empresa
+  (`make_tenant(..., plan="empresa")`) em vez de `DEFAULT_TRIAL_PLAN=empresa`.
+- /security-review (revisão manual do diff): sem achado aberto. Conferido: limite não fura
+  por teste em plano pago (guarda em `access`), teste não é reaproveitado em plano sem teste
+  (`extend-trial` recusa), Implantação não entra por rota, formulário, troca pendente ou
+  webhook, preço sempre lido do banco (o formulário só manda o código do plano), sem
+  aritmética com preço nulo.
+- Telas conferidas (375/768/1280, claro/escuro): não (sem navegador nesta sessão).
+- Commit: “feat: etapa B — planos novos e cobrança” (hash no histórico do branch).
+- ADRs criados: nenhum (decisões do usuário registradas no PRD D2–D5).
+- Pendências e dívidas:
+  - Rodar a suíte com `TEST_DATABASE_URL` em PostgreSQL (`controle_test_b`) e `flask db
+    check` em PG.
+  - Etapa C: consumir `plan.visual_custom_contracted` (requisição de identidade visual) e
+    painel interno; sair da Implantação hoje só por `set-plan` para plano com preço quando
+    houver assinatura no provedor (senão o cliente assina pela tela depois de a equipe
+    cancelar o contrato).
+  - Homologação no sandbox do Asaas com os valores novos (`pagamentos.md` §5).

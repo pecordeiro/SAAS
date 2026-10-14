@@ -48,13 +48,35 @@ estorno sair; `deleted: true` → `canceled`.
 
 ## 3. Regras
 
-- **Teste grátis**: 14 dias sem cartão no plano Profissional (`TRIAL_DAYS`,
-  `DEFAULT_TRIAL_PLAN`). A assinatura `trialing` é criada no cadastro (Fase 5) ou, na
-  falta, na primeira visita a `/app/assinatura` (mesma data: criação da empresa + 14 dias).
+- **Planos (Etapa B)**: Essencial R$ 249,90 (3 projetos, 3 pessoas), Profissional R$ 497,00
+  (10 projetos, 20 pessoas), Empresa R$ 997,00 (ilimitado, MFA, API, identidade visual) e
+  Implantação sob consulta (`price_cents` NULL). Valores e limites só na tabela `plans`
+  (`app/services/plans.py` + migration `b1e7c9d2a4f6`; `flask seed-plans` sincroniza).
+- **Teste grátis**: 14 dias sem cartão, **só no Essencial e no Profissional**
+  (`plans.TRIAL_PLAN_CODES`). O cadastro começa no Profissional (`TRIAL_DAYS`,
+  `DEFAULT_TRIAL_PLAN`; valor fora dos planos com teste é ignorado e cai no Profissional). A
+  assinatura `trialing` é criada no cadastro (Fase 5) ou, na falta, na primeira visita a
+  `/app/assinatura` (mesma data: criação da empresa + 14 dias). Assinatura `trialing` num
+  plano sem teste vale como o Profissional em `entitlements.access` (recurso pago nunca sai
+  de graça no teste).
+- **Empresa (sem teste)**: assinar o Empresa durante o teste gera a 1ª cobrança **com
+  vencimento no dia** (não espera o fim do teste); como é upgrade, o plano fica pendente e só
+  vale com essa fatura paga. Ao passar a valer (pago ou atribuído), grava
+  `plan.visual_custom_contracted` em `audit_logs` e `domain_events` (evento interno, não sai em
+  webhook de cliente) — gancho da requisição de identidade visual (Etapa C).
+- **Implantação (sob consulta)**: não aparece com botão de contratar; `/app/assinatura/planos/
+  implantacao` e `/app/assinatura/cobranca?plano=implantacao` respondem 404 e o serviço
+  recusa (`BillingError`). Só `flask billing-admin set-plan --company <uuid> --plan
+  implantacao --reason "..."` atribui: cancela a recorrência no Asaas (se houver), cancela
+  cobranças em aberto, deixa a assinatura `active` sem fim de período e audita
+  (`subscription.admin_plan_set`, motivo obrigatório). O recálculo/reconciliação não mexe
+  nela; o proprietário não troca nem cancela pela tela (“fale conosco”). `set-plan` para um
+  plano com preço só funciona com assinatura viva no provedor (muda o valor lá).
 - **Assinar**: plano → dados de cobrança (CPF/CNPJ com dígito verificador no formulário e de
   novo no serviço) → cliente + assinatura no provedor → redireciona (303) para a `invoiceUrl`
   da primeira cobrança, só se for `https` e o host estiver em `BILLING_CHECKOUT_HOSTS`. Em
-  teste grátis a 1ª cobrança vence no último dia do teste (pagar antes não encurta o teste).
+  teste grátis, num plano com teste, a 1ª cobrança vence no último dia do teste (pagar antes
+  não encurta o teste); no Empresa vence no dia.
   Nenhum dado de cartão passa pelo nosso servidor.
 - **Estado é recalculado** das cobranças (`service.recompute`), não “empurrado” por evento:
   - paga (`confirmed`/`received`) cobre do vencimento até o mesmo dia do mês seguinte
@@ -74,7 +96,10 @@ estorno sair; `deleted: true` → `canceled`.
     o plano da empresa quando uma fatura **no valor novo** for paga depois do pedido — os
     limites sobem na requisição seguinte ao pagamento confirmado (“vale após o pagamento”).
     Pedir upgrade e cancelar não libera nada (a troca pendente é descartada);
-  - **downgrade** (mais barato): vale no fim do período já pago ou do teste
+  - **mesmo preço** (outro plano com valor igual): tratado como upgrade — só vale depois de
+    uma fatura paga após o pedido, nunca de graça na hora; **preço nulo** (sob consulta) de um
+    dos lados: recusado (`service.compare_plans` devolve `managed`);
+  - **downgrade** (estritamente mais barato): vale no fim do período já pago ou do teste
     (`pending_plan_at`; aplicado pelo recálculo/`billing-reconcile`). O uso atual precisa caber
     no plano menor ao pedir (a mensagem diz quantos projetos arquivar/usuários remover) e de
     novo na hora de aplicar: se não couber mais, a troca NÃO é aplicada — plano e preço atuais
@@ -100,7 +125,9 @@ estorno sair; `deleted: true` → `canceled`.
   `tests/test_billing_rls.py`.
 - **Admin da plataforma** (CLI, sem tela): `flask billing-admin extend-trial --company <uuid>
   --days N --reason "..."` e `flask billing-admin discount --company <uuid> --percent P
-  --reason "..."` (0–90 %; aplica no Asaas). Motivo obrigatório (≥ 5 caracteres) em
+  --reason "..."` (0–90 %; aplica no Asaas; recusado em plano sob consulta) e `flask
+  billing-admin set-plan --company <uuid> --plan <código> --reason "..."` (Etapa B; único
+  caminho para a Implantação). `extend-trial` é recusado em plano sem teste. Motivo obrigatório (≥ 5 caracteres) em
   `audit_logs.details.motivo`, `actor_user_id` nulo e `"por": "admin da plataforma"`.
 - **Reconciliação**: `flask billing-reconcile` (idempotente; agendar 1x/dia no worker na
   Fase 10) — por empresa: estado da assinatura no provedor, todas as cobranças, recálculo.
@@ -138,14 +165,15 @@ desenvolvimento). Registre a data, prints e observações em uma seção “Exec
    faixa “faltam 14 dias”. Print.
 6. **Assinar**: Escolher plano → Essencial → CNPJ de teste válido (ex.: `11.222.333/0001-81`)
    → deve abrir a fatura do Asaas (`sandbox.asaas.com/i/...`). Confira no painel: cliente,
-   assinatura mensal R$ 149,00 com vencimento no fim do teste. Print das duas telas.
+   assinatura mensal R$ 249,90 com vencimento no fim do teste. Print das duas telas. Repita
+   com o **Empresa** numa empresa nova: R$ 997,00 com vencimento **hoje** (sem teste).
 7. **Pagar**: na fatura do sandbox, pague por Pix/cartão de teste (ou “Confirmar pagamento”
    no painel). Espere `PAYMENT_CONFIRMED`/`PAYMENT_RECEIVED` → `/app/assinatura` = **Ativa**,
    “Período pago até” = vencimento + 1 mês; `webhook_events` com `processed`. Print.
 8. **Duplicado**: no painel de webhooks, reenvie o mesmo evento → resposta 200 `duplicate` e
    nada muda.
-9. **Trocar plano**: Essencial → Profissional mostra +R$ 200,00 e “vale após o pagamento”;
-   confirme; no Asaas o valor da assinatura e da fatura em aberto vira R$ 349,00; o 4º projeto
+9. **Trocar plano**: Essencial → Profissional mostra +R$ 247,10 e “vale após o pagamento”;
+   confirme; no Asaas o valor da assinatura e da fatura em aberto vira R$ 497,00; o 4º projeto
    continua bloqueado até pagar essa fatura e passa a ser permitido logo depois. Rebaixar
    mostra “vale a partir de DD/MM” (fim do período pago).
 10. **Atraso**: crie (ou espere) uma cobrança vencida no sandbox / altere o vencimento para
@@ -157,7 +185,10 @@ desenvolvimento). Registre a data, prints e observações em uma seção “Exec
     …**; no Asaas a assinatura some/inativa e cobranças em aberto são removidas.
 13. **Reconciliação**: `flask billing-reconcile` duas vezes — a segunda deve dizer
     `corrigidas: 0`.
-14. **Token inválido**: `curl -X POST <url>/webhooks/asaas -H 'asaas-access-token: x' -d '{}'`
+14. **Implantação**: `flask billing-admin set-plan --company <uuid> --plan implantacao
+    --reason "Contrato ..."` → no Asaas a assinatura é inativada; `/app/assinatura` mostra
+    “Implantação · sob consulta”, sem trocar/cancelar; `flask billing-reconcile` não muda nada.
+15. **Token inválido**: `curl -X POST <url>/webhooks/asaas -H 'asaas-access-token: x' -d '{}'`
     → 401.
 
 Critério da Fase 10 (produção): cobrança real de valor baixo paga e estornada.
