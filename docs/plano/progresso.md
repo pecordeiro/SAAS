@@ -703,7 +703,7 @@ critérios de pronto da anterior estiverem marcados.
   - Produção: definir `REDIS_URL`, `TRUSTED_PROXY_COUNT=1`, `MFA_ENCRYPTION_KEY` própria.
 
 ### Etapa B — Planos novos e cobrança
-- Status: concluída (PostgreSQL pendente de rodar, ver pendências)
+- Status: concluída
 - Datas: início 2026-10-14 · fim 2026-10-14
 - Entregas:
   - `app/services/plans.py`: 4 planos (ids uuid5 mantidos) — Essencial R$ 249,90 (3 projetos,
@@ -738,13 +738,17 @@ critérios de pronto da anterior estiverem marcados.
   - `APP_BASE_URL` (https) obrigatório fora de development/test em `finalize_config`.
 - Critérios de pronto:
   - [x] Testes novos e antigos verdes em SQLite
-  - [ ] Suíte em PostgreSQL (cluster `/tmp/pgfase3` fora do ar; não deu para religar daqui)
+  - [x] Suíte em PostgreSQL 16 (`controle_test_b`)
   - [x] `flask db heads` com um head; upgrade → downgrade → upgrade e `flask db check` sem
-    drift (SQLite; `test_migrations` em SQLite verde)
+    drift em SQLite e PostgreSQL
   - [x] Revisão de segurança do diff
   - [ ] Telas conferidas em 375/768/1280 claro/escuro (só macros/tokens; `test_visual` verde)
   - [x] README, prd.md (D2–D5 + tabela de planos), pagamentos.md, backlog.md (F8-5)
-- Testes: SQLite `528 passed, 57 skipped, 3 xfailed`; novos em `tests/test_etapa_b_planos.py`
+- Testes: SQLite `528 passed, 57 skipped, 3 xfailed`; PostgreSQL `574 passed, 11 skipped,
+  3 xfailed`. Correção de isolamento no PG: `plans` sobrevive ao TRUNCATE entre testes e
+  testes que mexem em preço/limite (ex.: `test_preco_e_limite_vem_do_banco`,
+  `test_precos_vem_da_tabela_plans`) vazavam para os seguintes; `tests/conftest.py`
+  (`_resync_plans`) agora volta `plans` ao catálogo (e remove planos extras) antes de cada teste. novos em `tests/test_etapa_b_planos.py`
   (31 casos: limites dos 4 planos pelas rotas, trial só 1/2, Empresa sem trial, Implantação
   fora do autosserviço e só por `set-plan` com motivo, preço/limite do banco, telas 200,
   preço igual/nulo, `APP_BASE_URL`). Testes de API passam a assinar o Empresa
@@ -758,8 +762,6 @@ critérios de pronto da anterior estiverem marcados.
 - Commit: “feat: etapa B — planos novos e cobrança” (hash no histórico do branch).
 - ADRs criados: nenhum (decisões do usuário registradas no PRD D2–D5).
 - Pendências e dívidas:
-  - Rodar a suíte com `TEST_DATABASE_URL` em PostgreSQL (`controle_test_b`) e `flask db
-    check` em PG.
   - Etapa C: consumir `plan.visual_custom_contracted` (requisição de identidade visual) e
     painel interno; sair da Implantação hoje só por `set-plan` para plano com preço quando
     houver assinatura no provedor (senão o cliente assina pela tela depois de a equipe

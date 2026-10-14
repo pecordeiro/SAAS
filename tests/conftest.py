@@ -94,10 +94,23 @@ def truncate_all() -> None:
     _db.session.commit()
 
 
+def _resync_plans() -> None:
+    """``plans`` sobrevive ao TRUNCATE (semeada pela migration): volta ao catálogo antes de
+    cada teste — um teste que mexe em preço/limite/feature de plano (ou cria um plano extra)
+    não vaza para o próximo. Assinaturas já foram truncadas, então nada referencia os extras."""
+    from app.models import Plan
+    from app.services.plans import PLAN_CATALOG
+
+    _db.session.execute(Plan.__table__.delete().where(Plan.code.notin_([spec.code for spec in PLAN_CATALOG])))
+    seed_plans()
+    _db.session.commit()
+
+
 def _prepare_db(app) -> None:
     with app.app_context():
         if using_postgres():
             truncate_all()
+            _resync_plans()
         else:
             _db.drop_all()
             _db.create_all()
