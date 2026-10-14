@@ -108,6 +108,7 @@ class StageSlotForm(Form):
 
 class ProjectForm(BaseForm):
     name = StringField("Nome do projeto", filters=[_strip], validators=[DataRequired(), Length(max=160)])
+    product = StringField("Produto", filters=[_strip], validators=[Optional(), Length(max=160)])
     quantity = IntegerField(
         "Quantidade de equipamentos", validators=[InputRequired(), NumberRange(min=1, max=100000)]
     )

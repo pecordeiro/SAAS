@@ -3,6 +3,7 @@
 {% from "components/icon.html" import icon %}
 {% from "components/progress.html" import progress %}
 {% from "components/badge.html" import status_badge, badge %}
+{% from "components/plan_card.html" import plan_card %}
 {% block title %}Controle de Produção · saiba onde cada lote está{% endblock %}
 {% block main %}
 {# telas.md §1: proposta + CTA → prova (painel em HTML) → como funciona → para quem → preços → CTA final #}
@@ -11,8 +12,8 @@
     <h1 class="hero__title" id="hero-titulo">Saiba onde cada lote está.</h1>
     <p class="hero__lead">Unidades concluídas, horas que faltam e prazo em dias úteis — do celular ao escritório, sem planilha.</p>
     <div class="hero__actions">
-      {{ button("Começar teste grátis de 14 dias", "primary", size="lg", href=url_for('auth.signup'), class_="hero__cta") }}
-      {{ button("Ver preços", "ghost", href="#precos") }}
+      {{ button("Começar teste grátis de " ~ trial_days ~ " dias", "primary", size="lg", href=url_for('auth.signup'), class_="hero__cta") }}
+      {{ button("Ver preços", "ghost", href=url_for('public.pricing')) }}
     </div>
     <p class="muted text-sm">Sem cartão · cancela quando quiser</p>
   </div>
@@ -42,7 +43,7 @@
   <ol class="steps">
     <li class="steps__item">
       <span class="steps__num" aria-hidden="true">1</span>
-      <div><h3 class="steps__title">Monte as etapas</h3><p class="muted">Etapas, atividades e o tempo ideal de cada uma por unidade.</p></div>
+      <div><h3 class="steps__title">Monte o modelo de etapas</h3><p class="muted">Etapas, atividades e o tempo ideal de cada uma por unidade.</p></div>
     </li>
     <li class="steps__item">
       <span class="steps__num" aria-hidden="true">2</span>
@@ -63,31 +64,11 @@
 <section class="container landing-section" id="precos" aria-labelledby="precos-titulo">
   <h2 class="section-title" id="precos-titulo">Preços</h2>
   <div class="plans">
-    {%- for name, price, projects, users, extra, featured in [
-      ("Essencial", "149", "3 projetos ativos", "5 usuários", None, False),
-      ("Profissional", "349", "15 projetos ativos", "25 usuários", None, True),
-      ("Empresa", "799", "Projetos ilimitados", "100 usuários", "MFA obrigatório · API", False),
-    ] %}
-    <article class="card plan{% if featured %} plan--featured{% endif %}" aria-labelledby="plano-{{ loop.index }}">
-      <div class="plan__head">
-        <h3 class="plan__name" id="plano-{{ loop.index }}">{{ name }}</h3>
-        {%- if featured %}{{ badge("Mais escolhido", "info") }}{% endif %}
-      </div>
-      <p class="plan__price"><span class="plan__currency">R$</span> {{ price }} <span class="kpi__unit">/mês</span></p>
-      <ul class="plan__list">
-        <li>{{ icon("check", "sm") }} {{ projects }}</li>
-        <li>{{ icon("check", "sm") }} {{ users }}</li>
-        {%- if extra %}<li>{{ icon("check", "sm") }} {{ extra }}</li>{% endif %}
-      </ul>
-      {%- if featured %}
-      {{ button("Começar teste grátis", "primary", block=True, href=url_for('auth.signup')) }}
-      {%- else %}
-      {{ button("Começar com o " ~ name, "secondary", block=True, href=url_for('auth.signup')) }}
-      {%- endif %}
-    </article>
+    {%- for plan in plans %}
+    {{ plan_card(plan, url_for('auth.signup')) }}
     {%- endfor %}
   </div>
-  <p class="muted text-sm mt-4">Todos os planos: histórico, exportação, Pix/boleto/cartão e 14 dias grátis sem cartão.</p>
+  <p class="muted text-sm mt-4">Todos os planos: histórico, exportação, Pix/boleto/cartão e {{ trial_days }} dias grátis sem cartão. <a href="{{ url_for('public.pricing') }}">Comparar planos</a></p>
 </section>
 
 <section class="container landing-section">

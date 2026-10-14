@@ -39,6 +39,7 @@ class ProjectFromTemplateForm(ProjectForm):
 
 class ProjectEditForm(BaseForm):
     name = StringField("Nome do projeto", filters=[_strip], validators=[DataRequired(), Length(max=160)])
+    product = StringField("Produto", filters=[_strip], validators=[Optional(), Length(max=160)])
     quantity = IntegerField("Quantidade de equipamentos", validators=[InputRequired(), NumberRange(min=1, max=100000)])
     start_date = DateField("Início", validators=[Optional()])
     due_date = DateField("Prazo", validators=[Optional()])
@@ -77,7 +78,7 @@ class ConfirmForm(BaseForm):
 class TemplateForm(BaseForm):
     name = StringField("Nome do modelo", filters=[_strip], validators=[DataRequired(), Length(max=160)])
     description = TextAreaField("Descrição", filters=[_strip], validators=[Optional(), Length(max=2000)])
-    stages = FieldList(FormField(StageSlotForm), min_entries=3, max_entries=MAX_TEMPLATE_STAGES)
+    stages = FieldList(FormField(StageSlotForm), min_entries=1, max_entries=MAX_TEMPLATE_STAGES)
 
     def validate_stages(self, field):
         if not any(slot.form.name.data for slot in field):

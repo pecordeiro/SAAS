@@ -213,25 +213,59 @@
     }
   });
 
-  /* ---------- HTMX: registro sem recarregar ---------- */
+  /* ---------- HTMX: registro sem recarregar ----------
+     O formulário faz hx-post com hx-swap="none": o servidor devolve só pedaços com
+     hx-swap-oob (atividade, resumo da etapa, indicadores, toast). Aqui só cuidamos de
+     fechar a folha (hash da âncora), do estado de “ocupado” e do foco. */
   document.addEventListener("htmx:beforeRequest", function (event) {
     var form = event.target;
     if (form && form.classList && form.classList.contains("register__form")) form.setAttribute("aria-busy", "true");
   });
 
-  document.addEventListener("htmx:afterSwap", function (event) {
+  // beforeSwap: o formulário ainda está no DOM (depois do swap oob ele sai e o evento não chega ao document).
+  document.addEventListener("htmx:beforeSwap", function (event) {
+    var form = event.target;
+    if (!form || !form.classList || !form.classList.contains("register__form")) return;
+    form.removeAttribute("aria-busy");
     var xhr = event.detail && event.detail.xhr;
-    if (!xhr || !event.detail.requestConfig) return;
-    var source = event.detail.requestConfig.elt;
-    if (!source || !source.classList || !source.classList.contains("register__form")) return;
-    if (xhr.status < 400) {
-      // Sucesso: fecha a folha e destaca a linha (o servidor já mandou a página nova).
-      var sheet = source.closest("[data-register]");
+    if (xhr && xhr.status >= 200 && xhr.status < 400) {
+      // Sucesso: tira o #registrar-<id> da URL (a folha nova já vem fechada) e destaca a linha.
+      var sheet = form.closest("[data-register]");
       var back = sheet ? sheet.getAttribute("data-return") : null;
       if (back) location.replace(back);
     }
+  });
+
+  document.addEventListener("htmx:afterSettle", function () {
     init(document);
   });
+
+  /* ---------- Atualização leve do detalhe a cada 30 s (só com a aba visível) ---------- */
+  function startAutoRefresh() {
+    var panel = document.getElementById("painel");
+    var url = panel && panel.getAttribute("data-refresh-url");
+    if (!url) return;
+    var seconds = parseInt(panel.getAttribute("data-refresh-seconds") || "30", 10);
+    var last = Date.now();
+
+    function busy() {
+      // Não mexe na tela enquanto alguém registra: folha aberta ou foco dentro de um registrador.
+      if (document.querySelector(".sheet.is-open") || openSheet()) return true;
+      var active = document.activeElement;
+      return !!(active && active.closest && active.closest(".register__form"));
+    }
+
+    function refresh() {
+      if (document.visibilityState !== "visible" || !window.htmx || busy()) return;
+      last = Date.now();
+      window.htmx.ajax("GET", url, { source: panel, swap: "none" });
+    }
+
+    setInterval(refresh, seconds * 1000);
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible" && Date.now() - last >= seconds * 1000) refresh();
+    });
+  }
 
   /* ---------- Ao carregar ---------- */
   function init(scope) {
@@ -248,9 +282,14 @@
     }
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () { init(document); });
-  } else {
+  function boot() {
     init(document);
+    startAutoRefresh();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
   }
 })();

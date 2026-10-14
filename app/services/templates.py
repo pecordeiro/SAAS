@@ -205,6 +205,7 @@ def create_project_from_template(
     due_date: date | None,
     people: int,
     hours_per_day: Decimal,
+    product: str | None = None,
 ) -> Project:
     """Projeto com a cópia (snapshot) da versão ATUAL do modelo."""
     if template.company_id != company.id or template.archived_at is not None:
@@ -223,6 +224,7 @@ def create_project_from_template(
         stages=stages_from_version(version),
         template_version_id=version.id,
         source="template",
+        product=product,
     )
 
 

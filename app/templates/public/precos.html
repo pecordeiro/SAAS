@@ -1,0 +1,67 @@
+{% extends "base_publica.html" %}
+{% from "components/plan_card.html" import plan_card %}
+{% from "components/table.html" import data_table %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% block title %}Preços · Controle de Produção{% endblock %}
+{% block description %}Planos por empresa a partir de R$ {{ plans[0].price|num(0) if plans else 149 }}/mês, com {{ trial_days }} dias grátis sem cartão. Projetos ativos, usuários, histórico e exportação.{% endblock %}
+{% block main %}
+{# telas.md §2: três planos (Profissional primeiro no celular), tabela comparativa, perguntas frequentes. #}
+<section class="container pricing-hero" aria-labelledby="precos-titulo">
+  <h1 class="page-title" id="precos-titulo">Preços simples, por empresa</h1>
+  <p class="landing-lead">{{ trial_days }} dias grátis no Profissional, sem cartão. Troque de plano quando quiser.</p>
+  <div class="plans mt-8">
+    {%- for plan in plans %}
+    {{ plan_card(plan, url_for('auth.signup'), 'h2') }}
+    {%- endfor %}
+  </div>
+</section>
+
+<section class="container landing-section" aria-labelledby="comparar-titulo">
+  <h2 class="section-title" id="comparar-titulo">Comparar planos</h2>
+  {%- set cols = [("Recurso", "")] %}
+  {%- for plan in plans %}{% set _ = cols.append((plan.name, "is-num")) %}{% endfor %}
+  {% call data_table(cols, caption="Comparação dos planos", cards=False) %}
+  <tbody>
+    <tr><th scope="row">Projetos ativos</th>{% for plan in plans %}<td class="is-num">{{ plan.projects.replace(" projetos ativos", "") }}</td>{% endfor %}</tr>
+    <tr><th scope="row">Usuários</th>{% for plan in plans %}<td class="is-num">{{ plan.users.replace(" usuários", "") }}</td>{% endfor %}</tr>
+    <tr><th scope="row">MFA obrigatório para proprietários</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if "MFA obrigatório" in plan.extras else "—" }}</td>{% endfor %}</tr>
+    <tr><th scope="row">API de integração</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if "API" in plan.extras else "—" }}</td>{% endfor %}</tr>
+    <tr><th scope="row">Modelos de etapas, histórico e exportação CSV/XLSX</th>{% for plan in plans %}<td class="is-num">Sim</td>{% endfor %}</tr>
+  </tbody>
+  {% endcall %}
+</section>
+
+<section class="container landing-section" aria-labelledby="inclui-titulo">
+  <h2 class="section-title" id="inclui-titulo">Todos os planos incluem</h2>
+  <ul class="benefits">
+    <li>{{ icon("check") }}<span>Modelos de etapas com versões: projetos antigos não mudam quando você edita o modelo.</span></li>
+    <li>{{ icon("check") }}<span>Histórico completo de cada registro, com quem registrou e quando.</span></li>
+    <li>{{ icon("check") }}<span>Exportação em CSV e XLSX, sempre disponível, até com a assinatura atrasada.</span></li>
+    <li>{{ icon("check") }}<span>Pagamento por Pix, boleto ou cartão.</span></li>
+  </ul>
+</section>
+
+<section class="container landing-section" aria-labelledby="faq-titulo">
+  <h2 class="section-title" id="faq-titulo">Perguntas frequentes</h2>
+  <div class="faq">
+    <details class="faq__item">
+      <summary>Como pago?</summary>
+      <p class="muted">Depois do teste, você escolhe o plano e paga por Pix, boleto ou cartão. A cobrança é mensal e por empresa, não por usuário.</p>
+    </details>
+    <details class="faq__item">
+      <summary>E se eu atrasar o pagamento?</summary>
+      <p class="muted">Você tem 7 dias de carência com tudo funcionando. Depois, a empresa fica em modo leitura: dá para ver e exportar tudo, mas não registrar. Seus dados nunca são apagados por atraso.</p>
+    </details>
+    <details class="faq__item">
+      <summary>Posso cancelar quando quiser?</summary>
+      <p class="muted">Sim. Você cancela na tela de assinatura, sem multa, e continua com acesso até o fim do período pago.</p>
+    </details>
+    <details class="faq__item">
+      <summary>Emitem nota fiscal?</summary>
+      <p class="muted">A nota fiscal de serviço segue a regra do seu município e do seu cadastro. Fale com a gente em <a href="{{ url_for('public.contact') }}">contato</a> para combinar.</p>
+    </details>
+  </div>
+  <div class="mt-8">{{ button("Começar teste grátis", "primary", size="lg", href=url_for('auth.signup')) }}</div>
+</section>
+{% endblock %}

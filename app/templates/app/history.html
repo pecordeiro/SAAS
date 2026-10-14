@@ -1,41 +1,91 @@
 {% extends "base_app.html" %}
 {% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
 {% from "components/table.html" import data_table %}
 {% from "components/chart.html" import bar_chart %}
 {% from "components/empty_state.html" import empty_state %}
 {% from "components/badge.html" import badge %}
+{% from "components/pagination.html" import pagination %}
+{% set general = general | default(false) %}
 {% set nav_current = "history" %}
-{% set nav_project = project %}
-{% block title %}Histórico · {{ project.name }}{% endblock %}
+{% if project %}{% set nav_project = project %}{% endif %}
+{% block title %}Histórico{% if project %} · {{ project.name }}{% endif %} · Controle de Produção{% endblock %}
 {% block content %}
-{# telas.md §9: lista cronológica (quando, quem, onde, quanto) agrupada por dia + peças por dia. #}
+{# telas.md §9: lista cronológica (quando, quem, onde, quanto, de → para) em páginas, filtros e peças por dia. #}
+{%- set here = url_for(history_endpoint, **url_args_base) %}
+{%- macro page_url(n) %}{{ url_for(history_endpoint, **dict(url_args, page=(n if n > 1 else None))) }}{% endmacro %}
 <header class="page-header">
   <div class="page-header__titles">
+    {%- if project and not general %}
     <a class="back-link" href="{{ url_for('app.project_detail', project_id=project.id) }}">{{ icon("chevron-left") }}{{ project.name }}</a>
+    {%- endif %}
     <h1>Histórico</h1>
-    <p class="page-header__subtitle">{{ project.name }} · {{ entries|length }} {{ "registro" if entries|length == 1 else "registros" }}{% if entries|length >= 200 %} (os 200 mais recentes){% endif %}</p>
+    <p class="page-header__subtitle">{% if project %}{{ project.name }} · {% endif %}{{ total }} {{ "registro" if total == 1 else "registros" }}{% if filtered %} com os filtros atuais{% endif %}</p>
   </div>
+  {%- if project and can_undo %}
+  <div class="page-header__actions">
+    {{ button("Exportar CSV", "secondary", icon="download", href=url_for('dados.export_csv', project_id=project.id), class_="only-desktop") }}
+    {{ button("Exportar XLSX", "secondary", icon="download", href=url_for('dados.export_xlsx', project_id=project.id), class_="only-desktop") }}
+  </div>
+  {%- endif %}
 </header>
 
+<form class="filters" method="get" action="{{ here }}" role="search" aria-label="Filtrar histórico"
+      hx-get="{{ here }}" hx-target="#lista-historico" hx-select="#lista-historico" hx-swap="outerHTML" hx-push-url="true" hx-trigger="change">
+  <div class="filters__row">
+    {%- if general %}
+    <div class="field filters__select">
+      <label class="field__label" for="f-projeto">Projeto</label>
+      <select class="field__input" id="f-projeto" name="projeto">
+        <option value="">Todos os projetos</option>
+        {%- for pid, pname in project_choices %}<option value="{{ pid }}"{% if sel_project == pid %} selected{% endif %}>{{ pname }}</option>{% endfor %}
+      </select>
+    </div>
+    {%- else %}
+    <div class="field filters__select">
+      <label class="field__label" for="f-atividade">Atividade</label>
+      <select class="field__input" id="f-atividade" name="atividade">
+        <option value="">Todas as atividades</option>
+        {%- for aid, aname in activity_choices %}<option value="{{ aid }}"{% if sel_activity == aid %} selected{% endif %}>{{ aname }}</option>{% endfor %}
+      </select>
+    </div>
+    {%- endif %}
+    <div class="field filters__select">
+      <label class="field__label" for="f-usuario">Pessoa</label>
+      <select class="field__input" id="f-usuario" name="usuario">
+        <option value="">Todas as pessoas</option>
+        {%- for u in users %}<option value="{{ u.id }}"{% if sel_user == u.id %} selected{% endif %}>{{ u.name }}</option>{% endfor %}
+      </select>
+    </div>
+    {{ button("Filtrar", "secondary", class_="no-js-only") }}
+    {%- if filtered or (general and sel_project) %}{{ button("Limpar", "ghost", href=here) }}{% endif %}
+  </div>
+</form>
+
+<div id="lista-historico">
 {%- if entries %}
+{%- if per_day %}
 <div class="card mb-4">
   {{ bar_chart(per_day, "Peças por dia", orientation="vertical", table_headers=("Dia", "Peças")) }}
 </div>
+{%- endif %}
 
-{% call data_table([("Quando", "is-nowrap"), ("Pessoa", ""), ("Etapa › atividade", ""), ("Qtd.", "is-num"), ("", "")], caption="Registros de peças", class_="history-table") %}
+{% call data_table([("Quando", "is-nowrap"), ("Pessoa", ""), ("Etapa › atividade", ""), ("Qtd.", "is-num"), ("De → para", "is-num"), ("", "")], caption="Registros de peças", class_="history-table") %}
   {%- for day, items in days.items() %}
   <tbody>
-    <tr class="table__group"><th scope="rowgroup" colspan="5">{{ day|dia_rotulo }}</th></tr>
+    <tr class="table__group"><th scope="rowgroup" colspan="6">{{ day|dia_rotulo }}</th></tr>
     {%- for e in items %}
+    {%- set tot = totals.get(e.id) %}
     <tr class="history-row">
       <td class="history-row__when is-nowrap is-plain"><span class="wide-only">{{ e.at|datahora }}</span><span class="compact-only num">{{ e.at|hora }}</span></td>
       <td class="history-row__who is-plain">{{ e.user.name if e.user else "—" }}</td>
-      <td class="history-row__where is-plain">{{ e.activity.stage.name }} › {{ e.activity.name }}</td>
+      <td class="history-row__where is-plain">{% if general %}<span class="muted">{{ e.activity.stage.project.name }} ·</span> {% endif %}{{ e.activity.stage.name }} › {{ e.activity.name }}</td>
       <td class="history-row__qty is-num is-plain">{% if e.id in undone %}<s>{{ "%+d"|format(e.delta) }}</s>{% else %}{{ "%+d"|format(e.delta) }}{% endif %}</td>
+      <td class="history-row__range is-num is-plain muted">{% if tot %}{{ tot[0] }} → {{ tot[1] }} de {{ e.activity.stage.project.quantity }}{% endif %}</td>
       <td class="is-plain">
         {%- if e.reverts_entry_id %}{{ badge("desfazer", "neutral") }}
         {%- elif e.id in undone %}{{ badge("desfeito", "neutral") }}
-        {%- elif can_undo and e.delta > 0 and not e.activity.archived_at and not e.activity.stage.archived_at and not project.archived_at %}<a class="btn btn--ghost" href="{{ url_for('edicao.entry_undo', entry_id=e.id) }}">Desfazer</a>
+        {%- elif can_undo and e.delta > 0 and not e.activity.archived_at and not e.activity.stage.archived_at and not e.activity.stage.project.archived_at %}<a class="btn btn--ghost" href="{{ url_for('edicao.entry_undo', entry_id=e.id) }}">Desfazer</a>
         {%- endif %}
       </td>
     </tr>
@@ -43,11 +93,19 @@
   </tbody>
   {%- endfor %}
 {% endcall %}
+{{ pagination(page, pages, total, per_page, page_url) }}
 {%- else %}
 <div class="card">
+  {%- if filtered %}
+  {{ empty_state("Nenhum registro com estes filtros", "Tente outra atividade ou pessoa, ou limpe os filtros.", ghost_action=("Limpar filtros", here), icon="history") }}
+  {%- elif project %}
   {{ empty_state("Nenhum registro ainda", "Os registros aparecem quando alguém soma peças.", ghost_action=("Ir para o projeto", url_for('app.project_detail', project_id=project.id)), icon="history") }}
+  {%- else %}
+  {{ empty_state("Nenhum registro ainda", "Os registros aparecem quando alguém soma peças em qualquer projeto.", ghost_action=("Ir para Projetos", url_for('app.projects')), icon="history") }}
+  {%- endif %}
 </div>
 {%- endif %}
+</div>
 
 {%- if changes %}
 <section class="card mt-6 stack" aria-labelledby="alteracoes-titulo">

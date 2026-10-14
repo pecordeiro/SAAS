@@ -1,0 +1,46 @@
+{% from "components/icon.html" import icon %}
+{% from "components/progress.html" import progress %}
+{% from "components/badge.html" import status_badge %}
+{% from "components/stepper.html" import piece_stepper %}
+{% from "components/alert.html" import alert %}
+{#
+  Uma atividade (<li>) com o registrador de peças. No registro via HTMX o servidor devolve
+  este mesmo trecho com hx-swap-oob (troca por id) — a folha de registro volta fechada.
+  Variáveis: activity, ar (resultado), stage, project, errors, conflicts, deltas, detail_url.
+#}
+{%- set done = activity.units_done %}
+{%- set err = errors.get(activity.id) %}
+{%- set in_conflict = conflicts.get(activity.id, False) %}
+<li class="activity{% if ar.faltam == 0 %} activity--done{% endif %}" id="atividade-{{ activity.id }}"{% if oob %} hx-swap-oob="true"{% endif %}>
+  {%- if ar.faltam > 0 %}
+  <a class="activity__open compact-only" href="#registrar-{{ activity.id }}" aria-haspopup="dialog" aria-controls="registrar-{{ activity.id }}">
+    <span class="activity__name">{{ activity.name }}</span>
+    <span class="activity__units num">{{ done }}/{{ project.quantity }}</span>
+    <span class="btn btn--secondary btn--icon activity__plus" aria-hidden="true">{{ icon("plus") }}</span>
+    <span class="visually-hidden">Registrar peças em {{ activity.name }}</span>
+  </a>
+  {%- else %}
+  <div class="activity__open activity__open--static compact-only">
+    <span class="activity__name">{{ activity.name }}</span>
+    <span class="activity__units num">{{ done }}/{{ project.quantity }}</span>
+    {{ status_badge("Concluída") }}
+  </div>
+  {%- endif %}
+  <div class="activity__cells wide-only">
+    <span class="activity__name">{{ activity.name }}</span>
+    <span class="activity__ideal muted num">{{ activity.ideal_minutes|num(0) }} min</span>
+    <span class="activity__units num">{{ done }}/{{ project.quantity }}</span>
+    <span class="activity__progress">{{ progress(ar.pct, 1, label="Progresso de " ~ activity.name, size="sm", value_text=ar.pct|pct, show_text=False) }}</span>
+  </div>
+  <div class="activity__action">
+    {%- if ar.faltam > 0 %}
+    {{ piece_stepper(activity.id, activity.name, stage.name, done, project.quantity,
+         url_for('app.activity_progress', activity_id=activity.id), activity.version,
+         detail_url ~ "#atividade-" ~ activity.id, error=err, open=err is not none,
+         delta=deltas.get(activity.id, 1), conflict=in_conflict) }}
+    {%- else %}
+    <span class="wide-only">{{ status_badge("Concluída") }}</span>
+    {%- if err %}{{ alert("warning" if in_conflict else "danger", err, role="alert") }}{% endif %}
+    {%- endif %}
+  </div>
+</li>

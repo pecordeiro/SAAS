@@ -95,7 +95,9 @@ def test_csp_estrita_e_htmx_sem_eval(client):
     assert "default-src 'self'" in csp and "unsafe-inline" not in csp and "unsafe-eval" not in csp
     html = response.get_data(as_text=True)
     assert '"allowEval":false' in html
-    assert "/static/js/htmx.min.js" in html and "/static/js/app.js" in html
+    # Assets minificados com hash no nome (scripts/build_assets.py); sem build, os fontes.
+    assert re.search(r"/static/(dist/htmx\.[0-9a-f]{10}\.js|js/htmx\.min\.js)", html)
+    assert re.search(r"/static/(dist/app\.[0-9a-f]{10}\.js|js/app\.js)", html)
 
 
 def test_assets_locais_existem():
@@ -200,7 +202,7 @@ def test_detalhe_tem_registro_em_dois_toques(client, app, tenants):
     # toque 2: botão Registrar do formulário POST (HTMX só melhora)
     assert f'action="/app/atividades/{a.activity_id}/registrar"' in html
     assert "Registrar <span data-register-label>+1" in html
-    assert 'hx-boost="true"' in html
+    assert f'hx-post="/app/atividades/{a.activity_id}/registrar"' in html and 'hx-swap="none"' in html
 
 
 def test_erro_de_registro_reabre_a_folha(client, app, tenants):

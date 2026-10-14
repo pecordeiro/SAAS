@@ -56,6 +56,11 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
     app.register_blueprint(edicao_bp)
     app.register_blueprint(dados_bp)
 
+    # Fase 6: configurações da empresa (/app/empresa).
+    from app.blueprints.empresa import bp as empresa_bp
+
+    app.register_blueprint(empresa_bp)
+
     # Fase 9: API pública e tela de tokens só existem com FEATURE_PUBLIC_API (desligada → 404).
     if app.config.get("FEATURE_PUBLIC_API"):
         from app.blueprints.api_v1 import bp as api_v1_bp
@@ -73,6 +78,9 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
     _register_errors(app)
     _register_security_headers(app)
     _register_template_helpers(app)
+    from app import assets
+
+    assets.init_app(app)
 
     from app.cli import register_cli
 
@@ -163,7 +171,17 @@ def _register_security_headers(app: Flask) -> None:
 
 
 def _register_template_helpers(app: Flask) -> None:
-    from app.formatting import br_date, br_date_short, br_datetime, br_day_label, br_hours, br_number, br_pct, br_time
+    from app.formatting import (
+        br_date,
+        br_date_short,
+        br_datetime,
+        br_day_label,
+        br_hours,
+        br_number,
+        br_pct,
+        br_time,
+        br_workdays,
+    )
     from app.models import ROLE_LABELS
 
     app.add_template_filter(br_number, "num")
@@ -174,6 +192,7 @@ def _register_template_helpers(app: Flask) -> None:
     app.add_template_filter(br_hours, "horas")
     app.add_template_filter(br_time, "hora")
     app.add_template_filter(br_day_label, "dia_rotulo")
+    app.add_template_filter(br_workdays, "dias_semana")
 
     @app.context_processor
     def inject():

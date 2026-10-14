@@ -74,3 +74,16 @@ def br_day_label(value: date | None, today: date | None = None) -> str:
     if (today - value).days == 1:
         return f"Ontem, {value:%d/%m}"
     return value.strftime("%d/%m/%Y")
+
+
+WEEKDAY_ABBR = ("seg", "ter", "qua", "qui", "sex", "sáb", "dom")
+
+
+def br_workdays(days) -> str:
+    """Dias de trabalho: “seg–sex” quando seguidos, senão “seg, qua, sex”."""
+    ordered = sorted(set(days))
+    if not ordered:
+        return "nenhum"
+    if len(ordered) > 2 and ordered == list(range(ordered[0], ordered[-1] + 1)):
+        return f"{WEEKDAY_ABBR[ordered[0]]}–{WEEKDAY_ABBR[ordered[-1]]}"
+    return ", ".join(WEEKDAY_ABBR[d] for d in ordered)

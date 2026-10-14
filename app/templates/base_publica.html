@@ -17,7 +17,7 @@
       <span>Controle de Produção</span>
     </a>
     <nav class="site-nav" aria-label="Site">
-      <a class="site-nav__link" href="{{ url_for('public.index') }}#precos">Preços</a>
+      <a class="site-nav__link" href="{{ url_for('public.pricing') }}"{% if request.endpoint == 'public.pricing' %} aria-current="page"{% endif %}>Preços</a>
       {%- if current_user.is_authenticated %}
       {{ button("Ir para Projetos", "primary", href=url_for('app.projects')) }}
       {%- else %}
@@ -36,11 +36,15 @@
 <footer class="site-footer">
   <div class="container site-footer__inner">
     <nav class="cluster" aria-label="Rodapé">
-      <a href="{{ url_for('public.index') }}#precos">Preços</a>
+      <a href="{{ url_for('public.pricing') }}">Preços</a>
+      <span aria-hidden="true">·</span>
+      <a href="{{ url_for('public.terms') }}">Termos</a>
+      <span aria-hidden="true">·</span>
+      <a href="{{ url_for('public.privacy') }}">Privacidade</a>
+      <span aria-hidden="true">·</span>
+      <a href="{{ url_for('public.contact') }}">Contato</a>
       <span aria-hidden="true">·</span>
       <a href="{{ url_for('auth.login') }}">Entrar</a>
-      <span aria-hidden="true">·</span>
-      <a href="{{ url_for('auth.signup') }}">Cadastrar empresa</a>
     </nav>
     <p>© 2026 Controle de Produção</p>
   </div>
@@ -55,12 +59,15 @@
       <a class="btn btn--ghost btn--icon sheet__close" href="#fechar" aria-label="Fechar menu" data-dialog-cancel>{{ icon("x") }}</a>
     </div>
     <nav class="menu-list" aria-label="Site">
-      <a class="menu-list__item" href="{{ url_for('public.index') }}#precos">Preços</a>
+      <a class="menu-list__item" href="{{ url_for('public.pricing') }}">Preços</a>
       {%- if current_user.is_authenticated %}
       <a class="menu-list__item" href="{{ url_for('app.projects') }}">Projetos</a>
       {%- else %}
       <a class="menu-list__item" href="{{ url_for('auth.login') }}">Entrar</a>
       {%- endif %}
+      <a class="menu-list__item" href="{{ url_for('public.terms') }}">Termos de uso</a>
+      <a class="menu-list__item" href="{{ url_for('public.privacy') }}">Privacidade</a>
+      <a class="menu-list__item" href="{{ url_for('public.contact') }}">Contato</a>
     </nav>
     {%- if not current_user.is_authenticated %}
     <div class="mt-4">{{ button("Começar teste grátis", "primary", size="lg", block=True, href=url_for('auth.signup')) }}</div>

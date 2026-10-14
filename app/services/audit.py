@@ -44,6 +44,9 @@ ACTIVITY_ARCHIVED = "activity.archived"
 TEMPLATE_VERSION_APPLIED = "template.version_applied"
 TEMPLATE_ARCHIVED = "template.archived"
 PROGRESS_UNDONE = "progress.undone"
+COMPANY_UPDATED = "company.updated"
+HOLIDAY_ADDED = "holiday.added"
+HOLIDAY_REMOVED = "holiday.removed"
 
 ACTION_LABELS = {
     ROLE_CHANGED: "Papel alterado",
@@ -66,6 +69,9 @@ ACTION_LABELS = {
     TEMPLATE_VERSION_APPLIED: "Versão do modelo aplicada",
     TEMPLATE_ARCHIVED: "Modelo arquivado",
     PROGRESS_UNDONE: "Registro desfeito",
+    COMPANY_UPDATED: "Dados da empresa alterados",
+    HOLIDAY_ADDED: "Feriado incluído",
+    HOLIDAY_REMOVED: "Feriado removido",
 }
 
 

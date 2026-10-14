@@ -11,6 +11,11 @@
   <title>{% block title %}Controle de Produção{% endblock %}</title>
   <meta name="description" content="{% block description %}Acompanhe a produção por etapas: unidades concluídas, horas que faltam e prazo em dias úteis, do celular ao escritório.{% endblock %}">
   <meta name="color-scheme" content="light dark">
+  {%- block robots %}{% endblock %}
+  {%- block canonical %}
+  <link rel="canonical" href="{{ (config.get('APP_BASE_URL') or request.url_root).rstrip('/') ~ request.path }}">
+  <meta property="og:url" content="{{ (config.get('APP_BASE_URL') or request.url_root).rstrip('/') ~ request.path }}">
+  {%- endblock %}
   <meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"historyCacheSize":0,"refreshOnHistoryMiss":true,"selfRequestsOnly":true,"scrollIntoViewOnBoost":false,"attributesToSettle":["class","width","height"],"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":true,"error":true},{"code":"...","swap":false}]}'>
   <meta property="og:type" content="website">
   <meta property="og:locale" content="pt_BR">
@@ -26,12 +31,16 @@
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}">
   <link rel="preload" href="{{ url_for('static', filename='fonts/ibm-plex-sans-latin-400-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="{{ url_for('static', filename='fonts/barlow-semi-condensed-latin-700-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
-  {%- for sheet in ("tokens", "base", "layout", "components", "pages", "utilities") %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/' ~ sheet ~ '.css') }}">
+  {%- for href in asset_urls("site.css") %}
+  <link rel="stylesheet" href="{{ href }}">
   {%- endfor %}
   {% block head_extra %}{% endblock %}
-  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/htmx.min.js') }}" defer></script>
+  {%- for src in asset_urls("app.js") %}
+  <script src="{{ src }}"></script>
+  {%- endfor %}
+  {%- for src in asset_urls("htmx.js") %}
+  <script src="{{ src }}" defer></script>
+  {%- endfor %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
   {% include "components/_icons.html" %}

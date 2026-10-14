@@ -1,0 +1,15 @@
+{% extends "base_publica.html" %}
+{% from "components/icon.html" import icon %}
+{% block title %}Contato · Controle de Produção{% endblock %}
+{% block description %}Fale com o Controle de Produção: dúvidas sobre planos, suporte e privacidade, por e-mail.{% endblock %}
+{% block content %}
+<div class="legal__text">
+  <h1 class="page-title">Contato</h1>
+  <p class="landing-lead">Dúvidas sobre planos, suporte ou privacidade? Escreva para a gente.</p>
+  <div class="card mt-6 stack">
+    <h2 class="section-title">E-mail</h2>
+    <p class="contact__email">{{ contact_email }}</p>
+    <p class="muted text-sm">Respondemos em dias úteis. Para suporte, informe o nome da empresa e o que aconteceu; nunca envie sua senha.</p>
+  </div>
+</div>
+{% endblock %}

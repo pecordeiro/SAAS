@@ -1,0 +1,28 @@
+{% extends "base_publica.html" %}
+{% from "components/alert.html" import alert %}
+{#
+  Documento legal (telas.md §6): título + “Atualizado em”, sumário por âncoras (fixo à
+  esquerda no desktop), seções numeradas. O texto é RASCUNHO até a revisão jurídica.
+  Filhos definem `doc_title`, `sections` (lista de (id, título)) e o bloco `legal_body`.
+#}
+{% block main %}
+<div class="container legal">
+  <aside class="legal__toc" aria-label="Nesta página">
+    <details class="toc" open>
+      <summary class="toc__title">Nesta página</summary>
+      <ol class="toc__list">
+        {%- for sid, stitle in sections %}
+        <li><a href="#{{ sid }}">{{ stitle }}</a></li>
+        {%- endfor %}
+      </ol>
+    </details>
+  </aside>
+  <article class="legal__text">
+    <h1 class="page-title">{{ doc_title }}</h1>
+    <p class="muted">Atualizado em {{ updated|data }}</p>
+    <div class="mt-4">{{ alert("warning", "Rascunho para revisão jurídica", "Este texto ainda não foi revisado por advogado e pode mudar antes do lançamento. Não o trate como contrato final.") }}</div>
+    {% block legal_body %}{% endblock %}
+    <p class="mt-8"><a href="#conteudo">Voltar ao topo</a></p>
+  </article>
+</div>
+{% endblock %}

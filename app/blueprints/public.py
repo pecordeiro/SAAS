@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request, url_for
-from sqlalchemy import text
+from datetime import date
+
+from flask import Blueprint, Response, abort, current_app, jsonify, redirect, render_template, request, url_for
+from sqlalchemy import select, text
 
 from app.extensions import db, limiter
+from app.models import Plan
 
 bp = Blueprint("public", __name__)
 
@@ -14,9 +17,104 @@ THEMES_FIXED = ("light", "dark")
 THEMES = ("system",) + THEMES_FIXED
 
 
+# Páginas públicas indexáveis (sitemap.xml): (endpoint, prioridade). URLs em português.
+SITEMAP_PAGES = (
+    ("public.index", "1.0"),
+    ("public.pricing", "0.9"),
+    ("auth.signup", "0.6"),
+    ("auth.login", "0.3"),
+    ("public.contact", "0.4"),
+    ("public.terms", "0.2"),
+    ("public.privacy", "0.2"),
+)
+# Texto dos documentos legais: RASCUNHO até a revisão jurídica (ver docs/plano/progresso.md).
+LEGAL_UPDATED = date(2026, 10, 14)
+FEATURED_PLAN = "profissional"
+
+
+def public_plans() -> list[dict]:
+    """Planos ativos da tabela ``plans`` (preço e limites vêm do banco, nunca do template)."""
+    plans = db.session.execute(select(Plan).where(Plan.active.is_(True)).order_by(Plan.price_cents)).scalars()
+    return [
+        {
+            "code": plan.code,
+            "name": plan.name,
+            "price": plan.price_cents // 100 if plan.price_cents % 100 == 0 else plan.price_cents / 100,
+            "projects": "Projetos ilimitados" if plan.max_projects is None else f"{plan.max_projects} projetos ativos",
+            "users": f"{plan.max_users} usuários" if plan.max_users else "Usuários ilimitados",
+            "extras": [
+                label
+                for key, label in (("mfa_required", "MFA obrigatório"), ("api", "API"))
+                if (plan.features or {}).get(key)
+            ],
+            "featured": plan.code == FEATURED_PLAN,
+        }
+        for plan in plans
+    ]
+
+
+def _base_url() -> str:
+    return (current_app.config.get("APP_BASE_URL") or request.url_root).rstrip("/")
+
+
+@bp.app_context_processor
+def inject_site():
+    return {
+        "contact_email": current_app.config.get("CONTACT_EMAIL"),
+        "site_base_url": _base_url() if request else "",
+        "trial_days": current_app.config.get("TRIAL_DAYS", 14),
+    }
+
+
 @bp.get("/")
 def index():
-    return render_template("public/index.html")
+    return render_template("public/index.html", plans=public_plans())
+
+
+@bp.get("/precos")
+def pricing():
+    return render_template("public/precos.html", plans=public_plans())
+
+
+@bp.get("/termos")
+def terms():
+    return render_template("public/termos.html", updated=LEGAL_UPDATED)
+
+
+@bp.get("/privacidade")
+def privacy():
+    return render_template("public/privacidade.html", updated=LEGAL_UPDATED)
+
+
+@bp.get("/contato")
+def contact():
+    return render_template("public/contato.html")
+
+
+@bp.get("/sitemap.xml")
+def sitemap():
+    base = _base_url()
+    urls = [
+        f"  <url><loc>{base}{url_for(endpoint)}</loc><priority>{priority}</priority></url>"
+        for endpoint, priority in SITEMAP_PAGES
+    ]
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>\n"
+    return Response(xml, mimetype="application/xml")
+
+
+@bp.get("/robots.txt")
+def robots():
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /app/",
+        "Disallow: /conta/",
+        "Disallow: /convite/",
+        "Disallow: /senha/",
+        "Disallow: /api/",
+        f"Sitemap: {_base_url()}{url_for('public.sitemap')}",
+    ]
+    return Response("\n".join(lines) + "\n", mimetype="text/plain")
 
 
 @bp.get("/health")

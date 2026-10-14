@@ -1,0 +1,20 @@
+{% from "components/kpi.html" import kpi %}
+{% from "components/progress.html" import progress %}
+{#
+  Indicadores do detalhe (telas.md §8). Mesmo trecho na página inteira e no fragmento
+  HTMX (hx-swap-oob="true" troca o elemento de mesmo id).
+#}
+<section class="kpi-grid" id="indicadores" aria-label="Indicadores"{% if oob %} hx-swap-oob="true"{% endif %}>
+  {{ kpi("Unidades", result.unidades_concluidas ~ "/" ~ project.quantity, sub="concluídas") }}
+  {% call kpi("Progresso", result.progresso_geral|pct(0)) %}{{ progress(result.progresso_geral, 1, label="Progresso geral", size="sm", show_text=False, value_text=result.progresso_geral|pct) }}{% endcall %}
+  {{ kpi("Faltam", result.tempo_restante_h|horas, sub="de " ~ (result.tempo_total_h|horas)) }}
+  {%- if result.dias_uteis_restantes is none %}
+  {{ kpi("Dias úteis", None, empty_sub="informe a equipe") }}
+  {%- elif deadline.late %}
+  {{ kpi("Dias úteis", result.dias_uteis_restantes|num, sub="término " ~ (forecast|data_curta) ~ " · atraso de " ~ deadline.delay ~ (" dia útil" if deadline.delay == 1 else " dias úteis"), tone="danger") }}
+  {%- elif deadline.on_time %}
+  {{ kpi("Dias úteis", result.dias_uteis_restantes|num, sub="término " ~ (forecast|data_curta) ~ " · folga de " ~ deadline.slack ~ (" dia útil" if deadline.slack == 1 else " dias úteis"), tone="success") }}
+  {%- else %}
+  {{ kpi("Dias úteis", result.dias_uteis_restantes|num, sub="término previsto " ~ (forecast|data_curta)) }}
+  {%- endif %}
+</section>

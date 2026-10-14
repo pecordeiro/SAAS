@@ -187,3 +187,31 @@ def filename(project: Project, ext: str) -> str:
     ascii_name = unicodedata.normalize("NFKD", project.name).encode("ascii", "ignore").decode()
     slug = re.sub(r"[^A-Za-z0-9]+", "-", ascii_name).strip("-").lower()[:60] or "projeto"
     return f"{slug}.{ext}"
+
+
+LIST_COLUMNS = (
+    "Projeto", "Produto", "Unidades concluídas", "Quantidade", "Progresso", "Horas que faltam",
+    "Prazo", "Término previsto", "Situação",
+)
+
+
+def projects_csv(items: list[dict]) -> bytes:
+    """CSV da lista de projetos (uma linha por projeto, mesmo padrão do CSV de projeto)."""
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, delimiter=";", lineterminator="\r\n")
+    writer.writerow(LIST_COLUMNS)
+    for item in items:
+        writer.writerow(
+            [
+                neutralize(item["name"]),
+                neutralize(item.get("product") or ""),
+                br_decimal(item["units"]),
+                br_decimal(item["quantity"]),
+                br_decimal(round(Decimal(str(item["progress"])) * 100, 1)) + "%",
+                br_decimal(round(Decimal(str(item["hours_left"])), 2)),
+                br_date(item.get("due")),
+                br_date(item.get("forecast")),
+                neutralize(item["status"]),
+            ]
+        )
+    return ("﻿" + buffer.getvalue()).encode("utf-8")

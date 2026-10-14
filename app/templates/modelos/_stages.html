@@ -1,0 +1,34 @@
+{% from "components/icon.html" import icon %}
+{% from "components/field.html" import field %}
+{#
+  Lista de etapas do editor de modelo. Os botões ↑ ↓ remover e “+ Etapa” são submits com
+  `formaction` (sem JS: o servidor refaz a página com a lista alterada, nada é gravado) e
+  hx-post (com JS: troca só este bloco). Os campos digitados são preservados.
+#}
+{%- set rows_url = url_for('modelos.rows', template_id=template.id) if template else url_for('modelos.rows_new') %}
+{%- macro row_button(label, action, ico, disabled=False) %}
+<button class="btn btn--ghost btn--icon" type="submit" name="acao" value="{{ action }}" formaction="{{ rows_url }}" formnovalidate
+        hx-post="{{ rows_url }}" hx-target="#etapas-lista" hx-swap="outerHTML"{% if disabled %} disabled{% endif %}>{{ icon(ico) }}<span class="visually-hidden">{{ label }}</span></button>
+{%- endmacro %}
+<div id="etapas-lista" class="stack">
+  {%- for error in form.stages.errors if error is string %}<p class="field__error">{{ icon("alert", "sm") }}<span>{{ error }}</span></p>{% endfor %}
+  {%- for slot in form.stages %}
+  {%- set n = loop.index0 %}
+  <fieldset class="fieldset stage-slot stack--sm">
+    <legend class="stage-slot__legend">
+      <span>Etapa {{ loop.index }}</span>
+      <span class="stage-slot__tools">
+        {{ row_button("Subir etapa " ~ loop.index, "up-" ~ n, "arrow-up", loop.first) }}
+        {{ row_button("Descer etapa " ~ loop.index, "down-" ~ n, "arrow-down", loop.last) }}
+        {{ row_button("Remover etapa " ~ loop.index, "remove-" ~ n, "trash", loop|length == 1) }}
+      </span>
+    </legend>
+    {{ field(slot.form.name, label="Nome da etapa") }}
+    {{ field(slot.form.activities, label="Atividades", hint="Uma por linha: Nome; minutos por unidade", attrs={"rows": 4}) }}
+  </fieldset>
+  {%- endfor %}
+  <div>
+    <button class="btn btn--secondary" type="submit" name="acao" value="add" formaction="{{ rows_url }}" formnovalidate
+            hx-post="{{ rows_url }}" hx-target="#etapas-lista" hx-swap="outerHTML">{{ icon("plus") }}<span>Adicionar etapa</span></button>
+  </div>
+</div>

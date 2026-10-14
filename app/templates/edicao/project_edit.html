@@ -44,6 +44,7 @@
     {{ form.csrf_token }}
     <h2 class="section-title">Dados do projeto</h2>
     {{ field(form.name, attrs={"required": true}) }}
+    {{ field(form.product, optional=True) }}
     <div class="form-row form-row--2">
       {{ field(form.quantity, attrs={"min": 1, "inputmode": "numeric", "required": true}) }}
       {{ field(form.people, attrs={"min": 1, "inputmode": "numeric", "required": true}) }}
