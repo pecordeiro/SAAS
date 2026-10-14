@@ -38,14 +38,15 @@ class Plan(UUIDPk, Timestamps, db.Model):
 
     __tablename__ = "plans"
     __table_args__ = (
-        CheckConstraint("price_cents >= 0", name="price_nonnegative"),
+        CheckConstraint("price_cents IS NULL OR price_cents >= 0", name="price_nonnegative"),
         CheckConstraint("max_projects IS NULL OR max_projects >= 0", name="max_projects_nonnegative"),
         CheckConstraint("max_users IS NULL OR max_users >= 1", name="max_users_positive"),
     )
 
     code: Mapped[str] = mapped_column(String(40), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(80), nullable=False)
-    price_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    # NULL = sob consulta (sem checkout; só a equipe da plataforma atribui).
+    price_cents: Mapped[int | None] = mapped_column(Integer)
     # NULL = ilimitado.
     max_projects: Mapped[int | None] = mapped_column(Integer)
     max_users: Mapped[int | None] = mapped_column(Integer)
