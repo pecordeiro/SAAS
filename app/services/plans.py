@@ -1,8 +1,19 @@
-"""Catálogo de planos (fonte única para `flask seed-plans` e para os testes).
+"""Catálogo de planos (fonte única para `flask seed-plans`, para a migration da Etapa B e
+para os testes).
 
-A migration ``a7c2d4e8f901`` grava os mesmos três planos com os mesmos ids (uuid5 do
-código); `flask seed-plans` é idempotente e serve para sincronizar preço/limites depois.
-Limite NULL = ilimitado.
+Quatro planos (decisões D2–D4 do PRD, Etapa B):
+
+- ``essencial`` — R$ 249,90/mês, 3 projetos ativos, 3 pessoas, teste grátis;
+- ``profissional`` — R$ 497,00/mês, 10 projetos ativos, 20 pessoas, teste grátis (plano do
+  cadastro novo);
+- ``empresa`` — R$ 997,00/mês, ilimitado, MFA obrigatório, API e identidade visual
+  personalizada; SEM teste grátis (cobrança imediata no checkout);
+- ``implantacao`` — sob consulta (``price_cents`` NULL): tudo do Empresa + implantação por
+  técnicos nossos. Não entra no autosserviço; só ``flask billing-admin set-plan`` atribui.
+
+As migrations ``a7c2d4e8f901`` (3 planos antigos) e ``b1e7c9d2a4f6`` (Etapa B) gravam os
+mesmos ids (uuid5 do código); `flask seed-plans` é idempotente e sincroniza preço/limites.
+Limite NULL = ilimitado. Preço NULL = sob consulta (sem checkout).
 """
 
 from __future__ import annotations
@@ -21,13 +32,19 @@ PLAN_NAMESPACE = uuid.UUID("6f1d3c3e-2b7a-4c55-9a43-6d1f0c2a9e10")
 ESSENCIAL = "essencial"
 PROFISSIONAL = "profissional"
 EMPRESA = "empresa"
+IMPLANTACAO = "implantacao"
+
+# Só estes planos têm teste grátis (regra de negócio, checada no backend).
+TRIAL_PLAN_CODES = frozenset({ESSENCIAL, PROFISSIONAL})
+
+FEATURE_KEYS = ("mfa_required", "api", "visual_custom", "implantacao")
 
 
 @dataclass(frozen=True)
 class PlanSpec:
     code: str
     name: str
-    price_cents: int
+    price_cents: int | None
     max_projects: int | None
     max_users: int | None
     features: dict = field(default_factory=dict)
@@ -37,11 +54,45 @@ class PlanSpec:
         return uuid.uuid5(PLAN_NAMESPACE, self.code)
 
 
+def _features(**on: bool) -> dict:
+    return {key: bool(on.get(key, False)) for key in FEATURE_KEYS}
+
+
 PLAN_CATALOG: tuple[PlanSpec, ...] = (
-    PlanSpec(ESSENCIAL, "Essencial", 14900, 3, 5, {"mfa_required": False, "api": False}),
-    PlanSpec(PROFISSIONAL, "Profissional", 34900, 15, 25, {"mfa_required": False, "api": False}),
-    PlanSpec(EMPRESA, "Empresa", 79900, None, 100, {"mfa_required": True, "api": True}),
+    PlanSpec(ESSENCIAL, "Essencial", 24990, 3, 3, _features()),
+    PlanSpec(PROFISSIONAL, "Profissional", 49700, 10, 20, _features()),
+    PlanSpec(EMPRESA, "Empresa", 99700, None, None, _features(mfa_required=True, api=True, visual_custom=True)),
+    PlanSpec(
+        IMPLANTACAO,
+        "Implantação",
+        None,
+        None,
+        None,
+        _features(mfa_required=True, api=True, visual_custom=True, implantacao=True),
+    ),
 )
+
+
+def has_trial(plan: Plan) -> bool:
+    """Plano com teste grátis (só Essencial e Profissional)."""
+    return plan.code in TRIAL_PLAN_CODES
+
+
+def is_self_service(plan: Plan) -> bool:
+    """Pode ser contratado pela tela (ativo e com preço). Sob consulta (preço NULL) ou com
+    implantação: só a equipe da plataforma atribui (``billing-admin set-plan``)."""
+    return bool(plan.active) and plan.price_cents is not None and not (plan.features or {}).get("implantacao")
+
+
+def is_managed(plan: Plan) -> bool:
+    """Contrato fora do autosserviço (sob consulta): sem cobrança recorrente no provedor."""
+    return plan.price_cents is None or bool((plan.features or {}).get("implantacao"))
+
+
+def active_plans() -> list[Plan]:
+    """Planos ativos em ordem de preço; sob consulta (preço NULL) por último."""
+    plans = db.session.execute(select(Plan).where(Plan.active.is_(True))).scalars()
+    return sorted(plans, key=lambda p: (p.price_cents is None, p.price_cents or 0, p.code))
 
 
 def seed_plans() -> tuple[int, int]:
@@ -55,9 +106,10 @@ def seed_plans() -> tuple[int, int]:
             "max_projects": spec.max_projects,
             "max_users": spec.max_users,
             "features": dict(spec.features),
+            "active": True,
         }
         if plan is None:
-            db.session.add(Plan(id=spec.id, code=spec.code, active=True, **values))
+            db.session.add(Plan(id=spec.id, code=spec.code, **values))
             created += 1
             continue
         changed = False
