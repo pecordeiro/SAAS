@@ -1,0 +1,8 @@
+{% extends "emails/_base.txt" %}
+{% block body %}O pagamento da assinatura do Controle de Produção da empresa {{ company_name }} venceu e ainda não foi identificado.
+
+Você tem até {{ grace_date }} para regularizar. Depois disso a conta entra em modo leitura: dá para ver e exportar tudo, mas não registrar. Nenhum dado é apagado.
+
+Pague por Pix, boleto ou cartão: {{ billing_url }}
+
+Se já pagou, desconsidere esta mensagem (boleto pode levar até 3 dias úteis para compensar).{% endblock %}

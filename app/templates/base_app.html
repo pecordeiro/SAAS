@@ -16,6 +16,9 @@
 {%- if current_membership and current_membership.has_role("supervisor") -%}
   {%- set _ = nav_items.append({"key": "templates", "label": "Modelos", "href": url_for("modelos.index"), "icon": "folder"}) -%}
 {%- endif -%}
+{%- if current_membership and current_membership.role == "owner" -%}
+  {%- set _ = nav_items.append({"key": "billing", "label": "Assinatura", "href": url_for("billing.overview"), "icon": "check"}) -%}
+{%- endif -%}
 {%- if config.get("FEATURE_PUBLIC_API") and current_membership and current_membership.has_role("owner") -%}
   {%- set _ = nav_items.append({"key": "api", "label": "API", "href": url_for("api_tokens_ui.tokens_index"), "icon": "chart"}) -%}
 {%- endif -%}
@@ -68,6 +71,7 @@
     {%- if read_only | default(false) %}
     <div class="mb-4">{{ alert("warning", "Assinatura em modo leitura — registros pausados", "Dá para ver e exportar tudo. Para voltar a gravar, regularize a assinatura.") }}</div>
     {%- endif %}
+    {% include "app/assinatura_faixa.html" %}
     {% block content %}{% endblock %}
   </main>
 </div>

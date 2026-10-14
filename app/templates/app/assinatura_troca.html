@@ -1,0 +1,48 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% set nav_current = "billing" %}
+{%- set p = projection %}
+{% block title %}Trocar para {{ p.plan.name }} · Assinatura{% endblock %}
+{% block content %}
+{# F8-5: projeção de valor antes de confirmar; limites mudam na hora após a troca. #}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('billing.plans') }}">{{ icon("chevron-left") }}Planos</a>
+    <h1>Trocar para {{ p.plan.name }}</h1>
+  </div>
+</header>
+
+{%- if p.blocked %}
+<div class="mb-4">{{ alert("warning", "Troca de plano indisponível", p.blocked, action=("Ver faturas", url_for('billing.invoices'))) }}</div>
+{%- endif %}
+{%- if error %}
+<div class="mb-4">{{ alert("danger", "Não foi possível trocar o plano", error, role="alert") }}</div>
+{%- endif %}
+
+<form class="card stack" method="post" action="{{ url_for('billing.plan_change', code=p.plan.code) }}">
+  {{ form.csrf_token }}
+  <h2 class="card__title">Projeção</h2>
+  <dl class="meta-list">
+    <div><dt>Hoje ({{ p.current_plan.name }})</dt><dd>R$ {{ p.current_cents|reais }}/mês</dd></div>
+    <div><dt>Novo ({{ p.plan.name }})</dt><dd class="text-strong">R$ {{ p.new_cents|reais }}/mês</dd></div>
+    <div><dt>Diferença por mês</dt><dd>{{ "+" if p.difference_cents > 0 else ("−" if p.difference_cents < 0 else "") }}R$ {{ (p.difference_cents|abs)|reais }}</dd></div>
+    {%- if p.next_due %}
+    <div><dt>Próxima fatura</dt><dd>{{ p.next_due|data }} · R$ {{ p.new_cents|reais }}</dd></div>
+    {%- endif %}
+    <div><dt>Projetos ativos</dt><dd>{{ p.projects }} de {{ p.plan.max_projects if p.plan.max_projects is not none else "ilimitados" }}</dd></div>
+    <div><dt>Usuários</dt><dd>{{ p.users }} de {{ p.plan.max_users }}</dd></div>
+  </dl>
+  {%- if p.upgrade %}
+  <p class="text-strong">Vale após o pagamento: a fatura em aberto passa a R$ {{ p.new_cents|reais }} e os limites do {{ p.plan.name }} valem assim que ela for paga (dá para pagar antes do vencimento).</p>
+  {%- else %}
+  <p class="text-strong">Vale a partir de {{ p.effective_at|datahora }}: até lá você continua com os limites do {{ p.current_plan.name }}, que já estão pagos.</p>
+  {%- endif %}
+  <p class="muted text-sm">Sem cobrança proporcional.{% if p.discount_percent %} Seu desconto de {{ p.discount_percent }}% continua valendo.{% endif %}</p>
+  <div class="form-actions">
+    {{ button("Confirmar troca", "primary", size="lg", disabled=p.blocked is not none) }}
+    {{ button("Voltar", "secondary", size="lg", href=url_for('billing.plans')) }}
+  </div>
+</form>
+{% endblock %}

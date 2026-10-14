@@ -22,6 +22,12 @@ lançamento compensatório), importação CSV/XLSX e da planilha de referência 
 pré-visualização (`/app/importar`), exportação CSV/XLSX neutralizada, limites de plano e
 modo leitura (HTTP 402, `app/services/entitlements.py`), eventos de domínio
 (`services/events.py`) e auditoria (`services/audit.py::record`).
+Fase 8 (assinaturas e pagamento) entregue: `PaymentProvider` com Asaas e Fake
+(`app/services/billing/`), teste grátis de 14 dias sem cartão, assinar com CPF/CNPJ validado e
+checkout no Asaas (Pix, boleto ou cartão), webhook idempotente (`POST /webhooks/asaas`),
+carência de 7 dias com e-mail e faixa, modo leitura depois, troca de plano com projeção,
+faturas, cancelamento até o fim do período, `flask billing-reconcile` e
+`flask billing-admin` (ver [`docs/plano/pagamentos.md`](docs/plano/pagamentos.md)).
 Progresso por fase em [`docs/plano/progresso.md`](docs/plano/progresso.md).
 
 Variáveis da Fase 4 (opcionais): `READ_ONLY_ENFORCED` (padrão 1: sem assinatura ativa a
@@ -155,6 +161,21 @@ lá o RLS não tem efeito — os testes criam um papel comum para provar o isola
 - Usuários e convites: `/app/usuarios` (supervisor convida supervisor/operador; owner muda
   papel, desativa/reativa; último owner protegido; convites pendentes contam no limite do plano).
 - Testes: `tests/test_accounts.py` e os casos A/B no fim de `tests/test_isolation.py`.
+
+### Pagamento (Fase 8)
+
+Sem `ASAAS_API_KEY`, development/test usam o `FakeProvider` (em memória). Com a chave, o app
+fala com o Asaas em `ASAAS_BASE_URL` (padrão sandbox). Cadastre o webhook do Asaas para
+`<site>/webhooks/asaas` com o token de `ASAAS_WEBHOOK_TOKEN`. Comandos:
+
+```bash
+flask billing-reconcile                      # corrige divergências com o Asaas (idempotente; 1x/dia)
+flask billing-admin extend-trial --company <uuid> --days 7 --reason "motivo"
+flask billing-admin discount --company <uuid> --percent 20 --reason "motivo"
+```
+
+Telas em `/app/assinatura` (só proprietário). Roteiro do ciclo real no sandbox em
+[`docs/plano/pagamentos.md`](docs/plano/pagamentos.md).
 
 ### Produção
 

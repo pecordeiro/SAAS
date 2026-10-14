@@ -63,6 +63,7 @@ class Subscription(UUIDPk, Timestamps, TenantMixin, db.Model):
         Index("ix_subscriptions_status_period_end", "status", "current_period_end"),
         CheckConstraint(_in("status", SUBSCRIPTION_STATUSES), name="status_valid"),
         CheckConstraint(_in("provider", PROVIDERS), name="provider_valid"),
+        CheckConstraint("discount_percent IS NULL OR (discount_percent >= 0 AND discount_percent <= 90)", name="discount_range"),
     )
 
     plan_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("plans.id", ondelete="RESTRICT"), nullable=False)
@@ -74,9 +75,16 @@ class Subscription(UUIDPk, Timestamps, TenantMixin, db.Model):
     current_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     grace_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     canceled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Fase 8: desconto concedido pelo admin da plataforma (auditado), em % sobre o plano.
+    discount_percent: Mapped[int | None] = mapped_column(Integer)
+    # Fase 8: troca de plano pendente. Upgrade: vale quando a fatura no valor novo for paga
+    # (pending_plan_at = pedido). Downgrade: vale em pending_plan_at (fim do período pago).
+    pending_plan_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("plans.id", ondelete="RESTRICT"))
+    pending_plan_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
 
-    plan: Mapped[Plan] = relationship()
+    plan: Mapped[Plan] = relationship(foreign_keys=[plan_id])
+    pending_plan: Mapped[Plan | None] = relationship(foreign_keys=[pending_plan_id])
 
 
 class Payment(UUIDPk, Timestamps, TenantMixin, db.Model):
@@ -99,6 +107,8 @@ class Payment(UUIDPk, Timestamps, TenantMixin, db.Model):
     value_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     due_date: Mapped[date] = mapped_column(Date, nullable=False)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Fase 8: página de pagamento do provedor (Pix, boleto ou cartão; nada de cartão aqui).
+    invoice_url: Mapped[str | None] = mapped_column(String(255))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
 
 
