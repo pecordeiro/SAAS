@@ -1,0 +1,40 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/field.html" import field, form_errors %}
+{% set nav_current = "billing" %}
+{% block title %}Dados de cobrança · Assinatura{% endblock %}
+{% block content %}
+{# F8-2: CPF/CNPJ validado (dígito verificador) aqui e no serviço. Nenhum dado de cartão:
+   o pagamento é feito na página do Asaas. #}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('billing.plans') if plan else url_for('billing.overview') }}">{{ icon("chevron-left") }}{{ "Planos" if plan else "Assinatura" }}</a>
+    <h1>Dados de cobrança</h1>
+    {%- if plan and checkout %}
+    <p class="page-header__subtitle">Plano {{ plan.name }} · R$ {{ plan.price_cents|reais }}/mês{% if sub.discount_percent %} (com {{ sub.discount_percent }}% de desconto){% endif %}</p>
+    {%- endif %}
+  </div>
+</header>
+
+{{ form_errors(form) }}
+{%- if error %}
+<div class="mb-4">{{ alert("danger", "Não foi possível concluir", error, role="alert") }}</div>
+{%- endif %}
+
+<form class="card stack" method="post" action="{{ url_for('billing.billing_info') }}" novalidate>
+  {{ form.csrf_token }}
+  {{ form.plan }}
+  {{ field(form.name, required=True, attrs={"autocomplete": "organization"}) }}
+  {{ field(form.cpf_cnpj, hint="Só números ou com pontuação. Vai para a nota fiscal e para o Asaas.", required=True, attrs={"inputmode": "numeric", "autocomplete": "off"}) }}
+  {{ field(form.email, hint="Recebe as faturas e os avisos de cobrança.", required=True, attrs={"autocomplete": "email"}) }}
+  {%- if plan and checkout %}
+  <p class="muted text-sm">Ao continuar você vai para a página segura do Asaas para pagar por Pix, boleto ou cartão. {% if sub.status == "trialing" %}A primeira fatura vence no fim do teste grátis; pagar antes não encurta o teste.{% endif %}</p>
+  {%- endif %}
+  <div class="form-actions">
+    {{ button("Continuar para o pagamento" if (plan and checkout) else "Salvar dados", "primary", size="lg") }}
+    {{ button("Cancelar", "secondary", size="lg", href=url_for('billing.overview')) }}
+  </div>
+</form>
+{% endblock %}

@@ -77,7 +77,7 @@ direito conhece, ou roda empresa a empresa no próprio contexto.
 | Expurgo LGPD | contexto da empresa expurgada para apagar; para saber se um usuário tem vínculo em OUTRA empresa usa `memberships_own_user` (contexto de usuário) — nunca apaga quem ainda pertence a outra empresa | `services/lgpd.py::purge_company`; mesmo teste |
 | Retenção, suporte (`flask suporte ...`) | laço por empresa (`companies` não tem RLS), `set_context(company_id=…)` em cada uma e `flush` dentro do contexto | `services/lgpd.py::apply_retention`, `services/support.py`; `test_retencao_e_suporte_com_rls_forcado` |
 | Worker do outbox (Fase 8) | mesmo laço por empresa (o índice parcial `ix_domain_events_unpublished` continua útil por empresa) **ou** papel de plataforma dedicado só ao worker | a decidir na Fase 8 |
-| Webhook/reconciliação do Asaas (Fase 8) | política estreita pelo id externo (ex.: `subscriptions_by_provider_id` com `app.provider_subscription_id`) **ou** papel de plataforma dedicado ao worker de reconciliação | a decidir na Fase 8 |
+| Webhook/reconciliação do Asaas (Fase 8) | política estreita `subscriptions_provider_lookup` (SELECT só da linha cujo `provider_subscription_id` = `app.billing_lookup`); depois grava no contexto da empresa achada | migration `d8b2e6f4a1c7` (Fase 8) |
 | `flask seed-holidays` (nacionais, `company_id` NULL) | rodar com o papel dono **antes** de `flask rls enable` ou com papel de plataforma no deploy | Fase 10 (runbook) |
 
 Por que não `SECURITY DEFINER`: com `FORCE ROW LEVEL SECURITY` (necessário porque no Render

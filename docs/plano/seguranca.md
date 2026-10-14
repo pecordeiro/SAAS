@@ -68,14 +68,14 @@ legítimo de um cúmplice.
 | T | fórmula/CSV injection | fórmulas nunca avaliadas (`data_only`); exportação neutraliza `= + - @ TAB CR` | `services/exporter.py`; `tests/test_fase4_*`, `test_exportacao_neutraliza_formula` |
 | I | arquivo em disco | multipart lido em `BytesIO` (nada em /tmp nem pasta pública) | `security.py::InMemoryUploadRequest`; `test_upload_fica_em_memoria` |
 
-### Webhooks do Asaas (Fase 8)
-| STRIDE | Ameaça | Mitigação (exigida da Fase 8) |
+### Webhooks do Asaas (Fase 8, `app/blueprints/webhooks.py`)
+| STRIDE | Ameaça | Mitigação |
 |---|---|---|
 | S | webhook forjado | `asaas-access-token` com `hmac.compare_digest`; em dúvida, consultar a API do Asaas |
 | R/T | repetição/ordem | `webhook_events.external_event_id` UNIQUE gravado antes de processar |
 | D | inundação | qualquer blueprint com “webhook” no nome recebe `WEBHOOK_RATE_LIMIT` por IP automaticamente (`security.py::_limit_webhook_blueprints`; `test_blueprint_de_webhook_ganha_rate_limit`) |
 | I | payload em log | não logar payload; Sentry sem corpo (`max_request_body_size="never"`) |
-| E | RLS | achar a assinatura pelo id do provedor antes de saber a empresa: política estreita por id externo (mesmo padrão de `api_tokens_by_token`) ou papel de plataforma no worker — ver ADR-0003 |
+| E | RLS | achar a assinatura pelo id do provedor antes de saber a empresa: política `subscriptions_provider_lookup` (Fase 8, migration `d8b2e6f4a1c7`) — ver ADR-0003 |
 
 ### API v1 (atrás de `FEATURE_PUBLIC_API`)
 | STRIDE | Ameaça | Mitigação | Código / teste |

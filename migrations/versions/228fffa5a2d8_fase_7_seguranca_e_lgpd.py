@@ -12,7 +12,7 @@
   dono da função também passa pelo RLS — ver ADR-0003.)
 
 Revision ID: 228fffa5a2d8
-Revises: 4d8a644d753b
+Revises: d8b2e6f4a1c7
 Create Date: 2026-10-14 02:02:51.279099
 
 """
@@ -22,7 +22,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '228fffa5a2d8'
-down_revision = '4d8a644d753b'
+down_revision = 'd8b2e6f4a1c7'
 branch_labels = None
 depends_on = None
 

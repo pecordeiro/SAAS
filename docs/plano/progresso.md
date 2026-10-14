@@ -477,6 +477,74 @@ critérios de pronto da anterior estiverem marcados.
   - Tela: sem rotação de token nem edição de escopos (revoga e cria outro); fase 6 confere as
     capturas responsivas.
 
+### Fase 8 — Assinaturas e pagamento (Asaas)
+- Status: concluída (ciclo real no sandbox pendente — depende da chave do usuário)
+- Datas: início 2026-10-14 · fim 2026-10-14
+- Entregas:
+  - `app/services/billing/`: `provider.py` (interface `PaymentProvider`: create_customer,
+    update_customer, create_subscription, change_plan, cancel, get_subscription,
+    list_payments), `asaas.py` (requests com timeout, `access_token`, `ASAAS_BASE_URL` padrão
+    sandbox, `billingType=UNDEFINED`, log sem chave/payload), `fake.py` (determinístico, ids
+    `*_fake_0001`, helpers de teste), `service.py` (regras), `documents.py` (CPF/CNPJ com
+    dígito verificador), `notify.py` (e-mail de atraso via `app.services.email` da Fase 5), `cli.py`.
+  - Estado recalculado das cobranças (`recompute`): pago cobre até o mesmo dia do mês seguinte;
+    vencida → `past_due` + `grace_until` (vencimento + 7 dias) + e-mail; depois `expired`
+    (modo leitura, nada apagado); cancelada vale até `current_period_end`; estorno/chargeback
+    tira a cobertura. Evento que faz a cobrança regredir → consulta o provedor.
+  - `POST /webhooks/asaas` (`app/blueprints/webhooks.py`): sem CSRF, rate limit,
+    `hmac.compare_digest` do `asaas-access-token` (401), `webhook_events` UNIQUE commitado antes
+    de processar (duplicado → 200 sem efeito), falha → `status=failed` + `error` e 200.
+  - Troca de plano sem “upgrade grátis”: `subscriptions.pending_plan_id/pending_plan_at`;
+    upgrade vale após pagar a fatura no valor novo, downgrade no fim do período pago, troca
+    bloqueada em `past_due`. Assinar: todas as chamadas ao provedor antes de mudar o estado
+    local; em falha, rollback e só o `provider_customer_id` criado é gravado à parte.
+  - Telas `/app/assinatura` (owner; `allow_read_only`): assinatura atual com uso × limites e
+    fatura em aberto, planos, troca com projeção, dados de cobrança (→ redireciona 303 para a
+    `invoiceUrl`, só https e host em `BILLING_CHECKOUT_HOSTS`), faturas, cancelar com modal.
+    Faixa de teste/atraso/cancelamento no topo do `/app` (`app/assinatura_faixa.html`) e item
+    “Assinatura” no menu (owner).
+  - `flask billing-reconcile` (idempotente) e `flask billing-admin extend-trial|discount
+    --company --reason` (motivo obrigatório em `audit_logs`).
+  - Migration `d8b2e6f4a1c7` (de `4d8a644d753b`, cadeia linear): `payments.invoice_url`,
+    `subscriptions.discount_percent` (CHECK 0–90), `pending_plan_id`/`pending_plan_at` e política RLS
+    `subscriptions_provider_lookup` (SELECT só da linha cujo `provider_subscription_id` =
+    `app.billing_lookup`), para o webhook achar a assinatura antes de saber a empresa.
+  - `docs/plano/pagamentos.md`: fontes consultadas, mapeamento, regras e roteiro do sandbox.
+- Critérios de pronto:
+  - [x] Testes com FakeProvider: aprovado, recusado, vencido, pago com atraso, cancelado,
+        reembolso, webhook com token inválido (401), duplicado (200 sem efeito), fora de ordem.
+  - [x] CPF/CNPJ inválido recusado no formulário e no serviço.
+  - [x] Troca de plano muda limites na requisição seguinte (teste) — ajustado pela revisão de
+        segurança: upgrade muda na requisição seguinte ao pagamento confirmado da fatura no
+        valor novo; downgrade no fim do período pago (testes dos dois e do bloqueio em atraso).
+  - [ ] Ciclo real no sandbox, do teste grátis ao cancelamento, documentado com prints —
+        roteiro em `pagamentos.md` §5; a rede do ambiente bloqueia `*.asaas.com`.
+- Testes: SQLite `408 passed, 41 skipped, 3 xfailed`; PostgreSQL 16 (`TEST_DATABASE_URL`, RLS incluso) `449 passed, 3 xfailed`.
+  `flask db upgrade`/`downgrade 4d8a644d753b`/`upgrade` + `flask db check` sem drift no SQLite;
+  `test_migrations` (ida e volta + compare_metadata) verde no SQLite e no PostgreSQL.
+- /security-review: revisão manual — token do webhook em tempo constante e sem token
+  configurado = 401; idempotência por UNIQUE antes de processar; payload e chave fora de log e
+  banco; CPF/CNPJ só no provedor (no banco/auditoria só o tipo); redirecionamento externo só
+  para host de checkout conhecido; `invoice_url` só https; rotas de cobrança só owner (403
+  para supervisor/operador), POST com CSRF; empresa só da sessão; RLS da busca do webhook é
+  só SELECT e exige o id do provedor. Sem achados abertos.
+- Telas conferidas (375/768/1280, claro/escuro): não (sem navegador no ambiente; só macros e
+  tokens existentes, `test_visual` verde).
+- Commit: “feat: fase 8 — assinaturas e pagamento (Asaas)”.
+- ADRs criados: nenhum (segue ADR-0004). Decisões registradas em `pagamentos.md`: webhook
+  responde 200 mesmo com falha de processamento (não travar a fila do Asaas; reconciliação
+  corrige); 1ª cobrança vence no fim do teste grátis; sem cobrança proporcional na troca;
+  política RLS de busca por id do provedor.
+- Pendências e dívidas:
+  - Ciclo real no sandbox (roteiro em `pagamentos.md` §5) e confirmar header
+    `asaas-access-token`, `billingType=UNDEFINED` em assinatura e `invoiceUrl`.
+  - O cadastro da Fase 5 cria a assinatura `trialing` com `provider="fake"`; ao assinar, o
+    provedor real é gravado (`billing.ensure_subscription` é só rede de segurança).
+  - Upgrade sem fatura em aberto (o Asaas gera a próxima ~40 dias antes) fica pendente até a
+    próxima fatura ser gerada e paga; cobrança proporcional avulsa ficou para depois.
+  - Agendar `flask billing-reconcile` diário no worker (Fase 10).
+  - Telas conferidas em 375/768/1280 claro/escuro.
+
 ### Fase 7 — Segurança e LGPD
 - Status: concluída (telas não capturadas em 375/768/1280 — só a página nova de Privacidade, com macros existentes; Fase 6)
 - Datas: início 2026-10-14 · fim 2026-10-14
@@ -524,7 +592,8 @@ critérios de pronto da anterior estiverem marcados.
     LGPD/retenção/suporte rodam empresa a empresa no próprio contexto; decisão de não usar
     `SECURITY DEFINER` (com FORCE o dono também passa pelo RLS) nem BYPASSRLS no web.
   - Stubs 501 da API resolvem o id na empresa antes (B → 404).
-  - Migration `228fffa5a2d8` (depois de `4d8a644d753b`): `platform_audit_logs`,
+  - Migration `228fffa5a2d8` (cadeia linear depois de `d8b2e6f4a1c7` da Fase 8, após o merge com
+    `c5d1ecc`; `flask db heads` = um único head): `platform_audit_logs`,
     `memberships.is_support/expires_at`, política `api_tokens_by_token`.
   - Dependências: `redis==8.0.1`, `sentry-sdk==2.72.0`, `defusedxml==0.7.1`,
     `pip-audit==2.10.1` (dev); job `audit` no CI; `.github/dependabot.yml` (pip semanal,
@@ -543,10 +612,15 @@ critérios de pronto da anterior estiverem marcados.
         (exportação só com dados de A; exclusão só da empresa da sessão).
   - [x] `pip-audit -r requirements-dev.txt`: “No known vulnerabilities found” (sem exceções).
   - [x] Exportação LGPD gera ZIP só com dados da empresa (teste A/B, também com RLS forçado).
-  - [x] Migration reversível a partir de `4d8a644d753b` (upgrade → downgrade → upgrade →
+  - [x] Migration reversível a partir de `d8b2e6f4a1c7` (upgrade → downgrade → upgrade →
         `flask db check` sem drift no PostgreSQL 16 e no SQLite; `downgrade base` ida e volta).
   - [x] Revisão de segurança do próprio diff (abaixo).
-- Testes: SQLite `389 passed, 42 skipped, 3 xfailed` (~9 min); PostgreSQL 16 (`TEST_DATABASE_URL`, banco `controle_test_f7`) `431 passed, 3 xfailed` (~12 min), cobertura total de `app/` 94% (lgpd 90%, support 92%, security 96%, logging_config 91%).
+- Testes (depois do merge com a Fase 8, `c5d1ecc`): SQLite `463 passed, 44 skipped, 3 xfailed`
+  + PostgreSQL 16 (`controle_test_f7`) `507 passed, 3 xfailed`; a única falha nas duas
+  (`test_billing_asaas::test_provedor_em_producao_exige_chave`, app de produção sem Redis — regra
+  nova da Fase 7) foi corrigida no teste e o arquivo reroda verde. Antes do merge: SQLite
+  `389 passed, 42 skipped, 3 xfailed`, PostgreSQL `431 passed, 3 xfailed`, cobertura de `app/`
+  94% (lgpd 90%, support 92%, security 96%, logging_config 91%).
 - /security-review (revisão manual do diff, achados ≥ 8 corrigidos):
   - Suporte supervisor podia convidar alguém e transformar acesso temporário em permanente →
     `can_manage_invite_role` recusa vínculo de suporte (teste).
@@ -565,14 +639,14 @@ critérios de pronto da anterior estiverem marcados.
 - Telas conferidas (375/768/1280, claro/escuro): não (página nova só com macros/tokens;
   `test_visual` verde). Fase 6.
 - Commit: “feat: fase 7 — segurança e LGPD” (hash no histórico do branch).
-- ADRs criados: nenhum novo; ADR-0003 atualizado (fluxos entre empresas sem papel de plataforma).
+- ADRs criados: ADR-0009 (backend é a única fonte de regras; front é só painel — regra 9 em
+  `CLAUDE.md`); ADR-0003 atualizado (fluxos entre empresas sem papel de plataforma, incluindo a
+  política da Fase 8).
 - Pendências e dívidas:
   - Sessão ainda em cookie assinado (logout não revoga cópia do cookie); sessões no Redis
     ficam para depois do go-live se o risco justificar.
   - Fase 8: webhook do Asaas e worker do outbox decidem entre política estreita por id externo
     ou papel de plataforma só no worker (ADR-0003); usar `ASAAS_*` como em `incidentes.md`.
-  - Merge com a Fase 8: se ela criar migration a partir de `4d8a644d753b`, ajustar
-    `down_revision` (ou `flask db merge`).
   - Fase 6: rotas `/termos` e `/privacidade` com o texto de `docs/legal/` (RASCUNHO) e link no
     rodapé; página 500 mostrar o `X-Request-ID`; captura da página de Privacidade.
   - Revisão jurídica (termos, privacidade, `lgpd.md`), DPAs e região do Render (go/no-go).

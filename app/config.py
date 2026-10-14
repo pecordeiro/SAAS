@@ -97,6 +97,16 @@ class Config:
     DEFAULT_TRIAL_PLAN = "profissional"
     PAST_DUE_GRACE_DAYS = 7
 
+    # Fase 8 — cobrança (app/services/billing). Segredos só por variável de ambiente.
+    # BILLING_PROVIDER vazio = "asaas" se houver ASAAS_API_KEY, senão "fake" (só dev/test).
+    BILLING_PROVIDER = ""
+    ASAAS_API_KEY: str | None = None
+    ASAAS_BASE_URL = "https://api-sandbox.asaas.com/v3"
+    ASAAS_WEBHOOK_TOKEN: str | None = None
+    WEBHOOK_RATE_LIMIT = "120 per minute"
+    # Hosts aceitos no redirecionamento para a página de pagamento (anti open redirect).
+    BILLING_CHECKOUT_HOSTS = ("www.asaas.com", "asaas.com", "sandbox.asaas.com", "pagamento.fake.invalid")
+
     # Importação (app/services/importer.py): arquivo lido em memória, nunca gravado em disco.
     IMPORT_MAX_BYTES = 2 * 1024 * 1024
     # Teto de qualquer corpo de requisição (o maior é o upload da importação): acima disso o
@@ -148,6 +158,12 @@ class Config:
             "DEFAULT_TRIAL_PLAN": os.environ.get("DEFAULT_TRIAL_PLAN", cls.DEFAULT_TRIAL_PLAN),
             "PAST_DUE_GRACE_DAYS": int(os.environ.get("PAST_DUE_GRACE_DAYS", cls.PAST_DUE_GRACE_DAYS)),
         }
+        values["BILLING_PROVIDER"] = os.environ.get("BILLING_PROVIDER", cls.BILLING_PROVIDER)
+        values["ASAAS_API_KEY"] = os.environ.get("ASAAS_API_KEY") or cls.ASAAS_API_KEY
+        values["ASAAS_BASE_URL"] = os.environ.get("ASAAS_BASE_URL") or cls.ASAAS_BASE_URL
+        values["ASAAS_WEBHOOK_TOKEN"] = os.environ.get("ASAAS_WEBHOOK_TOKEN") or cls.ASAAS_WEBHOOK_TOKEN
+        values["WEBHOOK_RATE_LIMIT"] = os.environ.get("WEBHOOK_RATE_LIMIT", cls.WEBHOOK_RATE_LIMIT)
+
         for key in (
             "LOGIN_RATE_LIMIT",
             "SIGNUP_RATE_LIMIT",

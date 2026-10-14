@@ -15,9 +15,11 @@ Python 3.12, Flask 3, SQLAlchemy 2, Alembic (Flask-Migrate), PostgreSQL 16,
 Flask-Login, Flask-WTF (CSRF), Flask-Limiter, Gunicorn, pytest. Pagamento: Asaas.
 
 ## Estado atual
-Fases 0–5 e 9 concluídas: esqueleto, calc.py com paridade da planilha, design “Prumo”,
+Fases 0–5, 7, 8 e 9 concluídas: esqueleto, calc.py com paridade da planilha, design “Prumo”,
 schema completo com RLS ligável, regras de negócio (modelos, importação/exportação, limites
-de plano), contas (convites, MFA, bloqueio) e API v1 atrás de FEATURE_PUBLIC_API.
+de plano), contas (convites, MFA, bloqueio), segurança e LGPD (CSP com nonce, Redis, logs
+JSON, exportação/exclusão, suporte auditado), assinaturas (Asaas) e API v1 atrás de
+FEATURE_PUBLIC_API.
 Testes em PostgreSQL via TEST_DATABASE_URL. Ver docs/plano/progresso.md.
 
 ## Regras invioláveis
@@ -32,6 +34,9 @@ Testes em PostgreSQL via TEST_DATABASE_URL. Ver docs/plano/progresso.md.
    Nenhuma cor solta em template.
 7. Limites de plano são checados no backend, não só escondidos na tela.
 8. Assets servidos pelo próprio site (sem CDN em produção) para manter a CSP estrita.
+9. Backend é a única fonte de regras; o front é só painel (ADR-0009). Nenhum cálculo,
+   limite de plano ou permissão decidido no navegador (template/JS só exibem o que o
+   servidor calculou); esconder botão nunca substitui a recusa da rota.
 
 ## Comandos
 - Testes: python -m pytest -q

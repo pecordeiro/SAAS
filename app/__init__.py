@@ -72,6 +72,13 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
 
     app.register_blueprint(lgpd_bp)
 
+    # Fase 8: assinatura (owner) e webhook do Asaas (sem CSRF, token no header).
+    from app.blueprints.billing import bp as billing_bp
+    from app.blueprints.webhooks import bp as webhooks_bp
+
+    app.register_blueprint(billing_bp)
+    app.register_blueprint(webhooks_bp)
+
     from app.tenancy import load_company
 
     app.before_request(load_company)
@@ -87,6 +94,9 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
     from app.cli import register_cli
 
     register_cli(app)
+    from app.services.billing.cli import register_cli as register_billing_cli
+
+    register_billing_cli(app)
     return app
 
 

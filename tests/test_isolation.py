@@ -529,3 +529,69 @@ def test_lgpd_pedido_de_exclusao_so_afeta_a_empresa_da_sessao(client, app, tenan
     with app.app_context():
         assert db.session.get(Company, a.company_id).deletion_requested_at is not None
         assert db.session.get(Company, b.company_id).deletion_requested_at is None
+
+# ---------------------------------------------------------------- Fase 8: assinatura
+
+
+def _billing_setup(app_factory):
+    from tests.conftest import make_tenant
+    from tests.test_billing import WEBHOOK_TOKEN
+
+    app = app_factory({"ASAAS_WEBHOOK_TOKEN": WEBHOOK_TOKEN, "BILLING_PROVIDER": "fake"})
+    with app.app_context():
+        tenants = make_tenant("A"), make_tenant("B")
+    return app, tenants
+
+
+def test_fase8_assinatura_e_faturas_so_da_propria_empresa(app_factory):
+    """Rotas de cobrança não levam id: a empresa vem da sessão. A vê só as faturas de A;
+    cancelar ou trocar plano numa empresa não toca na outra."""
+    from tests.test_billing import fake, pay, sub_state, subscribe
+
+    app, (a, b) = _billing_setup(app_factory)
+    client_a, client_b = app.test_client(), app.test_client()
+    subscribe(client_b, app, b)
+    pay(client_b, app, b)
+    subscribe(client_a, app, a, plan="essencial")
+    pid_b = fake(app).payments_of(sub_state(app, b.company_id)["provider_subscription_id"])[0]
+    pid_a = fake(app).payments_of(sub_state(app, a.company_id)["provider_subscription_id"])[0]
+    for url in ("/app/assinatura", "/app/assinatura/faturas"):
+        page = client_a.get(url).get_data(as_text=True)
+        assert pid_a in page and pid_b not in page, url
+        assert "Empresa B" not in page
+    before_b = sub_state(app, b.company_id)
+    assert post(client_a, app, "/app/assinatura/cancelar").status_code == 303
+    assert sub_state(app, a.company_id)["status"] == "canceled"
+    assert sub_state(app, b.company_id) == before_b
+    before_a = sub_state(app, a.company_id)
+    assert post(client_b, app, "/app/assinatura/planos/essencial").status_code == 302
+    assert sub_state(app, a.company_id) == before_a and sub_state(app, b.company_id)["pending_plan"] == "essencial"
+
+
+def test_fase8_webhook_de_b_so_altera_b(app_factory):
+    from app.models import WebhookEvent
+    from tests.test_billing import fake, hook, sub_state, subscribe
+
+    app, (a, b) = _billing_setup(app_factory)
+    client_a, client_b = app.test_client(), app.test_client()
+    subscribe(client_a, app, a)
+    subscribe(client_b, app, b)
+    before_a = sub_state(app, a.company_id)
+    provider = fake(app)
+    pid_b = provider.payments_of(sub_state(app, b.company_id)["provider_subscription_id"])[0]
+    provider.set_payment_status(pid_b, "confirmed")
+    assert hook(client_a, provider.webhook("PAYMENT_CONFIRMED", payment_id=pid_b)).status_code == 200
+    assert sub_state(app, b.company_id)["status"] == "active"
+    assert sub_state(app, a.company_id) == before_a
+    with app.app_context():
+        assert db.session.query(WebhookEvent).one().company_id == b.company_id
+
+
+@pytest.mark.parametrize("url", ["/app/assinatura", "/app/assinatura/faturas", "/app/assinatura/planos", "/app/assinatura/cobranca"])
+def test_fase8_cobranca_negada_a_supervisor_e_operador(app, tenants, url):
+    a, _ = tenants
+    for email in (a.supervisor_email, a.operator_email):
+        other = app.test_client()
+        login(other, app, email)
+        assert other.get(url).status_code == 403
+        assert post(other, app, "/app/assinatura/cancelar").status_code == 403
