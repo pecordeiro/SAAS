@@ -6,6 +6,7 @@ from decimal import Decimal, InvalidOperation
 
 from flask_wtf import FlaskForm
 from wtforms import (
+    BooleanField,
     DateField,
     DecimalField,
     EmailField,
@@ -90,12 +91,41 @@ def parse_activities(text: str | None) -> list[NewActivity]:
     return activities
 
 
+MAX_CHECKLIST_ITEMS = 30
+CHECKLIST_ITEM_MAX = 200
+
+
+def parse_checklist(text: str | None) -> list[str]:
+    """Etapa G: um item de inspeção por linha; linhas vazias e repetidas (sem caixa) ignoradas."""
+    items: list[str] = []
+    seen: set[str] = set()
+    for number, raw_line in enumerate((text or "").splitlines(), start=1):
+        line = " ".join(raw_line.split())
+        if not line:
+            continue
+        if len(line) > CHECKLIST_ITEM_MAX:
+            raise ValidationError(f"Checklist, linha {number}: no máximo {CHECKLIST_ITEM_MAX} caracteres.")
+        if line.casefold() in seen:
+            continue
+        seen.add(line.casefold())
+        items.append(line)
+    if len(items) > MAX_CHECKLIST_ITEMS:
+        raise ValidationError(f"No máximo {MAX_CHECKLIST_ITEMS} itens de checklist por etapa.")
+    return items
+
+
 class StageSlotForm(Form):
     class Meta:
         locales = ("pt_BR", "pt")
 
     name = StringField("Etapa", filters=[_strip], validators=[Optional(), Length(max=160)])
     activities = TextAreaField("Atividades (uma por linha: Nome; minutos por unidade)")
+    # Etapa G: checklist de inspeção da etapa (copiado ao projeto) e se ele é exigido (sinal).
+    checklist = TextAreaField("Checklist de inspeção (um item por linha)")
+    checklist_required = BooleanField("Exigir checklist assinado")
+
+    def validate_checklist(self, field):
+        self.parsed_checklist = parse_checklist(field.data)
 
     def validate_activities(self, field):
         parsed = parse_activities(field.data)
@@ -131,7 +161,12 @@ class ProjectForm(BaseForm):
 
     def new_stages(self) -> list[NewStage]:
         return [
-            NewStage(name=slot.form.name.data, activities=slot.form.parsed)
+            NewStage(
+                name=slot.form.name.data,
+                activities=slot.form.parsed,
+                checklist=getattr(slot.form, "parsed_checklist", []),
+                checklist_required=bool(slot.form.checklist_required.data),
+            )
             for slot in self.stages
             if slot.form.name.data
         ]

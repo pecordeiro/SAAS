@@ -19,6 +19,7 @@ from app.forms_production import ProjectFromTemplateForm, WaitingPartForm
 from app.models import ROLE_OPERATOR, ROLE_SUPERVISOR, Activity, Project, Stage, Template
 from app.services import alerts as alerts_svc
 from app.services import audit, calc, dashboard, exporter
+from app.services import checklists as checklists_svc
 from app.services import comments as comments_svc
 from app.services import photos as photos_svc
 from app.services import projects as svc
@@ -314,6 +315,8 @@ def _detail_ctx(project: Project, *, errors=None, conflicts=None, deltas=None, o
         recent=svc.history(project, limit=5),
         last_entries=svc.last_entries(project),
         evidence_counts=evidence_counts,
+        # Etapa G: sinal do checklist por etapa (exige? assinado?) — só sinaliza, não bloqueia.
+        checklist_signals=checklists_svc.signals(project.company_id, stages),
         # Etapa D: resumo por pessoa (7 dias) só para supervisor+ — contas em calc.py.
         people=(
             svc.people_progress(project, tz=g.company.timezone, today=_today(), days=7)[:5]

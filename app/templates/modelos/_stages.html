@@ -1,5 +1,5 @@
 {% from "components/icon.html" import icon %}
-{% from "components/field.html" import field %}
+{% from "components/field.html" import field, checkbox %}
 {#
   Lista de etapas do editor de modelo. Os botões ↑ ↓ remover e “+ Etapa” são submits com
   `formaction` (sem JS: o servidor refaz a página com a lista alterada, nada é gravado) e
@@ -25,6 +25,8 @@
     </legend>
     {{ field(slot.form.name, label="Nome da etapa") }}
     {{ field(slot.form.activities, label="Atividades", hint="Uma por linha: Nome; minutos por unidade", attrs={"rows": 4}) }}
+    {{ field(slot.form.checklist, label="Checklist de inspeção (opcional)", hint="Um item por linha (ex.: Torque dos parafusos conferido). Copiado para os projetos novos.", attrs={"rows": 3}) }}
+    {{ checkbox(slot.form.checklist_required.name, "Exigir checklist assinado (só avisa; não bloqueia o registro)", checked=slot.form.checklist_required.data, value="y", id=slot.form.checklist_required.id) }}
   </fieldset>
   {%- endfor %}
   <div>

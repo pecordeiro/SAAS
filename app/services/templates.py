@@ -24,7 +24,17 @@ from decimal import Decimal
 from sqlalchemy import func, select
 
 from app.extensions import db
-from app.models import Company, Project, Stage, Template, TemplateActivity, TemplateStage, TemplateVersion
+from app.models import (
+    Company,
+    Project,
+    Stage,
+    StageChecklistItem,
+    Template,
+    TemplateActivity,
+    TemplateChecklistItem,
+    TemplateStage,
+    TemplateVersion,
+)
 from app.services import audit
 from app.services.projects import (
     NewActivity,
@@ -97,10 +107,15 @@ def add_version(
     db.session.flush()
     for s_pos, new_stage in enumerate(stages):
         stage = TemplateStage(
-            company_id=template.company_id, template_version_id=version.id, name=new_stage.name, position=s_pos
+            company_id=template.company_id, template_version_id=version.id, name=new_stage.name, position=s_pos,
+            checklist_required=bool(new_stage.checklist_required),
         )
         db.session.add(stage)
         db.session.flush()
+        for i_pos, text in enumerate(new_stage.checklist):
+            db.session.add(
+                TemplateChecklistItem(company_id=template.company_id, template_stage_id=stage.id, text=text, position=i_pos)
+            )
         for a_pos, new_activity in enumerate(new_stage.activities):
             db.session.add(
                 TemplateActivity(
@@ -122,6 +137,8 @@ def stages_from_version(version: TemplateVersion) -> list[NewStage]:
         NewStage(
             name=stage.name,
             activities=[NewActivity(name=a.name, ideal_minutes=a.ideal_minutes) for a in stage.activities],
+            checklist=[i.text for i in stage.checklist_items],
+            checklist_required=stage.checklist_required,
         )
         for stage in version.stages
     ]
@@ -129,7 +146,13 @@ def stages_from_version(version: TemplateVersion) -> list[NewStage]:
 
 def _signature(stages: list[NewStage]) -> list:
     return [
-        (s.name, [(a.name, Decimal(a.ideal_minutes).quantize(Decimal("0.01"))) for a in s.activities]) for s in stages
+        (
+            s.name,
+            [(a.name, Decimal(a.ideal_minutes).quantize(Decimal("0.01"))) for a in s.activities],
+            list(s.checklist),
+            bool(s.checklist_required),
+        )
+        for s in stages
     ]
 
 
@@ -233,7 +256,7 @@ def create_project_from_template(
 
 @dataclass(frozen=True)
 class Change:
-    kind: str  # stage_added | stage_removed | activity_added | activity_removed | minutes_changed | order_changed
+    kind: str  # stage_added | stage_removed | activity_added | activity_removed | minutes_changed | order_changed | checklist_changed
     stage: str
     activity: str | None = None
     old: Decimal | None = None
@@ -249,6 +272,8 @@ class Change:
             return f"Nova atividade “{self.activity}” em “{self.stage}” ({self.new} min)"
         if self.kind == "activity_removed":
             return f"Atividade “{self.activity}” de “{self.stage}” sai (fica arquivada com o histórico)"
+        if self.kind == "checklist_changed":
+            return f"Checklist de inspeção de “{self.stage}” muda (itens novos entram; respostas antigas ficam)"
         if self.kind == "minutes_changed":
             return f"Tempo ideal de “{self.activity}” ({self.stage}): {self.old} → {self.new} min"
         return "Ordem das etapas muda"
@@ -306,6 +331,26 @@ def _plan(project: Project, version: TemplateVersion):
     return pairs, leftover_stages
 
 
+def _project_items(p_stage: Stage) -> list[StageChecklistItem]:
+    return list(
+        db.session.execute(
+            select(StageChecklistItem)
+            .where(
+                StageChecklistItem.company_id == p_stage.company_id,
+                StageChecklistItem.stage_id == p_stage.id,
+                StageChecklistItem.archived_at.is_(None),
+            )
+            .order_by(StageChecklistItem.position)
+        ).scalars()
+    )
+
+
+def _checklist_missing(t_stage: TemplateStage, p_stage: Stage) -> list[str]:
+    """Itens do modelo que a etapa do projeto ainda não tem (comparação por texto, sem caixa)."""
+    have = {_key(i.text) for i in _project_items(p_stage)}
+    return [i.text for i in t_stage.checklist_items if _key(i.text) not in have]
+
+
 def compare(project: Project) -> Comparison:
     template, version = project_template(project)
     current = template.current_version if template is not None else None
@@ -328,6 +373,8 @@ def compare(project: Project) -> Comparison:
                 )
         for p_act in leftover_acts:
             changes.append(Change("activity_removed", p_stage.name, p_act.name))
+        if _checklist_missing(t_stage, p_stage) or bool(t_stage.checklist_required) != bool(p_stage.checklist_required):
+            changes.append(Change("checklist_changed", t_stage.name))
     for p_stage in leftover_stages:
         changes.append(Change("stage_removed", p_stage.name))
     matched = [p.id for _, p, _, _ in pairs if p is not None]
@@ -353,7 +400,20 @@ def apply_current_version(project: Project, confirmed_version_id: uuid.UUID, use
     position = 0
     for t_stage, p_stage, act_pairs, leftover_acts in pairs:
         if p_stage is None:
-            p_stage = add_stage(project, t_stage.name, [])
+            p_stage = add_stage(
+                project, t_stage.name, [], checklist=[i.text for i in t_stage.checklist_items],
+                checklist_required=t_stage.checklist_required,
+            )
+        else:
+            # Etapa G: itens novos do modelo entram no fim; nenhum item do projeto é apagado
+            # (respostas assinadas apontam para eles).
+            next_pos = max((i.position for i in _project_items(p_stage)), default=-1) + 1
+            for text in _checklist_missing(t_stage, p_stage):
+                db.session.add(StageChecklistItem(
+                    company_id=project.company_id, stage_id=p_stage.id, text=text, position=next_pos
+                ))
+                next_pos += 1
+            p_stage.checklist_required = bool(t_stage.checklist_required)
         p_stage.position = position
         position += 1
         a_pos = 0

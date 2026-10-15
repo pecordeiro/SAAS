@@ -638,4 +638,18 @@
   }
   .comment__body { white-space: pre-line; overflow-wrap: anywhere; }
   .evidence-links { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+  /* Checklist de inspeção */
+  .checklist-items { display: flex; flex-direction: column; padding-left: var(--space-5); }
+  .checklist-items__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: var(--space-1) 0;
+    border-bottom: var(--border-width) solid var(--color-border-subtle);
+    overflow-wrap: anywhere;
+  }
+  .checklist-answer { padding: var(--space-3) 0; border-bottom: var(--border-width) solid var(--color-border-subtle); }
+  .checklist-answer:last-child { border-bottom: 0; }
+  .stage-quality { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) var(--space-4) 0; }
 }

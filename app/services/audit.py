@@ -52,6 +52,12 @@ STAGE_WAITING_PART = "stage.waiting_part"
 # Etapa G — evidências (comentários e fotos por atividade). Detalhes sem o texto nem a imagem.
 COMMENT_DELETED = "activity.comment_deleted"
 PHOTO_DELETED = "activity.photo_deleted"
+# Etapa G — checklist de inspeção.
+CHECKLIST_ITEM_ADDED = "checklist.item_added"
+CHECKLIST_ITEM_ARCHIVED = "checklist.item_archived"
+STAGE_CHECKLIST_REQUIRED = "stage.checklist_required"
+INSPECTION_SIGNED = "inspection.signed"
+INSPECTION_CORRECTED = "inspection.corrected"
 TEMPLATE_VERSION_APPLIED = "template.version_applied"
 TEMPLATE_ARCHIVED = "template.archived"
 PROGRESS_UNDONE = "progress.undone"
@@ -92,6 +98,11 @@ ACTION_LABELS = {
     STAGE_WAITING_PART: "Aguardando peça alterado",
     COMMENT_DELETED: "Comentário apagado",
     PHOTO_DELETED: "Foto apagada",
+    CHECKLIST_ITEM_ADDED: "Item de checklist incluído",
+    CHECKLIST_ITEM_ARCHIVED: "Item de checklist arquivado",
+    STAGE_CHECKLIST_REQUIRED: "Exigência de checklist alterada",
+    INSPECTION_SIGNED: "Inspeção assinada",
+    INSPECTION_CORRECTED: "Inspeção corrigida",
     TEMPLATE_VERSION_APPLIED: "Versão do modelo aplicada",
     TEMPLATE_ARCHIVED: "Modelo arquivado",
     PROGRESS_UNDONE: "Registro desfeito",

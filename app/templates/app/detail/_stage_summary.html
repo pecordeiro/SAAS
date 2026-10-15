@@ -4,6 +4,8 @@
 {# Linha-resumo da etapa (<summary>): unidades, progresso, faltam e situação. Troca por id no fragmento. #}
 <summary class="stage__summary" id="etapa-resumo-{{ stage.id }}"{% if oob %} hx-swap-oob="true"{% endif %}>
   <span class="stage__name">{{ icon("chevron-down", class_="stage__chevron") }}<span>{{ stage.name }}</span>
+    {%- set _cs = checklist_signals.get(stage.id) if checklist_signals is defined else none %}
+    {%- if _cs and _cs.required %} {{ badge("Checklist pendente", "warning", "alert") if _cs.pending else badge("Checklist assinado", "success", "check") }}{% endif %}
     {%- if stage.waiting_part %} {{ badge("Aguardando peça" ~ (" · prev. " ~ (stage.part_expected_on|data_curta) if stage.part_expected_on else ""), "warning", "package") }}{% endif %}</span>
   <span class="stage__units num">{{ sr.unidades }}/{{ sr.previstas }}<span class="compact-only"> un.</span></span>
   <span class="stage__progress">{{ progress(sr.progresso, 1, label="Progresso de " ~ stage.name, size="sm", value_text=sr.progresso|pct) }}</span>

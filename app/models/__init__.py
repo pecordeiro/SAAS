@@ -52,4 +52,11 @@ from app.models.notifications import (  # noqa: F401,E402  (Etapa F)
     Alert,
     JobRun,
 )
-from app.models.quality import ActivityComment, ActivityPhoto  # noqa: F401,E402  (Etapa G)
+from app.models.quality import (  # noqa: F401,E402  (Etapa G)
+    ActivityComment,
+    ActivityPhoto,
+    InspectionAnswer,
+    StageChecklistItem,
+    StageInspection,
+    TemplateChecklistItem,
+)

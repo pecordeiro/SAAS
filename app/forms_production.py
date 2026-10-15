@@ -113,7 +113,16 @@ class TemplateForm(BaseForm):
             raise ValidationError("Inclua pelo menos uma etapa.")
 
     def new_stages(self) -> list[NewStage]:
-        return [NewStage(name=slot.form.name.data, activities=slot.form.parsed) for slot in self.stages if slot.form.name.data]
+        return [
+            NewStage(
+                name=slot.form.name.data,
+                activities=slot.form.parsed,
+                checklist=getattr(slot.form, "parsed_checklist", []),
+                checklist_required=bool(slot.form.checklist_required.data),
+            )
+            for slot in self.stages
+            if slot.form.name.data
+        ]
 
 
 class ImportForm(BaseForm):

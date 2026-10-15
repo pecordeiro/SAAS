@@ -25,9 +25,11 @@ def _slot_data(template: Template | None) -> list[dict]:
                 {
                     "name": stage.name,
                     "activities": "\n".join(f"{a.name}; {br_decimal(a.ideal_minutes)}" for a in stage.activities),
+                    "checklist": "\n".join(i.text for i in stage.checklist_items),
+                    "checklist_required": stage.checklist_required,
                 }
             )
-    return slots + [{"name": "", "activities": ""}] * 2
+    return slots + [{"name": "", "activities": "", "checklist": "", "checklist_required": False}] * 2
 
 
 @bp.get("")
@@ -126,7 +128,12 @@ def _slots_from_request() -> list[dict]:
         {int(m.group(1)) for key in request.form for m in [re.fullmatch(r"stages-(\d+)-name", key)] if m}
     )
     return [
-        {"name": request.form.get(f"stages-{i}-name", ""), "activities": request.form.get(f"stages-{i}-activities", "")}
+        {
+            "name": request.form.get(f"stages-{i}-name", ""),
+            "activities": request.form.get(f"stages-{i}-activities", ""),
+            "checklist": request.form.get(f"stages-{i}-checklist", ""),
+            "checklist_required": bool(request.form.get(f"stages-{i}-checklist_required")),
+        }
         for i in indexes
     ]
 
@@ -136,7 +143,7 @@ def _apply_row_action(slots: list[dict], action: str) -> list[dict]:
     kind, _, raw = action[:MAX_ROW_ACTION_LEN].partition("-")
     if kind == "add":
         if len(slots) < MAX_TEMPLATE_STAGES:
-            slots.append({"name": "", "activities": ""})
+            slots.append({"name": "", "activities": "", "checklist": "", "checklist_required": False})
         return slots
     try:
         index = int(raw)
@@ -156,7 +163,7 @@ def _apply_row_action(slots: list[dict], action: str) -> list[dict]:
 def _rows_response(template: Template | None):
     slots = _apply_row_action(_slots_from_request(), request.form.get("acao", ""))
     if not slots:
-        slots = [{"name": "", "activities": ""}]
+        slots = [{"name": "", "activities": "", "checklist": "", "checklist_required": False}]
     form = TemplateForm(
         formdata=None,
         data={"name": request.form.get("name", ""), "description": request.form.get("description", ""), "stages": slots},

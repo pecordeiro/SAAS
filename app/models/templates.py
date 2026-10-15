@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, Uuid
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.extensions import db
@@ -82,8 +82,15 @@ class TemplateStage(UUIDPk, Timestamps, TenantMixin, db.Model):
     )
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Etapa G: exige checklist assinado (só SINALIZA no projeto; não bloqueia) — ADR-0011.
+    checklist_required: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
 
     version: Mapped[TemplateVersion] = relationship(back_populates="stages")
+    checklist_items = relationship(
+        "TemplateChecklistItem", back_populates="stage", order_by="TemplateChecklistItem.position"
+    )
     activities: Mapped[list["TemplateActivity"]] = relationship(
         back_populates="stage", order_by="TemplateActivity.position"
     )

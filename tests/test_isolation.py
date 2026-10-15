@@ -103,7 +103,7 @@ def test_toda_rota_com_uuid_tem_caso_de_isolamento(app_factory, flags):
     """Varre o url_map (com e sem as flags que registram blueprints) e falha se alguma rota
     com <uuid:> não tiver caso A/B. Rota com dois <uuid:> também precisa estar listada."""
     app = app_factory(flags)
-    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI + ROUTES_ETAPA_D + ROUTES_ETAPA_E + ROUTES_ETAPA_F + ROUTES_ETAPA_G
+    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI + ROUTES_ETAPA_D + ROUTES_ETAPA_E + ROUTES_ETAPA_F + ROUTES_ETAPA_G + ROUTES_ETAPA_G_CHECKLIST
     cobertas = {template.replace("{id}", "") for _, template, _, _ in todas}
     # Etapa C: /interno é da plataforma (sem empresa na URL); acesso cruzado = não ser equipe → 404,
     # coberto por tests/test_etapa_c_interno.py::test_interno_e_404_para_quem_nao_e_equipe.
@@ -894,3 +894,95 @@ def test_etapa_g_evidencias_so_mostram_a_propria_empresa(client, app, tenants_g)
     with client.session_transaction() as sess:
         sess["company_id"] = str(b.company_id)
     assert client.get(f"/app/fotos/{b.photo_id}").status_code == 404
+
+
+# Bloco 2: checklist de inspeção. Ids no corpo (item) também são resolvidos na empresa/etapa da
+# URL: item de B numa inspeção de A → 404 e nada grava.
+
+from app.models.quality import InspectionAnswer, StageChecklistItem, StageInspection  # noqa: E402
+
+
+def _make_tenant_checklist(label: str) -> TenantG:
+    from app.services import checklists as checklists_svc
+
+    base = make_tenant(label)
+    stage = db.session.get(Stage, base.stage_id)
+    item = checklists_svc.add_item(stage, f"Item {label}", None)
+    signed = checklists_svc.start_inspection(stage, base.operator_id)
+    checklists_svc.save_answers(signed, {item.id: checklists_svc.AnswerInput("ok", None)}, base.operator_id, None)
+    checklists_svc.sign(signed, base.operator_id, None)
+    draft = checklists_svc.start_inspection(stage, base.operator_id)
+    db.session.commit()
+    return TenantG(base, item_id=item.id, inspection_id=draft.id, signed_inspection_id=signed.id)
+
+
+@pytest.fixture()
+def tenants_checklist(app):
+    with app.app_context():
+        return _make_tenant_checklist("A"), _make_tenant_checklist("B")
+
+
+ROUTES_ETAPA_G_CHECKLIST = [
+    ("GET", "/app/etapas/{id}/checklist", "stage_id", None),
+    ("POST", "/app/etapas/{id}/checklist/itens", "stage_id", {"text": "Invasor"}),
+    ("POST", "/app/etapas/{id}/checklist/exigir", "stage_id", {"required": "y"}),
+    ("POST", "/app/checklist-itens/{id}/arquivar", "item_id", {}),
+    ("POST", "/app/etapas/{id}/inspecoes", "stage_id", {}),
+    ("GET", "/app/inspecoes/{id}", "inspection_id", None),
+    (
+        "POST", "/app/inspecoes/{id}", "inspection_id",
+        lambda t: {"acao": "assinar", f"resultado-{t.item_id}": "nonconforming", f"obs-{t.item_id}": "x"},
+    ),
+    (
+        "POST", "/app/inspecoes/{id}/corrigir", "signed_inspection_id",
+        lambda t: {"item_id": str(t.item_id), "result": "na", "reason": "Invasão de teste"},
+    ),
+]
+
+
+def _snapshot_checklist(app, t) -> dict:
+    with app.app_context():
+        q = db.session.query
+        return {
+            "base": _snapshot(t.company_id),
+            "required": sorted(s.checklist_required for s in q(Stage).filter_by(company_id=t.company_id)),
+            "items": sorted((i.text, i.archived_at is None) for i in q(StageChecklistItem).filter_by(company_id=t.company_id)),
+            "inspections": sorted((i.status, i.version) for i in q(StageInspection).filter_by(company_id=t.company_id)),
+            "answers": sorted((a.result, a.note or "") for a in q(InspectionAnswer).filter_by(company_id=t.company_id)),
+        }
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_ETAPA_G_CHECKLIST)
+def test_etapa_g_checklist_recurso_de_outra_empresa_responde_404(client, app, tenants_checklist, method, template, field, data):
+    a, b = tenants_checklist
+    before = _snapshot_checklist(app, b)
+    login(client, app, a.owner_email)
+    for payload_tenant in (a, b):  # ids no corpo da própria empresa e da outra
+        response = _call_g(client, app, method, template.format(id=getattr(b, field)), data, payload_tenant)
+        assert response.status_code == 404
+        assert b"Item B" not in response.data
+    assert _snapshot_checklist(app, b) == before
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_ETAPA_G_CHECKLIST)
+def test_etapa_g_checklist_mesma_rota_funciona_na_propria_empresa(client, app, tenants_checklist, method, template, field, data):
+    a, b = tenants_checklist
+    before_b = _snapshot_checklist(app, b)
+    login(client, app, a.owner_email)
+    response = _call_g(client, app, method, template.format(id=getattr(a, field)), data, a)
+    assert response.status_code in (200, 302, 303)
+    assert _snapshot_checklist(app, b) == before_b
+
+
+def test_etapa_g_checklist_item_de_b_na_inspecao_de_a_responde_404(client, app, tenants_checklist):
+    a, b = tenants_checklist
+    before_a, before_b = _snapshot_checklist(app, a), _snapshot_checklist(app, b)
+    login(client, app, a.owner_email)
+    url = f"/app/inspecoes/{a.signed_inspection_id}/corrigir"
+    assert post(client, app, url, {"item_id": str(b.item_id), "result": "na", "reason": "Invasão de teste"}).status_code == 404
+    # resposta para item de B no rascunho de A é ignorada (só itens da etapa contam)
+    post(client, app, f"/app/inspecoes/{a.inspection_id}", {"acao": "salvar", f"resultado-{b.item_id}": "ok"})
+    with app.app_context():
+        assert db.session.query(InspectionAnswer).filter_by(item_id=b.item_id, company_id=a.company_id).count() == 0
+    assert _snapshot_checklist(app, b) == before_b
+    assert _snapshot_checklist(app, a)["answers"] == before_a["answers"]

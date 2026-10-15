@@ -1,0 +1,104 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/badge.html" import badge %}
+{% set nav_current = "projects" %}
+{% set nav_project = project %}
+{% block title %}Inspeção · {{ stage.name }} · Controle de Produção{% endblock %}
+{% block content %}
+{#
+  Etapa G — uma inspeção. Rascunho: formulário (operador+), “Salvar” ou “Assinar”. Assinada:
+  leitura com histórico por item (a resposta original e cada correção, com quem, quando e
+  motivo); supervisor+ registra correção (nova linha; a antiga fica). A assinatura é o usuário
+  logado + hora do servidor — nada disso vem do formulário.
+#}
+{%- set signed = inspection.status == "signed" %}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('qualidade.checklist', stage_id=stage.id) }}">{{ icon("chevron-left") }}Checklist · {{ stage.name }}</a>
+    <h1>Inspeção{% if inspection.unit is defined and inspection.unit %} · {{ inspection.unit.serial }}{% endif %}</h1>
+    <p class="page-header__subtitle">
+      {%- if signed %}{{ badge("Assinada", "success", "check") }} <span class="muted">por {{ inspection.signed_by.name if inspection.signed_by else "Pessoa removida" }} em <span class="num">{{ inspection.signed_at|datahora }}</span></span>
+      {%- else %}{{ badge("Rascunho", "neutral", "circle") }} <span class="muted">aberta em <span class="num">{{ inspection.created_at|datahora }}</span></span>{% endif %}
+    </p>
+  </div>
+</header>
+
+{%- if error %}<div class="mb-4">{{ alert("danger", error, role="alert") }}</div>{% endif %}
+
+{%- if not signed %}
+<form class="card stack" method="post" action="{{ url_for('qualidade.inspection_save', inspection_id=inspection.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="version" value="{{ inspection.version }}">
+  {%- for item in items %}
+  {%- set cur = posted.get(item.id) or current.get(item.id) %}
+  <fieldset class="fieldset checklist-answer" id="item-{{ item.id }}">
+    <legend class="text-strong">{{ loop.index }}. {{ item.text }}</legend>
+    <div class="cluster">
+      {%- for value, label in results.items() %}
+      <label class="check"><input type="radio" name="resultado-{{ item.id }}" value="{{ value }}"{% if cur and cur.result == value %} checked{% endif %}><span>{{ label }}</span></label>
+      {%- endfor %}
+    </div>
+    <div class="field">
+      <label class="field__label" for="obs-{{ item.id }}">Observação <span class="field__req">(obrigatória se não conforme)</span></label>
+      <input class="field__input" id="obs-{{ item.id }}" type="text" name="obs-{{ item.id }}" maxlength="{{ note_max }}" value="{{ cur.note if cur and cur.note else '' }}">
+    </div>
+  </fieldset>
+  {%- endfor %}
+  <div class="cluster">
+    <button class="btn btn--secondary" type="submit" name="acao" value="salvar"><span class="btn__label">Salvar rascunho</span></button>
+    <button class="btn btn--primary" type="submit" name="acao" value="assinar">{{ icon("check") }}<span class="btn__label">Assinar como {{ current_user.name }}</span></button>
+  </div>
+  <p class="muted text-sm">Ao assinar ficam gravados seu usuário e a data/hora do servidor. Depois disso, mudanças só por correção registrada (supervisor).</p>
+</form>
+{%- else %}
+<section class="card" aria-label="Respostas">
+  <ol class="checklist-items">
+    {%- for item in items %}
+    {%- set cur = current.get(item.id) %}
+    <li class="checklist-answer stack--sm" id="item-{{ item.id }}">
+      <p class="text-strong">{{ item.text }}{% if item.archived_at %} <span class="muted text-sm">(item arquivado)</span>{% endif %}</p>
+      {%- if cur %}
+      <p>{{ badge(results[cur.result], "success" if cur.result == "ok" else ("danger" if cur.result == "nonconforming" else "neutral")) }}{% if cur.note %} <span>{{ cur.note }}</span>{% endif %}</p>
+      {%- else %}<p class="muted">Sem resposta.</p>{% endif %}
+      {%- set hist = history.get(item.id, []) %}
+      {%- if hist|length > 1 or (cur and cur.correction_reason) %}
+      <details>
+        <summary class="text-sm">Histórico ({{ hist|length }})</summary>
+        <ul class="text-sm muted">
+          {%- for h in hist %}
+          <li>{{ results[h.result] }}{% if h.note %} — {{ h.note }}{% endif %} · {{ h.answered_by.name if h.answered_by else "Pessoa removida" }} · <span class="num">{{ h.answered_at|datahora }}</span>{% if h.correction_reason %} · correção: {{ h.correction_reason }}{% endif %}</li>
+          {%- endfor %}
+        </ul>
+      </details>
+      {%- endif %}
+      {%- if can_correct %}
+      <details class="confirm-inline">
+        <summary class="btn btn--ghost">Registrar correção</summary>
+        <form class="stack mt-2" method="post" action="{{ url_for('qualidade.inspection_correct', inspection_id=inspection.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="item_id" value="{{ item.id }}">
+          <div class="cluster">
+            {%- for value, label in results.items() %}
+            <label class="check"><input type="radio" name="result" value="{{ value }}" required><span>{{ label }}</span></label>
+            {%- endfor %}
+          </div>
+          <div class="field">
+            <label class="field__label" for="corr-obs-{{ item.id }}">Observação</label>
+            <input class="field__input" id="corr-obs-{{ item.id }}" type="text" name="note" maxlength="{{ note_max }}">
+          </div>
+          <div class="field">
+            <label class="field__label" for="corr-motivo-{{ item.id }}">Motivo da correção</label>
+            <input class="field__input" id="corr-motivo-{{ item.id }}" type="text" name="reason" minlength="5" maxlength="{{ note_max }}" required>
+          </div>
+          <div>{{ button("Registrar correção", "secondary") }}</div>
+        </form>
+      </details>
+      {%- endif %}
+    </li>
+    {%- endfor %}
+  </ol>
+</section>
+{%- endif %}
+{% endblock %}

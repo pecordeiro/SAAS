@@ -1,0 +1,105 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/badge.html" import badge %}
+{% from "components/field.html" import checkbox %}
+{% from "components/empty_state.html" import empty_state %}
+{% from "components/table.html" import data_table %}
+{% set nav_current = "projects" %}
+{% set nav_project = project %}
+{% block title %}Checklist · {{ stage.name }} · Controle de Produção{% endblock %}
+{% block content %}
+{#
+  Etapa G — checklist de inspeção da etapa. Supervisor+ define itens e se a etapa exige
+  checklist assinado (só sinal: o registro de peças continua livre). Operador+ abre uma
+  inspeção, preenche e assina. O sinal (pendente/assinado) vem pronto do servidor.
+#}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('app.project_detail', project_id=project.id, etapa=stage.id, _anchor='etapa-' ~ stage.id) }}">{{ icon("chevron-left") }}{{ project.name }}</a>
+    <h1>Checklist · {{ stage.name }}</h1>
+    <p class="page-header__subtitle">
+      {%- if signal.required %}
+        {%- if signal.pending %}{{ badge("Checklist pendente", "warning", "alert") }}{% else %}{{ badge("Checklist assinado", "success", "check") }}{% endif %}
+        <span class="muted text-sm">Exigido nesta etapa — só avisa; não bloqueia o registro de peças.</span>
+      {%- else %}
+        <span class="muted">Não exigido nesta etapa.</span>
+      {%- endif %}
+    </p>
+  </div>
+</header>
+
+{%- if error %}<div class="mb-4">{{ alert("danger", error, role="alert") }}</div>{% endif %}
+
+<section class="card mb-4" aria-labelledby="itens-titulo">
+  <h2 class="card__title" id="itens-titulo">Itens <span class="muted num">{{ items|length }}</span></h2>
+  {%- if items %}
+  <ol class="checklist-items">
+    {%- for item in items %}
+    <li class="checklist-items__row">
+      <span>{{ item.text }}</span>
+      {%- if can_manage %}
+      <form method="post" action="{{ url_for('qualidade.checklist_item_archive', item_id=item.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {{ button("Arquivar", "ghost", icon="trash", icon_only=True, aria_label="Arquivar item " ~ item.text) }}
+      </form>
+      {%- endif %}
+    </li>
+    {%- endfor %}
+  </ol>
+  {%- else %}
+  <p class="muted">Nenhum item ainda.{% if can_manage %} Inclua abaixo ou defina no modelo de etapas.{% endif %}</p>
+  {%- endif %}
+  {%- if can_manage %}
+  <form class="inline-form mt-4" method="post" action="{{ url_for('qualidade.checklist_item_add', stage_id=stage.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="field">
+      <label class="field__label" for="novo-item">Novo item</label>
+      <input class="field__input" id="novo-item" type="text" name="text" maxlength="{{ item_max }}" required>
+    </div>
+    {{ button("Incluir item", "secondary", icon="plus") }}
+  </form>
+  <form class="inline-form mt-4" method="post" action="{{ url_for('qualidade.checklist_required', stage_id=stage.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {{ checkbox("required", "Exigir checklist assinado nesta etapa (sinaliza “pendente”)", checked=stage.checklist_required, value="y", id="exigir-checklist") }}
+    {{ button("Salvar", "secondary") }}
+  </form>
+  {%- endif %}
+</section>
+
+<section class="card" aria-labelledby="inspecoes-titulo">
+  <h2 class="card__title" id="inspecoes-titulo">Inspeções</h2>
+  {%- if items %}
+  <form class="inline-form mb-4" method="post" action="{{ url_for('qualidade.inspection_start', stage_id=stage.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {%- if units %}
+    <div class="field">
+      <label class="field__label" for="inspecao-unidade">Unidade <span class="field__req">(opcional)</span></label>
+      <select class="field__input" id="inspecao-unidade" name="unit_id">
+        <option value="">Etapa inteira (sem unidade)</option>
+        {%- for u in units %}<option value="{{ u.id }}">{{ u.serial }}</option>{% endfor %}
+      </select>
+    </div>
+    {%- endif %}
+    {{ button("Nova inspeção", "primary", icon="plus") }}
+  </form>
+  {%- endif %}
+  {%- if inspections %}
+  {% call data_table([("Aberta em", ""), ("Unidade", ""), ("Situação", ""), ("Assinatura", "")], caption="Inspeções da etapa") %}
+    <tbody>
+    {%- for i in inspections %}
+      <tr>
+        <td class="num" data-label="Aberta em"><a class="row-link" href="{{ url_for('qualidade.inspection', inspection_id=i.id) }}">{{ i.created_at|datahora }}</a></td>
+        <td data-label="Unidade">{{ i.unit.serial if i.unit is defined and i.unit else "—" }}</td>
+        <td data-label="Situação">{% if i.status == "signed" %}{{ badge("Assinada", "success", "check") }}{% else %}{{ badge("Rascunho", "neutral", "circle") }}{% endif %}</td>
+        <td data-label="Assinatura">{% if i.signed_at %}{{ i.signed_by.name if i.signed_by else "Pessoa removida" }} · <span class="num">{{ i.signed_at|datahora }}</span>{% else %}—{% endif %}</td>
+      </tr>
+    {%- endfor %}
+    </tbody>
+  {% endcall %}
+  {%- else %}
+  {{ empty_state("Nenhuma inspeção", "Abra uma inspeção, marque cada item e assine.", icon="check") }}
+  {%- endif %}
+</section>
+{% endblock %}

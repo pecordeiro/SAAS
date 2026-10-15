@@ -86,6 +86,11 @@ class Stage(UUIDPk, Timestamps, TenantMixin, db.Model):
     part_expected_on: Mapped[date | None] = mapped_column(Date)
     part_note: Mapped[str | None] = mapped_column(String(140))
     part_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Etapa G: exige checklist de inspeção assinado. SÓ SINALIZA (“Checklist pendente”), como o
+    # “aguardando peça”: nunca bloqueia registro de peças nem conclusão (ADR-0011).
+    checklist_required: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
 
     project: Mapped[Project] = relationship(back_populates="stages")
     activities: Mapped[list["Activity"]] = relationship(

@@ -18,6 +18,9 @@
     <h1>{{ activity.name }}</h1>
     <p class="page-header__subtitle muted">Evidências · {{ stage.name }}</p>
   </div>
+  <div class="page-header__actions">
+    {{ button("Checklist da etapa", "secondary", icon="check", href=url_for('qualidade.checklist', stage_id=stage.id)) }}
+  </div>
 </header>
 
 <section class="card mb-4" id="fotos" aria-labelledby="fotos-titulo">

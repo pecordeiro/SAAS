@@ -12,8 +12,17 @@ from flask import Blueprint, Response, abort, current_app, flash, g, redirect, r
 from flask_login import current_user
 
 from app.extensions import db, limiter
-from app.models import ROLE_OPERATOR, ROLE_SUPERVISOR, Activity
-from app.models.quality import PHOTO_CAPTION_MAX, ActivityComment, ActivityPhoto
+from app.models import ROLE_OPERATOR, ROLE_SUPERVISOR, Activity, Stage
+from app.models.quality import (
+    CHECKLIST_ITEM_MAX,
+    CHECKLIST_NOTE_MAX,
+    PHOTO_CAPTION_MAX,
+    ActivityComment,
+    ActivityPhoto,
+    StageChecklistItem,
+    StageInspection,
+)
+from app.services import checklists as checklists_svc
 from app.services import comments as comments_svc
 from app.services import photos as photos_svc
 from app.services import storage as storage_mod
@@ -157,3 +166,179 @@ def photo_delete(photo_id):
     db.session.commit()
     flash("Foto apagada (registrado na auditoria).", "sucesso")
     return redirect(_evidence_url(activity, "fotos"), 303)
+
+
+# ================================================================ checklist de inspeção (bloco 2)
+# supervisor+: itens e “exige checklist”; operador+: abrir, preencher e assinar; supervisor+:
+# correção depois de assinada (nova linha + motivo). Assinatura = usuário da sessão + hora do
+# servidor. “Exige” só sinaliza (ADR-0011).
+
+
+def _units_for_select(stage: Stage) -> list:
+    """Unidades do projeto para escolher na inspeção (bloco 3; vazio sem o módulo)."""
+    try:
+        from app.services import units as units_svc
+    except ImportError:  # pragma: no cover - antes do bloco 3
+        return []
+    return units_svc.list_units(stage.project)
+
+
+def _checklist_page(stage: Stage, *, status: int = 200, error: str | None = None):
+    return (
+        render_template(
+            "qualidade/checklist.html",
+            stage=stage,
+            project=stage.project,
+            items=checklists_svc.active_items(stage),
+            inspections=checklists_svc.inspections_for(stage),
+            signal=checklists_svc.signals(stage.company_id, [stage])[stage.id],
+            can_manage=g.membership.has_role(ROLE_SUPERVISOR),
+            item_max=CHECKLIST_ITEM_MAX,
+            error=error,
+            units=_units_for_select(stage),
+        ),
+        status,
+    )
+
+
+@bp.get("/etapas/<uuid:stage_id>/checklist")
+@tenant_required(ROLE_OPERATOR)
+def checklist(stage_id):
+    return _checklist_page(get_or_404(Stage, stage_id))
+
+
+@bp.post("/etapas/<uuid:stage_id>/checklist/itens")
+@tenant_required(ROLE_SUPERVISOR)
+def checklist_item_add(stage_id):
+    stage = get_or_404(Stage, stage_id)
+    try:
+        checklists_svc.add_item(stage, request.form.get("text"), current_user.id)
+    except checklists_svc.ChecklistError as exc:
+        db.session.rollback()
+        return _checklist_page(stage, status=400, error=str(exc))
+    db.session.commit()
+    flash("Item incluído no checklist.", "sucesso")
+    return redirect(url_for("qualidade.checklist", stage_id=stage.id), 303)
+
+
+@bp.post("/checklist-itens/<uuid:item_id>/arquivar")
+@tenant_required(ROLE_SUPERVISOR)
+def checklist_item_archive(item_id):
+    item = get_or_404(StageChecklistItem, item_id)
+    stage = item.stage
+    checklists_svc.archive_item(item, current_user.id)
+    db.session.commit()
+    flash("Item arquivado. Respostas antigas continuam guardadas.", "sucesso")
+    return redirect(url_for("qualidade.checklist", stage_id=stage.id), 303)
+
+
+@bp.post("/etapas/<uuid:stage_id>/checklist/exigir")
+@tenant_required(ROLE_SUPERVISOR)
+def checklist_required(stage_id):
+    stage = get_or_404(Stage, stage_id)
+    required = request.form.get("required") in {"y", "1", "on", "true"}
+    checklists_svc.set_required(stage, required, current_user.id)
+    db.session.commit()
+    flash("A etapa passa a sinalizar checklist pendente." if required else "Checklist deixa de ser exigido.", "sucesso")
+    return redirect(url_for("qualidade.checklist", stage_id=stage.id), 303)
+
+
+@bp.post("/etapas/<uuid:stage_id>/inspecoes")
+@tenant_required(ROLE_OPERATOR)
+def inspection_start(stage_id):
+    stage = get_or_404(Stage, stage_id)
+    unit = None
+    raw_unit = (request.form.get("unit_id") or "").strip()
+    if raw_unit:
+        from app.models import Unit
+
+        unit = get_or_404(Unit, raw_unit)  # de outra empresa → 404
+        if unit.project_id != stage.project_id:
+            abort(404)
+    try:
+        inspection = checklists_svc.start_inspection(stage, current_user.id, unit=unit)
+    except checklists_svc.ChecklistError as exc:
+        db.session.rollback()
+        return _checklist_page(stage, status=400, error=str(exc))
+    db.session.commit()
+    return redirect(url_for("qualidade.inspection", inspection_id=inspection.id), 303)
+
+
+def _inspection_page(inspection: StageInspection, *, status: int = 200, error: str | None = None, posted=None):
+    return (
+        render_template(
+            "qualidade/inspecao.html",
+            inspection=inspection,
+            stage=inspection.stage,
+            project=inspection.stage.project,
+            items=checklists_svc.items_of(inspection),
+            current=checklists_svc.current_answers(inspection),
+            history=checklists_svc.history_by_item(inspection),
+            results=checklists_svc.RESULT_LABELS,
+            can_correct=g.membership.has_role(ROLE_SUPERVISOR),
+            note_max=CHECKLIST_NOTE_MAX,
+            error=error,
+            posted=posted or {},
+        ),
+        status,
+    )
+
+
+@bp.get("/inspecoes/<uuid:inspection_id>")
+@tenant_required(ROLE_OPERATOR)
+def inspection(inspection_id):
+    return _inspection_page(get_or_404(StageInspection, inspection_id))
+
+
+def _posted_answers(inspection: StageInspection) -> dict:
+    out = {}
+    for item in checklists_svc.items_of(inspection):
+        result = request.form.get(f"resultado-{item.id}")
+        if result:
+            out[item.id] = checklists_svc.AnswerInput(result, request.form.get(f"obs-{item.id}"))
+    return out
+
+
+@bp.post("/inspecoes/<uuid:inspection_id>")
+@tenant_required(ROLE_OPERATOR)
+def inspection_save(inspection_id):
+    """Salva o rascunho (``acao=salvar``) ou salva e assina (``acao=assinar``)."""
+    inspection = get_or_404(StageInspection, inspection_id)
+    answers = _posted_answers(inspection)
+    try:
+        version = int(request.form.get("version", ""))
+    except ValueError:
+        version = None
+    sign = request.form.get("acao") == "assinar"
+    try:
+        checklists_svc.save_answers(inspection, answers, current_user.id, version)
+        if sign:
+            checklists_svc.sign(inspection, current_user.id, None)
+    except checklists_svc.InspectionConflict as exc:
+        db.session.rollback()
+        return _inspection_page(get_or_404(StageInspection, inspection_id), status=409, error=str(exc))
+    except checklists_svc.ChecklistError as exc:
+        db.session.rollback()
+        return _inspection_page(get_or_404(StageInspection, inspection_id), status=400, error=str(exc),
+                                posted=answers)
+    db.session.commit()
+    flash("Inspeção assinada." if sign else "Rascunho salvo.", "sucesso")
+    return redirect(url_for("qualidade.inspection", inspection_id=inspection.id), 303)
+
+
+@bp.post("/inspecoes/<uuid:inspection_id>/corrigir")
+@tenant_required(ROLE_SUPERVISOR)
+def inspection_correct(inspection_id):
+    inspection = get_or_404(StageInspection, inspection_id)
+    item = get_or_404(StageChecklistItem, request.form.get("item_id", ""), include_archived=True)
+    if item.stage_id != inspection.stage_id:
+        abort(404)
+    value = checklists_svc.AnswerInput(request.form.get("result", ""), request.form.get("note"))
+    try:
+        checklists_svc.correct(inspection, item, value, request.form.get("reason"), current_user.id)
+    except checklists_svc.ChecklistError as exc:
+        db.session.rollback()
+        return _inspection_page(get_or_404(StageInspection, inspection_id), status=400, error=str(exc))
+    db.session.commit()
+    flash("Correção registrada. A resposta anterior continua no histórico.", "sucesso")
+    return redirect(url_for("qualidade.inspection", inspection_id=inspection.id, _anchor=f"item-{item.id}"), 303)

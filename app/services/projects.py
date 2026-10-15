@@ -52,6 +52,9 @@ class NewStage:
     name: str
     activities: list[NewActivity] = field(default_factory=list)
     archived: bool = False
+    # Etapa G: itens do checklist de inspeção (texto) e se a etapa exige checklist assinado.
+    checklist: list[str] = field(default_factory=list)
+    checklist_required: bool = False
 
 
 def _now() -> datetime:
@@ -102,7 +105,10 @@ def create_project(
     db.session.add(project)
     db.session.flush()
     for s_pos, new_stage in enumerate(stages):
-        stage = add_stage(project, new_stage.name, new_stage.activities, position=s_pos)
+        stage = add_stage(
+            project, new_stage.name, new_stage.activities, position=s_pos,
+            checklist=new_stage.checklist, checklist_required=new_stage.checklist_required,
+        )
         if new_stage.archived:
             stage.archived_at = _now()
     db.session.flush()
@@ -115,14 +121,31 @@ def create_project(
     return project
 
 
-def add_stage(project: Project, name: str, activities: list[NewActivity], position: int | None = None) -> Stage:
+def add_stage(
+    project: Project,
+    name: str,
+    activities: list[NewActivity],
+    position: int | None = None,
+    *,
+    checklist: list[str] | tuple = (),
+    checklist_required: bool = False,
+) -> Stage:
     if position is None:
         position = max((s.position for s in project.stages), default=-1) + 1
-    stage = Stage(company_id=project.company_id, project_id=project.id, name=name, position=position)
+    stage = Stage(
+        company_id=project.company_id, project_id=project.id, name=name, position=position,
+        checklist_required=bool(checklist_required),
+    )
     db.session.add(stage)
     db.session.flush()
     for a_pos, new_activity in enumerate(activities):
         add_activity(stage, new_activity, position=a_pos)
+    if checklist:
+        from app.models import StageChecklistItem
+
+        for i_pos, text in enumerate(checklist):
+            db.session.add(StageChecklistItem(company_id=project.company_id, stage_id=stage.id, text=text, position=i_pos))
+        db.session.flush()
     return stage
 
 
@@ -729,10 +752,14 @@ def archive_project(project: Project, user_id: uuid.UUID | None) -> None:
 def duplicate_project(project: Project, user_id: uuid.UUID | None, name: str | None = None) -> Project:
     """Mesmas etapas/atividades ativas (e mesma origem de modelo), progresso zero."""
     company = db.session.get(Company, project.company_id)
+    from app.services.checklists import active_items
+
     stages = [
         NewStage(
             name=s.name,
             activities=[NewActivity(name=a.name, ideal_minutes=a.ideal_minutes) for a in active_activities(s)],
+            checklist=[i.text for i in active_items(s)],
+            checklist_required=s.checklist_required,
         )
         for s in active_stages(project)
     ]
