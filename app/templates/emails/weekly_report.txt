@@ -1,0 +1,17 @@
+{% extends "emails/_base.txt" %}
+{% block body %}Olá, {{ name }}. Resumo da produção da empresa {{ company_name }} de {{ period }}.
+A planilha completa (projetos e pessoas) vai em anexo.
+
+PROJETOS
+{% for p in projects %}- {{ p["Projeto"] }}{% if p["Etapas aguardando peça"] %} (aguardando peça){% endif %}: {{ p["Progresso"]|pct(0) }}, {{ p["Unidades concluídas"] }}/{{ p["Quantidade"] }} unidades, {{ p["Peças na semana"] }} peças na semana, prazo {{ p["Prazo"]|data if p["Prazo"] else "—" }}, término previsto {{ p["Término previsto"]|data if p["Término previsto"] else "—" }}{% if p["Atraso previsto (dias úteis)"] %} (atraso de {{ p["Atraso previsto (dias úteis)"] }} d.u.){% endif %}
+{% else %}Nenhum projeto ativo.
+{% endfor %}
+PESSOAS
+{% for r in people %}- {{ r["Pessoa"] }}: {{ r["Peças (saldo)"] }} peças em {{ r["Registros"] }} registros ({{ r["Horas-padrão"]|num(1) }} h-padrão)
+{% else %}Nenhum lançamento na semana.
+{% endfor %}{% if more_people %}E mais {{ more_people }} pessoas na planilha.
+{% endif %}
+Abrir os projetos: {{ projects_url }}{% endblock %}
+{% block footer %}Você recebe este relatório porque é supervisor ou proprietário na empresa {{ company_name }}.
+Para não receber mais, desligue "Relatório semanal" em {{ prefs_url }}
+Não responda: esta caixa não é lida.{% endblock %}

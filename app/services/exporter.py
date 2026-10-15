@@ -215,3 +215,46 @@ def projects_csv(items: list[dict]) -> bytes:
             ]
         )
     return ("﻿" + buffer.getvalue()).encode("utf-8")
+
+
+# ---------------------------------------------------------------- relatório semanal (Etapa F)
+
+WEEKLY_PROJECT_COLUMNS = (
+    "Projeto", "Produto", "Situação", "Progresso", "Unidades concluídas", "Quantidade", "Peças na semana",
+    "Horas que faltam", "Prazo", "Término previsto", "Atraso previsto (dias úteis)", "Etapas aguardando peça",
+)
+WEEKLY_PEOPLE_COLUMNS = ("Pessoa", "Peças (saldo)", "Registros", "Desfeitos", "Horas-padrão", "Dias com lançamento")
+
+
+def _xlsx_value(value):
+    if isinstance(value, Decimal):
+        value = float(value)
+    return neutralize(value)
+
+
+def weekly_xlsx(projects: list[dict], people: list[dict], period: str) -> bytes:
+    """XLSX do relatório semanal: aba “Projetos” e aba “Pessoas”. Números já calculados por
+    quem chama (calc/serviços); aqui só escreve, com a mesma proteção contra fórmula."""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    sheets = (
+        ("Projetos", WEEKLY_PROJECT_COLUMNS, projects),
+        ("Pessoas", WEEKLY_PEOPLE_COLUMNS, people),
+    )
+    for index, (title, columns, items) in enumerate(sheets):
+        ws = wb.active if index == 0 else wb.create_sheet()
+        ws.title = title
+        ws.append([f"Relatório semanal · {period}"])
+        ws.append(list(columns))
+        for item in items:
+            ws.append([_xlsx_value(item.get(c)) for c in columns])
+        for cells in ws.iter_rows(min_row=1):
+            for cell in cells:
+                if isinstance(cell.value, str):
+                    cell.data_type = "s"  # nunca fórmula
+                elif isinstance(cell.value, date):
+                    cell.number_format = "DD/MM/YYYY"
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()
