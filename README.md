@@ -39,6 +39,15 @@ atividade (supervisor+, só membro ativo da empresa; evento interno `activity.as
 progresso por pessoa (`calc.progresso_por_pessoa`, tela `/app/projetos/<id>/pessoas`) e
 arrastar etapas/atividades na edição (`static/js/arrastar.js`, sem biblioteca; Subir/Descer e
 “Mover” continuam sem JS). Migration `d4a8c2e6f1b3`.
+Etapa F (worker e alertas): processo separado `flask worker run` (ou `--once` no cron) que
+consome o outbox com tentativas e backoff e roda tarefas idempotentes empresa a empresa no
+contexto RLS (ADR-0010): alertas automáticos (prazo em risco, atraso previsto, etapa parada há
+X dias úteis — X por empresa em `/app/empresa` —, peça atrasada) em `/app/alertas` e por e-mail,
+e-mail ao responsável quando uma atividade é atribuída, relatório semanal com XLSX,
+reconciliação do Asaas e limpeza de tokens. Etapa “aguardando peça” (supervisor+, só sinaliza)
+com selo na lista, no detalhe e no painel. Preferências de e-mail em `/conta/perfil`.
+Migrations `e2b7f1c3a9d0`, `f3c8a2d4b1e5`, `a5d9e3f7c2b8`. Runbook:
+[`docs/plano/worker.md`](docs/plano/worker.md).
 Progresso por fase em [`docs/plano/progresso.md`](docs/plano/progresso.md).
 
 Variáveis da Fase 4 (opcionais): `READ_ONLY_ENFORCED` (padrão 1: sem assinatura ativa a
@@ -214,6 +223,18 @@ flask billing-admin discount --company <uuid> --percent 20 --reason "motivo"
 Telas em `/app/assinatura` (só proprietário). Roteiro do ciclo real no sandbox em
 [`docs/plano/pagamentos.md`](docs/plano/pagamentos.md).
 
+### Worker (Etapa F)
+
+```bash
+flask worker run                 # laço (Background Worker no Render)
+flask worker run --once          # um ciclo de tudo e sai (cron); --task events|alerts|weekly|reconcile|tokens
+flask worker status              # eventos pendentes/esgotados por empresa
+```
+
+Sem o worker rodando, nada de e-mail de atribuição, alertas ou relatório semanal sai (os
+eventos ficam na fila). Detalhes, retentativas e variáveis em
+[`docs/plano/worker.md`](docs/plano/worker.md).
+
 ### Produção
 
 `APP_ENV=production` exige `SECRET_KEY`, `DATABASE_URL` e `REDIS_URL` (ou
@@ -224,7 +245,8 @@ Não ligue o access log do Gunicorn (ele grava o caminho, que pode ter token): o
 registra cada requisição em JSON com o molde da rota.
 
 Rotinas agendadas (cron): `flask lgpd-purge --operador cron` e `flask lgpd-retencao
---operador cron` (diárias), `flask suporte expirar` (de hora em hora). Acesso de suporte:
+--operador cron` (diárias), `flask suporte expirar` (de hora em hora). O worker
+(`flask worker run`, processo separado) já cobre `billing-reconcile` e a limpeza de tokens. Acesso de suporte:
 `flask suporte conceder EMAIL --empresa UUID --motivo "..." --horas 4 --autorizado-por "..."`.
 Auditoria de dependências: `pip-audit -r requirements-dev.txt`.
 Servidor: `gunicorn run:app`. Variáveis em [`.env.example`](.env.example) e em

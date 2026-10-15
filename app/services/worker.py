@@ -250,7 +250,9 @@ def run_task(name: str, now: datetime | None = None) -> dict:
         return {"error": exc.__class__.__name__}
     finally:
         db.session.remove()
-    logger.info("tarefa %s: %s", name, result)
+    # Ciclo sem trabalho fica em DEBUG (o laço roda a cada 30 s).
+    busy = any(v for v in result.values() if isinstance(v, (int, float))) if isinstance(result, dict) else True
+    logger.log(logging.INFO if busy else logging.DEBUG, "tarefa %s: %s", name, result)
     return result
 
 

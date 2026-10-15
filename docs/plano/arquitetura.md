@@ -58,9 +58,11 @@ flowchart LR
 - **Web**: Flask 3 com app factory e blueprints: `public` (site), `auth`, `app` (área
   logada, prefixo `/app`), `billing`, `webhooks`, `api_v1` (só com flag), `dev` (só em
   development: `/estilo`).
-- **Worker**: processo separado (`flask worker`) que roda jobs periódicos: e-mails pendentes,
-  reconciliação do Asaas, limpeza de tokens, apagamento LGPD e, na fase 9, entrega do outbox.
-  Sem Celery no MVP: loop simples com `SELECT ... FOR UPDATE SKIP LOCKED`.
+- **Worker** (Etapa F, ADR-0010): processo separado (`flask worker run`, `--once` para cron)
+  que consome o outbox (`domain_events`, um evento por transação com `FOR UPDATE SKIP LOCKED`,
+  tentativas com backoff) e roda tarefas idempotentes: alertas, relatório semanal,
+  reconciliação do Asaas e limpeza de tokens. Empresa a empresa com `rls.set_context`, sem
+  papel `BYPASSRLS`. Sem Celery. Runbook em [`worker.md`](worker.md).
 - **Templates**: Jinja com macros em `app/templates/components/`, tokens em
   `app/static/css/tokens.css`, HTMX e fontes servidos pelo próprio site.
 
@@ -421,8 +423,11 @@ Vínculo com várias empresas: `memberships` N:N; a troca de empresa reescreve
 - `app/services/events.py::emit(type, payload)` adiciona uma linha em `domain_events` na
   **mesma transação** da mudança. Tipos do MVP: `project.created`,
   `activity.progress_updated`, `stage.completed`, `project.completed`.
-- No MVP nada consome além das métricas internas. Na fase 9 o worker lê
-  `published_at IS NULL` com `FOR UPDATE SKIP LOCKED` e entrega aos webhooks de saída.
+- Etapa F: o worker lê `published_at IS NULL` (por empresa, `FOR UPDATE SKIP LOCKED`), chama o
+  consumidor do tipo (`worker._handlers`: `activity.assigned` → e-mail ao responsável;
+  `plan.visual_custom_contracted` → aviso à equipe) e marca `published_at`; erro → `attempts`,
+  `next_attempt_at` (backoff) e `last_error`. Tipos sem consumidor (públicos) só são marcados
+  até existirem os webhooks de saída.
 
 ## 9. API de publicação (fase 9, atrás de `FEATURE_PUBLIC_API`)
 
@@ -444,6 +449,7 @@ Vínculo com várias empresas: `memberships` N:N; a troca de empresa reescreve
 | `ASAAS_API_KEY`, `ASAAS_BASE_URL`, `ASAAS_WEBHOOK_TOKEN` | pagamento |
 | `EMAIL_BACKEND`, `RESEND_API_KEY`, `MAIL_FROM` | e-mail |
 | `SENTRY_DSN` | monitoramento |
+| `WORKER_INTERVAL_SECONDS`, `WORKER_EVENT_MAX_ATTEMPTS`, `STAFF_NOTIFY_EMAIL` | worker (Etapa F, `worker.md`) |
 
 Ambientes: `development` (SQLite ou Postgres local via docker-compose, e-mail no console),
 `test` (Postgres via `TEST_DATABASE_URL`), `staging` e `production` (Render, segredos

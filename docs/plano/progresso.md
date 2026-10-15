@@ -847,3 +847,96 @@ critérios de pronto da anterior estiverem marcados.
 - [ ] Não feito de propósito: destaque de etapas futuras “aguardando peça” (o campo não existe; não foi criado).
 - [ ] Suíte em PostgreSQL não rodada (banco local ocupado). Conferência visual feita por captura automática (375/768/1280, claro/escuro, sem rolagem horizontal da página); revisão humana pendente. Treemap tem texto pequeno no celular (a tabela repete os valores).
 - Testes SQLite: tudo verde (painel, calc, charts, isolamento, visual, fase6 com manifesto de assets reconstruído).
+
+## Etapa F — worker, aguardando peça, alertas e e-mails
+- Status: concluída em SQLite (pendências abaixo) · 2026-10-15
+- Entregas:
+  - [x] **Worker** (ADR-0010, proposto): `flask worker run` (laço; `SIGTERM` para no fim do
+    ciclo), `--once` (cron/testes), `--task events|alerts|weekly|reconcile|tokens`,
+    `flask worker status`. Laço **empresa a empresa com `rls.set_context`**, sem papel
+    `BYPASSRLS`. Outbox: um evento por transação, `FOR UPDATE SKIP LOCKED`, `attempts` +
+    `next_attempt_at` (60 s × 2^n, teto 6 h) + `last_error` (só o nome da exceção), limite
+    `WORKER_EVENT_MAX_ATTEMPTS` (8). Tarefas idempotentes: alertas (dedupe), relatório
+    semanal (`job_runs`), `billing.reconcile_all` (reaproveitado), limpeza de tokens
+    (`lgpd.purge_expired_tokens`, auditada em `platform_audit_logs`). Runbook
+    `docs/plano/worker.md`. Migration `e2b7f1c3a9d0` (down `d4a8c2e6f1b3`): colunas no outbox +
+    `job_runs` (RLS).
+  - [x] **Aguardando peça**: `stages.waiting_part`, `part_expected_on`, `part_note` (140),
+    `part_updated_at` — migration `f3c8a2d4b1e5`. `POST /app/etapas/<id>/aguardando-peca`
+    (supervisor+, `version` → 409, auditoria `stage.waiting_part` sem a observação livre, 404
+    cruzado). Só sinaliza: registro de peças continua livre (teste). Selo texto + ícone
+    (`i-package`) na lista de projetos, no resumo da etapa do detalhe, no painel (cabeçalho e
+    tabelas). Resolve a pendência da Etapa E (“destaque de aguardando peça”).
+  - [x] **Alertas**: regra PURA `calc.alertas_projeto` (atraso previsto, prazo em risco, etapa
+    parada há X dias úteis, peça atrasada) + `calc.dias_parada_valido`. Tabela `alerts`
+    (RLS, `UNIQUE(company_id, dedupe_key, day)`), `companies.stalled_days` (padrão 3, CHECK
+    1..60, validado no formulário e no serviço), migration `a5d9e3f7c2b8`. Tela `/app/alertas`
+    (supervisor+, 14 dias, item “Alertas” no menu). E-mail-resumo a supervisores/proprietários
+    com `notify_alerts`, a partir das 7h locais; a mesma situação volta ao e-mail no máx. 1×
+    a cada 7 dias.
+  - [x] **Atribuição**: consumidor de `activity.assigned` → e-mail com link
+    (`/app/atividades/<id>`, base `APP_BASE_URL`) ao responsável com `notify_assignment`;
+    não envia se a pessoa se atribuiu (payload ganhou `assigned_by_user_id`, só id), se foi
+    reatribuída, se saiu da empresa ou se a atividade foi arquivada; falha → backoff.
+  - [x] **Relatório semanal**: segunda, a partir das 7h locais, uma vez por semana ISO por
+    empresa; projetos (calc/serviços) e pessoas (`calc.progresso_por_pessoa`, todos os
+    projetos, últimos 7 dias); anexo XLSX (`exporter.weekly_xlsx`, células neutralizadas).
+  - [x] Preferências por usuário em `/conta/perfil#notificacoes` (`users.notify_assignment`,
+    `notify_alerts`, `notify_weekly`, padrão ligado; valem em todas as empresas).
+  - [x] E-mail: anexos (`email.Attachment`; Resend em base64), `email.send_now` (síncrono,
+    levanta `EmailError` para o worker), `email.request_scope` (links fora de requisição),
+    rodapé por bloco (`emails/_base.*`) com o link para desligar. Aviso à equipe da requisição
+    de identidade visual (`STAFF_NOTIFY_EMAIL`) — resolve a pendência da Etapa C.
+- Critérios de pronto:
+  - [x] Testes novos verdes (`test_etapa_f_worker.py` 12, `test_etapa_f_peca.py` 6,
+    `test_etapa_f_alertas.py` 21, `test_etapa_f_atribuicao.py` 6, `test_etapa_f_semanal.py` 4)
+    e antigos verdes em SQLite
+  - [x] Teste A/B para cada rota nova (`ROUTES_ETAPA_F` + `test_etapa_f_alertas_so_da_propria_empresa`
+    e `test_etapa_f_preferencias_so_do_proprio_usuario` em `tests/test_isolation.py`)
+  - [x] `calc.py` continua puro; nenhum cálculo no template (contagem de etapas aguardando
+    peça vem de `dashboard.build`/serviço)
+  - [x] `RLS_TABLES` + políticas nas tabelas novas (`job_runs`, `alerts`); `test_schema` verde;
+    `flask db heads` = `a5d9e3f7c2b8`; upgrade → downgrade → upgrade sem drift em SQLite
+  - [ ] Suíte e migrations em PostgreSQL 16 (não rodadas: banco local ocupado por outro processo)
+  - [ ] Telas conferidas em 375/768/1280 claro/escuro (sem navegador nesta sessão; só macros e
+    tokens, `test_visual` verde, manifesto de assets reconstruído)
+  - [x] Revisão de segurança do diff (manual, abaixo)
+- Testes: SQLite `646 passed, 59 skipped, 3 xfailed` (antes da etapa: 593 passed).
+- /security-review (manual): empresa sempre da sessão (rotas) ou do evento/laço (worker, com
+  `set_context` antes de cada consulta); ids do payload resolvidos com `company_id` do evento;
+  destinatários só com vínculo `usable()`, sem suporte, usuário ativo e preferência ligada;
+  e-mails só com nome da empresa/projeto/etapa/atividade e links de `APP_BASE_URL`; HTML dos
+  e-mails com autoescape; `last_error` sem mensagem (pode ter PII); logs sem endereço; XLSX
+  neutralizado; CSRF em todo POST novo; papel checado na rota (403) além de esconder o botão.
+- ADRs: 0010 (worker laço por empresa) — **proposto, confirmar**; atualizações em 0003 (tabela
+  de fluxos) e 0005.
+- Decisões a confirmar com o usuário:
+  - Preferências de e-mail no USUÁRIO (valem em todas as empresas), não por vínculo.
+  - Alertas e relatório só para supervisor+ (operador não vê `/app/alertas`).
+  - “Etapa parada” em dias ÚTEIS (feriados e fins de semana não contam) e só para etapa “Em
+    andamento”; etapa aguardando peça não gera “parada”. Margens fixas no calc: folga ≤ 1 dia
+    útil = prazo em risco; sem previsão, prazo em ≤ 5 dias úteis = risco.
+  - E-mail de alertas a partir das 7h locais; repetição no máx. 1×/7 dias por situação;
+    relatório semanal na segunda a partir das 7h (semana anterior, seg–dom).
+  - Marcar/desmarcar “aguardando peça” incrementa `stages.version` (invalida um renomear aberto).
+  - Empresas com exclusão pedida (carência LGPD) não recebem alertas nem relatório.
+  - Eventos públicos sem consumidor são marcados publicados (até existirem webhooks de saída).
+- Pendências:
+  - PDF do relatório semanal: fora (sem dependência leve no `requirements.txt`; reportlab/
+    weasyprint são pesadas) — só XLSX.
+  - Rodar no PostgreSQL: suíte com `TEST_DATABASE_URL`, `tests/test_migrations.py` (roundtrip
+    das 3 migrations + políticas `tenant_isolation` em `job_runs`/`alerts`), `tests/test_rls.py`
+    (as tabelas novas entram no parametrize de `RLS_TABLES`), worker com `RLS_ENABLED=1` e papel
+    `NOSUPERUSER NOBYPASSRLS` (`flask worker run --once` com RLS forçado), `FOR UPDATE SKIP
+    LOCKED` com dois workers simultâneos, e o ramo da migration que liga ENABLE/FORCE quando o RLS
+    já está ativo.
+  - Link do e-mail de atribuição abre na empresa ATIVA da sessão; quem tem várias empresas pode
+    cair em 404 até trocar de empresa (texto do e-mail avisa). Melhoria: parâmetro de troca
+    segura de empresa no link.
+  - Render: criar o Background Worker (`flask worker run`) ou cron `flask worker run --once`;
+    definir `STAFF_NOTIFY_EMAIL`.
+  - Conferência visual: `/app/alertas`, formulário/selo de aguardando peça (detalhe, lista,
+    painel), seção “Notificações por e-mail” no perfil e “Alertas” em `/app/empresa`.
+  - Eventos esgotados não são apagados pela retenção (só os publicados): acompanhar com
+    `flask worker status`.
+

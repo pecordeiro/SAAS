@@ -1,13 +1,16 @@
 # Webhooks de saída — desenho (não implementado)
 
 Status: **somente desenho** (Fase 9). Nada disto existe em código. Implementação futura
-sobre o outbox `domain_events` (já gravado na mesma transação da mudança).
+sobre o outbox `domain_events` (já gravado na mesma transação da mudança). O worker existe
+desde a Etapa F (`docs/plano/worker.md`); hoje ele só MARCA os eventos públicos como
+publicados — ao implementar os webhooks, registre o consumidor em `worker._handlers` e decida
+o que fazer com os eventos antigos já marcados.
 
 ## Fluxo
 1. A empresa (owner, plano com feature `api`) cadastra uma URL HTTPS e escolhe os tipos de
    evento (`activity.progress_updated`, `stage.completed`, `project.completed`, ...). O
    segredo de assinatura (32 bytes aleatórios) é mostrado uma vez e guardado cifrado.
-2. O worker lê `domain_events` com `published_at IS NULL` (papel de plataforma, ADR-0003),
+2. O worker lê `domain_events` com `published_at IS NULL` (empresa a empresa no contexto RLS, ADR-0010),
    cria uma entrega por endpoint inscrito e faz o POST.
 3. Sucesso (2xx em até 10 s) marca a entrega como feita; o evento só recebe `published_at`
    quando todas as entregas terminam (sucesso ou esgotadas).

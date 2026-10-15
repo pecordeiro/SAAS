@@ -20,3 +20,10 @@ só gravamos (e usamos para métricas); a entrega começa na fase 9.
 ## Alternativas
 Fila externa (Redis/RabbitMQ) sem outbox: risco de inconsistência. CDC/Debezium: pesado
 demais para o porte.
+
+## Atualização da Etapa F
+O worker passou a existir (ADR-0010): consome por empresa, um evento por transação, com
+`attempts`/`next_attempt_at`/`last_error` (backoff exponencial, limite
+`WORKER_EVENT_MAX_ATTEMPTS`). Primeiros consumidores internos: `activity.assigned` (e-mail ao
+responsável) e `plan.visual_custom_contracted` (aviso à equipe). Entrega continua “pelo menos
+uma vez”: cada consumidor confere o estado atual antes de agir.
