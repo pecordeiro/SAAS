@@ -43,3 +43,4 @@ from app.models.staff import (  # noqa: F401,E402  (Etapa C)
     VISUAL_STATUSES,
     VisualRequest,
 )
+from app.models.notifications import JobRun  # noqa: F401,E402  (Etapa F)

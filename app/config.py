@@ -139,6 +139,11 @@ class Config:
     RETENTION_THROTTLE_DAYS = 30
     # Acesso de suporte (flask suporte conceder): teto de horas por concessão.
     SUPPORT_ACCESS_MAX_HOURS = 72
+    # Etapa F — worker (flask worker run, ADR-0010).
+    WORKER_INTERVAL_SECONDS = 30  # pausa entre ciclos do laço
+    WORKER_EVENT_MAX_ATTEMPTS = 8  # depois disso o evento sai da fila (flask worker status)
+    # Aviso à equipe da plataforma (requisição de identidade visual). Vazio = sem aviso.
+    STAFF_NOTIFY_EMAIL: str | None = None
 
     @classmethod
     def from_env(cls) -> dict:
@@ -188,6 +193,13 @@ class Config:
         for key in ("IMPORT_RATE_LIMIT", "WEBHOOK_RATE_LIMIT", "LGPD_EXPORT_RATE_LIMIT", "LGPD_DELETE_RATE_LIMIT", "LOG_LEVEL"):
             values[key] = os.environ.get(key) or getattr(cls, key)
         values["LOG_JSON"] = _bool("LOG_JSON", cls.LOG_JSON)
+        # Etapa F — worker
+        values["STAFF_NOTIFY_EMAIL"] = os.environ.get("STAFF_NOTIFY_EMAIL") or cls.STAFF_NOTIFY_EMAIL
+        for key in ("WORKER_INTERVAL_SECONDS", "WORKER_EVENT_MAX_ATTEMPTS"):
+            try:
+                values[key] = max(1, int(os.environ.get(key, getattr(cls, key))))
+            except ValueError:
+                raise RuntimeError(f"{key} precisa ser um número inteiro.") from None
         values["SENTRY_DSN"] = os.environ.get("SENTRY_DSN") or None
         try:
             values["SENTRY_TRACES_SAMPLE_RATE"] = float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", cls.SENTRY_TRACES_SAMPLE_RATE))

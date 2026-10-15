@@ -36,8 +36,9 @@ USER_GUC = "app.user_id"
 # 4d8a644d753b) — permite ler SÓ o convite cujo hash é este, antes de saber a empresa.
 TOKEN_GUC = "app.token_hash"
 
-# Tabelas com política, iguais às da migration b3e9f1a2c4d5. tests/test_schema.py confere
-# que toda tabela com company_id NOT NULL do metadata está aqui (e no banco).
+# Tabelas com política: as da migration b3e9f1a2c4d5 + as novas de cada etapa (cada migration
+# cria a sua ``tenant_isolation``). tests/test_schema.py confere que toda tabela com
+# company_id NOT NULL do metadata está aqui (e no banco).
 RLS_TABLES: tuple[str, ...] = (
     "memberships",
     "invitations",
@@ -56,6 +57,8 @@ RLS_TABLES: tuple[str, ...] = (
     "domain_events",
     "api_clients",
     "api_tokens",
+    # Etapa F (worker, ADR-0010): migration e2b7f1c3a9d0.
+    "job_runs",
 )
 
 _UNSET: Any = object()

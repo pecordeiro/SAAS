@@ -15,17 +15,28 @@ requisição pode ser forjado e envenenar o link de reset).
 
 from __future__ import annotations
 
+import base64
 import logging
-from dataclasses import dataclass
+from contextlib import nullcontext
+from dataclasses import dataclass, field
 from email.message import EmailMessage as _MimeMessage
 from pathlib import Path
 from typing import Protocol
 
-from flask import Flask, current_app, render_template, url_for
+from flask import Flask, current_app, has_request_context, render_template, url_for
 
 logger = logging.getLogger(__name__)
 
 RESEND_URL = "https://api.resend.com/emails"
+
+
+@dataclass(frozen=True)
+class Attachment:
+    """Anexo (Etapa F: XLSX do relatório semanal). ``content`` em bytes."""
+
+    filename: str
+    content: bytes
+    content_type: str = "application/octet-stream"
 
 
 @dataclass(frozen=True)
@@ -34,6 +45,7 @@ class EmailMessage:
     subject: str
     text: str
     html: str
+    attachments: tuple[Attachment, ...] = field(default_factory=tuple)
 
 
 class EmailSender(Protocol):
@@ -69,6 +81,9 @@ class ConsoleEmailSender:
         mime["Subject"] = message.subject
         mime.set_content(message.text)
         mime.add_alternative(message.html, subtype="html")
+        for item in message.attachments:
+            maintype, _, subtype = item.content_type.partition("/")
+            mime.add_attachment(item.content, maintype=maintype, subtype=subtype or "octet-stream", filename=item.filename)
         path = folder / f"{len(self.messages):04d}.eml"
         path.write_bytes(bytes(mime))
 
@@ -84,17 +99,23 @@ class ResendEmailSender:
     def send(self, message: EmailMessage) -> None:
         import requests
 
+        body = {
+            "from": self.sender,
+            "to": [message.to],
+            "subject": message.subject,
+            "text": message.text,
+            "html": message.html,
+        }
+        if message.attachments:
+            body["attachments"] = [
+                {"filename": a.filename, "content": base64.b64encode(a.content).decode("ascii")}
+                for a in message.attachments
+            ]
         try:
             response = requests.post(
                 RESEND_URL,
                 headers={"Authorization": f"Bearer {self.api_key}"},
-                json={
-                    "from": self.sender,
-                    "to": [message.to],
-                    "subject": message.subject,
-                    "text": message.text,
-                    "html": message.html,
-                },
+                json=body,
                 timeout=self.timeout,
             )
         except requests.RequestException as exc:
@@ -149,17 +170,44 @@ def external_url(endpoint: str, **values) -> str:
     raise RuntimeError("APP_BASE_URL é obrigatório para montar links de e-mail fora de development/test.")
 
 
-def send_template(to: str, subject: str, template: str, **context) -> None:
-    """Renderiza ``emails/<template>.txt`` e ``.html`` e envia."""
+def render_message(to: str, subject: str, template: str, attachments=(), **context) -> EmailMessage:
+    """Monta a mensagem a partir de ``emails/<template>.txt`` e ``.html`` (sem enviar)."""
     context.setdefault("subject", subject)
     context.setdefault("site_url", _site_url())
-    message = EmailMessage(
+    return EmailMessage(
         to=to,
         subject=subject,
         text=render_template(f"emails/{template}.txt", **context),
         html=render_template(f"emails/{template}.html", **context),
+        attachments=tuple(attachments),
     )
-    deliver(message)
+
+
+def send_template(to: str, subject: str, template: str, **context) -> None:
+    """Renderiza ``emails/<template>.txt`` e ``.html`` e envia."""
+    deliver(render_message(to, subject, template, **context))
+
+
+def send_now(message: EmailMessage) -> None:
+    """Entrega SÍNCRONA para o worker (Etapa F): falha levanta ``EmailError`` para o evento do
+    outbox ser tentado de novo com backoff. Nunca usar dentro de requisição web."""
+    sender = get_sender()
+    try:
+        sender.send(message)
+    except EmailError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - normaliza qualquer falha do backend
+        logger.error("falha inesperada ao enviar e-mail '%s' (%s)", message.subject, exc.__class__.__name__)
+        raise EmailError("falha ao enviar e-mail") from None
+
+
+def request_scope():
+    """Fora de requisição (worker/CLI) ``url_for`` e os context processors precisam de uma
+    requisição: cria uma sintética com a URL base do site (``APP_BASE_URL``)."""
+    if has_request_context():
+        return nullcontext()
+    base = current_app.config.get("APP_BASE_URL") or "http://localhost"
+    return current_app.test_request_context("/", base_url=base)
 
 
 def _safe_send(sender: EmailSender, message: EmailMessage) -> None:

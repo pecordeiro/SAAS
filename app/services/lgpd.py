@@ -454,3 +454,40 @@ def apply_retention(*, operator: str, now: datetime | None = None, dry_run: bool
     )
     db.session.commit()
     return counts
+
+
+TOKENS_PURGED = "worker.tokens_purged"
+
+
+def purge_expired_tokens(*, operator: str, now: datetime | None = None) -> dict[str, int]:
+    """Etapa F (tarefa ``tokens`` do worker): só a parte de tokens da retenção — resets de
+    senha, confirmações de e-mail e convites usados/vencidos/revogados há mais de
+    ``RETENTION_TOKENS_DAYS``. Idempotente; convites empresa a empresa no contexto RLS dela.
+    Registra em ``platform_audit_logs`` só quando apagou algo (só contagens)."""
+    now = now or _now()
+    limit = now - _days("RETENTION_TOKENS_DAYS", 30)
+    counts: dict[str, int] = {}
+    for model in (PasswordReset, EmailConfirmation):
+        stmt = delete(model.__table__).where(
+            model.created_at < limit, or_(model.used_at.is_not(None), model.expires_at < now)
+        )
+        counts[model.__tablename__] = db.session.execute(stmt).rowcount or 0
+    counts["invitations"] = 0
+    try:
+        for company_id in list(db.session.execute(select(Company.id)).scalars()):
+            rls.set_context(company_id=company_id)
+            counts["invitations"] += db.session.execute(
+                delete(Invitation.__table__).where(
+                    Invitation.company_id == company_id,
+                    Invitation.created_at < limit,
+                    or_(Invitation.used_at.is_not(None), Invitation.revoked_at.is_not(None), Invitation.expires_at < now),
+                )
+            ).rowcount or 0
+    finally:
+        rls.set_context(company_id=None)
+    if any(counts.values()):
+        db.session.add(
+            PlatformAuditLog(action=TOKENS_PURGED, operator=operator[:120], details={k: v for k, v in counts.items() if v})
+        )
+    db.session.commit()
+    return counts

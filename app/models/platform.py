@@ -63,6 +63,10 @@ class DomainEvent(UUIDPk, TenantMixin, db.Model):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    # Etapa F (worker, ADR-0010): próxima tentativa depois de uma falha (backoff) e o nome da
+    # última exceção (nunca a mensagem: pode carregar dado pessoal).
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(String(200))
 
 
 class ApiClient(UUIDPk, Timestamps, TenantMixin, db.Model):

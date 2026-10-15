@@ -229,3 +229,46 @@ def register_cli(app: Flask) -> None:
                 click.echo("Senha: a definida em DEMO_PASSWORD.")
             else:
                 click.echo(f"Senha gerada para todos: {password}")
+
+    # ------------------------------------------------------------------ worker (Etapa F)
+    from app.services import worker as worker_svc
+
+    worker_cli = AppGroup("worker", help="Worker: outbox e tarefas agendadas (ADR-0010).")
+
+    @worker_cli.command("run")
+    @click.option("--once", is_flag=True, help="Roda um ciclo (todas as tarefas pedidas) e sai — cron e testes.")
+    @click.option(
+        "--task",
+        "tasks",
+        multiple=True,
+        type=click.Choice(worker_svc.TASKS),
+        help="Tarefa a rodar (repita para várias). Padrão: todas.",
+    )
+    @click.option("--interval", type=float, default=None, help="Segundos entre ciclos (padrão WORKER_INTERVAL_SECONDS).")
+    def worker_run(once: bool, tasks: tuple[str, ...], interval: float | None) -> None:
+        """Consome domain_events pendentes e roda as tarefas agendadas, empresa a empresa."""
+        chosen = tuple(tasks) or worker_svc.TASKS
+        if once:
+            results = worker_svc.run_once(chosen)
+            for name, result in results.items():
+                click.echo(f"{name}: {result}")
+            if any("error" in r for r in results.values()):
+                raise SystemExit(1)
+            return
+        loop = worker_svc.Loop(
+            tasks=chosen, interval=interval or float(current_app.config.get("WORKER_INTERVAL_SECONDS", 30))
+        )
+        loop.install_signals()
+        loop.run()
+
+    @worker_cli.command("status")
+    def worker_status() -> None:
+        """Eventos pendentes e esgotados (tentativas no limite), por empresa."""
+        rows = worker_svc.queue_status()
+        if not rows:
+            click.echo("Fila vazia: nenhum evento pendente.")
+            return
+        for row in rows:
+            click.echo(f"empresa {row['company_id']}: pendentes={row['pending']} esgotados={row['dead']}")
+
+    app.cli.add_command(worker_cli)
