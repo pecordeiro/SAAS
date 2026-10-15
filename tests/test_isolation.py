@@ -103,7 +103,7 @@ def test_toda_rota_com_uuid_tem_caso_de_isolamento(app_factory, flags):
     """Varre o url_map (com e sem as flags que registram blueprints) e falha se alguma rota
     com <uuid:> não tiver caso A/B. Rota com dois <uuid:> também precisa estar listada."""
     app = app_factory(flags)
-    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI + ROUTES_ETAPA_D + ROUTES_ETAPA_E
+    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI + ROUTES_ETAPA_D + ROUTES_ETAPA_E + ROUTES_ETAPA_F
     cobertas = {template.replace("{id}", "") for _, template, _, _ in todas}
     # Etapa C: /interno é da plataforma (sem empresa na URL); acesso cruzado = não ser equipe → 404,
     # coberto por tests/test_etapa_c_interno.py::test_interno_e_404_para_quem_nao_e_equipe.
@@ -235,7 +235,10 @@ def _snapshot(company_id) -> dict:
             (p.name, p.quantity, p.archived_at is None, str(p.template_version_id))
             for p in q(Project).filter_by(company_id=company_id)
         ),
-        "stages": sorted((s.name, s.position, s.archived_at is None) for s in q(Stage).filter_by(company_id=company_id)),
+        "stages": sorted(
+            (s.name, s.position, s.archived_at is None, s.waiting_part, s.version)
+            for s in q(Stage).filter_by(company_id=company_id)
+        ),
         "activities": sorted(
             (a.name, str(a.ideal_minutes), a.position, a.units_done, a.archived_at is None)
             for a in q(Activity).filter_by(company_id=company_id)
@@ -707,3 +710,35 @@ def test_etapa_d_arrastar_com_etapa_de_outra_empresa_responde_404_e_nada_grava(c
     assert post(client, app, order, {"order": [str(a.stage_id), str(b.stage_id)]}).status_code == 404
     with app.app_context():
         assert _snapshot(a.company_id) == before_a and _snapshot(b.company_id) == before_b
+
+
+# ================================================================ Etapa F — aguardando peça
+# Dono de A marcando etapa de B → 404 e nada muda em B (nem marca, nem versão, nem auditoria).
+
+ROUTES_ETAPA_F = [
+    (
+        "POST", "/app/etapas/{id}/aguardando-peca", "stage_id",
+        {"waiting": "y", "expected_on": "2026-10-20", "note": "Invasora", "version": 1},
+    ),
+]
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_ETAPA_F)
+def test_etapa_f_recurso_de_outra_empresa_responde_404(client, app, tenants, method, template, field, data):
+    a, b = tenants
+    with app.app_context():
+        before = _snapshot(b.company_id)
+    login(client, app, a.owner_email)
+    assert _call(client, app, method, template.format(id=getattr(b, field)), data).status_code == 404
+    with app.app_context():
+        assert _snapshot(b.company_id) == before
+        assert db.session.get(Stage, b.stage_id).waiting_part is False
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_ETAPA_F)
+def test_etapa_f_mesma_rota_funciona_na_propria_empresa(client, app, tenants, method, template, field, data):
+    a, _ = tenants
+    login(client, app, a.owner_email)
+    assert _call(client, app, method, template.format(id=getattr(a, field)), data).status_code in (200, 302, 303)
+    with app.app_context():
+        assert db.session.get(Stage, a.stage_id).waiting_part is True

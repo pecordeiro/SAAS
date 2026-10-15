@@ -40,6 +40,9 @@ def build(
                 "n": i,
                 "id": stage.id,
                 "name": stage.name,
+                # Etapa F: “aguardando peça” (só sinaliza); objetos sem o campo valem False.
+                "waiting_part": bool(getattr(stage, "waiting_part", False)),
+                "part_expected_on": getattr(stage, "part_expected_on", None),
                 "r": r,
                 "pct_unidades": calc.razao(r.unidades, r.previstas),
                 "trabalhado_h": r.tempo_trabalhado_min / 60,
@@ -117,6 +120,7 @@ def build(
 
     return {
         "etapas": etapas,
+        "aguardando_peca": sum(1 for e in etapas if e["waiting_part"]),
         "quantity": quantity,
         "medidor": charts.medidor(result.progresso_geral),
         "unidades_pct": calc.razao(result.unidades_concluidas, quantity),

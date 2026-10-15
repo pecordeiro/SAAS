@@ -68,6 +68,7 @@
           {{ status_badge(status) }}
           {%- if deadline.late %}{{ badge("Atraso previsto" ~ (" · " ~ deadline.delay ~ " d.u." if deadline.delay else ""), "danger", "alert") }}
           {%- elif deadline.on_time %}<span class="text-success text-sm text-strong compact-only">no prazo</span>{% endif %}
+          {%- if it.waiting_part %}{{ badge("Aguardando peça" ~ (" · " ~ it.waiting_part ~ " etapas" if it.waiting_part > 1 else ""), "warning", "package") }}{% endif %}
         </span>
       </td>
     </tr>

@@ -7,6 +7,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -78,6 +79,13 @@ class Stage(UUIDPk, Timestamps, TenantMixin, db.Model):
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Etapa D: controle otimista na edição (renomear) — 409 com o valor atual.
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    # Etapa F: “aguardando peça” — SÓ SINALIZA (nunca bloqueia o registro de peças). Marcado e
+    # desmarcado por supervisor+ (projects.set_waiting_part); ``part_updated_at`` = última vez que
+    # alguém mexeu na marca (o lembrete sai quando a previsão passa sem atualização).
+    waiting_part: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    part_expected_on: Mapped[date | None] = mapped_column(Date)
+    part_note: Mapped[str | None] = mapped_column(String(140))
+    part_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     project: Mapped[Project] = relationship(back_populates="stages")
     activities: Mapped[list["Activity"]] = relationship(

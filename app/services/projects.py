@@ -491,6 +491,70 @@ def rename_stage(stage: Stage, name: str, expected_version: int | None = None, u
         )
 
 
+PART_NOTE_MAX = 140
+PART_DATE_MIN = date(2000, 1, 1)
+PART_DATE_MAX = date(2100, 12, 31)
+
+
+def set_waiting_part(
+    stage: Stage,
+    waiting: bool,
+    expected_on: date | None,
+    note: str | None,
+    expected_version: int | None = None,
+    user_id: uuid.UUID | None = None,
+) -> None:
+    """Etapa F: marca/desmarca “aguardando peça”. SÓ SINALIZA — o registro de peças continua
+    livre. Desmarcar limpa previsão e observação. ``expected_version`` velha → ``EditConflict``
+    (a versão da etapa é a mesma do renomear). Salvar de novo com a marca conta como
+    atualização (zera o lembrete de previsão vencida)."""
+    note = (note or "").strip() or None
+    if note is not None and len(note) > PART_NOTE_MAX:
+        raise EditError(f"A observação da peça tem no máximo {PART_NOTE_MAX} caracteres.")
+    if expected_on is not None and not (PART_DATE_MIN <= expected_on <= PART_DATE_MAX):
+        raise EditError("Previsão de chegada da peça inválida.")
+    if not waiting:
+        expected_on, note = None, None
+    before = {"aguardando": stage.waiting_part, "previsao": stage.part_expected_on.isoformat() if stage.part_expected_on else None}
+    _guarded_update(
+        Stage,
+        stage,
+        expected_version,
+        {
+            "waiting_part": bool(waiting),
+            "part_expected_on": expected_on,
+            "part_note": note,
+            "part_updated_at": _now() if waiting else None,
+        },
+        _stage_state,
+        STAGE_CONFLICT,
+    )
+    after = {"aguardando": bool(waiting), "previsao": expected_on.isoformat() if expected_on else None}
+    audit.record(
+        audit.STAGE_WAITING_PART, company_id=stage.company_id, actor_user_id=user_id,
+        object_type="project", object_id=stage.project_id,
+        details={"stage": stage.name, "antes": before, "depois": after},
+    )
+
+
+def waiting_part_counts(project_ids) -> dict[uuid.UUID, int]:
+    """Etapas ativas marcadas “aguardando peça” por projeto (lista de projetos, uma consulta)."""
+    ids = list(project_ids)
+    if not ids:
+        return {}
+    rows = db.session.execute(
+        select(Stage.project_id, func.count())
+        .where(
+            Stage.company_id == current_company_id(),
+            Stage.project_id.in_(ids),
+            Stage.waiting_part.is_(True),
+            Stage.archived_at.is_(None),
+        )
+        .group_by(Stage.project_id)
+    ).all()
+    return {pid: n for pid, n in rows}
+
+
 def update_activity(
     activity: Activity,
     name: str,

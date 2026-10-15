@@ -74,6 +74,15 @@ class AssignForm(BaseForm):
     assignee_id = StringField(filters=[_strip], validators=[Optional(), Length(max=36)])
 
 
+class WaitingPartForm(BaseForm):
+    """Etapa F: “aguardando peça” (supervisor+). Só sinaliza; o serviço revalida tudo."""
+
+    waiting = BooleanField("Aguardando peça")
+    expected_on = DateField("Previsão de chegada", validators=[Optional()])
+    note = StringField("Observação", filters=[_strip], validators=[Optional(), Length(max=140)])
+    version = IntegerField(validators=[Optional(), NumberRange(min=1)])
+
+
 class PositionForm(BaseForm):
     """Etapa D: mover a atividade (arrastar ou “Mover para”). O navegador só manda a
     intenção; etapa, posição e versão são conferidas no servidor."""

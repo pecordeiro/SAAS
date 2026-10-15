@@ -233,6 +233,9 @@
   .stage__status { grid-area: status; justify-self: end; }
   .stage__body { border-top: var(--border-width) solid var(--color-border-subtle); }
   .stage__body > .alert { margin: var(--space-3) var(--space-4) 0; }
+  /* Etapa F: marcar/atualizar “aguardando peça” (supervisor+). */
+  .stage__body > .part-toggle { margin: var(--space-3) var(--space-4) 0; }
+  .stage__name .badge { margin-left: var(--space-2); }
 
   @media (max-width: 47.99em) {
     .stage--done { order: 1; }

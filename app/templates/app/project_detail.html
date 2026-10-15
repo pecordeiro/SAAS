@@ -4,6 +4,7 @@
 {% from "components/alert.html" import alert %}
 {% from "components/empty_state.html" import empty_state %}
 {% from "components/modal.html" import confirm_dialog %}
+{% from "components/field.html" import checkbox %}
 {% set nav_current = "projects" %}
 {% set nav_project = project %}
 {% block title %}{{ project.name }} · Controle de Produção{% endblock %}
@@ -60,6 +61,28 @@
         {% include "app/detail/_stage_summary.html" %}
         <div class="stage__body">
           {%- if errors.get(stage.id) %}{{ alert("danger", errors.get(stage.id), role="alert") }}{% endif %}
+          {%- if stage.waiting_part %}
+          {{ alert("warning", "Aguardando peça" ~ (" · previsão " ~ (stage.part_expected_on|data) if stage.part_expected_on else ""), stage.part_note or "O registro de peças continua liberado; a marca só avisa a equipe.") }}
+          {%- endif %}
+          {%- if can_edit %}
+          <details class="part-toggle">
+            <summary class="btn btn--ghost">{{ icon("package") }}<span>{{ "Atualizar aguardando peça" if stage.waiting_part else "Marcar aguardando peça" }}</span></summary>
+            <form class="inline-form mt-2" method="post" action="{{ url_for('app.stage_waiting_part', stage_id=stage.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="version" value="{{ stage.version }}">
+              {{ checkbox("waiting", "Aguardando peça", checked=stage.waiting_part, value="y", id="aguardando-" ~ stage.id) }}
+              <div class="field inline-form__small">
+                <label class="field__label" for="previsao-{{ stage.id }}">Previsão de chegada</label>
+                <input class="field__input" id="previsao-{{ stage.id }}" type="date" name="expected_on" value="{{ stage.part_expected_on.isoformat() if stage.part_expected_on else '' }}">
+              </div>
+              <div class="field">
+                <label class="field__label" for="obs-peca-{{ stage.id }}">Observação (opcional)</label>
+                <input class="field__input" id="obs-peca-{{ stage.id }}" type="text" name="note" maxlength="140" value="{{ stage.part_note or '' }}">
+              </div>
+              {{ button("Salvar", "secondary") }}
+            </form>
+          </details>
+          {%- endif %}
           <ul class="activities" role="list">
             {%- for activity, ar in activities %}
             {% include "app/detail/_activity.html" %}

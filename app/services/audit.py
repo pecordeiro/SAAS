@@ -47,6 +47,8 @@ ACTIVITY_UPDATED = "activity.updated"
 ACTIVITY_ASSIGNED = "activity.assigned"
 ACTIVITY_MOVED = "activity.moved"
 STAGES_REORDERED = "stages.reordered"
+# Etapa F — aguardando peça.
+STAGE_WAITING_PART = "stage.waiting_part"
 TEMPLATE_VERSION_APPLIED = "template.version_applied"
 TEMPLATE_ARCHIVED = "template.archived"
 PROGRESS_UNDONE = "progress.undone"
@@ -84,6 +86,7 @@ ACTION_LABELS = {
     ACTIVITY_ASSIGNED: "Responsável da atividade alterado",
     ACTIVITY_MOVED: "Atividade movida",
     STAGES_REORDERED: "Etapas reordenadas",
+    STAGE_WAITING_PART: "Aguardando peça alterado",
     TEMPLATE_VERSION_APPLIED: "Versão do modelo aplicada",
     TEMPLATE_ARCHIVED: "Modelo arquivado",
     PROGRESS_UNDONE: "Registro desfeito",

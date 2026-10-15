@@ -3,7 +3,7 @@
 {% from "components/button.html" import button %}
 {% from "components/kpi.html" import kpi %}
 {% from "components/progress.html" import progress %}
-{% from "components/badge.html" import status_badge %}
+{% from "components/badge.html" import status_badge, badge %}
 {% from "components/table.html" import data_table %}
 {% from "components/empty_state.html" import empty_state %}
 {% from "components/chart.html" import gauge, legend, grouped_bars, donut, treemap_chart, stacked_columns, team_columns %}
@@ -23,7 +23,7 @@
     <a class="back-link" href="{{ url_for('app.project_detail', project_id=project.id) }}">{{ icon("chevron-left") }}{{ project.name }}</a>
     <h1>Painel do projeto</h1>
     <p class="page-header__subtitle muted">{{ project.name }}{% if project.product %} · {{ project.product }}{% endif %} · meta de {{ project.quantity }} {{ "unidade" if project.quantity == 1 else "unidades" }}</p>
-    <p class="cluster page-header__meta">{{ status_badge(project_status) }}</p>
+    <p class="cluster page-header__meta">{{ status_badge(project_status) }}{% if d.aguardando_peca %}{{ badge("Aguardando peça · " ~ d.aguardando_peca ~ (" etapa" if d.aguardando_peca == 1 else " etapas"), "warning", "package") }}{% endif %}</p>
   </div>
   <div class="page-header__actions">
     {{ button("Lançar peças", "secondary", icon="progress", href=url_for('app.project_detail', project_id=project.id)) }}
@@ -147,7 +147,7 @@
   <tbody>
     {%- for e in d.etapas %}
     <tr>
-      <td data-label="Etapa"><a class="row-link" href="{{ url_for('app.project_detail', project_id=project.id, etapa=e.id, _anchor='etapa-' ~ e.id) }}">{{ e.n }}. {{ e.name }}</a></td>
+      <td data-label="Etapa"><a class="row-link" href="{{ url_for('app.project_detail', project_id=project.id, etapa=e.id, _anchor='etapa-' ~ e.id) }}">{{ e.n }}. {{ e.name }}</a>{% if e.waiting_part %} {{ badge("Aguardando peça" ~ (" · prev. " ~ (e.part_expected_on|data_curta) if e.part_expected_on else ""), "warning", "package") }}{% endif %}</td>
       <td class="is-num" data-label="Tempo por unidade (min)">{{ e.r.tempo_unidade_min|num(0) }}</td>
       <td class="is-num" data-label="Peso">{{ e.r.peso_no_projeto|pct(1) }}</td>
       <td class="is-num" data-label="Previstas">{{ e.r.previstas }}</td>
@@ -172,7 +172,7 @@
   <tbody>
     {%- for e in d.etapas %}
     <tr>
-      <td data-label="Etapa"><a class="row-link" href="{{ url_for('app.project_detail', project_id=project.id, etapa=e.id, _anchor='etapa-' ~ e.id) }}">{{ e.n }}. {{ e.name }}</a></td>
+      <td data-label="Etapa"><a class="row-link" href="{{ url_for('app.project_detail', project_id=project.id, etapa=e.id, _anchor='etapa-' ~ e.id) }}">{{ e.n }}. {{ e.name }}</a>{% if e.waiting_part %} {{ badge("Aguardando peça" ~ (" · prev. " ~ (e.part_expected_on|data_curta) if e.part_expected_on else ""), "warning", "package") }}{% endif %}</td>
       <td class="is-num" data-label="Feitas">{{ e.r.unidades }}</td>
       <td class="is-num" data-label="Previstas">{{ e.r.previstas }}</td>
       <td data-label="% concluída">{{ progress(e.pct_unidades, 1, label="Unidades concluídas de " ~ e.name, size="sm", value_text=e.pct_unidades|pct(0)) }}</td>

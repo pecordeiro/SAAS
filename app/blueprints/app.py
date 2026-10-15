@@ -15,7 +15,7 @@ from flask_login import current_user
 from app.extensions import db
 from app.formatting import br_hours, local_dt
 from app.forms import ActivityForm, ProgressForm, StageForm
-from app.forms_production import ProjectFromTemplateForm
+from app.forms_production import ProjectFromTemplateForm, WaitingPartForm
 from app.models import ROLE_OPERATOR, ROLE_SUPERVISOR, Activity, Project, Stage, Template
 from app.services import audit, calc, dashboard, exporter
 from app.services import projects as svc
@@ -112,7 +112,9 @@ def _filtered_projects() -> tuple[list[dict], dict]:
     deadline = request.args.get("prazo", "")
     deadline = deadline if deadline in dict(DEADLINE_FILTERS) else ""
     q = (request.args.get("q") or "").strip()[:80]
-    items = [_list_item(p) for p in svc.list_projects(status, q)]
+    projects = svc.list_projects(status, q)
+    waiting = svc.waiting_part_counts(p.id for p in projects)
+    items = [dict(_list_item(p), waiting_part=waiting.get(p.id, 0)) for p in projects]
     if deadline == "atraso":
         items = [i for i in items if i["deadline"]["late"]]
     elif deadline == "semana":
@@ -543,6 +545,38 @@ def activity_create(stage_id):
     db.session.commit()
     flash("Atividade incluída.", "sucesso")
     return redirect(url_for("app.project_detail", project_id=stage.project_id, _anchor=f"etapa-{stage.id}"), 303)
+
+
+@bp.post("/etapas/<uuid:stage_id>/aguardando-peca")
+@tenant_required(ROLE_SUPERVISOR)
+def stage_waiting_part(stage_id):
+    """Etapa F: marca/desmarca “aguardando peça” (supervisor+, com ``version``). Só sinaliza:
+    nunca bloqueia o registro de peças. Etapa de outra empresa (ou arquivada) → 404."""
+    stage = get_or_404(Stage, stage_id)
+    project = stage.project
+    form = WaitingPartForm()
+    if not form.validate():
+        return _render_detail(project, errors={stage.id: "Confira a previsão (data) e a observação (até 140 caracteres)."},
+                              status=400, open_stage=stage.id)
+    try:
+        svc.set_waiting_part(stage, form.waiting.data, form.expected_on.data, form.note.data, form.version.data,
+                             current_user.id)
+    except svc.EditConflict:
+        db.session.rollback()
+        stage = get_or_404(Stage, stage_id)
+        state = "marcada como aguardando peça" if stage.waiting_part else "sem a marca de aguardando peça"
+        return _render_detail(
+            stage.project,
+            errors={stage.id: f"Outra pessoa alterou esta etapa enquanto você editava: agora ela está {state}. Confira e salve de novo."},
+            status=409,
+            open_stage=stage.id,
+        )
+    except svc.EditError as exc:
+        db.session.rollback()
+        return _render_detail(project, errors={stage.id: str(exc)}, status=400, open_stage=stage.id)
+    db.session.commit()
+    flash("Etapa marcada como aguardando peça." if form.waiting.data else "Marca de aguardando peça retirada.", "sucesso")
+    return redirect(url_for("app.project_detail", project_id=project.id, etapa=stage.id, _anchor=f"etapa-{stage.id}"), 303)
 
 
 @bp.get("/atividades/<uuid:activity_id>")
