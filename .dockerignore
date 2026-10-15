@@ -1,0 +1,44 @@
+# O contexto de build só leva o que a imagem precisa. Nada de segredo, banco local ou teste.
+.git
+.github
+.claude
+.gitignore
+
+# Segredos e ambiente local (NUNCA entram na imagem)
+.env
+.env.*
+!.env.example
+instance/
+*.db
+*.sqlite
+*.sqlite3
+*.eml
+*.dump
+*.age
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Fora da imagem de execução
+tests/
+docs/
+docker/
+docker-compose.yml
+requirements-dev.txt
+README.md
+CLAUDE.md
+render.yaml
+render.staging.yaml
+Dockerfile
+.dockerignore
+.DS_Store
+.idea/
+.vscode/

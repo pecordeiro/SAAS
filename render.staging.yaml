@@ -1,0 +1,213 @@
+# GERADO por scripts/gen_render_yaml.py — NÃO edite à mão (o CI confere). Veja docs/plano/lancamento.md.
+# Valide antes de criar o Blueprint:  render blueprints validate render.staging.yaml
+# Segredos: todos `sync: false` — o Render pergunta o valor uma única vez, no serviço web.
+services:
+- type: web
+  name: controle-web-staging
+  runtime: docker
+  region: virginia
+  plan: starter
+  dockerfilePath: ./Dockerfile
+  dockerContext: .
+  branch: staging
+  autoDeploy: true
+  healthCheckPath: /saude
+  preDeployCommand: sh -c "flask config-check --online && flask db upgrade && flask seed-plans"
+  envVars:
+  - key: APP_ENV
+    value: staging
+  - key: TRUSTED_PROXY_COUNT
+    value: '1'
+  - key: LOG_JSON
+    value: 'true'
+  - key: LOG_LEVEL
+    value: INFO
+  - key: RLS_ENABLED
+    value: 'true'
+  - key: FEATURE_PUBLIC_API
+    value: 'false'
+  - key: READ_ONLY_ENFORCED
+    value: 'true'
+  - key: BILLING_PROVIDER
+    value: asaas
+  - key: ASAAS_BASE_URL
+    value: https://api-sandbox.asaas.com/v3
+  - key: MAIL_BACKEND
+    value: resend
+  - key: STORAGE_BACKEND
+    value: s3
+  - key: STORAGE_S3_REGION
+    value: auto
+  - key: STORAGE_S3_ADDRESSING
+    value: path
+  - key: SENTRY_TRACES_SAMPLE_RATE
+    value: '0'
+  - key: DATABASE_URL
+    fromDatabase:
+      name: controle-db-staging
+      property: connectionString
+  - key: REDIS_URL
+    fromService:
+      type: keyvalue
+      name: controle-redis-staging
+      property: connectionString
+  - key: SECRET_KEY
+    sync: false
+  - key: MFA_ENCRYPTION_KEY
+    sync: false
+  - key: APP_BASE_URL
+    sync: false
+  - key: CONTACT_EMAIL
+    sync: false
+  - key: MAIL_FROM
+    sync: false
+  - key: RESEND_API_KEY
+    sync: false
+  - key: ASAAS_API_KEY
+    sync: false
+  - key: ASAAS_WEBHOOK_TOKEN
+    sync: false
+  - key: STORAGE_S3_ENDPOINT
+    sync: false
+  - key: STORAGE_S3_BUCKET
+    sync: false
+  - key: STORAGE_S3_ACCESS_KEY_ID
+    sync: false
+  - key: STORAGE_S3_SECRET_ACCESS_KEY
+    sync: false
+  - key: SENTRY_DSN
+    sync: false
+  - key: STAFF_NOTIFY_EMAIL
+    sync: false
+- type: worker
+  name: controle-worker-staging
+  runtime: docker
+  region: virginia
+  plan: starter
+  dockerfilePath: ./Dockerfile
+  dockerContext: .
+  branch: staging
+  autoDeploy: true
+  dockerCommand: flask worker run
+  envVars:
+  - key: APP_ENV
+    value: staging
+  - key: LOG_JSON
+    value: 'true'
+  - key: LOG_LEVEL
+    value: INFO
+  - key: RLS_ENABLED
+    value: 'true'
+  - key: FEATURE_PUBLIC_API
+    value: 'false'
+  - key: READ_ONLY_ENFORCED
+    value: 'true'
+  - key: BILLING_PROVIDER
+    value: asaas
+  - key: ASAAS_BASE_URL
+    value: https://api-sandbox.asaas.com/v3
+  - key: MAIL_BACKEND
+    value: resend
+  - key: STORAGE_BACKEND
+    value: s3
+  - key: STORAGE_S3_REGION
+    value: auto
+  - key: STORAGE_S3_ADDRESSING
+    value: path
+  - key: SENTRY_TRACES_SAMPLE_RATE
+    value: '0'
+  - key: DATABASE_URL
+    fromDatabase:
+      name: controle-db-staging
+      property: connectionString
+  - key: REDIS_URL
+    fromService:
+      type: keyvalue
+      name: controle-redis-staging
+      property: connectionString
+  - key: SECRET_KEY
+    fromService:
+      type: web
+      name: controle-web-staging
+      envVarKey: SECRET_KEY
+  - key: MFA_ENCRYPTION_KEY
+    fromService:
+      type: web
+      name: controle-web-staging
+      envVarKey: MFA_ENCRYPTION_KEY
+  - key: APP_BASE_URL
+    fromService:
+      type: web
+      name: controle-web-staging
+      envVarKey: APP_BASE_URL
+  - key: CONTACT_EMAIL
+    fromService:
+      type: web
+      name: controle-web-staging
+      envVarKey: CONTACT_EMAIL
+  - key: MAIL_FROM
+    fromService:
+      type: web
+      name: controle-web-staging
+      envVarKey: MAIL_FROM
+  - key: RESEND_API_KEY
+    fromService:
+      type: web
+      name: controle-web-staging
+      envVarKey: RESEND_API_KEY
+  - key: ASAAS_API_KEY
+    fromService:
+      type: web
+      name: controle-web-staging
+      envVarKey: ASAAS_API_KEY
+  - key: ASAAS_WEBHOOK_TOKEN
+    fromService:
+      type: web
+      name: controle-web-staging
+      envVarKey: ASAAS_WEBHOOK_TOKEN
+  - key: STORAGE_S3_ENDPOINT
+    fromService:
+      type: web
+      name: controle-web-staging
+      envVarKey: STORAGE_S3_ENDPOINT
+  - key: STORAGE_S3_BUCKET
+    fromService:
+      type: web
+      name: controle-web-staging
+      envVarKey: STORAGE_S3_BUCKET
+  - key: STORAGE_S3_ACCESS_KEY_ID
+    fromService:
+      type: web
+      name: controle-web-staging
+      envVarKey: STORAGE_S3_ACCESS_KEY_ID
+  - key: STORAGE_S3_SECRET_ACCESS_KEY
+    fromService:
+      type: web
+      name: controle-web-staging
+      envVarKey: STORAGE_S3_SECRET_ACCESS_KEY
+  - key: SENTRY_DSN
+    fromService:
+      type: web
+      name: controle-web-staging
+      envVarKey: SENTRY_DSN
+  - key: STAFF_NOTIFY_EMAIL
+    fromService:
+      type: web
+      name: controle-web-staging
+      envVarKey: STAFF_NOTIFY_EMAIL
+  - key: WORKER_INTERVAL_SECONDS
+    value: '30'
+- type: keyvalue
+  name: controle-redis-staging
+  region: virginia
+  plan: starter
+  maxmemoryPolicy: allkeys-lru
+  ipAllowList: []
+databases:
+- name: controle-db-staging
+  databaseName: controle
+  user: controle
+  region: virginia
+  plan: basic-256mb
+  postgresMajorVersion: '16'
+  ipAllowList: []

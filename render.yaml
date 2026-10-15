@@ -1,0 +1,481 @@
+# GERADO por scripts/gen_render_yaml.py — NÃO edite à mão (o CI confere). Veja docs/plano/lancamento.md.
+# Valide antes de criar o Blueprint:  render blueprints validate render.yaml
+# Segredos: todos `sync: false` — o Render pergunta o valor uma única vez, no serviço web.
+services:
+- type: web
+  name: controle-web
+  runtime: docker
+  region: virginia
+  plan: starter
+  dockerfilePath: ./Dockerfile
+  dockerContext: .
+  branch: main
+  autoDeploy: false
+  healthCheckPath: /saude
+  preDeployCommand: sh -c "flask config-check --online && flask db upgrade && flask seed-plans"
+  envVars:
+  - key: APP_ENV
+    value: production
+  - key: TRUSTED_PROXY_COUNT
+    value: '1'
+  - key: LOG_JSON
+    value: 'true'
+  - key: LOG_LEVEL
+    value: INFO
+  - key: RLS_ENABLED
+    value: 'true'
+  - key: FEATURE_PUBLIC_API
+    value: 'false'
+  - key: READ_ONLY_ENFORCED
+    value: 'true'
+  - key: BILLING_PROVIDER
+    value: asaas
+  - key: ASAAS_BASE_URL
+    value: https://api.asaas.com/v3
+  - key: MAIL_BACKEND
+    value: resend
+  - key: STORAGE_BACKEND
+    value: s3
+  - key: STORAGE_S3_REGION
+    value: auto
+  - key: STORAGE_S3_ADDRESSING
+    value: path
+  - key: SENTRY_TRACES_SAMPLE_RATE
+    value: '0'
+  - key: DATABASE_URL
+    fromDatabase:
+      name: controle-db
+      property: connectionString
+  - key: REDIS_URL
+    fromService:
+      type: keyvalue
+      name: controle-redis
+      property: connectionString
+  - key: SECRET_KEY
+    sync: false
+  - key: MFA_ENCRYPTION_KEY
+    sync: false
+  - key: APP_BASE_URL
+    sync: false
+  - key: CONTACT_EMAIL
+    sync: false
+  - key: MAIL_FROM
+    sync: false
+  - key: RESEND_API_KEY
+    sync: false
+  - key: ASAAS_API_KEY
+    sync: false
+  - key: ASAAS_WEBHOOK_TOKEN
+    sync: false
+  - key: STORAGE_S3_ENDPOINT
+    sync: false
+  - key: STORAGE_S3_BUCKET
+    sync: false
+  - key: STORAGE_S3_ACCESS_KEY_ID
+    sync: false
+  - key: STORAGE_S3_SECRET_ACCESS_KEY
+    sync: false
+  - key: SENTRY_DSN
+    sync: false
+  - key: STAFF_NOTIFY_EMAIL
+    sync: false
+- type: worker
+  name: controle-worker
+  runtime: docker
+  region: virginia
+  plan: starter
+  dockerfilePath: ./Dockerfile
+  dockerContext: .
+  branch: main
+  autoDeploy: false
+  dockerCommand: flask worker run
+  envVars:
+  - key: APP_ENV
+    value: production
+  - key: LOG_JSON
+    value: 'true'
+  - key: LOG_LEVEL
+    value: INFO
+  - key: RLS_ENABLED
+    value: 'true'
+  - key: FEATURE_PUBLIC_API
+    value: 'false'
+  - key: READ_ONLY_ENFORCED
+    value: 'true'
+  - key: BILLING_PROVIDER
+    value: asaas
+  - key: ASAAS_BASE_URL
+    value: https://api.asaas.com/v3
+  - key: MAIL_BACKEND
+    value: resend
+  - key: STORAGE_BACKEND
+    value: s3
+  - key: STORAGE_S3_REGION
+    value: auto
+  - key: STORAGE_S3_ADDRESSING
+    value: path
+  - key: SENTRY_TRACES_SAMPLE_RATE
+    value: '0'
+  - key: DATABASE_URL
+    fromDatabase:
+      name: controle-db
+      property: connectionString
+  - key: REDIS_URL
+    fromService:
+      type: keyvalue
+      name: controle-redis
+      property: connectionString
+  - key: SECRET_KEY
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: SECRET_KEY
+  - key: MFA_ENCRYPTION_KEY
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: MFA_ENCRYPTION_KEY
+  - key: APP_BASE_URL
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: APP_BASE_URL
+  - key: CONTACT_EMAIL
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: CONTACT_EMAIL
+  - key: MAIL_FROM
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: MAIL_FROM
+  - key: RESEND_API_KEY
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: RESEND_API_KEY
+  - key: ASAAS_API_KEY
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: ASAAS_API_KEY
+  - key: ASAAS_WEBHOOK_TOKEN
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: ASAAS_WEBHOOK_TOKEN
+  - key: STORAGE_S3_ENDPOINT
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: STORAGE_S3_ENDPOINT
+  - key: STORAGE_S3_BUCKET
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: STORAGE_S3_BUCKET
+  - key: STORAGE_S3_ACCESS_KEY_ID
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: STORAGE_S3_ACCESS_KEY_ID
+  - key: STORAGE_S3_SECRET_ACCESS_KEY
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: STORAGE_S3_SECRET_ACCESS_KEY
+  - key: SENTRY_DSN
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: SENTRY_DSN
+  - key: STAFF_NOTIFY_EMAIL
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: STAFF_NOTIFY_EMAIL
+  - key: WORKER_INTERVAL_SECONDS
+    value: '30'
+- type: cron
+  name: controle-lgpd
+  runtime: docker
+  region: virginia
+  plan: starter
+  dockerfilePath: ./Dockerfile
+  dockerContext: .
+  branch: main
+  autoDeploy: false
+  schedule: 0 6 * * *
+  dockerCommand: sh -c "flask lgpd-retencao && flask lgpd-purge"
+  envVars:
+  - key: APP_ENV
+    value: production
+  - key: LOG_JSON
+    value: 'true'
+  - key: LOG_LEVEL
+    value: INFO
+  - key: RLS_ENABLED
+    value: 'true'
+  - key: FEATURE_PUBLIC_API
+    value: 'false'
+  - key: READ_ONLY_ENFORCED
+    value: 'true'
+  - key: BILLING_PROVIDER
+    value: asaas
+  - key: ASAAS_BASE_URL
+    value: https://api.asaas.com/v3
+  - key: MAIL_BACKEND
+    value: resend
+  - key: STORAGE_BACKEND
+    value: s3
+  - key: STORAGE_S3_REGION
+    value: auto
+  - key: STORAGE_S3_ADDRESSING
+    value: path
+  - key: SENTRY_TRACES_SAMPLE_RATE
+    value: '0'
+  - key: DATABASE_URL
+    fromDatabase:
+      name: controle-db
+      property: connectionString
+  - key: REDIS_URL
+    fromService:
+      type: keyvalue
+      name: controle-redis
+      property: connectionString
+  - key: SECRET_KEY
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: SECRET_KEY
+  - key: MFA_ENCRYPTION_KEY
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: MFA_ENCRYPTION_KEY
+  - key: APP_BASE_URL
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: APP_BASE_URL
+  - key: CONTACT_EMAIL
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: CONTACT_EMAIL
+  - key: MAIL_FROM
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: MAIL_FROM
+  - key: RESEND_API_KEY
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: RESEND_API_KEY
+  - key: ASAAS_API_KEY
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: ASAAS_API_KEY
+  - key: ASAAS_WEBHOOK_TOKEN
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: ASAAS_WEBHOOK_TOKEN
+  - key: STORAGE_S3_ENDPOINT
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: STORAGE_S3_ENDPOINT
+  - key: STORAGE_S3_BUCKET
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: STORAGE_S3_BUCKET
+  - key: STORAGE_S3_ACCESS_KEY_ID
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: STORAGE_S3_ACCESS_KEY_ID
+  - key: STORAGE_S3_SECRET_ACCESS_KEY
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: STORAGE_S3_SECRET_ACCESS_KEY
+  - key: SENTRY_DSN
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: SENTRY_DSN
+  - key: STAFF_NOTIFY_EMAIL
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: STAFF_NOTIFY_EMAIL
+- type: cron
+  name: controle-backup
+  runtime: docker
+  region: virginia
+  plan: starter
+  dockerfilePath: ./docker/backup/Dockerfile
+  dockerContext: .
+  branch: main
+  autoDeploy: false
+  schedule: 0 7 * * *
+  envVars:
+  - key: DATABASE_URL
+    fromDatabase:
+      name: controle-db
+      property: connectionString
+  - key: BACKUP_RETENTION_DAYS
+    value: '30'
+  - key: BACKUP_PREFIX
+    value: db/
+  - key: PHOTOS_SRC_BUCKET
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: STORAGE_S3_BUCKET
+  - key: BACKUP_S3_ENDPOINT
+    sync: false
+  - key: BACKUP_S3_BUCKET
+    sync: false
+  - key: BACKUP_S3_ACCESS_KEY_ID
+    sync: false
+  - key: BACKUP_S3_SECRET_ACCESS_KEY
+    sync: false
+  - key: BACKUP_AGE_RECIPIENT
+    sync: false
+- type: cron
+  name: controle-monitor
+  runtime: docker
+  region: virginia
+  plan: starter
+  dockerfilePath: ./Dockerfile
+  dockerContext: .
+  branch: main
+  autoDeploy: false
+  schedule: '*/10 * * * *'
+  dockerCommand: flask worker status --check
+  envVars:
+  - key: APP_ENV
+    value: production
+  - key: LOG_JSON
+    value: 'true'
+  - key: LOG_LEVEL
+    value: INFO
+  - key: RLS_ENABLED
+    value: 'true'
+  - key: FEATURE_PUBLIC_API
+    value: 'false'
+  - key: READ_ONLY_ENFORCED
+    value: 'true'
+  - key: BILLING_PROVIDER
+    value: asaas
+  - key: ASAAS_BASE_URL
+    value: https://api.asaas.com/v3
+  - key: MAIL_BACKEND
+    value: resend
+  - key: STORAGE_BACKEND
+    value: s3
+  - key: STORAGE_S3_REGION
+    value: auto
+  - key: STORAGE_S3_ADDRESSING
+    value: path
+  - key: SENTRY_TRACES_SAMPLE_RATE
+    value: '0'
+  - key: DATABASE_URL
+    fromDatabase:
+      name: controle-db
+      property: connectionString
+  - key: REDIS_URL
+    fromService:
+      type: keyvalue
+      name: controle-redis
+      property: connectionString
+  - key: SECRET_KEY
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: SECRET_KEY
+  - key: MFA_ENCRYPTION_KEY
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: MFA_ENCRYPTION_KEY
+  - key: APP_BASE_URL
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: APP_BASE_URL
+  - key: CONTACT_EMAIL
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: CONTACT_EMAIL
+  - key: MAIL_FROM
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: MAIL_FROM
+  - key: RESEND_API_KEY
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: RESEND_API_KEY
+  - key: ASAAS_API_KEY
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: ASAAS_API_KEY
+  - key: ASAAS_WEBHOOK_TOKEN
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: ASAAS_WEBHOOK_TOKEN
+  - key: STORAGE_S3_ENDPOINT
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: STORAGE_S3_ENDPOINT
+  - key: STORAGE_S3_BUCKET
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: STORAGE_S3_BUCKET
+  - key: STORAGE_S3_ACCESS_KEY_ID
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: STORAGE_S3_ACCESS_KEY_ID
+  - key: STORAGE_S3_SECRET_ACCESS_KEY
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: STORAGE_S3_SECRET_ACCESS_KEY
+  - key: SENTRY_DSN
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: SENTRY_DSN
+  - key: STAFF_NOTIFY_EMAIL
+    fromService:
+      type: web
+      name: controle-web
+      envVarKey: STAFF_NOTIFY_EMAIL
+- type: keyvalue
+  name: controle-redis
+  region: virginia
+  plan: starter
+  maxmemoryPolicy: allkeys-lru
+  ipAllowList: []
+databases:
+- name: controle-db
+  databaseName: controle
+  user: controle
+  region: virginia
+  plan: basic-1gb
+  postgresMajorVersion: '16'
+  ipAllowList: []

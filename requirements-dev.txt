@@ -7,3 +7,5 @@ rjsmin==1.2.4
 playwright==1.55.0
 # Fase 7: auditoria de dependências (o CI roda com esta versão).
 pip-audit==2.10.1
+# Etapa H: gera render.yaml/render.staging.yaml (scripts/gen_render_yaml.py) e os testes leem YAML.
+PyYAML==6.0.1
