@@ -166,3 +166,22 @@ def test_expurgo_lgpd_apaga_a_requisicao_da_empresa(app, tenants):
 
     with app.app_context():
         assert "visual_requests" in {t.name for t in lgpd.company_tables()}
+
+
+def test_exportacao_lgpd_nao_leva_anotacao_nem_email_da_equipe(client, app, tenants):
+    import io
+    import zipfile
+
+    a, _ = tenants
+    _contract_visual(app, a.company_id)
+    with app.app_context():
+        req = db.session.execute(select(VisualRequest)).scalars().first()
+        req.notes, req.updated_by = "ANOTACAO-INTERNA-SECRETA", "equipe-interna@exemplo.com"
+        db.session.commit()
+        from app.services import lgpd
+
+        data, _counts = lgpd.export_company(db.session.get(Company, a.company_id))
+    zf = zipfile.ZipFile(io.BytesIO(data))
+    blob = b"".join(zf.read(n) for n in zf.namelist())
+    assert b"ANOTACAO-INTERNA-SECRETA" not in blob and b"equipe-interna@exemplo.com" not in blob
+    assert not any("visual_requests" in n for n in zf.namelist())

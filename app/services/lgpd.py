@@ -65,7 +65,8 @@ SECRET_COLUMNS = frozenset(
 # Tabelas com company_id que NÃO entram no ZIP: caixa de entrada bruta do provedor de
 # pagamento (pode trazer campos do Asaas sem relação com o titular; os dados úteis já estão
 # em subscriptions/payments).
-EXPORT_SKIP_TABLES = frozenset({"webhook_events"})
+# visual_requests: anotações e e-mail da equipe (Etapa C) não são dado da empresa para devolver a ela.
+EXPORT_SKIP_TABLES = frozenset({"webhook_events", "visual_requests"})
 USER_EXPORT_COLUMNS = ("id", "name", "email", "email_confirmed_at", "active", "mfa_enabled", "last_login_at", "created_at")
 # Tabelas globais ligadas ao usuário (sem company_id) apagadas junto com o usuário.
 USER_CHILD_MODELS = (PasswordReset, EmailConfirmation, MfaRecoveryCode)
