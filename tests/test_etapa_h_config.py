@@ -368,3 +368,42 @@ def test_online_postgres_confere_papel_migrations_e_rls(app):
     # A suíte roda com superusuário no compose: com RLS_ENABLED o app seria reprovado por isso.
     assert por_codigo["DB_ROLE"].level in {configcheck.INFO, configcheck.ERRO}
     assert por_codigo["RLS_FORCED"].level in {configcheck.INFO, configcheck.AVISO}
+
+
+# ------------------------------------------------------------------ flask sentry-test (filtro validado de ponta a ponta)
+
+
+def test_sentry_test_sem_dsn_falha(app):
+    result = app.test_cli_runner().invoke(args=["sentry-test"])
+    assert result.exit_code == 1 and "SENTRY_DSN" in result.output
+
+
+def test_sentry_test_evento_sai_filtrado(app_factory, monkeypatch):
+    import json
+
+    import sentry_sdk
+    from sentry_sdk.transport import Transport
+
+    capturados: list[dict] = []
+
+    class Captura(Transport):
+        def capture_envelope(self, envelope):
+            for item in envelope.items:
+                if item.headers.get("type") == "event":
+                    capturados.append(json.loads(item.get_bytes()))
+
+    original = sentry_sdk.init
+    monkeypatch.setattr(sentry_sdk, "init", lambda **kw: original(**kw, transport=Captura()))
+    try:
+        app = app_factory({"SENTRY_DSN": "https://chave@o1.ingest.sentry.io/1"})
+        result = app.test_cli_runner().invoke(args=["sentry-test"])
+        assert result.exit_code == 0, result.output
+        assert len(capturados) == 1
+        bruto = json.dumps(capturados[0])
+        for vazamento in ("pessoa@exemplo.com", "cp_abcdefghijklmnopqrstuvwxyz012345", "203.0.113.7"):
+            assert vazamento not in bruto, vazamento
+        assert capturados[0]["user"] == {"id": "usuario-de-teste"}
+        assert capturados[0]["extra"]["token"] == "[filtrado]"
+    finally:
+        monkeypatch.undo()
+        sentry_sdk.init()  # desliga o cliente global para não vazar para outros testes

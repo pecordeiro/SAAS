@@ -108,3 +108,20 @@ def register_ops_cli(app: Flask) -> None:
             except storage_svc.StorageError:
                 click.echo("DELETE falhou: apague o objeto de teste manualmente.", err=True)
         click.echo("Armazenamento OK.")
+
+    @app.cli.command("sentry-test")
+    def sentry_test() -> None:
+        """Manda um evento de teste ao Sentry com dados “sensíveis” falsos para provar o filtro."""
+        if not current_app.config.get("SENTRY_DSN"):
+            raise click.ClickException("SENTRY_DSN ausente: o Sentry está desligado neste ambiente.")
+        import sentry_sdk
+
+        with sentry_sdk.new_scope() as scope:
+            scope.set_user({"id": "usuario-de-teste", "email": "pessoa@exemplo.com", "ip_address": "203.0.113.7"})
+            scope.set_extra("token", "cp_abcdefghijklmnopqrstuvwxyz012345")
+            scope.set_extra("contato", "pessoa@exemplo.com")
+            scope.set_tag("origem", "flask sentry-test")
+            event_id = sentry_sdk.capture_message("Teste de integração do Sentry (flask sentry-test)", level="info")
+        sentry_sdk.flush(timeout=10)
+        click.echo(f"Evento enviado (id {event_id}).")
+        click.echo("Abra-o no Sentry: token deve estar [filtrado], e-mail [e-mail] e o usuário só com o id.")
