@@ -383,6 +383,8 @@ def assign_activity(activity: Activity, assignee_id: uuid.UUID | None, user_id: 
                 "stage_id": stage.id,
                 "activity_id": activity.id,
                 "assignee_user_id": assignee_id,
+                # Etapa F: quem atribuiu (o e-mail não sai quando a pessoa atribui a si mesma).
+                "assigned_by_user_id": user_id,
             },
         )
     return True

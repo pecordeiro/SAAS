@@ -1,0 +1,12 @@
+{% extends "emails/_base.txt" %}
+{% block body %}Olá, {{ name }}. Você agora é responsável por uma atividade na empresa {{ company_name }}:
+
+{{ activity_name }}
+Etapa: {{ stage_name }}
+Projeto: {{ project_name }}
+
+Abrir a atividade: {{ url }}
+Se você participa de mais de uma empresa, entre na {{ company_name }} antes.{% endblock %}
+{% block footer %}Você recebe este aviso porque uma atividade foi atribuída a você.
+Para não receber mais, desligue "Atividade atribuída a mim" em {{ prefs_url }}
+Não responda: esta caixa não é lida.{% endblock %}

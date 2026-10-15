@@ -1,0 +1,14 @@
+{% extends "emails/_base.html" %}
+{% block body %}
+  <p>Olá, {{ name }}. Você agora é responsável por uma atividade na empresa {{ company_name }}:</p>
+  <p><strong>{{ activity_name }}</strong><br>
+  Etapa: {{ stage_name }}<br>
+  Projeto: {{ project_name }}</p>
+  <p><a href="{{ url }}">Abrir a atividade</a></p>
+  <p><small>Se o botão não abrir, copie o endereço: {{ url }}. Se você participa de mais de uma empresa, entre na {{ company_name }} antes.</small></p>
+{% endblock %}
+{% block footer %}
+  <p><small>Você recebe este aviso porque uma atividade foi atribuída a você. Para não receber mais,
+  desligue “Atividade atribuída a mim” em <a href="{{ prefs_url }}">{{ prefs_url }}</a>.
+  Não responda: esta caixa não é lida.</small></p>
+{% endblock %}

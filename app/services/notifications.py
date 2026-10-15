@@ -17,12 +17,13 @@ from flask import current_app
 from sqlalchemy import select
 
 from app.extensions import db
-from app.models import ROLE_LEVEL, ROLE_SUPERVISOR, Company, DomainEvent, Membership, User
+from app.models import ROLE_LEVEL, ROLE_SUPERVISOR, Activity, Company, DomainEvent, Membership, User
 from app.services import email as email_svc
 
 logger = logging.getLogger(__name__)
 
 VISUAL_REQUEST_SUBJECT = "Nova requisição de identidade visual"
+ASSIGNED_SUBJECT = "Nova atividade atribuída a você"
 
 
 PREFS = ("notify_assignment", "notify_alerts", "notify_weekly")
@@ -82,3 +83,66 @@ def on_visual_custom_contracted(event: DomainEvent) -> None:
         return
     plan = str((event.payload or {}).get("plano") or "")
     send(to, VISUAL_REQUEST_SUBJECT, "staff_visual_request", plan=plan, url=url_for_email("interno.index"))
+
+
+def _uuid(value) -> uuid.UUID | None:
+    try:
+        return uuid.UUID(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _active_member(company_id: uuid.UUID, user_id: uuid.UUID) -> User | None:
+    """Usuário com vínculo que vale agora na empresa (sem suporte) e conta ativa."""
+    return db.session.execute(
+        select(User)
+        .join(Membership, Membership.user_id == User.id)
+        .where(
+            Membership.company_id == company_id,
+            Membership.user_id == user_id,
+            Membership.usable(),
+            Membership.is_support.is_(False),
+            User.active.is_(True),
+        )
+    ).scalar_one_or_none()
+
+
+def on_activity_assigned(event: DomainEvent) -> None:
+    """Etapa D → F: e-mail ao responsável com o link da atividade.
+
+    Confere o estado ATUAL antes de enviar (entrega “pelo menos uma vez”): atividade ainda
+    existe, não está arquivada e continua com o mesmo responsável; a pessoa ainda é membro
+    ativo; a preferência ``notify_assignment`` está ligada; não foi ela mesma que se atribuiu.
+    Qualquer “não” → nada a enviar (o evento é marcado publicado)."""
+    payload = event.payload or {}
+    activity_id = _uuid(payload.get("activity_id"))
+    assignee_id = _uuid(payload.get("assignee_user_id"))
+    if activity_id is None or assignee_id is None:
+        return
+    if _uuid(payload.get("assigned_by_user_id")) == assignee_id:
+        return
+    activity = db.session.execute(
+        select(Activity).where(Activity.id == activity_id, Activity.company_id == event.company_id)
+    ).scalar_one_or_none()
+    if activity is None or activity.assignee_id != assignee_id:
+        return
+    stage = activity.stage
+    project = stage.project
+    if activity.archived_at or stage.archived_at or project.archived_at:
+        return
+    user = _active_member(event.company_id, assignee_id)
+    if user is None or not user.notify_assignment:
+        return
+    company = db.session.get(Company, event.company_id)
+    send(
+        user.email,
+        ASSIGNED_SUBJECT,
+        "activity_assigned",
+        name=user.name,
+        company_name=company.name if company else "",
+        project_name=project.name,
+        stage_name=stage.name,
+        activity_name=activity.name,
+        url=url_for_email("app.activity_detail", activity_id=activity.id),
+        prefs_url=url_for_email("account.profile", _anchor="notificacoes"),
+    )

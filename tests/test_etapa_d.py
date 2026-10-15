@@ -130,7 +130,8 @@ def test_supervisor_atribui_audita_e_grava_evento_interno_so_com_ids(client, app
         log = db.session.query(AuditLog).filter_by(company_id=a.company_id, action="activity.assigned").one()
         assert log.details["para"] == str(a.operator_id)
         event = db.session.query(DomainEvent).filter_by(company_id=a.company_id, type="activity.assigned").one()
-        assert set(event.payload) == {"project_id", "stage_id", "activity_id", "assignee_user_id"}
+        # Etapa F acrescentou quem atribuiu (também só id).
+        assert set(event.payload) == {"project_id", "stage_id", "activity_id", "assignee_user_id", "assigned_by_user_id"}
         assert "@" not in str(event.payload) and "operator A" not in str(event.payload)
         assert events.ACTIVITY_ASSIGNED in events.INTERNAL_EVENT_TYPES
         assert events.ACTIVITY_ASSIGNED not in events.PUBLIC_EVENT_TYPES

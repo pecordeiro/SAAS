@@ -95,6 +95,7 @@ def _handlers() -> dict[str, Callable[[DomainEvent], None]]:
     from app.services import events, notifications
 
     return {
+        events.ACTIVITY_ASSIGNED: notifications.on_activity_assigned,
         events.PLAN_VISUAL_CUSTOM_CONTRACTED: notifications.on_visual_custom_contracted,
     }
 
