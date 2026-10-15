@@ -145,6 +145,29 @@ class Config:
     # Aviso à equipe da plataforma (requisição de identidade visual). Vazio = sem aviso.
     STAFF_NOTIFY_EMAIL: str | None = None
 
+    # Etapa G — fotos, comentários, checklist e unidades (app/services/storage.py, photos.py).
+    # STORAGE_BACKEND: local (disco em instance/uploads, só development/test) | s3 (R2/AWS/MinIO)
+    # | none. Vazio = local em development/test e none (fotos desligadas) fora deles.
+    STORAGE_BACKEND = ""
+    STORAGE_LOCAL_DIR: str | None = None
+    STORAGE_S3_ENDPOINT: str | None = None  # ex.: https://<conta>.r2.cloudflarestorage.com
+    STORAGE_S3_BUCKET: str | None = None
+    STORAGE_S3_REGION = "auto"  # R2 = auto; AWS = região do bucket (ex.: sa-east-1)
+    STORAGE_S3_ACCESS_KEY_ID: str | None = None
+    STORAGE_S3_SECRET_ACCESS_KEY: str | None = None
+    STORAGE_S3_ADDRESSING = "path"  # path (R2/MinIO) | virtual (AWS)
+    STORAGE_TIMEOUT_SECONDS = 10
+    PHOTO_MAX_BYTES = 5 * 1024 * 1024
+    # Só a rota de upload de foto aceita corpo maior que MAX_CONTENT_LENGTH (security.py).
+    PHOTO_MAX_REQUEST_BYTES = PHOTO_MAX_BYTES + 256 * 1024
+    PHOTO_MAX_PIXELS = 40_000_000  # largura × altura lida do cabeçalho, antes de decodificar
+    PHOTO_MAX_SIDE = 2560  # a foto guardada é reduzida para no máximo isto (lado maior)
+    PHOTO_THUMB_SIDE = 480
+    PHOTOS_MAX_PER_ACTIVITY = 20
+    PHOTOS_MAX_PER_COMPANY = 5000
+    PHOTO_UPLOAD_RATE_LIMIT = "30 per minute; 300 per hour"
+    COMMENT_MAX_CHARS = 1000
+
     @classmethod
     def from_env(cls) -> dict:
         """Lê as variáveis de ambiente na hora de criar o app (não na importação)."""
@@ -201,6 +224,24 @@ class Config:
             except ValueError:
                 raise RuntimeError(f"{key} precisa ser um número inteiro.") from None
         values["SENTRY_DSN"] = os.environ.get("SENTRY_DSN") or None
+        # Etapa G — armazenamento de fotos (segredos só daqui; nunca em código ou log).
+        for key in (
+            "STORAGE_BACKEND",
+            "STORAGE_LOCAL_DIR",
+            "STORAGE_S3_ENDPOINT",
+            "STORAGE_S3_BUCKET",
+            "STORAGE_S3_REGION",
+            "STORAGE_S3_ACCESS_KEY_ID",
+            "STORAGE_S3_SECRET_ACCESS_KEY",
+            "STORAGE_S3_ADDRESSING",
+            "PHOTO_UPLOAD_RATE_LIMIT",
+        ):
+            values[key] = os.environ.get(key) or getattr(cls, key)
+        for key in ("PHOTOS_MAX_PER_ACTIVITY", "PHOTOS_MAX_PER_COMPANY", "STORAGE_TIMEOUT_SECONDS"):
+            try:
+                values[key] = max(1, int(os.environ.get(key, getattr(cls, key))))
+            except ValueError:
+                raise RuntimeError(f"{key} precisa ser um número inteiro.") from None
         try:
             values["SENTRY_TRACES_SAMPLE_RATE"] = float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", cls.SENTRY_TRACES_SAMPLE_RATE))
         except ValueError:
@@ -274,7 +315,11 @@ def get_config(name: str | None = None) -> type[Config]:
 
 def finalize_config(app_config: dict, env_name: str) -> None:
     """Valida o que é obrigatório. Fora de development/test, SECRET_KEY, DATABASE_URL e
-    APP_BASE_URL (https) são exigidos."""
+    APP_BASE_URL (https) são exigidos. Etapa G: armazenamento de fotos coerente com o ambiente
+    (disco local nunca em produção; S3 com todas as variáveis)."""
+    from app.services.storage import validate_config as validate_storage
+
+    validate_storage(app_config, env_name)
     if env_name in {"development", "test"}:
         if not app_config.get("SECRET_KEY"):
             # Chave efêmera só em desenvolvimento: as sessões caem a cada reinício.

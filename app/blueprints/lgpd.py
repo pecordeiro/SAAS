@@ -122,7 +122,10 @@ def purge_command(dry_run: bool, operador: str | None) -> None:
     for r in results:
         total = sum(r.rows.values())
         verb = "seria apagada" if dry_run else "apagada"
-        click.echo(f"Empresa {r.company_id} {verb}: {total} linha(s), até {r.users_deleted} usuário(s).")
+        click.echo(
+            f"Empresa {r.company_id} {verb}: {total} linha(s), até {r.users_deleted} usuário(s), "
+            f"{r.objects_deleted} arquivo(s) de foto."
+        )
 
 
 @bp.cli.command("lgpd-retencao")

@@ -1,0 +1,112 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/empty_state.html" import empty_state %}
+{% set nav_current = "projects" %}
+{% set nav_project = project %}
+{% block title %}Evidências · {{ activity.name }} · Controle de Produção{% endblock %}
+{% block content %}
+{#
+  Etapa G — evidências da atividade (montagem / não conformidade): fotos e comentários.
+  Operador+ envia; supervisor+ apaga (auditado). As fotos vêm SÓ de /app/fotos/<uuid> (rota
+  autenticada que confere a empresa); nenhuma URL pública. Sem script nem estilo inline.
+#}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('app.project_detail', project_id=project.id, etapa=stage.id, _anchor='atividade-' ~ activity.id) }}">{{ icon("chevron-left") }}{{ project.name }}</a>
+    <h1>{{ activity.name }}</h1>
+    <p class="page-header__subtitle muted">Evidências · {{ stage.name }}</p>
+  </div>
+</header>
+
+<section class="card mb-4" id="fotos" aria-labelledby="fotos-titulo">
+  <h2 class="card__title" id="fotos-titulo">Fotos <span class="muted num">{{ photos|length }}/{{ photos_max }}</span></h2>
+  {%- if photo_error %}{{ alert("danger", photo_error, role="alert") }}{% endif %}
+  {%- if photos %}
+  <ul class="photo-grid" role="list">
+    {%- for photo in photos %}
+    <li class="photo-card">
+      <a class="photo-card__link" href="{{ url_for('qualidade.photo_view', photo_id=photo.id) }}">
+        <img class="photo-card__img" src="{{ url_for('qualidade.photo_view', photo_id=photo.id, tamanho='mini') }}" alt="{{ photo.caption or ('Foto de ' ~ activity.name) }}" loading="lazy" width="{{ photo.width }}" height="{{ photo.height }}">
+      </a>
+      <p class="photo-card__meta text-sm">
+        {%- if photo.caption %}<span class="text-strong">{{ photo.caption }}</span><br>{% endif %}
+        <span class="muted">{{ photo.uploaded_by.name if photo.uploaded_by else "Pessoa removida" }} · <span class="num">{{ photo.created_at|datahora }}</span></span>
+      </p>
+      {%- if can_delete %}
+      <details class="confirm-inline">
+        <summary class="btn btn--ghost">{{ icon("trash") }}<span>Apagar</span></summary>
+        <form method="post" action="{{ url_for('qualidade.photo_delete', photo_id=photo.id) }}" class="mt-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <p class="text-sm muted">A foto some para todos. Fica registrado quem apagou.</p>
+          {{ button("Apagar foto", "danger") }}
+        </form>
+      </details>
+      {%- endif %}
+    </li>
+    {%- endfor %}
+  </ul>
+  {%- else %}
+  {{ empty_state("Nenhuma foto", "Fotografe a montagem pronta ou o defeito encontrado.", icon="folder") }}
+  {%- endif %}
+
+  {%- if photos_enabled %}
+  {%- if photos|length < photos_max %}
+  <form class="stack mt-4" method="post" action="{{ url_for('qualidade.photo_upload', activity_id=activity.id) }}" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="field">
+      <label class="field__label" for="foto-arquivo">Nova foto</label>
+      <input class="field__input" id="foto-arquivo" type="file" name="photo" accept="image/jpeg,image/png,image/webp" required aria-describedby="foto-dica">
+      <p class="field__hint" id="foto-dica">JPEG, PNG ou WebP até {{ photo_max_mb }} MB. A localização (GPS) e os dados da câmera são removidos.</p>
+    </div>
+    <div class="field">
+      <label class="field__label" for="foto-legenda">Legenda <span class="field__req">(opcional)</span></label>
+      <input class="field__input" id="foto-legenda" type="text" name="caption" maxlength="{{ caption_max }}">
+    </div>
+    <div>{{ button("Enviar foto", "primary", icon="plus") }}</div>
+  </form>
+  {%- else %}
+  <p class="muted text-sm mt-4">Limite de {{ photos_max }} fotos nesta atividade.{% if can_delete %} Apague uma para enviar outra.{% endif %}</p>
+  {%- endif %}
+  {%- else %}
+  <p class="muted text-sm mt-4">O envio de fotos não está configurado neste ambiente.</p>
+  {%- endif %}
+</section>
+
+<section class="card" id="comentarios" aria-labelledby="comentarios-titulo">
+  <h2 class="card__title" id="comentarios-titulo">Comentários <span class="muted num">{{ comments|length }}</span></h2>
+  {%- if comment_error %}{{ alert("danger", comment_error, role="alert") }}{% endif %}
+  <form class="stack mb-4" method="post" action="{{ url_for('qualidade.comment_create', activity_id=activity.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="field">
+      <label class="field__label" for="comentario">Novo comentário</label>
+      <textarea class="field__input" id="comentario" name="body" rows="3" maxlength="{{ comment_max }}" required aria-describedby="comentario-dica">{{ draft }}</textarea>
+      <p class="field__hint" id="comentario-dica">Até {{ comment_max }} caracteres. Visível para toda a equipe da empresa.</p>
+    </div>
+    <div>{{ button("Publicar", "secondary") }}</div>
+  </form>
+  {%- if comments %}
+  <ul class="comment-list" role="list">
+    {%- for c in comments %}
+    <li class="comment" id="comentario-{{ c.id }}">
+      <p class="comment__meta text-sm"><span class="text-strong">{{ c.author.name if c.author else "Pessoa removida" }}</span> · <span class="muted num">{{ c.created_at|datahora }}</span></p>
+      <p class="comment__body">{{ c.body }}</p>
+      {%- if can_delete %}
+      <details class="confirm-inline">
+        <summary class="btn btn--ghost">{{ icon("trash") }}<span>Apagar</span></summary>
+        <form method="post" action="{{ url_for('qualidade.comment_delete', comment_id=c.id) }}" class="mt-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <p class="text-sm muted">O comentário some para todos. Fica registrado quem apagou (sem o texto).</p>
+          {{ button("Apagar comentário", "danger") }}
+        </form>
+      </details>
+      {%- endif %}
+    </li>
+    {%- endfor %}
+  </ul>
+  {%- else %}
+  <p class="muted">Nenhum comentário ainda.</p>
+  {%- endif %}
+</section>
+{% endblock %}

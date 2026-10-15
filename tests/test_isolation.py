@@ -103,7 +103,7 @@ def test_toda_rota_com_uuid_tem_caso_de_isolamento(app_factory, flags):
     """Varre o url_map (com e sem as flags que registram blueprints) e falha se alguma rota
     com <uuid:> não tiver caso A/B. Rota com dois <uuid:> também precisa estar listada."""
     app = app_factory(flags)
-    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI + ROUTES_ETAPA_D + ROUTES_ETAPA_E + ROUTES_ETAPA_F
+    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI + ROUTES_ETAPA_D + ROUTES_ETAPA_E + ROUTES_ETAPA_F + ROUTES_ETAPA_G
     cobertas = {template.replace("{id}", "") for _, template, _, _ in todas}
     # Etapa C: /interno é da plataforma (sem empresa na URL); acesso cruzado = não ser equipe → 404,
     # coberto por tests/test_etapa_c_interno.py::test_interno_e_404_para_quem_nao_e_equipe.
@@ -781,3 +781,116 @@ def test_etapa_f_preferencias_so_do_proprio_usuario(client, app, tenants):
         assert db.session.query(User).filter_by(email=a.owner_email).one().notify_alerts is False
         other = db.session.query(User).filter_by(email=b.owner_email).one()
         assert (other.notify_assignment, other.notify_alerts, other.notify_weekly) == (True, True, True)
+
+
+# ================================================================ Etapa G — qualidade
+# Bloco 1: evidências por atividade (comentários e fotos). Dono de A pedindo/alterando recurso
+# de B → 404 e nada muda em B (linhas, objetos no armazenamento, auditoria); na própria
+# empresa a rota funciona. A foto de B nunca é servida a A (nem a miniatura).
+
+import io as _io_g  # noqa: E402
+
+from app.models.quality import ActivityComment, ActivityPhoto  # noqa: E402
+from tests import fotos as _fotos  # noqa: E402
+
+
+class TenantG:
+    """Tenant base + ids extras da Etapa G (atributos ausentes caem no Tenant base)."""
+
+    def __init__(self, base, **extra):
+        self.base = base
+        self.__dict__.update(extra)
+
+    def __getattr__(self, name):
+        return getattr(self.base, name)
+
+
+def _make_tenant_g(label: str) -> TenantG:
+    from app.services import comments as comments_svc
+    from app.services import photos as photos_svc
+
+    base = make_tenant(label)
+    activity = db.session.get(Activity, base.activity_id)
+    comment = comments_svc.add_comment(activity, f"Comentário {label}", base.operator_id)
+    photo = photos_svc.add_photo(activity, _fotos.jpeg(), base.operator_id, caption=f"Foto {label}")
+    db.session.commit()
+    return TenantG(base, comment_id=comment.id, photo_id=photo.id, photo_key=photo.object_key)
+
+
+@pytest.fixture()
+def tenants_g(app):
+    with app.app_context():
+        return _make_tenant_g("A"), _make_tenant_g("B")
+
+
+def _photo_payload(_t):
+    return {"photo": (_io_g.BytesIO(_fotos.jpeg()), "invasora.jpg")}
+
+
+ROUTES_ETAPA_G = [
+    ("GET", "/app/atividades/{id}/evidencias", "activity_id", None),
+    ("POST", "/app/atividades/{id}/comentarios", "activity_id", {"body": "Invasor"}),
+    ("POST", "/app/comentarios/{id}/apagar", "comment_id", {}),
+    ("POST", "/app/atividades/{id}/fotos", "activity_id", _photo_payload),
+    ("GET", "/app/fotos/{id}", "photo_id", None),
+    ("POST", "/app/fotos/{id}/apagar", "photo_id", {}),
+]
+
+
+def _snapshot_g(app, t) -> dict:
+    from app.services import storage as storage_mod
+
+    with app.app_context():
+        q = db.session.query
+        try:
+            stored = storage_mod.get_storage().get(t.photo_key)
+        except storage_mod.ObjectNotFound:
+            stored = None
+        return {
+            "base": _snapshot(t.company_id),
+            "comments": sorted(c.body for c in q(ActivityComment).filter_by(company_id=t.company_id)),
+            "photos": sorted(str(p.id) for p in q(ActivityPhoto).filter_by(company_id=t.company_id)),
+            "object": stored,
+        }
+
+
+def _call_g(client, app, method, url, data, tenant):
+    payload = data(tenant) if callable(data) else data
+    if method == "GET":
+        return client.get(url)
+    return post(client, app, url, payload)
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_ETAPA_G)
+def test_etapa_g_recurso_de_outra_empresa_responde_404(client, app, tenants_g, method, template, field, data):
+    a, b = tenants_g
+    before = _snapshot_g(app, b)
+    login(client, app, a.owner_email)
+    response = _call_g(client, app, method, template.format(id=getattr(b, field)), data, a)
+    assert response.status_code == 404
+    assert b"Foto B" not in response.data and "Comentário B".encode() not in response.data
+    assert _snapshot_g(app, b) == before
+    if field == "photo_id":
+        assert client.get(f"/app/fotos/{b.photo_id}?tamanho=mini").status_code == 404
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_ETAPA_G)
+def test_etapa_g_mesma_rota_funciona_na_propria_empresa(client, app, tenants_g, method, template, field, data):
+    a, b = tenants_g
+    before_b = _snapshot_g(app, b)
+    login(client, app, a.owner_email)
+    response = _call_g(client, app, method, template.format(id=getattr(a, field)), data, a)
+    assert response.status_code in (200, 302, 303)
+    assert _snapshot_g(app, b) == before_b
+
+
+def test_etapa_g_evidencias_so_mostram_a_propria_empresa(client, app, tenants_g):
+    a, b = tenants_g
+    login(client, app, a.operator_email)
+    html = client.get(f"/app/atividades/{a.activity_id}/evidencias").get_data(as_text=True)
+    assert "Comentário A" in html and "Foto A" in html
+    assert "Comentário B" not in html and "Foto B" not in html and str(b.photo_id) not in html
+    # sessão com company_id forjado (sem vínculo com B) não dá acesso à foto de B
+    with client.session_transaction() as sess:
+        sess["company_id"] = str(b.company_id)
+    assert client.get(f"/app/fotos/{b.photo_id}").status_code == 404

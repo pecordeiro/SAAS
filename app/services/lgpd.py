@@ -163,7 +163,10 @@ def export_company(company: Company) -> tuple[bytes, dict[str, int]]:
             "Um arquivo CSV por tabela (separador ';', UTF-8 com BOM, abre no Excel).\n"
             "Datas em ISO 8601 (UTC). Textos que começam com = + - @ ganham um apóstrofo\n"
             "para a planilha não executar fórmula.\n"
-            "Não incluídos por segurança: hashes de senha e de tokens, segredo do MFA.\n\n"
+            "Não incluídos por segurança: hashes de senha e de tokens, segredo do MFA.\n"
+            "Fotos de evidência: activity_photos.csv lista os METADADOS (atividade, data, quem\n"
+            "enviou, tamanho, SHA-256); os arquivos de imagem não vão no ZIP — abra cada foto na\n"
+            "tela da atividade ou peça ao encarregado de dados a cópia das imagens.\n\n"
             "Arquivos e linhas:\n" + "".join(f"  {name}: {n}\n" for name, n in counts.items())
         )
         zf.writestr("LEIA-ME.txt", readme.encode("utf-8"))
@@ -277,6 +280,8 @@ class PurgeResult:
     rows: dict[str, int] = field(default_factory=dict)
     users_deleted: int = 0
     dry_run: bool = False
+    # Etapa G: objetos de foto apagados do armazenamento (foto + miniatura).
+    objects_deleted: int = 0
 
 
 def _count(table: Table, company_id: uuid.UUID) -> int:
@@ -314,6 +319,12 @@ def purge_company(company_id: uuid.UUID, *, operator: str, now: datetime | None 
             ).scalars()
         )
         requested_at = _aware(company.deletion_requested_at)
+        # Etapa G: os ARQUIVOS das fotos saem do armazenamento ANTES das linhas (as chaves estão
+        # nelas). Falha do armazenamento → exceção → rollback: nada some do banco e o expurgo
+        # roda de novo no próximo ciclo (apagar objeto é idempotente).
+        from app.services import photos as photos_svc
+
+        result.objects_deleted = photos_svc.delete_company_objects(company_id, dry_run=dry_run)
         for table in reversed(company_tables()):
             if dry_run:
                 result.rows[table.name] = _count(table, company_id)
@@ -352,6 +363,7 @@ def purge_company(company_id: uuid.UUID, *, operator: str, now: datetime | None 
                     "requested_at": requested_at.isoformat() if requested_at else None,
                     "rows": {k: v for k, v in result.rows.items() if v},
                     "users_deleted": result.users_deleted,
+                    "photo_objects_deleted": result.objects_deleted,
                 },
             )
         )

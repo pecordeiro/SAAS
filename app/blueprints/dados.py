@@ -32,7 +32,10 @@ def _serializer() -> URLSafeTimedSerializer:
 
 @bp.app_errorhandler(413)
 def too_large(err):
-    limit = int(current_app.config.get("IMPORT_MAX_BYTES", 2 * 1024 * 1024))
+    from flask import request
+
+    key = "PHOTO_MAX_BYTES" if request.endpoint == "qualidade.photo_upload" else "IMPORT_MAX_BYTES"
+    limit = int(current_app.config.get(key, 2 * 1024 * 1024))
     return render_template("errors/400.html", message=f"Arquivo grande demais (máximo {limit // (1024 * 1024)} MB)."), 413
 
 

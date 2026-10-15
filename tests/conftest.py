@@ -127,11 +127,15 @@ def _cleanup_db(app) -> None:
 
 
 @pytest.fixture()
-def app_factory(_postgres_schema):
-    """Cria apps de teste com overrides de config, banco limpo e limpeza no fim."""
+def app_factory(_postgres_schema, tmp_path_factory):
+    """Cria apps de teste com overrides de config, banco limpo e limpeza no fim.
+
+    Etapa G: cada app grava fotos (backend ``local``) numa pasta temporária própria — nunca em
+    ``instance/`` do repositório."""
     created = []
 
     def factory(overrides: dict | None = None):
+        overrides = {"STORAGE_LOCAL_DIR": str(tmp_path_factory.mktemp("storage")), **(overrides or {})}
         new_app = create_app("test", overrides)
         _prepare_db(new_app)
         created.append(new_app)

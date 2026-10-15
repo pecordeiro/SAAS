@@ -83,6 +83,16 @@
             </form>
           </details>
           {%- endif %}
+          {%- if activities %}
+          <details class="part-toggle evidence-toggle">
+            <summary class="btn btn--ghost">{{ icon("folder") }}<span>Fotos e comentários</span></summary>
+            <ul class="evidence-links" role="list">
+              {%- for activity, ar in activities %}
+              <li><a class="btn btn--secondary" href="{{ url_for('qualidade.evidence', activity_id=activity.id) }}">{{ activity.name }}<span class="muted num">&nbsp;({{ evidence_counts.get(activity.id, 0) }})</span></a></li>
+              {%- endfor %}
+            </ul>
+          </details>
+          {%- endif %}
           <ul class="activities" role="list">
             {%- for activity, ar in activities %}
             {% include "app/detail/_activity.html" %}

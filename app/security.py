@@ -30,11 +30,30 @@ PERMISSIONS_POLICY = (
 HSTS = "max-age=63072000; includeSubDomains"
 
 
+# Etapa G: rotas de upload com teto próprio (chave de config), maior que MAX_CONTENT_LENGTH.
+# Só elas; qualquer outra rota continua com o teto global (≈ 2,25 MB).
+UPLOAD_LIMIT_BY_ENDPOINT = {"qualidade.photo_upload": "PHOTO_MAX_REQUEST_BYTES"}
+
+
 class InMemoryUploadRequest(Request):
     """Arquivos de formulário em memória: nada de upload em disco (nem temporário).
 
     O tamanho é limitado por ``MAX_CONTENT_LENGTH`` antes de o corpo ser lido, então a
-    memória por requisição tem teto (≈ 2,25 MB)."""
+    memória por requisição tem teto (≈ 2,25 MB; upload de foto ≈ 5,25 MB — Etapa G)."""
+
+    @property
+    def max_content_length(self) -> int | None:  # type: ignore[override]
+        if self._max_content_length is not None:
+            return self._max_content_length
+        rule = self.url_rule
+        key = UPLOAD_LIMIT_BY_ENDPOINT.get(rule.endpoint) if rule is not None else None
+        if key and current_app:
+            return int(current_app.config[key])
+        return super().max_content_length
+
+    @max_content_length.setter
+    def max_content_length(self, value: int | None) -> None:
+        self._max_content_length = value
 
     def _get_file_stream(self, total_content_length, content_type, filename=None, content_length=None):  # noqa: D401
         return io.BytesIO()

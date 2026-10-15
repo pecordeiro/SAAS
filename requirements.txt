@@ -28,3 +28,6 @@ defusedxml==0.7.1
 redis==8.0.1
 # Erros 500 no Sentry (opcional: só com SENTRY_DSN), sem PII.
 sentry-sdk==2.72.0
+# Etapa G — fotos de evidência: validar pelo conteúdo, decodificar e reencodar (sem EXIF/GPS).
+# S3/R2 sem boto3: assinatura SigV4 própria com requests (ADR-0011).
+Pillow==12.3.0

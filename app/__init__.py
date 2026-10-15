@@ -63,6 +63,10 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
     from app.blueprints.empresa import bp as empresa_bp
 
     app.register_blueprint(empresa_bp)
+    # Etapa G: qualidade (evidências por atividade, checklist, unidades).
+    from app.blueprints.qualidade import bp as qualidade_bp
+
+    app.register_blueprint(qualidade_bp)
 
     # Fase 9: API pública e tela de tokens só existem com FEATURE_PUBLIC_API (desligada → 404).
     if app.config.get("FEATURE_PUBLIC_API"):

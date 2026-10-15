@@ -19,6 +19,8 @@ from app.forms_production import ProjectFromTemplateForm, WaitingPartForm
 from app.models import ROLE_OPERATOR, ROLE_SUPERVISOR, Activity, Project, Stage, Template
 from app.services import alerts as alerts_svc
 from app.services import audit, calc, dashboard, exporter
+from app.services import comments as comments_svc
+from app.services import photos as photos_svc
 from app.services import projects as svc
 from app.services import templates as tsvc
 from app.services.holidays import holidays_for
@@ -285,6 +287,15 @@ def _detail_ctx(project: Project, *, errors=None, conflicts=None, deltas=None, o
     # Vindo do painel (?etapa=): abre a etapa pedida, só se for deste projeto (id solto é ignorado).
     if open_stage is not None and any(s.id == open_stage for s, _, _ in rows):
         current_stage = open_stage
+    # Etapa G: fotos + comentários por atividade (duas consultas agrupadas, só contagem).
+    activity_ids = [a.id for _, _, acts in rows for a, _ in acts]
+    evidence_counts: dict = {}
+    for counts in (
+        photos_svc.counts_by_activity(project.company_id, activity_ids),
+        comments_svc.counts_by_activity(project.company_id, activity_ids),
+    ):
+        for aid, n in counts.items():
+            evidence_counts[aid] = evidence_counts.get(aid, 0) + n
     progress_series = [
         {"label": s.name, "value": sr.progresso, "max": 1, "text": f"{sr.progresso * 100:.0f}%", "done": sr.progresso >= 1}
         for s, sr, _ in rows
@@ -302,6 +313,7 @@ def _detail_ctx(project: Project, *, errors=None, conflicts=None, deltas=None, o
         current_stage=current_stage,
         recent=svc.history(project, limit=5),
         last_entries=svc.last_entries(project),
+        evidence_counts=evidence_counts,
         # Etapa D: resumo por pessoa (7 dias) só para supervisor+ — contas em calc.py.
         people=(
             svc.people_progress(project, tz=g.company.timezone, today=_today(), days=7)[:5]
