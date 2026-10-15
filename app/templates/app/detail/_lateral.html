@@ -1,6 +1,6 @@
 {#
   Coluna lateral do detalhe: equipe e prazo + registros recentes. Troca por id no fragmento.
-  Variáveis: project, result, deadline, forecast, recent.
+  Variáveis: project, result, deadline, forecast, recent, people/can_edit (Etapa D).
 #}
 {%- set weekdays = current_company.workdays() %}
 <div class="stack--lg" id="lateral"{% if oob %} hx-swap-oob="true"{% endif %}>
@@ -20,6 +20,25 @@
       <div><dt>Tempo total</dt><dd>{{ result.tempo_total_h|horas }}</dd></div>
     </dl>
   </section>
+  {%- if can_edit %}
+  <section class="card" aria-labelledby="pessoas-titulo">
+    <h2 class="section-title" id="pessoas-titulo">Pessoas · 7 dias</h2>
+    {%- if people %}
+    <ul class="recent">
+      {%- for r in people %}
+      <li class="recent__item">
+        <span class="recent__time num text-strong">{{ r.result.pecas }}</span>
+        <span class="recent__text"><span class="text-strong">{{ r.user.name if r.user else "Pessoa removida" }}</span>
+          <span class="muted">· {{ r.result.horas|horas }} padrão{% if r.result.atribuidas %} · {{ r.result.atribuidas_concluidas }}/{{ r.result.atribuidas }} atribuída{{ "s" if r.result.atribuidas != 1 }}{% endif %}</span></span>
+      </li>
+      {%- endfor %}
+    </ul>
+    {%- else %}
+    <p class="muted">Ninguém lançou peças nos últimos 7 dias.</p>
+    {%- endif %}
+    <a class="btn btn--ghost recent__more" href="{{ url_for('app.project_people', project_id=project.id) }}">Ver progresso por pessoa</a>
+  </section>
+  {%- endif %}
   <section class="card" aria-labelledby="recente-titulo">
     <h2 class="section-title" id="recente-titulo">Recente</h2>
     {%- if recent %}

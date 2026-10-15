@@ -323,3 +323,121 @@ def resumo_projeto(
         progresso_geral=progresso_geral(restante, total),
         dias_uteis_restantes=dias_uteis_restantes(restante / 60, pessoas, horas_dia),
     )
+
+
+# ---------------------------------------------------------------------------
+# Progresso por pessoa (Etapa D)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Lancamento:
+    """Um registro do histórico, já reduzido a tipos simples.
+
+    ``pessoa``/``atividade`` são chaves opacas (ex.: ids); ``pessoa`` None = autor removido.
+    ``delta`` negativo = desfazer. ``dia`` = data local do registro. ``ideal_min`` = tempo
+    ideal da atividade por unidade (para as horas-padrão produzidas)."""
+
+    pessoa: object
+    atividade: object
+    delta: int
+    dia: date
+    ideal_min: float = 0.0
+
+
+@dataclass(frozen=True)
+class AtividadeAtribuida:
+    """Atividade com responsável: peças feitas (por qualquer pessoa) e previstas."""
+
+    atividade: object
+    responsavel: object
+    ideal_min: float = 0.0
+    pecas: int = 0
+    previstas: int = 0
+
+
+@dataclass(frozen=True)
+class ProgressoPessoa:
+    pessoa: object
+    pecas: int  # saldo de peças no período (registros − desfazeres)
+    registros: int  # lançamentos positivos no período
+    desfeitos: int  # lançamentos negativos (desfazer) no período
+    horas: float  # horas-padrão produzidas no período: Σ delta × tempo ideal ÷ 60
+    dias_ativos: int  # dias distintos com lançamento no período
+    por_atividade: tuple[tuple[object, int], ...]  # (atividade, saldo) com saldo ≠ 0, maior primeiro
+    atribuidas: int  # atividades sob a responsabilidade da pessoa
+    atribuidas_concluidas: int
+    pecas_atribuidas: int  # peças feitas nas atividades atribuídas (total, qualquer autor)
+    previstas_atribuidas: int
+    progresso_atribuidas: float  # Σ(tempo × %) ÷ Σ tempo das atribuídas (média simples se tempos = 0)
+
+
+def progresso_por_pessoa(
+    lancamentos: Iterable[Lancamento],
+    atribuidas: Iterable[AtividadeAtribuida] = (),
+    inicio: date | None = None,
+    fim: date | None = None,
+) -> tuple[ProgressoPessoa, ...]:
+    """Agrega o histórico por pessoa no período [inicio, fim] (limites opcionais, inclusive)
+    e as atividades atribuídas por responsável.
+
+    Entra quem lançou no período ou é responsável por alguma atividade. Ordem: mais peças,
+    depois mais horas; autor removido (``pessoa`` None) por último."""
+    saldo: dict = {}
+    registros: dict = {}
+    desfeitos: dict = {}
+    horas: dict = {}
+    dias: dict = {}
+    por_atv: dict = {}
+    for lanc in lancamentos:
+        if inicio is not None and lanc.dia < inicio:
+            continue
+        if fim is not None and lanc.dia > fim:
+            continue
+        p = lanc.pessoa
+        saldo[p] = saldo.get(p, 0) + lanc.delta
+        if lanc.delta > 0:
+            registros[p] = registros.get(p, 0) + 1
+        elif lanc.delta < 0:
+            desfeitos[p] = desfeitos.get(p, 0) + 1
+        horas[p] = horas.get(p, 0.0) + lanc.delta * (lanc.ideal_min or 0) / 60
+        dias.setdefault(p, set()).add(lanc.dia)
+        atv = por_atv.setdefault(p, {})
+        atv[lanc.atividade] = atv.get(lanc.atividade, 0) + lanc.delta
+
+    grupos: dict = {}
+    for a in atribuidas:
+        if a.responsavel is None:
+            continue
+        grupos.setdefault(a.responsavel, []).append(a)
+
+    resultado = []
+    for p in list(saldo) + [r for r in grupos if r not in saldo]:
+        minhas = grupos.get(p, [])
+        pcts = [pct_atividade(a.pecas, a.previstas) for a in minhas]
+        soma_tempos = sum((a.ideal_min or 0) for a in minhas)
+        if not minhas:
+            prog = 0.0
+        elif soma_tempos > 0:
+            prog = sum((a.ideal_min or 0) * pc for a, pc in zip(minhas, pcts)) / soma_tempos
+        else:
+            prog = sum(pcts) / len(pcts)
+        itens = sorted(((k, v) for k, v in por_atv.get(p, {}).items() if v), key=lambda kv: -kv[1])
+        resultado.append(
+            ProgressoPessoa(
+                pessoa=p,
+                pecas=saldo.get(p, 0),
+                registros=registros.get(p, 0),
+                desfeitos=desfeitos.get(p, 0),
+                horas=horas.get(p, 0.0),
+                dias_ativos=len(dias.get(p, ())),
+                por_atividade=tuple(itens),
+                atribuidas=len(minhas),
+                atribuidas_concluidas=sum(1 for pc in pcts if pc >= 1),
+                pecas_atribuidas=sum(min(a.pecas, a.previstas) if a.previstas > 0 else a.pecas for a in minhas),
+                previstas_atribuidas=sum(a.previstas for a in minhas),
+                progresso_atribuidas=prog,
+            )
+        )
+    resultado.sort(key=lambda r: (r.pessoa is None, -r.pecas, -r.horas))
+    return tuple(resultado)

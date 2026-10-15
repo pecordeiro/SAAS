@@ -615,6 +615,7 @@ def test_fase8_cobranca_negada_a_supervisor_e_operador(app, tenants, url):
 
 ROUTES_ETAPA_D = [
     ("POST", "/app/atividades/{id}/responsavel", "activity_id", lambda t: {"assignee_id": str(t.owner_id)}),
+    ("GET", "/app/projetos/{id}/pessoas", "project_id", None),
 ]
 
 

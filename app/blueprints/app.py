@@ -296,6 +296,12 @@ def _detail_ctx(project: Project, *, errors=None, conflicts=None, deltas=None) -
         current_stage=current_stage,
         recent=svc.history(project, limit=5),
         last_entries=svc.last_entries(project),
+        # Etapa D: resumo por pessoa (7 dias) só para supervisor+ — contas em calc.py.
+        people=(
+            svc.people_progress(project, tz=g.company.timezone, today=_today(), days=7)[:5]
+            if g.membership.has_role(ROLE_SUPERVISOR)
+            else []
+        ),
         forecast=deadline["forecast"],
         errors=errors or {},
         conflicts=conflicts or {},
@@ -340,6 +346,30 @@ def project_refresh(project_id):
     response = Response(render_template("app/detail/_oob.html", **ctx), mimetype="text/html")
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+# ---------------------------------------------------------------- progresso por pessoa (Etapa D)
+
+PEOPLE_PERIOD_TABS = (("7", "7 dias"), ("30", "30 dias"), ("90", "90 dias"), ("tudo", "Tudo"))
+
+
+@bp.get("/projetos/<uuid:project_id>/pessoas")
+@tenant_required(ROLE_SUPERVISOR)
+def project_people(project_id):
+    """Peças, registros e horas-padrão por pessoa no período + atividades atribuídas.
+    Supervisor+ (dado de desempenho individual). Tudo calculado no servidor (calc.py)."""
+    project = get_or_404(Project, project_id)
+    period = request.args.get("periodo", "7")
+    period = period if period in svc.PEOPLE_PERIODS else "7"
+    rows = svc.people_progress(project, tz=g.company.timezone, today=_today(), days=svc.PEOPLE_PERIODS[period])
+    series = [
+        {"label": r.user.name if r.user else "Pessoa removida", "value": max(r.result.pecas, 0), "text": f"{r.result.pecas}"}
+        for r in rows
+        if r.result.registros or r.result.desfeitos
+    ]
+    return render_template(
+        "app/people.html", project=project, rows=rows, period=period, period_tabs=PEOPLE_PERIOD_TABS, series=series
+    )
 
 
 # ---------------------------------------------------------------- histórico

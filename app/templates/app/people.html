@@ -1,0 +1,62 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/table.html" import data_table %}
+{% from "components/chart.html" import bar_chart %}
+{% from "components/progress.html" import progress %}
+{% from "components/empty_state.html" import empty_state %}
+{% set nav_current = "projects" %}
+{% set nav_project = project %}
+{% block title %}Pessoas · {{ project.name }} · Controle de Produção{% endblock %}
+{% block content %}
+{#
+  Etapa D — progresso por pessoa (supervisor+). Todos os números vêm de
+  calc.progresso_por_pessoa (servidor); a tela só exibe. Período em dias do fuso da empresa.
+#}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('app.project_detail', project_id=project.id) }}">{{ icon("chevron-left") }}{{ project.name }}</a>
+    <h1>Progresso por pessoa</h1>
+    <p class="page-header__subtitle">Peças lançadas no período (desfazeres descontados) e atividades sob responsabilidade de cada pessoa.</p>
+  </div>
+</header>
+
+<nav class="tabs mb-4" aria-label="Período">
+  {%- for key, label in period_tabs %}
+  <a class="tabs__item" href="{{ url_for('app.project_people', project_id=project.id, periodo=key) }}"{% if key == period %} aria-current="page"{% endif %}>{{ label }}</a>
+  {%- endfor %}
+</nav>
+
+{%- if rows %}
+{%- if series %}
+<div class="card mb-4">{{ bar_chart(series, "Peças por pessoa", table_headers=("Pessoa", "Peças")) }}</div>
+{%- endif %}
+{% call data_table([("Pessoa", ""), ("Peças", "is-num"), ("Registros", "is-num"), ("Horas-padrão", "is-num"), ("Dias", "is-num"), ("Atribuídas", ""), ("Onde", "")], caption="Progresso por pessoa", class_="people-table") %}
+  <tbody>
+  {%- for r in rows %}
+    {%- set p = r.result %}
+    <tr>
+      <td class="text-strong" data-label="Pessoa">{{ r.user.name if r.user else "Pessoa removida" }}</td>
+      <td class="is-num num" data-label="Peças">{{ p.pecas }}{% if p.desfeitos %} <span class="muted text-sm">({{ p.desfeitos }} desfeito{{ "s" if p.desfeitos != 1 }})</span>{% endif %}</td>
+      <td class="is-num num" data-label="Registros">{{ p.registros }}</td>
+      <td class="is-num num" data-label="Horas-padrão">{{ p.horas|horas }}</td>
+      <td class="is-num num" data-label="Dias">{{ p.dias_ativos }}</td>
+      <td data-label="Atribuídas">
+        {%- if p.atribuidas %}
+        <span class="text-sm">{{ p.atribuidas_concluidas }} de {{ p.atribuidas }} concluída{{ "s" if p.atribuidas != 1 }} · {{ p.pecas_atribuidas }}/{{ p.previstas_atribuidas }} peças</span>
+        {{ progress(p.progresso_atribuidas, 1, label="Progresso das atividades de " ~ (r.user.name if r.user else "pessoa removida"), size="sm") }}
+        {%- else %}<span class="muted">—</span>{% endif %}
+      </td>
+      <td class="text-sm" data-label="Onde">
+        {%- for act, n in r.activities[:3] %}{{ act.name }} <span class="num muted">{{ "%+d"|format(n) }}</span>{% if not loop.last %} · {% endif %}{% endfor %}
+        {%- if r.activities|length > 3 %} <span class="muted">e mais {{ r.activities|length - 3 }}</span>{% endif %}
+      </td>
+    </tr>
+  {%- endfor %}
+  </tbody>
+{% endcall %}
+{%- else %}
+<div class="card">
+  {{ empty_state("Nada neste período", "Ninguém lançou peças neste projeto no período e nenhuma atividade tem responsável.", ghost_action=("Ver tudo", url_for('app.project_people', project_id=project.id, periodo='tudo')), icon="team") }}
+</div>
+{%- endif %}
+{% endblock %}

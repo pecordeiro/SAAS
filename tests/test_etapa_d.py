@@ -3,6 +3,8 @@ pessoa e arrastar (ordem decidida no servidor)."""
 
 from __future__ import annotations
 
+import re
+
 from app.extensions import db
 from app.models import Activity, ProgressEntry, User
 from app.services import projects as svc
@@ -184,3 +186,63 @@ def test_suporte_da_plataforma_nao_e_responsavel(app, tenants):
             pass
         else:  # pragma: no cover
             raise AssertionError("suporte não pode ser responsável")
+
+
+# ================================================================ 4) progresso por pessoa
+
+
+def test_calc_progresso_por_pessoa_agrega_periodo_e_atribuidas():
+    from datetime import date
+
+    from app.services.calc import AtividadeAtribuida, Lancamento, progresso_por_pessoa
+
+    d1, d2, d3 = date(2026, 10, 1), date(2026, 10, 2), date(2026, 10, 3)
+    lancs = [
+        Lancamento("ana", "x", 3, d1, 10),
+        Lancamento("ana", "y", 2, d2, 30),
+        Lancamento("ana", "x", -1, d2, 10),  # desfazer
+        Lancamento("bia", "x", 5, d3, 10),
+        Lancamento(None, "y", 1, d2, 30),  # autor removido
+        Lancamento("ana", "x", 7, date(2026, 9, 1), 10),  # fora do período
+    ]
+    atrib = [
+        AtividadeAtribuida("x", "ana", 10, 10, 10),  # concluída
+        AtividadeAtribuida("y", "ana", 30, 3, 10),
+        AtividadeAtribuida("z", "caio", 0, 5, 10),  # só responsável, sem lançamento; tempo 0
+        AtividadeAtribuida("w", None, 5, 1, 10),  # sem responsável: ignorada
+    ]
+    res = progresso_por_pessoa(lancs, atrib, inicio=d1, fim=d3)
+    by = {r.pessoa: r for r in res}
+    assert [r.pessoa for r in res] == ["bia", "ana", "caio", None]
+    ana = by["ana"]
+    assert (ana.pecas, ana.registros, ana.desfeitos, ana.dias_ativos) == (4, 2, 1, 2)
+    assert abs(ana.horas - (3 * 10 + 2 * 30 - 10) / 60) < 1e-9
+    assert dict(ana.por_atividade) == {"x": 2, "y": 2}
+    assert (ana.atribuidas, ana.atribuidas_concluidas, ana.pecas_atribuidas, ana.previstas_atribuidas) == (2, 1, 13, 20)
+    # Σ(tempo × %) ÷ Σ tempo = (10×1 + 30×0,3) ÷ 40
+    assert abs(ana.progresso_atribuidas - (10 * 1 + 30 * 0.3) / 40) < 1e-9
+    caio = by["caio"]
+    assert (caio.pecas, caio.registros, caio.atribuidas) == (0, 0, 1)
+    assert abs(caio.progresso_atribuidas - 0.5) < 1e-9  # tempos 0 → média simples
+    assert by[None].pecas == 1
+    # Sem limites: tudo entra.
+    assert {r.pessoa: r.pecas for r in progresso_por_pessoa(lancs)}["ana"] == 11
+    assert progresso_por_pessoa([]) == ()
+
+
+def test_tela_de_pessoas_mostra_numeros_do_servidor(client, app, tenants):
+    a, _ = tenants
+    op = app.test_client()
+    login(op, app, a.operator_email)
+    post(op, app, f"/app/atividades/{a.activity_id}/registrar", {"delta": 4, "version": 1})
+    assert op.get(f"/app/projetos/{a.project_id}/pessoas").status_code == 403  # operador não vê
+    assert "Pessoas · 7 dias" not in op.get(f"/app/projetos/{a.project_id}").get_data(as_text=True)
+    login(client, app, a.supervisor_email)
+    _assign(client, app, a.activity_id, a.operator_id)
+    for period in ("7", "30", "90", "tudo", "invalido"):
+        response = client.get(f"/app/projetos/{a.project_id}/pessoas?periodo={period}")
+        assert response.status_code == 200
+        page = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", response.get_data(as_text=True)))
+        assert "operator A" in page and "Atividade 1 +4" in page and "0 de 1 concluída" in page
+    detail = text_of(client.get(f"/app/projetos/{a.project_id}"))
+    assert "Pessoas · 7 dias" in detail and "Ver progresso por pessoa" in detail

@@ -801,6 +801,64 @@ def last_entries(project: Project) -> dict[uuid.UUID, ProgressEntry]:
     return {e.activity_id: e for e in rows}
 
 
+PEOPLE_PERIODS = {"7": 7, "30": 30, "90": 90, "tudo": None}
+
+
+@dataclass(frozen=True)
+class PersonRow:
+    user: object  # User ou None (autor removido)
+    result: calc.ProgressoPessoa
+    activities: tuple  # ((Activity, saldo), ...) para a tela
+
+
+def people_progress(project: Project, *, tz: str, today: date, days: int | None) -> list[PersonRow]:
+    """Progresso por pessoa no projeto: lançamentos dos últimos ``days`` dias (``None`` = tudo,
+    datas no fuso da empresa) e atividades ATIVAS atribuídas. As contas são de
+    ``calc.progresso_por_pessoa``; aqui só se lê o banco (empresa da sessão)."""
+    from datetime import timedelta
+
+    from app.formatting import local_dt
+    from app.models import User
+
+    rows = db.session.execute(
+        select(ProgressEntry.user_id, ProgressEntry.activity_id, ProgressEntry.delta, ProgressEntry.at, Activity.ideal_minutes)
+        .join(Activity, Activity.id == ProgressEntry.activity_id)
+        .join(Stage, Stage.id == Activity.stage_id)
+        .where(ProgressEntry.company_id == current_company_id(), Stage.project_id == project.id)
+    ).all()
+    lancamentos = [
+        calc.Lancamento(pessoa=u, atividade=a, delta=d, dia=local_dt(at, tz).date(), ideal_min=float(m or 0))
+        for u, a, d, at, m in rows
+    ]
+    live = [act for stage in active_stages(project) for act in active_activities(stage)]
+    atribuidas = [
+        calc.AtividadeAtribuida(
+            atividade=act.id, responsavel=act.assignee_id, ideal_min=float(act.ideal_minutes or 0),
+            pecas=act.units_done, previstas=project.quantity,
+        )
+        for act in live
+        if act.assignee_id is not None
+    ]
+    inicio = today - timedelta(days=days - 1) if days else None
+    results = calc.progresso_por_pessoa(lancamentos, atribuidas, inicio=inicio, fim=today)
+    user_ids = [r.pessoa for r in results if r.pessoa is not None]
+    users = {u.id: u for u in db.session.execute(select(User).where(User.id.in_(user_ids))).scalars()} if user_ids else {}
+    activity_ids = {k for r in results for k, _ in r.por_atividade}
+    acts = (
+        {a.id: a for a in db.session.execute(scoped(Activity).where(Activity.id.in_(activity_ids))).scalars()}
+        if activity_ids
+        else {}
+    )
+    return [
+        PersonRow(
+            user=users.get(r.pessoa),
+            result=r,
+            activities=tuple((acts[k], v) for k, v in r.por_atividade if k in acts),
+        )
+        for r in results
+    ]
+
+
 def running_totals(entries: list[ProgressEntry]) -> dict[uuid.UUID, tuple[int, int]]:
     """{id do registro: (antes, depois)} = peças da atividade antes e depois do lançamento
     (soma acumulada dos lançamentos, desfazeres incluídos). Para o “6 → 7 de 10”."""
