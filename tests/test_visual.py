@@ -104,14 +104,13 @@ def test_assets_locais_existem():
     htmx = (STATIC / "js" / "htmx.min.js").read_text(encoding="utf-8")
     assert 'version:"2.0.4"' in htmx
     for name in (
-        "ibm-plex-sans-latin-400-normal.woff2",
-        "ibm-plex-sans-latin-600-normal.woff2",
-        "ibm-plex-sans-latin-700-normal.woff2",
-        "barlow-semi-condensed-latin-600-normal.woff2",
-        "barlow-semi-condensed-latin-700-normal.woff2",
+        "geist-latin-400-normal.woff2",
+        "geist-latin-500-normal.woff2",
+        "geist-latin-600-normal.woff2",
+        "geist-latin-700-normal.woff2",
     ):
         assert (STATIC / "fonts" / name).read_bytes()[:4] == b"wOF2", name
-    for lic in ("OFL-IBMPlexSans.txt", "OFL-BarlowSemiCondensed.txt"):
+    for lic in ("OFL-Geist.txt",):
         assert "SIL Open Font License" in (STATIC / "fonts" / lic).read_text(encoding="utf-8")
 
 

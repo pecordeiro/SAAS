@@ -1063,3 +1063,13 @@ critérios de pronto da anterior estiverem marcados.
   comprometimento do próprio ambiente do cron; espelho de fotos na mesma conta Cloudflare;
   `send_default_pii` do Sentry aparece como depreciado na versão instalada (migrar para
   `data_collection` em manutenção).
+
+## Identidade visual “Prumo Noturno” (2026-10-15)
+
+- Entregue: novos tokens (claro e escuro), fonte Geist, símbolo e imagens da marca, componentes
+  (botão principal com brilho, foco com halo, rótulos em frase normal, faixa final azul, menu lateral
+  em pílula), hero maior no desktop, docs de marca/contraste e ADR-0013.
+- Verificação: `pytest` completo verde (873 passed, 77 skipped, 3 xfailed; os skips são os testes
+  que exigem PostgreSQL), `scripts/build_assets.py --check` ok, contraste recalculado (claro e escuro).
+- Pendências: telas conferidas em 375/768/1280 px no navegador (sem navegador neste ambiente);
+  regerar `docs/design/capturas/`; decidir o nome comercial.
