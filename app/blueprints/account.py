@@ -19,6 +19,7 @@ from app.forms_accounts import (
     MfaDisableForm,
     MfaRegenerateForm,
     MfaSetupForm,
+    NotificationPrefsForm,
     ProfileEmailForm,
     ProfileNameForm,
     ProfilePasswordForm,
@@ -127,6 +128,13 @@ def _profile(status: int = 200, **forms):
     forms.setdefault("email_form", ProfileEmailForm(formdata=None))
     forms.setdefault("password_form", ProfilePasswordForm(formdata=None))
     forms.setdefault("sessions_form", TokenActionForm(formdata=None))
+    forms.setdefault(
+        "prefs_form",
+        NotificationPrefsForm(
+            formdata=None,
+            data={p: getattr(current_user, p) for p in ("notify_assignment", "notify_alerts", "notify_weekly")},
+        ),
+    )
     return render_template(
         "account/profile.html",
         recovery_left=mfa.remaining_recovery_codes(current_user) if current_user.mfa_enabled else 0,
@@ -150,6 +158,20 @@ def profile_name():
     db.session.commit()
     flash("Nome atualizado.", "sucesso")
     return redirect(url_for("account.profile"), code=303)
+
+
+@bp.post("/perfil/notificacoes")
+@login_required
+def profile_notifications():
+    """Etapa F: liga/desliga os e-mails automáticos do PRÓPRIO usuário (vale em todas as empresas)."""
+    form = NotificationPrefsForm()
+    if not form.validate_on_submit():
+        return _profile(400, prefs_form=form)
+    for pref in ("notify_assignment", "notify_alerts", "notify_weekly"):
+        setattr(current_user, pref, bool(getattr(form, pref).data))
+    db.session.commit()
+    flash("Preferências de e-mail salvas.", "sucesso")
+    return redirect(url_for("account.profile", _anchor="notificacoes"), code=303)
 
 
 @bp.post("/perfil/email")

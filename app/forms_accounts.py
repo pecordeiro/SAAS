@@ -3,7 +3,7 @@ com a Fase 4."""
 
 from __future__ import annotations
 
-from wtforms import EmailField, HiddenField, PasswordField, RadioField, StringField
+from wtforms import BooleanField, EmailField, HiddenField, PasswordField, RadioField, StringField
 from wtforms.validators import DataRequired, Email, EqualTo, Length
 
 from app.forms import BaseForm, _strip
@@ -54,6 +54,14 @@ class ProfileNameForm(BaseForm):
 class ProfileEmailForm(BaseForm):
     email = _email_field("Novo e-mail")
     current_password = PasswordField("Senha atual", validators=[DataRequired(), Length(max=128)])
+
+
+class NotificationPrefsForm(BaseForm):
+    """Etapa F: preferências de e-mail (caixa desmarcada = desligado)."""
+
+    notify_assignment = BooleanField("Atividade atribuída a mim")
+    notify_alerts = BooleanField("Alertas de produção")
+    notify_weekly = BooleanField("Relatório semanal")
 
 
 class ProfilePasswordForm(BaseForm):

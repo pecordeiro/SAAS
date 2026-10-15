@@ -50,6 +50,7 @@ class Company(UUIDPk, Timestamps, db.Model):
     __table_args__ = (
         CheckConstraint("daily_hours > 0 AND daily_hours <= 24", name="daily_hours_range"),
         CheckConstraint("workdays_mask BETWEEN 0 AND 127", name="workdays_mask_range"),
+        CheckConstraint("stalled_days BETWEEN 1 AND 60", name="stalled_days_range"),
     )
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -61,6 +62,8 @@ class Company(UUIDPk, Timestamps, db.Model):
     mfa_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     # LGPD: pedido de exclusão; o worker apaga depois do prazo de carência.
     deletion_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Etapa F: alerta “etapa parada há X dias úteis” (1–60, validado no servidor e no banco).
+    stalled_days: Mapped[int] = mapped_column(Integer, nullable=False, default=3, server_default="3")
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="company")
 
@@ -87,6 +90,11 @@ class User(UUIDPk, Timestamps, UserMixin, db.Model):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Etapa C: equipe da plataforma (painel /interno). Só por ``flask staff grant`` (exige MFA).
     is_staff: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    # Etapa F: preferências de e-mail (ligar/desligar em /conta/perfil). Valem para todas as
+    # empresas do usuário. Alertas e relatório só chegam a supervisor/proprietário.
+    notify_assignment: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    notify_alerts: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    notify_weekly: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="user")
 

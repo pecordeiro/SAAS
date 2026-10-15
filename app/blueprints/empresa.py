@@ -51,6 +51,7 @@ def settings():
                 "cnpj": company.cnpj or "",
                 "daily_hours": company.daily_hours,
                 "workdays": list(company.workdays()),
+                "stalled_days": company.stalled_days,
             },
         )
     if form.validate_on_submit():
@@ -62,6 +63,7 @@ def settings():
                 daily_hours=form.daily_hours.data,
                 workdays=form.workdays.data or [],
                 user_id=current_user.id,
+                stalled_days=form.stalled_days.data,
             )
         except svc.CompanyError as exc:
             db.session.rollback()
@@ -105,4 +107,5 @@ def _company_data() -> dict:
         "cnpj": company.cnpj or "",
         "daily_hours": company.daily_hours,
         "workdays": list(company.workdays()),
+        "stalled_days": company.stalled_days,
     }

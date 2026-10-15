@@ -40,7 +40,7 @@ TASK_ALERTS = "alerts"
 TASK_WEEKLY = "weekly"
 TASK_RECONCILE = "reconcile"
 TASK_TOKENS = "tokens"
-TASKS = (TASK_EVENTS, TASK_RECONCILE, TASK_TOKENS)
+TASKS = (TASK_EVENTS, TASK_ALERTS, TASK_RECONCILE, TASK_TOKENS)
 
 # Intervalo mínimo entre execuções de cada tarefa no modo laço (segundos). ``--once`` roda
 # todas as pedidas, sem olhar o intervalo (cron).
@@ -205,6 +205,12 @@ def queue_status() -> list[dict]:
 # ------------------------------------------------------------------ tarefas agendadas
 
 
+def run_alerts(now: datetime | None = None) -> dict:
+    from app.services import alerts
+
+    return alerts.run_all(now or _now())
+
+
 def run_reconcile(now: datetime | None = None) -> dict:
     from app.services.billing import service as billing
 
@@ -219,6 +225,7 @@ def run_tokens(now: datetime | None = None) -> dict:
 
 RUNNERS: dict[str, Callable[..., dict]] = {
     TASK_EVENTS: process_events,
+    TASK_ALERTS: run_alerts,
     TASK_RECONCILE: run_reconcile,
     TASK_TOKENS: run_tokens,
 }

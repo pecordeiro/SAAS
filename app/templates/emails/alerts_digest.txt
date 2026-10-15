@@ -1,0 +1,10 @@
+{% extends "emails/_base.txt" %}
+{% block body %}Olá, {{ name }}. Estes são os alertas de hoje da empresa {{ company_name }}:
+{% for item in items %}
+- {{ item.label }} — {{ item.project }}: {{ item.text }}
+  Abrir o projeto: {{ item.url }}
+{% endfor %}
+Ver todos os alertas: {{ list_url }}{% endblock %}
+{% block footer %}Você recebe este resumo porque é supervisor ou proprietário na empresa {{ company_name }}.
+Para não receber mais, desligue "Alertas de produção" em {{ prefs_url }}
+Não responda: esta caixa não é lida.{% endblock %}

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from wtforms import DateField, DecimalField, SelectMultipleField, StringField
+from wtforms import DateField, DecimalField, IntegerField, SelectMultipleField, StringField
 from wtforms.validators import DataRequired, InputRequired, Length, NumberRange, Optional
 
 from app.forms import BaseForm, _strip
+from app.services.calc import DIAS_PARADA_MAX, DIAS_PARADA_MIN
 from app.services.company import WEEKDAYS
 
 
@@ -25,6 +26,12 @@ class CompanyForm(BaseForm):
         coerce=int,
         choices=[(n, long) for n, _short, long in WEEKDAYS],
         default=[0, 1, 2, 3, 4],
+    )
+    # Etapa F: alerta “etapa parada há X dias úteis” (o serviço valida de novo). Vazio mantém
+    # o valor atual (formulários antigos sem o campo continuam válidos).
+    stalled_days = IntegerField(
+        "Alerta de etapa parada (dias úteis sem lançamento)",
+        validators=[Optional(), NumberRange(min=DIAS_PARADA_MIN, max=DIAS_PARADA_MAX)],
     )
 
 

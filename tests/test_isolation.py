@@ -742,3 +742,42 @@ def test_etapa_f_mesma_rota_funciona_na_propria_empresa(client, app, tenants, me
     assert _call(client, app, method, template.format(id=getattr(a, field)), data).status_code in (200, 302, 303)
     with app.app_context():
         assert db.session.get(Stage, a.stage_id).waiting_part is True
+
+
+# Etapa F — rotas sem <uuid:> também ganham caso A/B: a lista de alertas e as preferências de
+# e-mail só enxergam/alteram a empresa e o usuário da sessão.
+
+
+def test_etapa_f_alertas_so_da_propria_empresa(client, app, tenants):
+    from datetime import date, datetime, timezone
+
+    from app.models import Alert
+
+    a, b = tenants
+    with app.app_context():
+        for t in (a, b):
+            db.session.add(Alert(company_id=t.company_id, kind="forecast_late", severity="danger",
+                                 dedupe_key=f"forecast_late:{t.project_id}", day=date.today(), project_id=t.project_id,
+                                 details={"atraso_du": 1, "previsao": "2026-10-20", "prazo": "2026-10-19"},
+                                 created_at=datetime.now(timezone.utc)))
+        db.session.commit()
+    login(client, app, a.owner_email)
+    page = client.get("/app/alertas").get_data(as_text=True)
+    assert "Projeto A" in page and "Projeto B" not in page and str(b.project_id) not in page
+    with client.session_transaction() as sess:
+        sess["company_id"] = str(b.company_id)  # forjado: sem vínculo com B
+    page = client.get("/app/alertas").get_data(as_text=True)
+    assert "Projeto B" not in page
+
+
+def test_etapa_f_preferencias_so_do_proprio_usuario(client, app, tenants):
+    from app.models import User
+
+    a, b = tenants
+    login(client, app, a.owner_email)
+    # Campos extras (ex.: id de outro usuário) são ignorados: só o usuário da sessão muda.
+    assert post(client, app, "/conta/perfil/notificacoes", {"user_id": str(b.owner_id)}).status_code == 303
+    with app.app_context():
+        assert db.session.query(User).filter_by(email=a.owner_email).one().notify_alerts is False
+        other = db.session.query(User).filter_by(email=b.owner_email).one()
+        assert (other.notify_assignment, other.notify_alerts, other.notify_weekly) == (True, True, True)

@@ -21,6 +21,7 @@
     <a class="section-nav__item" href="#dados">Dados</a>
     <a class="section-nav__item" href="#calendario">Calendário</a>
     <a class="section-nav__item" href="#feriados">Feriados</a>
+    <a class="section-nav__item" href="#alertas">Alertas</a>
   </nav>
 
   <div class="settings__body stack--lg">
@@ -42,6 +43,8 @@
         </div>
         <p class="field__hint">Fins de semana e feriados não contam nos dias úteis.</p>
       </fieldset>
+      <h2 class="section-title" id="alertas">Alertas</h2>
+      {{ field(form.stalled_days, hint="Etapa em andamento sem nenhum lançamento por este número de dias úteis gera o alerta “etapa parada”. De 1 a 60; padrão 3.", attrs={"inputmode": "numeric", "min": 1, "max": 60, "required": true}) }}
       <div class="form-actions">{{ button("Salvar", "primary") }}</div>
     </form>
 

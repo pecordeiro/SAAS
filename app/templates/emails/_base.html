@@ -16,7 +16,9 @@
   <h1>{{ subject }}</h1>
   {% block body %}{% endblock %}
   <hr>
+  {%- block footer %}
   <p><small>Você recebeu esta mensagem por causa de uma ação na sua conta do Controle de Produção.
   Se não foi você, ignore este e-mail ou troque a senha. Não responda: esta caixa não é lida.</small></p>
+  {%- endblock %}
 </body>
 </html>

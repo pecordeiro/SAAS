@@ -1,5 +1,5 @@
 {% extends "base_app.html" %}
-{% from "components/field.html" import field %}
+{% from "components/field.html" import field, checkbox %}
 {% from "components/button.html" import button %}
 {% from "components/alert.html" import alert %}
 {% from "components/badge.html" import badge %}
@@ -79,6 +79,21 @@
     <p class="muted">Confirme seu e-mail para poder ativar.</p>
     {%- endif %}
     {%- endif %}
+  </section>
+
+  <section class="card stack" aria-labelledby="notificacoes">
+    <h2 class="section-title" id="notificacoes">Notificações por e-mail</h2>
+    <form class="stack" method="post" action="{{ url_for('account.profile_notifications') }}">
+      {{ prefs_form.csrf_token }}
+      <fieldset class="fieldset stack--sm">
+        <legend class="field__label">Quero receber</legend>
+        {{ checkbox("notify_assignment", "Atividade atribuída a mim (com o link)", checked=prefs_form.notify_assignment.data, value="y", id="pref-atribuicao") }}
+        {{ checkbox("notify_alerts", "Alertas de produção: prazo em risco, atraso previsto, etapa parada, peça atrasada", checked=prefs_form.notify_alerts.data, value="y", id="pref-alertas") }}
+        {{ checkbox("notify_weekly", "Relatório semanal com planilha (XLSX)", checked=prefs_form.notify_weekly.data, value="y", id="pref-semanal") }}
+        <p class="field__hint">Alertas e relatório semanal só chegam a supervisores e proprietários. Vale para todas as suas empresas.</p>
+      </fieldset>
+      <div>{{ button("Salvar preferências", "secondary") }}</div>
+    </form>
   </section>
 
   <section class="card stack" aria-labelledby="perfil-sessoes">

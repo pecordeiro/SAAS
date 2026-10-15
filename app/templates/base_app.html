@@ -17,6 +17,7 @@
   {"key": "history", "label": "Histórico", "href": url_for("app.history"), "icon": "history"},
 ] -%}
 {%- if current_membership and current_membership.has_role("supervisor") -%}
+  {%- set _ = nav_items.append({"key": "alerts", "label": "Alertas", "href": url_for("app.alerts"), "icon": "alert"}) -%}
   {%- set _ = nav_items.append({"key": "templates", "label": "Modelos", "href": url_for("modelos.index"), "icon": "folder"}) -%}
   {%- set _ = nav_items.append({"key": "users", "label": "Usuários", "href": url_for("team.users"), "icon": "team"}) -%}
 {%- endif -%}

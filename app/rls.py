@@ -59,6 +59,7 @@ RLS_TABLES: tuple[str, ...] = (
     "api_tokens",
     # Etapa F (worker, ADR-0010): migration e2b7f1c3a9d0.
     "job_runs",
+    "alerts",  # migration a5d9e3f7c2b8
 )
 
 _UNSET: Any = object()

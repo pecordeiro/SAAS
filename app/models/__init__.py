@@ -43,4 +43,12 @@ from app.models.staff import (  # noqa: F401,E402  (Etapa C)
     VISUAL_STATUSES,
     VisualRequest,
 )
-from app.models.notifications import JobRun  # noqa: F401,E402  (Etapa F)
+from app.models.notifications import (  # noqa: F401,E402  (Etapa F)
+    ALERT_DEADLINE_RISK,
+    ALERT_FORECAST_LATE,
+    ALERT_KINDS,
+    ALERT_PART_OVERDUE,
+    ALERT_STAGE_STALLED,
+    Alert,
+    JobRun,
+)

@@ -488,3 +488,140 @@ def progresso_por_pessoa(
         )
     resultado.sort(key=lambda r: (r.pessoa is None, -r.pecas, -r.horas))
     return tuple(resultado)
+
+
+# ---------------------------------------------------------------------------
+# Alertas automáticos (Etapa F). Regra pura: o worker monta as entradas com o banco e grava
+# o que sair daqui (tabela alerts, dedupe por chave + dia).
+# ---------------------------------------------------------------------------
+
+ALERTA_PRAZO_EM_RISCO = "deadline_risk"
+ALERTA_ATRASO_PREVISTO = "forecast_late"
+ALERTA_ETAPA_PARADA = "stage_stalled"
+ALERTA_PECA_ATRASADA = "part_overdue"
+
+DIAS_PARADA_PADRAO = 3  # etapa em andamento sem lançamento há X dias úteis (configurável)
+DIAS_PARADA_MIN = 1
+DIAS_PARADA_MAX = 60
+MARGEM_FOLGA_RISCO = 1  # folga (término previsto → prazo) de até 1 dia útil = prazo em risco
+MARGEM_PRAZO_SEM_PREVISAO = 5  # sem previsão (equipe zerada): prazo em até 5 dias úteis = risco
+
+
+def dias_parada_valido(valor) -> bool:
+    """X de “etapa parada há X dias”: inteiro entre 1 e 60."""
+    return isinstance(valor, int) and not isinstance(valor, bool) and DIAS_PARADA_MIN <= valor <= DIAS_PARADA_MAX
+
+
+@dataclass(frozen=True)
+class EtapaAlerta:
+    """Situação de uma etapa para os alertas, em tipos simples.
+
+    ``ultimo_registro`` = dia local do último lançamento em qualquer atividade da etapa;
+    ``peca_atualizada`` = dia local da última mudança na marca “aguardando peça”."""
+
+    id: object
+    status: str
+    ultimo_registro: date | None = None
+    aguardando_peca: bool = False
+    peca_prevista: date | None = None
+    peca_atualizada: date | None = None
+
+
+@dataclass(frozen=True)
+class Alerta:
+    tipo: str
+    severidade: str  # "warning" | "danger"
+    chave: str  # dedupe (junto com o dia)
+    etapa: object | None
+    valores: dict = field(default_factory=dict)  # só números e datas ISO
+
+
+def alertas_projeto(
+    *,
+    projeto: object,
+    hoje: date,
+    prazo: date | None,
+    previsao: date | None,
+    concluido: bool,
+    etapas: Sequence[EtapaAlerta] = (),
+    dias_parada: int = DIAS_PARADA_PADRAO,
+    feriados: Iterable[date] = (),
+    dias_semana: Iterable[int] = DIAS_SEMANA_PADRAO,
+) -> tuple[Alerta, ...]:
+    """Alertas de um projeto ativo no dia ``hoje``.
+
+    - Atraso previsto (danger): término previsto depois do prazo; valor = atraso em dias úteis.
+    - Prazo em risco: sem atraso previsto, mas (a) prazo já passou sem previsão (danger),
+      (b) folga até o prazo ≤ ``MARGEM_FOLGA_RISCO`` dia útil, ou (c) sem previsão e prazo em
+      até ``MARGEM_PRAZO_SEM_PREVISAO`` dias úteis (warning).
+    - Etapa parada (warning): etapa “Em andamento” sem lançamento há ≥ ``dias_parada`` dias
+      úteis. Etapa marcada “aguardando peça” não entra (a marca já explica a parada).
+    - Peça atrasada (warning): etapa aguardando peça cuja previsão passou e ninguém atualizou
+      a marca depois da previsão (lembrete ao supervisor).
+    Projeto concluído não gera alerta."""
+    if concluido:
+        return ()
+    if not dias_parada_valido(dias_parada):
+        raise ValueError("dias_parada fora de 1..60")
+    feriados = tuple(feriados)
+    dias_semana = tuple(dias_semana)
+    saida: list[Alerta] = []
+
+    if prazo is not None:
+        if previsao is not None and previsao > prazo:
+            saida.append(
+                Alerta(
+                    ALERTA_ATRASO_PREVISTO, "danger", f"{ALERTA_ATRASO_PREVISTO}:{projeto}", None,
+                    {"atraso_du": dias_uteis_entre(prazo, previsao, feriados, dias_semana),
+                     "previsao": previsao.isoformat(), "prazo": prazo.isoformat()},
+                )
+            )
+        elif previsao is None and hoje > prazo:
+            saida.append(
+                Alerta(
+                    ALERTA_PRAZO_EM_RISCO, "danger", f"{ALERTA_PRAZO_EM_RISCO}:{projeto}", None,
+                    {"vencido_du": dias_uteis_entre(prazo, hoje, feriados, dias_semana), "prazo": prazo.isoformat()},
+                )
+            )
+        elif previsao is not None:
+            folga = dias_uteis_entre(previsao, prazo, feriados, dias_semana)
+            if folga <= MARGEM_FOLGA_RISCO:
+                saida.append(
+                    Alerta(
+                        ALERTA_PRAZO_EM_RISCO, "warning", f"{ALERTA_PRAZO_EM_RISCO}:{projeto}", None,
+                        {"folga_du": folga, "previsao": previsao.isoformat(), "prazo": prazo.isoformat()},
+                    )
+                )
+        else:
+            ate = dias_uteis_entre(hoje, prazo, feriados, dias_semana)
+            if ate <= MARGEM_PRAZO_SEM_PREVISAO:
+                saida.append(
+                    Alerta(
+                        ALERTA_PRAZO_EM_RISCO, "warning", f"{ALERTA_PRAZO_EM_RISCO}:{projeto}", None,
+                        {"ate_prazo_du": ate, "prazo": prazo.isoformat()},
+                    )
+                )
+
+    for e in etapas:
+        if e.status == STATUS_EM_ANDAMENTO and not e.aguardando_peca and e.ultimo_registro is not None:
+            parada = dias_uteis_entre(e.ultimo_registro, hoje, feriados, dias_semana)
+            if parada >= dias_parada:
+                saida.append(
+                    Alerta(
+                        ALERTA_ETAPA_PARADA, "warning", f"{ALERTA_ETAPA_PARADA}:{e.id}", e.id,
+                        {"parada_du": parada, "ultimo": e.ultimo_registro.isoformat(), "limite": dias_parada},
+                    )
+                )
+        if (
+            e.aguardando_peca
+            and e.peca_prevista is not None
+            and e.peca_prevista < hoje
+            and (e.peca_atualizada is None or e.peca_atualizada <= e.peca_prevista)
+        ):
+            saida.append(
+                Alerta(
+                    ALERTA_PECA_ATRASADA, "warning", f"{ALERTA_PECA_ATRASADA}:{e.id}:{e.peca_prevista.isoformat()}", e.id,
+                    {"dias": (hoje - e.peca_prevista).days, "prevista": e.peca_prevista.isoformat()},
+                )
+            )
+    return tuple(saida)

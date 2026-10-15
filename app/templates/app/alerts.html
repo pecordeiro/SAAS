@@ -1,0 +1,39 @@
+{% extends "base_app.html" %}
+{% from "components/badge.html" import badge %}
+{% from "components/table.html" import data_table %}
+{% from "components/empty_state.html" import empty_state %}
+{% set nav_current = "alerts" %}
+{% block title %}Alertas · Controle de Produção{% endblock %}
+{% block content %}
+{#
+  Etapa F — alertas automáticos (gerados pelo worker; regra em calc.alertas_projeto). Só
+  leitura. Texto e números vêm prontos do servidor (alerts.describe); cor sempre com texto e
+  ícone no selo.
+#}
+<header class="page-header">
+  <div class="page-header__titles">
+    <h1>Alertas</h1>
+    <p class="page-header__subtitle muted">Últimos {{ days }} dias · prazo em risco, atraso previsto, etapa parada há {{ stalled_days }} dias úteis ou mais e peça atrasada.</p>
+  </div>
+</header>
+
+{%- if rows %}
+{% call data_table([("Dia", ""), ("Projeto", ""), ("Alerta", ""), ("Detalhe", "")], caption="Alertas automáticos") %}
+  <tbody>
+  {%- for r in rows %}
+    <tr>
+      <td class="num" data-label="Dia">{{ r.alert.day|data }}</td>
+      <td data-label="Projeto"><a class="row-link" href="{{ url_for('app.project_detail', project_id=r.alert.project_id) }}">{{ r.alert.project.name }}</a></td>
+      <td data-label="Alerta">{{ badge(r.label, "danger" if r.alert.severity == "danger" else "warning", "alert") }}</td>
+      <td data-label="Detalhe">{{ r.text }}</td>
+    </tr>
+  {%- endfor %}
+  </tbody>
+{% endcall %}
+{%- else %}
+<div class="card">
+  {{ empty_state("Nenhum alerta", "Quando um prazo entrar em risco, uma etapa ficar parada ou uma peça atrasar, o alerta aparece aqui e por e-mail.", icon="alert") }}
+</div>
+{%- endif %}
+<p class="muted text-sm mt-4">Os alertas são conferidos várias vezes ao dia. O e-mail de cada situação se repete no máximo uma vez por semana; desligue em <a href="{{ url_for('account.profile', _anchor='notificacoes') }}">Perfil › Notificações</a>.{% if current_membership and current_membership.has_role("owner") %} O número de dias de “etapa parada” fica em <a href="{{ url_for('empresa.settings', _anchor='alertas') }}">Empresa</a>.{% endif %}</p>
+{% endblock %}

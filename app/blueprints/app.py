@@ -17,6 +17,7 @@ from app.formatting import br_hours, local_dt
 from app.forms import ActivityForm, ProgressForm, StageForm
 from app.forms_production import ProjectFromTemplateForm, WaitingPartForm
 from app.models import ROLE_OPERATOR, ROLE_SUPERVISOR, Activity, Project, Stage, Template
+from app.services import alerts as alerts_svc
 from app.services import audit, calc, dashboard, exporter
 from app.services import projects as svc
 from app.services import templates as tsvc
@@ -407,6 +408,23 @@ def project_people(project_id):
     return render_template(
         "app/people.html", project=project, rows=rows, period=period, period_tabs=PEOPLE_PERIOD_TABS, series=series
     )
+
+
+# ---------------------------------------------------------------- alertas (Etapa F)
+
+
+@bp.get("/alertas")
+@tenant_required(ROLE_SUPERVISOR)
+def alerts():
+    """Alertas automáticos dos últimos 14 dias (gerados pelo worker; regra em calc.py).
+    Supervisor+ (mesmo público do e-mail). Só leitura; empresa sempre a da sessão."""
+    today = _today()
+    rows = [
+        {"alert": a, "label": alerts_svc.KIND_LABELS.get(a.kind, a.kind), "text": alerts_svc.describe(a)}
+        for a in alerts_svc.recent(g.company.id, today)
+    ]
+    return render_template("app/alerts.html", rows=rows, days=alerts_svc.ALERT_LIST_DAYS,
+                           stalled_days=g.company.stalled_days)
 
 
 # ---------------------------------------------------------------- histórico

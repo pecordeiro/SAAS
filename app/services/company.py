@@ -16,7 +16,7 @@ from sqlalchemy import select
 
 from app.extensions import db
 from app.models import Company, Holiday
-from app.services import audit
+from app.services import audit, calc
 from app.tenancy import scoped
 
 WEEKDAYS = (
@@ -69,7 +69,9 @@ def update_company(
     daily_hours: Decimal,
     workdays: list[int],
     user_id: uuid.UUID | None,
+    stalled_days: int | None = None,
 ) -> None:
+    """``stalled_days`` (Etapa F): X de “etapa parada há X dias úteis”; None mantém o atual."""
     name = (name or "").strip()
     if not name or len(name) > 120:
         raise CompanyError("Informe o nome da empresa (até 120 caracteres).")
@@ -81,11 +83,21 @@ def update_company(
         raise CompanyError("Marque pelo menos um dia de trabalho na semana.")
     if not Decimal("0.5") <= daily_hours <= Decimal("24"):
         raise CompanyError("A jornada deve ficar entre 0,5 e 24 horas por dia.")
-    before = {"name": company.name, "daily_hours": str(company.daily_hours), "workdays_mask": company.workdays_mask}
+    if stalled_days is None:
+        stalled_days = company.stalled_days
+    if not calc.dias_parada_valido(stalled_days):
+        raise CompanyError(
+            f"Etapa parada: informe de {calc.DIAS_PARADA_MIN} a {calc.DIAS_PARADA_MAX} dias úteis."
+        )
+    before = {
+        "name": company.name, "daily_hours": str(company.daily_hours), "workdays_mask": company.workdays_mask,
+        "stalled_days": company.stalled_days,
+    }
     company.name = name
     company.cnpj = format_cnpj(digits) if digits else None
     company.daily_hours = daily_hours
     company.workdays_mask = mask
+    company.stalled_days = stalled_days
     db.session.flush()
     audit.record(
         audit.COMPANY_UPDATED,
@@ -93,7 +105,10 @@ def update_company(
         actor_user_id=user_id,
         object_type="company",
         object_id=company.id,
-        details={"antes": before, "depois": {"name": name, "daily_hours": str(daily_hours), "workdays_mask": mask}},
+        details={
+            "antes": before,
+            "depois": {"name": name, "daily_hours": str(daily_hours), "workdays_mask": mask, "stalled_days": stalled_days},
+        },
     )
 
 

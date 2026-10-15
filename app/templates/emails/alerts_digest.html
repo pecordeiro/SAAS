@@ -1,0 +1,15 @@
+{% extends "emails/_base.html" %}
+{% block body %}
+  <p>Olá, {{ name }}. Estes são os alertas de hoje da empresa {{ company_name }}:</p>
+  <ul>
+  {%- for item in items %}
+    <li><strong>{{ item.label }}</strong> — {{ item.project }}: {{ item.text }} <a href="{{ item.url }}">Abrir o projeto</a></li>
+  {%- endfor %}
+  </ul>
+  <p><a href="{{ list_url }}">Ver todos os alertas</a></p>
+{% endblock %}
+{% block footer %}
+  <p><small>Você recebe este resumo porque é supervisor ou proprietário na empresa {{ company_name }}.
+  Para não receber mais, desligue “Alertas de produção” em <a href="{{ prefs_url }}">{{ prefs_url }}</a>.
+  Não responda: esta caixa não é lida.</small></p>
+{% endblock %}
