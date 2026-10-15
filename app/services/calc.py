@@ -80,6 +80,11 @@ class ResultadoEtapa:
     tarefas_concluidas: int
     atividades: tuple[ResultadoAtividade, ...]
 
+    @property
+    def tempo_trabalhado_min(self) -> float:
+        """Tempo já trabalhado na etapa (total − que falta); Tabela 1: F − G."""
+        return self.tempo_total_min - self.tempo_restante_min
+
 
 @dataclass(frozen=True)
 class ResultadoProjeto:
@@ -100,6 +105,15 @@ class ResultadoProjeto:
     @property
     def tempo_total_h(self) -> float:
         return self.tempo_total_min / 60
+
+    @property
+    def tempo_trabalhado_min(self) -> float:
+        """Tempo trabalhado = total − que falta (planilha B381 = F414 − G414)."""
+        return self.tempo_total_min - self.tempo_restante_min
+
+    @property
+    def tempo_trabalhado_h(self) -> float:
+        return self.tempo_trabalhado_min / 60
 
     @property
     def tempo_restante_h(self) -> float:
@@ -255,6 +269,34 @@ def dias_uteis_entre(
             total += 1
         atual += timedelta(days=1)
     return total
+
+
+def razao(feito: float, total: float) -> float:
+    """feito ÷ total (0 se total ≤ 0): colunas “%” do resumo final (D377:D381)."""
+    if not total or total <= 0:
+        return 0.0
+    return (feito or 0) / total
+
+
+EQUIPE_MAXIMA_GRAFICO = 6  # aba Equipe: linhas “E se mudar o tamanho da equipe?” (1 a 6)
+
+
+def equipe_x_prazo(
+    horas: float, horas_dia: float, ate: int = EQUIPE_MAXIMA_GRAFICO
+) -> tuple[tuple[int, float | None], ...]:
+    """Dias úteis restantes para 1..`ate` pessoas (aba Equipe, C13:C18).
+
+    Cada item é ``(pessoas, dias)``; ``dias`` é None se as horas por dia forem 0.
+    """
+    return tuple((p, dias_uteis_restantes(horas, p, horas_dia)) for p in range(1, max(ate, 1) + 1))
+
+
+def contagem_status(etapas: Iterable[ResultadoEtapa]) -> dict[str, int]:
+    """Quantas etapas em cada situação (Tabela 2; B378 conta as concluídas)."""
+    contagem = {STATUS_CONCLUIDA: 0, STATUS_EM_ANDAMENTO: 0, STATUS_NAO_INICIADA: 0}
+    for e in etapas:
+        contagem[e.status] += 1
+    return contagem
 
 
 # ---------------------------------------------------------------------------

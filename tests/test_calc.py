@@ -375,3 +375,100 @@ def test_dias_uteis_entre_e_inverso_de_prazo_em_data():
     fim = calc.prazo_em_data(date(2026, 10, 12), 5)
     assert fim == date(2026, 10, 16)
     assert calc.dias_uteis_entre(date(2026, 10, 11), fim) == 5
+
+
+# ---------------------------------------------------------------- dashboard (Etapa E)
+
+
+def test_razao_e_contagem_e_equipe_a_mao():
+    assert calc.razao(40, 240) == pytest.approx(40 / 240)
+    assert calc.razao(5, 0) == 0.0
+    # 10 h ÷ (p × 8 h): 1,25; 0,625; ...
+    tabela = calc.equipe_x_prazo(10, 8, ate=3)
+    assert [p for p, _ in tabela] == [1, 2, 3]
+    assert tabela[0][1] == pytest.approx(1.25) and tabela[1][1] == pytest.approx(0.625)
+    assert calc.equipe_x_prazo(10, 0, ate=2) == ((1, None), (2, None))
+    r = calc.resumo_projeto(
+        [Etapa([Atividade(10, 10)], 10), Etapa([Atividade(10, 3)], 10), Etapa([Atividade(10, 0)], 10)], 10
+    )
+    assert calc.contagem_status(r.etapas) == {"Concluída": 1, "Em andamento": 1, "Não iniciada": 1}
+    # trabalhado = total − falta: etapa 2 = 100 − 70 = 30 min
+    assert r.etapas[1].tempo_trabalhado_min == pytest.approx(30)
+    assert r.tempo_trabalhado_min == pytest.approx(130)
+
+
+def test_paridade_dashboard_com_planilha_de_referencia():
+    """Cada número do dashboard (KPIs, Tabela 1, Tabela 2, status, horas por etapa, equipe × prazo)
+    sai de calc.py e bate com o cache de valores do Excel."""
+    wf, wv, equipe = _ler_planilha()
+    if wv["B6"].value is None or wv["F414"].value is None:
+        pytest.skip("cache de valores do Excel vazio (planilha salva sem recálculo)")
+    ws = wv  # aba Acompanhamento com valores
+
+    blocos = _descobrir_etapas(wf, wv)
+    n = len(blocos)
+    etapas = [calc.Etapa(atividades=tuple(atvs), previstas=int(esp["previstas"])) for _, atvs, esp in blocos]
+    pessoas = int(_n(equipe["B6"].value))
+    horas_dia = _n(equipe["B7"].value)
+    r = calc.resumo_projeto(etapas, quantidade=int(ws["B4"].value), pessoas=pessoas, horas_dia=horas_dia)
+
+    # --- Tabela 1 (linhas 390…) e linha Total
+    t1, t2 = 390, 419
+    for i, e in enumerate(r.etapas):
+        ctx = f"etapa {i + 1}"
+        assert e.tempo_unidade_min == pytest.approx(ws.cell(t1 + i, 2).value, abs=TOL), ctx  # tempo por robô
+        assert e.peso_no_projeto == pytest.approx(ws.cell(t1 + i, 3).value, abs=TOL), ctx  # peso no robô
+        assert e.previstas == ws.cell(t1 + i, 4).value, ctx
+        assert e.progresso == pytest.approx(ws.cell(t1 + i, 5).value, abs=TOL), ctx
+        assert e.tempo_total_min / 60 == pytest.approx(ws.cell(t1 + i, 6).value, abs=TOL), ctx
+        assert e.tempo_restante_min / 60 == pytest.approx(ws.cell(t1 + i, 7).value, abs=TOL), ctx
+        # Horas por etapa (gráfico trabalhadas × faltam): F − G
+        trabalhadas = ws.cell(t1 + i, 6).value - ws.cell(t1 + i, 7).value
+        assert e.tempo_trabalhado_min / 60 == pytest.approx(trabalhadas, abs=TOL), ctx
+    tot = t1 + n
+    assert ws.cell(tot, 1).value == "Total"
+    assert r.tempo_unidade_min == pytest.approx(ws.cell(tot, 2).value, abs=TOL)
+    assert sum(e.peso_no_projeto for e in r.etapas) == pytest.approx(ws.cell(tot, 3).value, abs=TOL)  # treemap = 100%
+    assert r.unidades_etapas_previstas == ws.cell(tot, 4).value
+    assert r.progresso_geral == pytest.approx(ws.cell(tot, 5).value, abs=TOL)
+    assert r.tempo_total_h == pytest.approx(ws.cell(tot, 6).value, abs=TOL)
+    assert r.tempo_restante_h == pytest.approx(ws.cell(tot, 7).value, abs=TOL)
+
+    # --- Tabela 2 (linhas 419…) e Total: unidades, % e status
+    for i, e in enumerate(r.etapas):
+        ctx = f"etapa {i + 1}"
+        assert e.unidades == ws.cell(t2 + i, 2).value, ctx
+        assert e.previstas == ws.cell(t2 + i, 3).value, ctx
+        assert f"{e.unidades}/{e.previstas}" == ws.cell(t2 + i, 4).value, ctx
+        assert calc.razao(e.unidades, e.previstas) == pytest.approx(ws.cell(t2 + i, 5).value, abs=TOL), ctx
+        assert e.status == ws.cell(t2 + i, 6).value, ctx
+    assert ws.cell(t2 + n, 1).value == "Total"
+    assert r.unidades_etapas == ws.cell(t2 + n, 2).value
+    assert r.unidades_etapas_previstas == ws.cell(t2 + n, 3).value
+    assert calc.razao(r.unidades_etapas, r.unidades_etapas_previstas) == pytest.approx(ws.cell(t2 + n, 5).value, abs=TOL)
+
+    # --- Rosca “status das etapas”: contagem por situação (B378 e F419:F442)
+    contagem = calc.contagem_status(r.etapas)
+    status_excel = [ws.cell(t2 + i, 6).value for i in range(n)]
+    for nome in (calc.STATUS_CONCLUIDA, calc.STATUS_EM_ANDAMENTO, calc.STATUS_NAO_INICIADA):
+        assert contagem[nome] == status_excel.count(nome), nome
+    assert contagem[calc.STATUS_CONCLUIDA] == ws["B378"].value and sum(contagem.values()) == ws["C378"].value
+
+    # --- KPIs (resumo final 377–384)
+    assert r.unidades_concluidas == ws["B377"].value and r.previstas == ws["C377"].value
+    assert calc.razao(r.unidades_concluidas, r.previstas) == pytest.approx(ws["D377"].value, abs=TOL)
+    assert (r.tarefas_concluidas, r.tarefas) == (ws["B379"].value, ws["C379"].value)
+    assert calc.razao(r.tarefas_concluidas, r.tarefas) == pytest.approx(ws["D379"].value, abs=TOL)
+    assert calc.razao(r.unidades_etapas, r.unidades_etapas_previstas) == pytest.approx(ws["D380"].value, abs=TOL)
+    assert r.tempo_trabalhado_h == pytest.approx(ws["B381"].value, abs=TOL)  # “67,8 h trabalhadas de 160,5 h”
+    assert r.tempo_total_h == pytest.approx(ws["C381"].value, abs=TOL)
+    assert r.progresso_geral == pytest.approx(ws["D381"].value, abs=TOL)
+    assert r.tempo_restante_h == pytest.approx(ws["B383"].value, abs=TOL)
+    assert r.dias_uteis_restantes == pytest.approx(ws["B384"].value, abs=TOL)
+
+    # --- Equipe × prazo (aba Equipe, linhas 13–18): pessoas 1…6
+    tabela = calc.equipe_x_prazo(r.tempo_restante_h, horas_dia)
+    assert len(tabela) == 6
+    for linha, (p, dias) in zip(range(13, 19), tabela):
+        assert p == equipe.cell(linha, 1).value
+        assert dias == pytest.approx(equipe.cell(linha, 3).value, abs=TOL)
