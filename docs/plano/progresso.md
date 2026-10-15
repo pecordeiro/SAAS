@@ -1028,3 +1028,38 @@ critérios de pronto da anterior estiverem marcados.
   - Sem varredura de objetos órfãos no bucket (falha ao apagar depois do commit só loga
     `photos.orphan_object`); sem cópia dos arquivos de foto na exportação LGPD.
   - API v1 não expõe fotos/checklist/unidades.
+
+### Etapa H — Deploy e lançamento
+- Status: concluída no repositório; **o lançamento depende do dono** (`lancamento.md`, Parte B)
+- Datas: início 2026-10-15 · fim 2026-10-15
+- Entregas:
+  - [x] **Bloco 1 — saúde**: `GET /saude` (liveness, sem banco/sessão/dado interno, `no-store`) como
+    health check do Render; `/health` segue como prontidão. Testes em `tests/test_etapa_h_saude.py`.
+  - [x] **Bloco 2 — configuração**: `flask config-check` (`--online`, `--strict`, `--ignorar`) e
+    `scripts/config_check.py` (`app/configcheck.py`); `flask mail-test`, `storage-test`,
+    `sentry-test`, `worker status --check` + `queue_metrics` e linha de vida do worker a cada 5 min.
+  - [x] **Bloco 3 — backup**: `backup_dump.sh` (age + assinatura `ssh-keygen -Y` + R2 + retenção 30 dias
+    com mínimo), `backup_photos.sh` (espelho com trava), `backup_restore_check.sh` (assinatura
+    obrigatória antes de descriptografar; restore como papel temporário sem privilégios; contagens);
+    `docker/backup/Dockerfile`. Recusa quando o papel não enxerga todas as linhas (RLS forçado).
+  - [x] **Bloco 4 — deploy**: `Dockerfile`, `.dockerignore`, `gunicorn.conf.py`, gerador de `render.yaml` /
+    `render.staging.yaml`, job `docker` e conferências no CI.
+  - [x] **Bloco 5 — docs**: `operacao.md`, `lancamento.md`, ADR-0012 (proposto), README, `.env.example`;
+    `scripts/smoke_check.py` com teste local.
+- Critérios de pronto:
+  - [x] Testes novos verdes (SQLite e PostgreSQL 16 privado): `test_etapa_h_saude/config/backup/render/smoke`
+  - [x] Teste de isolamento: nenhuma rota com `<uuid:>` nova (só `/saude`, pública); `test_isolation` verde
+  - [x] Sem regra de negócio alterada (`calc.py` intocado); mudanças de app: rota `/saude`, comandos de CLI,
+    `queue_metrics`, linha de vida do worker
+  - [ ] `docker build` (sem daemon neste ambiente — CI) e `render blueprints validate` (sem CLI)
+  - [ ] Telas 375/768/1280 (nenhuma tela nova)
+- Testes: ver linha “Suíte” abaixo.
+- Decisões a confirmar: ADR-0012 (liveness separada, imagem única, crons fora do worker, backup assinado;
+  §6 aberta: papel do banco no Render).
+- Pendências para o dono: tudo da Parte B de `lancamento.md` (domínio, contas, DNS/SPF/DKIM/DMARC, chaves,
+  R2, Asaas produção e homologação, contador, advogado, `rls enable`, `seed-holidays`, `staff conceder`,
+  teste de restore, alertas, smoke test, cobrança real estornada).
+- Limitações conhecidas: a assinatura do backup protege contra token do bucket vazado, não contra o
+  comprometimento do próprio ambiente do cron; espelho de fotos na mesma conta Cloudflare;
+  `send_default_pii` do Sentry aparece como depreciado na versão instalada (migrar para
+  `data_collection` em manutenção).

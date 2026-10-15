@@ -16,7 +16,7 @@ repositório não tem como verificá-los.
 ┌───────────────────────── Render, região virginia ─────────────────────────┐
 │  controle-web      gunicorn (Docker)  ── /saude (liveness) · /health (com banco)
 │  controle-worker   flask worker run   ── outbox, alertas, relatório semanal, reconciliação
-│  controle-lgpd     cron 06:00 UTC     ── flask lgpd-retencao && flask lgpd-purge
+│  controle-lgpd     cron 06:00 UTC     ── flask suporte expirar && flask lgpd-retencao && flask lgpd-purge
 │  controle-monitor  cron */10 min      ── flask worker status --check (falha = aviso do Render)
 │  controle-backup   cron 07:00 UTC     ── dump criptografado → R2 + espelho das fotos
 │  controle-redis    Key Value          ── rate limit e bloqueio de login (rede privada)

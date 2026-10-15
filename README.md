@@ -272,6 +272,26 @@ Auditoria de dependências: `pip-audit -r requirements-dev.txt`.
 Servidor: `gunicorn run:app`. Variáveis em [`.env.example`](.env.example) e em
 `docs/plano/arquitetura.md` §10.
 
+### Deploy e lançamento (Etapa H)
+
+Guia completo: [`docs/plano/lancamento.md`](docs/plano/lancamento.md) (checklist go/no-go: o que
+já está pronto e o que só o dono faz) e [`docs/plano/operacao.md`](docs/plano/operacao.md)
+(runbook de deploy, e-mail SPF/DKIM/DMARC, backup/restauração, monitoramento).
+
+- `Dockerfile` (multi-stage, sem root, assets construídos) + `gunicorn.conf.py`; um build serve
+  web, worker e crons. `render.yaml` (produção) e `render.staging.yaml` são **gerados** por
+  `python scripts/gen_render_yaml.py` (não edite à mão). Segredos: `sync: false`, só no web.
+- Saúde: `GET /saude` (liveness, sem banco; health check do Render) e `GET /health` (prontidão
+  com banco; monitor de uptime).
+- `flask config-check [--online] [--strict]` lista tudo que falta/está inseguro em produção (exit 1)
+  e roda no `preDeployCommand`; `python scripts/config_check.py` faz o mesmo sem subir o app.
+- `flask mail-test DESTINO`, `flask storage-test`, `flask sentry-test`, `flask worker status --check`.
+- Backup: `scripts/backup_dump.sh` (pg_dump → age → assinatura → R2, 30 dias),
+  `scripts/backup_photos.sh`, `scripts/backup_restore_check.sh` (restaura num banco temporário, como
+  papel sem privilégios, e confere contagens). Crons de LGPD (`suporte expirar`, `lgpd-retencao`,
+  `lgpd-purge`), monitor e backup estão no `render.yaml`.
+- `python scripts/smoke_check.py https://seu-host --producao` — smoke test sem login.
+
 ## Base de referência
 
 - [`docs/referencia/acompanhamento_montagem_v4.xlsx`](docs/referencia/acompanhamento_montagem_v4.xlsx): planilha cujas regras de cálculo o SaaS reproduz.

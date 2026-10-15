@@ -173,7 +173,7 @@ def build(env: dict) -> dict:
                 "autoDeploy": env["auto_deploy"],
                 # 06:00 UTC = 03:00 em Brasília. Retenção e expurgo LGPD (docs/plano/lgpd.md).
                 "schedule": "0 6 * * *",
-                "dockerCommand": 'sh -c "flask lgpd-retencao && flask lgpd-purge"',
+                "dockerCommand": 'sh -c "flask suporte expirar && flask lgpd-retencao && flask lgpd-purge"',
                 "envVars": app_env_vars(env, names, owner=names["web"]),
             }
         )
