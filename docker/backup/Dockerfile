@@ -5,7 +5,7 @@
 FROM postgres:16-bookworm
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends age awscli ca-certificates \
+ && apt-get install -y --no-install-recommends age awscli openssh-client ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
 COPY scripts/backup_dump.sh scripts/backup_photos.sh scripts/backup_run.sh /usr/local/bin/

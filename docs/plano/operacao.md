@@ -173,6 +173,15 @@ com `age`** (chave pública `BACKUP_AGE_RECIPIENT`) → envia `db/controle-AAAAM
 + `.sha256` ao bucket de backup → apaga o que passou da retenção.
 
 Preparação (uma vez, dono):
+0. **Chave de assinatura** (autenticidade): `ssh-keygen -t ed25519 -N "" -C controle-backup -f assina-backup`
+   num computador seu. O conteúdo de `assina-backup` (PRIVADA) vai **só** em `BACKUP_SIGN_KEY` no cron; a
+   `assina-backup.pub` fica com você, offline/gerenciador de senhas, para restaurar. **Não use as mesmas
+   credenciais do bucket nem guarde esta chave em outro lugar acessível a quem escreve no bucket.**
+   Por quê: o `.sha256` no bucket não prova nada (quem grava o dump grava o hash); a assinatura
+   `.sig` (`ssh-keygen -Y sign`, namespace `controle-backup`) é conferida **antes** de descriptografar
+   ou restaurar. Limite: quem controlar o ambiente do cron (que tem a chave) ainda consegue assinar;
+   a assinatura protege contra token do R2 vazado/outro serviço com acesso ao bucket e contra
+   adulteração no bucket, não contra o comprometimento do próprio Render.
 1. `age-keygen -o chave-backup.txt` (num computador seu). Guarde o **arquivo inteiro** no
    gerenciador de senhas **e** uma cópia impressa/offline. A linha `# public key: age1…` vai em
    `BACKUP_AGE_RECIPIENT` (Render). **Sem a chave privada o backup é inútil; quem a tem lê tudo.**
@@ -206,14 +215,17 @@ espelho rodar. Evolução sugerida: segundo provedor (Backblaze B2/AWS) com `rcl
 3. `flask config-check --online`, `flask rls status`, smoke test (`lancamento.md`, seção 6).
 
 **Cenário 2 — perda do banco/conta (usa a camada B).**
-1. Baixe o último `…dump.age` e o `.sha256` do bucket `controle-backup` (painel R2 ou `aws s3 cp`).
+1. Baixe o último `…dump.age`, o `.sha256` **e o `.sig`** do bucket `controle-backup` (painel R2 ou `aws s3 cp`).
+   Sem o `.sig` o script **recusa** (saída 4).
 2. Num computador seu (tem a chave privada), com Docker/Postgres 16 local:
    ```bash
    sha256sum -c controle-AAAAMMDDTHHMMSSZ.dump.age.sha256
+   BACKUP_SIGN_PUBKEY="$(cut -d' ' -f1,2 assina-backup.pub)" \
    AGE_IDENTITY_FILE=chave-backup.txt RESTORE_ADMIN_URL=postgresql://postgres@localhost:5432/postgres \
      scripts/backup_restore_check.sh --dump controle-AAAAMMDDTHHMMSSZ.dump.age --sem-fonte
    ```
-   Isso restaura num banco temporário e confere (tabelas, `alembic_version`, planos, RLS). Para
+   O script verifica a **assinatura** com a chave pública do dono antes de descriptografar e só então
+   restaura num banco temporário e confere (tabelas, `alembic_version`, planos, RLS). Para
    **subir em produção**: crie o banco novo no Render, e restaure nele com
    `age -d -i chave-backup.txt arquivo.dump.age | pg_restore --no-owner --no-privileges -d "<URL EXTERNA do banco novo>"`
    (libere seu IP no `ipAllowList` do banco só durante a restauração; depois, remova).
@@ -244,7 +256,10 @@ RESTORE_ADMIN_URL=postgresql://controle:controle@localhost:5432/postgres \
 ```
 
 Saídas: 0 ok · 1 divergência · 2 configuração · 3 papel sem acesso a todas as linhas · 4 falha
-de dump/restore (ou arquivo adulterado: o `.sha256` é conferido antes de descriptografar).
+de dump/restore, **assinatura ausente ou inválida** (arquivo adulterado) — checada antes de descriptografar.
+`--allow-unsigned` existe só para dev e imprime aviso alto. O `pg_restore` roda como **papel temporário
+sem privilégios** (`NOSUPERUSER`, dono apenas do banco temporário), criado e removido pelo script; o
+administrador só cria/derruba e lê as contagens (precisa de `CREATEROLE`/`CREATEDB`).
 Com fonte viva use `--tolerar-crescimento` (aceita linhas novas depois do dump; nunca aceita
 linhas a menos). **Nunca aponte `RESTORE_ADMIN_URL` para o banco de produção.**
 Registre cada teste (data, arquivo, tempo, resultado) em `progresso.md` → “Operação”.

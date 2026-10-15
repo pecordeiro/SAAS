@@ -37,6 +37,18 @@ def run(script: Path, *args: str, env: dict | None = None) -> subprocess.Complet
     return subprocess.run(["bash", str(script), *args], capture_output=True, text=True, env=base, timeout=300)
 
 
+tem_ssh = shutil.which("ssh-keygen") is not None
+requires_ssh = pytest.mark.skipif(not tem_ssh, reason="precisa de ssh-keygen (openssh-client)")
+
+
+def make_sign_keys(tmp_path: Path, name: str = "assina") -> tuple[str, str]:
+    """(chave privada, linha da chave pública) ed25519 OpenSSH sem senha."""
+    key = tmp_path / name
+    subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "teste", "-f", str(key)], check=True, capture_output=True)
+    pub = (tmp_path / f"{name}.pub").read_text().strip()
+    return key.read_text(), " ".join(pub.split()[:2])
+
+
 def libpq(url: str, database: str | None = None) -> str:
     parsed = make_url(url).set(drivername="postgresql")
     if database:
@@ -72,6 +84,16 @@ def test_backup_dump_sem_configuracao_sai_com_2():
         env={"DATABASE_URL": "postgresql://x@127.0.0.1:1/x", "BACKUP_AGE_RECIPIENT": "AGE-SECRET-KEY-1ABC", "BACKUP_DRY_RUN": "1"},
     )
     assert chave_privada.returncode == 2 and "PÚBLICA" in chave_privada.stderr
+
+
+@requires_tools
+def test_backup_dump_exige_chave_de_assinatura():
+    base = {"DATABASE_URL": "postgresql://x@127.0.0.1:1/x", "BACKUP_AGE_RECIPIENT": "age1abc", "BACKUP_DRY_RUN": "1"}
+    result = run(DUMP, env=base)
+    assert result.returncode == 2 and "BACKUP_SIGN_KEY" in result.stderr
+    # --allow-unsigned só em dev: passa da checagem de assinatura (e falha adiante, sem banco) com aviso alto.
+    dev = run(DUMP, env={**base, "BACKUP_ALLOW_UNSIGNED": "1"})
+    assert "AVISO ALTO" in dev.stderr
 
 
 @requires_tools
@@ -134,7 +156,8 @@ class TestCicloComPostgres:
         assert gen.returncode == 0
         public = next(line.split()[-1] for line in keyfile.read_text().splitlines() if line.startswith("# public key:"))
         out = tmp_path / "saida"
-        dump = run(DUMP, env={"DATABASE_URL": source, "BACKUP_AGE_RECIPIENT": public, "BACKUP_DRY_RUN": "1", "BACKUP_OUT_DIR": str(out)})
+        priv, pub = make_sign_keys(tmp_path)
+        dump = run(DUMP, env={"DATABASE_URL": source, "BACKUP_AGE_RECIPIENT": public, "BACKUP_DRY_RUN": "1", "BACKUP_OUT_DIR": str(out), "BACKUP_SIGN_KEY": priv})
         assert dump.returncode == 0, dump.stderr
         (arquivo,) = out.glob("controle-*.dump.age")
         # Cifrado de verdade: não é um dump legível.
@@ -143,23 +166,72 @@ class TestCicloComPostgres:
         restore = run(
             CHECK,
             "--dump", str(arquivo), "--sem-fonte",
-            env={"AGE_IDENTITY_FILE": str(keyfile), "RESTORE_ADMIN_URL": admin},
+            env={"AGE_IDENTITY_FILE": str(keyfile), "RESTORE_ADMIN_URL": admin, "BACKUP_SIGN_PUBKEY": pub},
         )
         assert restore.returncode == 0, restore.stdout + restore.stderr
         assert "RESULTADO: OK" in restore.stdout
+        assert "assinatura confere" in restore.stderr and "papel temporário removido" in restore.stderr
+        roles = subprocess.run(["psql", admin, "-Atc", "SELECT count(*) FROM pg_roles WHERE rolname LIKE 'restore_role_%'"], capture_output=True, text=True)
+        assert roles.stdout.strip() == "0"
 
-    def test_arquivo_adulterado_e_recusado(self, app, urls, tmp_path):
+    def _backup_assinado(self, urls, tmp_path):
         source, admin = urls
         keyfile = tmp_path / "chave.txt"
         subprocess.run(["age-keygen", "-o", str(keyfile)], capture_output=True, check=True)
         public = next(line.split()[-1] for line in keyfile.read_text().splitlines() if line.startswith("# public key:"))
         out = tmp_path / "saida"
-        assert run(DUMP, env={"DATABASE_URL": source, "BACKUP_AGE_RECIPIENT": public, "BACKUP_DRY_RUN": "1", "BACKUP_OUT_DIR": str(out)}).returncode == 0
+        priv, pub = make_sign_keys(tmp_path)
+        env = {"DATABASE_URL": source, "BACKUP_AGE_RECIPIENT": public, "BACKUP_DRY_RUN": "1", "BACKUP_OUT_DIR": str(out), "BACKUP_SIGN_KEY": priv}
+        assert run(DUMP, env=env).returncode == 0
         (arquivo,) = out.glob("controle-*.dump.age")
+        renv = {"AGE_IDENTITY_FILE": str(keyfile), "RESTORE_ADMIN_URL": admin, "BACKUP_SIGN_PUBKEY": pub}
+        return arquivo, renv, tmp_path
+
+    @requires_ssh
+    def test_arquivo_adulterado_e_recusado_pela_assinatura(self, app, urls, tmp_path):
+        arquivo, renv, _ = self._backup_assinado(urls, tmp_path)
         with arquivo.open("ab") as fh:
-            fh.write(b"x")  # o .sha256 gravado no backup já não confere
-        restore = run(CHECK, "--dump", str(arquivo), "--sem-fonte", env={"AGE_IDENTITY_FILE": str(keyfile), "RESTORE_ADMIN_URL": admin})
-        assert restore.returncode == 4 and "sha256" in restore.stderr
+            fh.write(b"x")
+        restore = run(CHECK, "--dump", str(arquivo), "--sem-fonte", env=renv)
+        assert restore.returncode == 4 and "INVÁLIDA" in restore.stderr
+
+    @requires_ssh
+    def test_hash_regravado_junto_com_o_arquivo_nao_engana(self, app, urls, tmp_path):
+        """Quem escreve no bucket troca o dump E o .sha256; sem a chave de assinatura não forja o .sig."""
+        import hashlib
+
+        arquivo, renv, _ = self._backup_assinado(urls, tmp_path)
+        arquivo.write_bytes(arquivo.read_bytes() + b"x")
+        (arquivo.parent / f"{arquivo.name}.sha256").write_text(f"{hashlib.sha256(arquivo.read_bytes()).hexdigest()}  {arquivo.name}\n")
+        restore = run(CHECK, "--dump", str(arquivo), "--sem-fonte", env=renv)
+        assert restore.returncode == 4 and "INVÁLIDA" in restore.stderr
+
+    @requires_ssh
+    def test_assinatura_de_outra_chave_e_recusada(self, app, urls, tmp_path):
+        arquivo, renv, _ = self._backup_assinado(urls, tmp_path)
+        _, outra_pub = make_sign_keys(tmp_path, "intrusa")
+        restore = run(CHECK, "--dump", str(arquivo), "--sem-fonte", env={**renv, "BACKUP_SIGN_PUBKEY": outra_pub})
+        assert restore.returncode == 4 and "INVÁLIDA" in restore.stderr
+
+    @requires_ssh
+    def test_sem_assinatura_e_falha_dura_e_allow_unsigned_avisa(self, app, urls, tmp_path):
+        arquivo, renv, _ = self._backup_assinado(urls, tmp_path)
+        (arquivo.parent / f"{arquivo.name}.sig").unlink()
+        restore = run(CHECK, "--dump", str(arquivo), "--sem-fonte", env=renv)
+        assert restore.returncode == 4 and "assinatura ausente" in restore.stderr
+        dev = run(CHECK, "--dump", str(arquivo), "--sem-fonte", "--allow-unsigned", env=renv)
+        assert dev.returncode == 0, dev.stderr
+        assert "AVISO ALTO" in dev.stderr
+
+    def test_restore_usa_papel_temporario_sem_privilegios_e_o_remove(self, app, urls, tmp_path):
+        source, admin = urls
+        dump = tmp_path / "fonte.dump"
+        subprocess.run(["pg_dump", source, "--format=custom", "--no-owner", "--no-privileges", "--file", str(dump)], check=True)
+        result = run(CHECK, "--dump", str(dump), "--sem-fonte", "--allow-unsigned", env={"RESTORE_ADMIN_URL": admin})
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "papel temporário sem privilégios" in result.stderr and "papel temporário removido" in result.stderr
+        roles = subprocess.run(["psql", admin, "-Atc", "SELECT count(*) FROM pg_roles WHERE rolname LIKE 'restore_role_%'"], capture_output=True, text=True)
+        assert roles.stdout.strip() == "0"
 
 
 # ------------------------------------------------------------------ envio, retenção e espelho de fotos (aws falso)
@@ -303,6 +375,7 @@ class TestEspelhoDeFotos:
 
 @requires_postgres
 @requires_tools
+@requires_ssh
 class TestEnvioERetencao:
     @pytest.fixture()
     def ctx(self, app, fake_aws, tmp_path):
@@ -315,6 +388,7 @@ class TestEnvioERetencao:
             **S3_ENV,
             "DATABASE_URL": libpq(get_test_database_url()),
             "BACKUP_AGE_RECIPIENT": public,
+            "BACKUP_SIGN_KEY": make_sign_keys(tmp_path)[0],
         }, root, keyfile
 
     def test_envia_dump_criptografado_e_aplica_retencao_com_minimo(self, ctx):
@@ -348,13 +422,15 @@ class TestEnvioERetencao:
         objetos = [p.name for p in (root / "backup" / "db").iterdir() if p.name.endswith(".dump.age")]
         assert len(objetos) == 3  # 2 antigos preservados + o novo
 
-    def test_o_dump_enviado_restaura(self, ctx, app):
+    def test_o_dump_enviado_restaura(self, ctx, app, tmp_path):
         env, root, keyfile = ctx
         assert run(DUMP, env=env).returncode == 0
         (arquivo,) = [p for p in (root / "backup" / "db").iterdir() if p.name.endswith(".dump.age")]
+        assert (root / "backup" / "db" / f"{arquivo.name}.sig").exists()
         admin = os.environ.get("RESTORE_CHECK_ADMIN_URL") or libpq(get_test_database_url(), "postgres")
         probe = subprocess.run(["psql", admin, "-Atc", "SELECT rolcreatedb OR rolsuper FROM pg_roles WHERE rolname=current_user"], capture_output=True, text=True)
         if probe.stdout.strip() != "t":
             pytest.skip("sem CREATE DATABASE no servidor de teste")
-        restore = run(CHECK, "--dump", str(arquivo), "--sem-fonte", env={"AGE_IDENTITY_FILE": str(keyfile), "RESTORE_ADMIN_URL": admin})
+        pub = subprocess.run(["ssh-keygen", "-y", "-f", str(tmp_path / "assina")], capture_output=True, text=True, check=True).stdout
+        restore = run(CHECK, "--dump", str(arquivo), "--sem-fonte", env={"AGE_IDENTITY_FILE": str(keyfile), "RESTORE_ADMIN_URL": admin, "BACKUP_SIGN_PUBKEY": " ".join(pub.split()[:2])})
         assert restore.returncode == 0, restore.stdout + restore.stderr

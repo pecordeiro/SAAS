@@ -348,6 +348,8 @@ services:
     sync: false
   - key: BACKUP_AGE_RECIPIENT
     sync: false
+  - key: BACKUP_SIGN_KEY
+    sync: false
 - type: cron
   name: controle-monitor
   runtime: docker

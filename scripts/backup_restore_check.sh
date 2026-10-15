@@ -12,14 +12,20 @@
 #      Com SOURCE_DATABASE_URL também definido, compara com a fonte (aceite crescimento com
 #      --tolerar-crescimento, pois a fonte continua recebendo escrita depois do dump).
 #
+# Autenticidade (OBRIGATÓRIA): todo --dump precisa de ARQUIVO.sig (ssh-keygen -Y, namespace
+# controle-backup) conferido com a chave PÚBLICA do dono ANTES de descriptografar/restaurar. Falta de
+# assinatura ou assinatura inválida = falha dura (saída 4). O .sha256 no bucket não autentica nada
+# (quem escreve o dump escreve o hash). --allow-unsigned só em dev (aviso alto).
+#
 # Variáveis
+#   BACKUP_SIGN_PUBKEY     chave pública de assinatura (linha "ssh-ed25519 AAAA…") ou BACKUP_SIGN_PUBKEY_FILE
 #   SOURCE_DATABASE_URL    fonte (padrão: DATABASE_URL). Precisa enxergar todas as linhas (RLS).
 #   RESTORE_ADMIN_URL      servidor ONDE restaurar, com permissão de CREATE/DROP DATABASE.
 #                          NUNCA aponte para o banco de produção. Padrão: postgresql://postgres@localhost:5432/postgres
 #   AGE_IDENTITY_FILE      chave privada age (só para --dump *.age)
 #   KEEP_TEMP=1            não apaga o banco temporário (para inspecionar)
 #
-# Opções: --dump ARQUIVO · --sem-fonte (só confere o restaurado) · --tolerar-crescimento
+# Opções: --dump ARQUIVO · --allow-unsigned (dev) · --sem-fonte (só confere o restaurado) · --tolerar-crescimento
 # Saída: 0 ok · 1 divergência · 2 uso/configuração · 3 papel sem acesso a todas as linhas · 4 falha de dump/restore
 # Nunca imprime URL nem senha.
 set -Eeuo pipefail
@@ -31,10 +37,12 @@ die() { local code="$1"; shift; log "ERRO: $*"; exit "$code"; }
 DUMP_ARG=""
 NO_SOURCE=0
 GROWTH=0
+ALLOW_UNSIGNED=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dump) DUMP_ARG="${2:-}"; [[ -n "$DUMP_ARG" ]] || die 2 "--dump precisa de um arquivo"; shift 2 ;;
     --sem-fonte) NO_SOURCE=1; shift ;;
+    --allow-unsigned) ALLOW_UNSIGNED=1; shift ;;
     --tolerar-crescimento) GROWTH=1; shift ;;
     -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
     *) die 2 "opção desconhecida: $1" ;;
@@ -54,6 +62,13 @@ with_db() {
   printf '%s/%s%s' "$base" "$db" "$query"
 }
 
+# with_user URL USUARIO SENHA -> troca as credenciais da URL (senha só alfanumérica).
+with_user() {
+  local url="$1" user="$2" pass="$3" scheme rest
+  scheme="${url%%://*}"; rest="${url#*://}"; rest="${rest#*@}"
+  printf '%s://%s:%s@%s' "$scheme" "$user" "$pass" "$rest"
+}
+
 ADMIN_URL="$(norm_url "${RESTORE_ADMIN_URL:-postgresql://postgres@localhost:5432/postgres}")"
 SOURCE_URL=""
 if [[ "$NO_SOURCE" != "1" ]]; then
@@ -68,12 +83,19 @@ WORK="$(mktemp -d)"
 umask 077
 TMPDB="restore_check_$(date -u +%Y%m%d%H%M%S)_$$"
 TMPDB_CREATED=0
+TMPROLE_CREATED=0
 cleanup() {
-  if [[ "$TMPDB_CREATED" == "1" && "${KEEP_TEMP:-0}" != "1" ]]; then
-    psql "$ADMIN_URL" -qAt -c "DROP DATABASE IF EXISTS \"$TMPDB\" WITH (FORCE)" >/dev/null 2>&1 \
-      && log "banco temporário apagado" || log "AVISO: apague o banco temporário $TMPDB manualmente"
-  elif [[ "$TMPDB_CREATED" == "1" ]]; then
-    log "KEEP_TEMP=1: banco temporário mantido: $TMPDB"
+  if [[ "${KEEP_TEMP:-0}" == "1" ]]; then
+    [[ "$TMPDB_CREATED" != "1" ]] || log "KEEP_TEMP=1: banco temporário mantido: $TMPDB (papel $TMPROLE)"
+  else
+    if [[ "$TMPDB_CREATED" == "1" ]]; then
+      psql "$ADMIN_URL" -qAt -c "DROP DATABASE IF EXISTS \"$TMPDB\" WITH (FORCE)" >/dev/null 2>&1 \
+        && log "banco temporário apagado" || log "AVISO: apague o banco temporário $TMPDB manualmente"
+    fi
+    if [[ "$TMPROLE_CREATED" == "1" ]]; then
+      psql "$ADMIN_URL" -qAt -c "DROP ROLE IF EXISTS \"$TMPROLE\"" >/dev/null 2>&1 \
+        && log "papel temporário removido" || log "AVISO: apague o papel $TMPROLE manualmente"
+    fi
   fi
   rm -rf "$WORK"
 }
@@ -88,9 +110,22 @@ START_ALL=$SECONDS
 if [[ -n "$DUMP_ARG" ]]; then
   [[ -f "$DUMP_ARG" ]] || die 2 "arquivo não encontrado: $DUMP_ARG"
   DUMP="$DUMP_ARG"
+  if [[ "$ALLOW_UNSIGNED" == "1" ]]; then
+    log "################ AVISO ALTO: --allow-unsigned: autenticidade do backup NÃO verificada. Só em dev. ################"
+  else
+    command -v ssh-keygen >/dev/null || die 2 "ferramenta ausente: ssh-keygen"
+    [[ -f "$DUMP_ARG.sig" ]] || die 4 "assinatura ausente ($DUMP_ARG.sig): backup sem assinatura não é restaurado (use --allow-unsigned só em dev)"
+    PUB="${BACKUP_SIGN_PUBKEY:-}"
+    [[ -n "$PUB" || -z "${BACKUP_SIGN_PUBKEY_FILE:-}" ]] || PUB="$(cat "$BACKUP_SIGN_PUBKEY_FILE")"
+    [[ -n "$PUB" ]] || die 2 "defina BACKUP_SIGN_PUBKEY (ou _FILE) com a chave pública de assinatura"
+    printf 'controle-backup %s\n' "$PUB" > "$WORK/allowed_signers"
+    ssh-keygen -Y verify -f "$WORK/allowed_signers" -I controle-backup -n controle-backup -s "$DUMP_ARG.sig" < "$DUMP_ARG" >/dev/null 2>&1 \
+      || die 4 "assinatura INVÁLIDA: o arquivo foi alterado ou não foi assinado pela chave do dono. Não restaurar."
+    log "assinatura confere (chave do dono)"
+  fi
   if [[ -f "$DUMP_ARG.sha256" ]]; then
     ( cd "$(dirname "$DUMP_ARG")" && sha256sum --check --status "$(basename "$DUMP_ARG").sha256" ) \
-      && log "sha256 do arquivo confere" || die 4 "sha256 NÃO confere: backup corrompido"
+      && log "sha256 confere (integridade; a autenticidade vem da assinatura)" || die 4 "sha256 NÃO confere: backup corrompido"
   fi
   if [[ "$DUMP" == *.age ]]; then
     command -v age >/dev/null || die 2 "ferramenta ausente: age"
@@ -111,15 +146,26 @@ else
 fi
 pg_restore --list "$DUMP" >/dev/null || die 4 "o arquivo não é um dump válido do pg_dump"
 
-# 2) Restaurar em banco temporário.
-psql "$ADMIN_URL" -qAt -c "CREATE DATABASE \"$TMPDB\"" >/dev/null || die 2 "sem permissão para CREATE DATABASE no servidor de restauração"
+# 2) Restaurar em banco temporário, com um papel NÃO-super que é dono só dele (nada de pg_restore
+#    como superusuário: um dump malicioso não executa comando de superusuário). O papel é criado
+#    aqui e removido no fim. O administrador (RESTORE_ADMIN_URL) só cria/derruba e lê as contagens.
+TMPROLE="restore_role_${TMPDB#restore_check_}"
+TMPPASS="$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24)"
+psql "$ADMIN_URL" -qAt -c "CREATE ROLE \"$TMPROLE\" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS PASSWORD '$TMPPASS'" >/dev/null \
+  || die 2 "sem permissão para CREATE ROLE no servidor de restauração (precisa de CREATEROLE)"
+TMPROLE_CREATED=1
+psql "$ADMIN_URL" -qAt -c "CREATE DATABASE \"$TMPDB\" OWNER \"$TMPROLE\"" >/dev/null || die 2 "sem permissão para CREATE DATABASE no servidor de restauração"
 TMPDB_CREATED=1
-RESTORED_URL="$(with_db "$ADMIN_URL" "$TMPDB")"
+RESTORED_URL="$(with_db "$ADMIN_URL" "$TMPDB")"                       # leitura das contagens (admin)
+RESTORER_URL="$(with_user "$(with_db "$ADMIN_URL" "$TMPDB")" "$TMPROLE" "$TMPPASS")"
 t0=$SECONDS
-pg_restore --no-owner --no-privileges --exit-on-error --dbname "$RESTORED_URL" "$DUMP" 2> "$WORK/restore.err" \
-  || { log "$(head -c 600 "$WORK/restore.err")"; die 4 "pg_restore falhou"; }
+# --no-owner/--no-privileges SÓ porque os papéis de origem (dono, app) não existem neste servidor de
+# teste: os objetos passam a ser do papel temporário. Não dá privilégio nenhum; qualquer outra coisa
+# que exija superusuário (CREATE EXTENSION não confiável, CREATE ROLE…) continua FALHANDO aqui.
+pg_restore --no-owner --no-privileges --exit-on-error --dbname "$RESTORER_URL" "$DUMP" 2> "$WORK/restore.err" \
+  || { log "$(head -c 600 "$WORK/restore.err" | sed "s/$TMPPASS/***/g")"; die 4 "pg_restore falhou (como papel sem privilégios; extensão ou objeto que exige superusuário?)"; }
 RESTORE_SECONDS=$((SECONDS - t0))
-log "restore em ${RESTORE_SECONDS}s"
+log "restore em ${RESTORE_SECONDS}s (papel temporário sem privilégios)"
 
 # 3) Contagens por tabela (lista de tabelas vem do próprio banco; nomes sempre entre aspas).
 counts() {

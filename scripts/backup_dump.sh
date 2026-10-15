@@ -10,6 +10,10 @@
 #   DATABASE_URL                 banco a copiar (aceita postgres://, postgresql:// e postgresql+psycopg://)
 #   BACKUP_S3_ENDPOINT/BUCKET/ACCESS_KEY_ID/SECRET_ACCESS_KEY   destino (Cloudflare R2, AWS, MinIO)
 #   BACKUP_AGE_RECIPIENT         chave PÚBLICA age (age1...). A privada fica com o dono, offline.
+#   BACKUP_SIGN_KEY              chave PRIVADA de assinatura (ed25519 OpenSSH, conteúdo do arquivo). Assina o
+#                                .age (ssh-keygen -Y sign). É uma chave À PARTE das credenciais do bucket: quem só
+#                                tem o token do R2 não consegue forjar backup. A pública fica com o dono (restore).
+#   BACKUP_ALLOW_UNSIGNED=1      só dev: dispensa a assinatura (imprime aviso alto)
 #   BACKUP_PREFIX                pasta no bucket (padrão: db/)
 #   BACKUP_RETENTION_DAYS        retenção (padrão 30 — docs/plano/lgpd.md)
 #   BACKUP_MIN_KEEP              nunca apaga se restariam menos que isto (padrão 3)
@@ -40,10 +44,16 @@ if [[ "$DRY_RUN" != "1" ]]; then
   done
   [[ "$BACKUP_S3_ENDPOINT" == https://* ]] || die 2 "BACKUP_S3_ENDPOINT precisa ser https://"
 fi
+SIGN="yes"
+if [[ -z "${BACKUP_SIGN_KEY:-}" ]]; then
+  [[ "${BACKUP_ALLOW_UNSIGNED:-0}" == "1" ]] || die 2 "BACKUP_SIGN_KEY ausente (backup sem assinatura não é aceito; BACKUP_ALLOW_UNSIGNED=1 só em dev)"
+  SIGN="no"; log "AVISO ALTO: backup SEM ASSINATURA (BACKUP_ALLOW_UNSIGNED=1). Nunca em produção."
+fi
 for tool in pg_dump pg_restore psql age sha256sum; do
   command -v "$tool" >/dev/null || die 2 "ferramenta ausente: $tool"
 done
 [[ "$DRY_RUN" == "1" ]] || command -v aws >/dev/null || die 2 "ferramenta ausente: aws"
+[[ "$SIGN" == "no" ]] || command -v ssh-keygen >/dev/null || die 2 "ferramenta ausente: ssh-keygen"
 
 # libpq não entende o prefixo do SQLAlchemy.
 PGURL="${DATABASE_URL/postgresql+psycopg:\/\//postgresql://}"
@@ -77,12 +87,24 @@ log "dump ok: ${DUMP_BYTES} bytes, ${TABLES} tabelas, $((SECONDS - START))s"
 age -r "$BACKUP_AGE_RECIPIENT" -o "$WORK/$NAME.age" "$WORK/$NAME" || die 4 "falha ao criptografar"
 rm -f "$WORK/$NAME"
 ( cd "$WORK" && sha256sum "$NAME.age" > "$NAME.age.sha256" )
+UPLOADS=("$NAME.age" "$NAME.age.sha256")
+if [[ "$SIGN" == "yes" ]]; then
+  # A assinatura cobre o texto cifrado. O hash no bucket NÃO autentica nada (quem escreve o dump
+  # escreve o hash); a assinatura com chave que o bucket não tem, sim.
+  KEYFILE="$WORK/sign.key"
+  printf '%s\n' "$BACKUP_SIGN_KEY" > "$KEYFILE"; chmod 600 "$KEYFILE"
+  ssh-keygen -q -Y sign -f "$KEYFILE" -n controle-backup "$WORK/$NAME.age" >/dev/null 2>&1 \
+    || die 4 "falha ao assinar (BACKUP_SIGN_KEY inválida? precisa ser chave OpenSSH sem senha)"
+  rm -f "$KEYFILE"
+  UPLOADS+=("$NAME.age.sig")
+  log "assinado"
+fi
 log "criptografado: $(stat -c %s "$WORK/$NAME.age") bytes"
 
 if [[ "$DRY_RUN" == "1" ]]; then
   OUT="${BACKUP_OUT_DIR:-.}"
   mkdir -p "$OUT"
-  cp "$WORK/$NAME.age" "$WORK/$NAME.age.sha256" "$OUT/"
+  for f in "${UPLOADS[@]}"; do cp "$WORK/$f" "$OUT/"; done
   log "DRY RUN: nada enviado; arquivo em $OUT/$NAME.age"
   exit 0
 fi
@@ -94,7 +116,9 @@ export AWS_DEFAULT_REGION="${BACKUP_S3_REGION:-auto}"
 export AWS_EC2_METADATA_DISABLED=true
 S3=(aws s3 --endpoint-url "$BACKUP_S3_ENDPOINT" --only-show-errors)
 "${S3[@]}" cp "$WORK/$NAME.age" "s3://$BACKUP_S3_BUCKET/$PREFIX$NAME.age" || die 5 "falha no envio do dump"
-"${S3[@]}" cp "$WORK/$NAME.age.sha256" "s3://$BACKUP_S3_BUCKET/$PREFIX$NAME.age.sha256" || die 5 "falha no envio do hash"
+for f in "${UPLOADS[@]:1}"; do
+  "${S3[@]}" cp "$WORK/$f" "s3://$BACKUP_S3_BUCKET/$PREFIX$f" || die 5 "falha no envio de $f"
+done
 log "enviado: ${PREFIX}${NAME}.age"
 
 # 5) Retenção: apaga dumps mais antigos que RETENTION_DAYS (data no nome), guardando no mínimo MIN_KEEP.
@@ -109,6 +133,7 @@ for key in "${KEYS[@]}"; do
   if [[ "$day" < "$CUTOFF" && $((TOTAL - DELETED)) -gt "$MIN_KEEP" ]]; then
     "${S3[@]}" rm "s3://$BACKUP_S3_BUCKET/$key" || die 5 "falha ao apagar dump antigo"
     "${S3[@]}" rm "s3://$BACKUP_S3_BUCKET/$key.sha256" || true
+    "${S3[@]}" rm "s3://$BACKUP_S3_BUCKET/$key.sig" || true
     DELETED=$((DELETED + 1))
   fi
 done
