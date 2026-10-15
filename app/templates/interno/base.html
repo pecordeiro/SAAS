@@ -1,0 +1,12 @@
+{% extends "_base.html" %}
+{% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block canonical %}{% endblock %}
+{% block body %}
+<main class="container stack" id="conteudo">
+  <p class="muted"><a href="{{ url_for('interno.index') }}">Painel interno</a> · {{ current_user.email }}</p>
+  {%- for category, message in get_flashed_messages(with_categories=true) %}
+  <div class="alert alert--{{ 'success' if category == 'success' else 'info' }}" role="status">{{ message }}</div>
+  {%- endfor %}
+  {% block content %}{% endblock %}
+</main>
+{% endblock %}

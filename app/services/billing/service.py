@@ -40,6 +40,7 @@ from app.extensions import db
 from app.models import Company, Payment, Plan, Subscription
 from app.models.billing import SUB_ACTIVE, SUB_CANCELED, SUB_EXPIRED, SUB_PAST_DUE, SUB_TRIALING
 from app.services import audit, entitlements, events
+from app.services import staff as staff_svc
 from app.services import plans as plan_catalog
 from app.services.billing import notify
 from app.services.billing.asaas import AsaasProvider, map_payment
@@ -296,6 +297,8 @@ def _apply_plan(sub: Subscription, plan: Plan, actor_user_id=None) -> None:
             object_id=sub.id,
             details=details,
         )
+        # Etapa C: a requisição de identidade visual abre na mesma transação, para o painel interno.
+        staff_svc.open_visual_request(sub.company_id, plan.code)
 
 
 def needs_checkout(sub: Subscription) -> bool:

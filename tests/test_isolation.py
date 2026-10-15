@@ -105,6 +105,9 @@ def test_toda_rota_com_uuid_tem_caso_de_isolamento(app_factory, flags):
     app = app_factory(flags)
     todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI
     cobertas = {template.replace("{id}", "") for _, template, _, _ in todas}
+    # Etapa C: /interno é da plataforma (sem empresa na URL); acesso cruzado = não ser equipe → 404,
+    # coberto por tests/test_etapa_c_interno.py::test_interno_e_404_para_quem_nao_e_equipe.
+    cobertas |= {"/interno/requisicoes/", "/interno/requisicoes//estado"}
     vistas = 0
     for rule in app.url_map.iter_rules():
         if "<uuid:" not in rule.rule:

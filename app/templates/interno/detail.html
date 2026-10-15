@@ -1,0 +1,26 @@
+{% extends "interno/base.html" %}
+{% from "components/field.html" import field %}
+{% from "components/button.html" import button %}
+{% block title %}{{ item.company_name }} · Painel interno{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div class="page-header__titles">
+    <h1>{{ item.company_name }}</h1>
+    <p class="page-header__subtitle muted">Plano {{ item.plan_code }} · aberta em {{ item.created_at|data }}</p>
+  </div>
+</header>
+<section class="card stack" aria-labelledby="contato-titulo">
+  <h2 class="section-title" id="contato-titulo">Contato do cliente</h2>
+  <p>{{ item.contact_name or "—" }}{% if item.contact_email %} · <a href="mailto:{{ item.contact_email }}">{{ item.contact_email }}</a>{% endif %}</p>
+</section>
+<section class="card stack" aria-labelledby="estado-titulo">
+  <h2 class="section-title" id="estado-titulo">Acompanhamento</h2>
+  <form method="post" action="{{ url_for('interno.change_status', request_id=item.id) }}" class="stack" novalidate>
+    {{ form.csrf_token }}
+    {{ field(form.status) }}
+    {{ field(form.notes) }}
+    {{ button("Salvar", "primary") }}
+  </form>
+  {%- if item.updated_by %}<p class="muted">Última alteração por {{ item.updated_by }} em {{ item.updated_at|data }}.</p>{%- endif %}
+</section>
+{% endblock %}

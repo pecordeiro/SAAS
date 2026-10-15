@@ -77,6 +77,13 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
 
     app.register_blueprint(lgpd_bp)
 
+    from app.blueprints.interno import bp as interno_bp  # Etapa C: /interno (só equipe)
+
+    app.register_blueprint(interno_bp)
+    from app.blueprints.interno import staff_cli
+
+    app.cli.add_command(staff_cli)
+
     # Fase 8: assinatura (owner) e webhook do Asaas (sem CSRF, token no header).
     from app.blueprints.billing import bp as billing_bp
     from app.blueprints.webhooks import bp as webhooks_bp

@@ -15,7 +15,7 @@ Python 3.12, Flask 3, SQLAlchemy 2, Alembic (Flask-Migrate), PostgreSQL 16,
 Flask-Login, Flask-WTF (CSRF), Flask-Limiter, Gunicorn, pytest. Pagamento: Asaas.
 
 ## Estado atual
-Fases 0–5, 7, 8 e 9 concluídas: esqueleto, calc.py com paridade da planilha, design “Prumo”,
+Fases 0–5, 7, 8 e 9 e Etapas B–C concluídas (planos novos; painel interno /interno): esqueleto, calc.py com paridade da planilha, design “Prumo”,
 schema completo com RLS ligável, regras de negócio (modelos, importação/exportação, limites
 de plano), contas (convites, MFA, bloqueio), segurança e LGPD (CSP com nonce, Redis, logs
 JSON, exportação/exclusão, suporte auditado), assinaturas (Asaas) e API v1 atrás de

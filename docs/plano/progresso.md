@@ -767,3 +767,11 @@ critérios de pronto da anterior estiverem marcados.
     houver assinatura no provedor (senão o cliente assina pela tela depois de a equipe
     cancelar o contrato).
   - Homologação no sandbox do Asaas com os valores novos (`pagamentos.md` §5).
+
+## Etapa C — painel interno e requisição de identidade visual
+- [x] `users.is_staff` + `flask staff conceder|revogar|listar` (motivo ≥ 15 caracteres, quem autorizou, e-mail confirmado e MFA ativo; revogar derruba as sessões; tudo em `platform_audit_logs`).
+- [x] `visual_requests` (dado da plataforma, sem RLS por empresa; `company_id` nullable, sem FK; o expurgo LGPD apaga as linhas via `lgpd.company_tables`). Migration `c7d3e9a1b5f2`.
+- [x] `billing.service._apply_plan` abre a requisição na mesma transação ao passar a ter `visual_custom` (uma aberta por empresa), copiando o contato do proprietário.
+- [x] `/interno` (lista com filtro por estado, detalhe, mudar estado + anotação): só `staff.is_staff` (equipe ativa, MFA, e-mail confirmado); qualquer outra pessoa, logada ou não, recebe 404; `Cache-Control: no-store`; CSRF; estado validado no servidor; auditoria sem o texto da anotação. Decisão: acesso pelo login normal do sistema, com MFA obrigatório para a conta de equipe.
+- Testes: `tests/test_etapa_c_interno.py` (abertura única, 404 para anônimo/dono/não-equipe/sem MFA, fluxo da equipe, CLI, LGPD).
+- Pendências: telas do `/interno` ainda sem conferência visual (375/768/1280, claro/escuro); aviso por e-mail à equipe ao abrir a requisição entra com o worker (Etapa F).

@@ -36,3 +36,10 @@ from app.models.production import (  # noqa: F401
 from app.models.templates import Template, TemplateActivity, TemplateStage, TemplateVersion  # noqa: F401
 from app.models.security import THROTTLE_ACCOUNT, THROTTLE_IP, LoginThrottle  # noqa: F401
 from app.models.privacy import PlatformAuditLog  # noqa: F401,E402  (Fase 7)
+from app.models.staff import (  # noqa: F401,E402  (Etapa C)
+    VISUAL_DELIVERED,
+    VISUAL_IN_PROGRESS,
+    VISUAL_NEW,
+    VISUAL_STATUSES,
+    VisualRequest,
+)
