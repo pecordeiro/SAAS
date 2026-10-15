@@ -1,4 +1,4 @@
-"""Site público, /health e troca de tema."""
+"""Site público, /saude (liveness), /health (prontidão) e troca de tema."""
 
 from __future__ import annotations
 
@@ -126,9 +126,23 @@ def robots():
     return Response("\n".join(lines) + "\n", mimetype="text/plain")
 
 
+@bp.get("/saude")
+@limiter.exempt
+def saude():
+    """Liveness para o health check do host (Render) e monitor de uptime: o processo está de pé e
+    responde HTTP. Não abre sessão, não toca no banco nem no Redis e não devolve versão, ambiente
+    ou qualquer dado interno — só ``{"status": "ok"}``. Uma queda do banco não deve fazer o host
+    reiniciar o web (isso é a prontidão, ``/health``)."""
+    response = jsonify(status="ok")
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @bp.get("/health")
 @limiter.exempt
 def health():
+    """Prontidão: além de responder, o banco precisa responder (``SELECT 1``). Para alerta de
+    uptime com banco; NÃO usar como health check de reinício do host (ver ``/saude``)."""
     try:
         db.session.execute(text("SELECT 1"))
     except Exception:  # noqa: BLE001 - não vaza detalhes do banco

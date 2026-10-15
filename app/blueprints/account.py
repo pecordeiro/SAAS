@@ -36,7 +36,7 @@ bp = Blueprint("account", __name__, url_prefix="/conta")
 MFA_SETUP_KEY = "mfa_setup"
 
 # Endpoints liberados mesmo com confirmação vencida ou MFA obrigatório pendente.
-_ALWAYS_ALLOWED = {"static", "auth.logout", "public.set_theme", "public.health", "public.index"}
+_ALWAYS_ALLOWED = {"static", "auth.logout", "public.set_theme", "public.health", "public.saude", "public.index"}
 
 
 def register_guards(app: Flask) -> None:
