@@ -262,8 +262,26 @@ def register_cli(app: Flask) -> None:
         loop.run()
 
     @worker_cli.command("status")
-    def worker_status() -> None:
+    @click.option("--check", is_flag=True, help="Imprime métricas e sai com 1 se há eventos esgotados ou fila parada.")
+    @click.option(
+        "--max-idade-min", "max_age_min", type=int, default=15, show_default=True,
+        help="Com --check: idade máxima (min) do evento pendente mais antigo.",
+    )
+    def worker_status(check: bool, max_age_min: int) -> None:
         """Eventos pendentes e esgotados (tentativas no limite), por empresa."""
+        if check:
+            metrics = worker_svc.queue_metrics()
+            click.echo(
+                "worker_queue pending={pending} dead={dead} companies={companies} "
+                "oldest_pending_seconds={oldest_pending_seconds}".format(**metrics)
+            )
+            if metrics["dead"] > 0:
+                click.echo("PROBLEMA: há evento esgotado (sai da fila sem ser entregue).", err=True)
+                raise SystemExit(1)
+            if metrics["oldest_pending_seconds"] > max_age_min * 60:
+                click.echo(f"PROBLEMA: evento pendente há mais de {max_age_min} min (worker parado?).", err=True)
+                raise SystemExit(1)
+            return
         rows = worker_svc.queue_status()
         if not rows:
             click.echo("Fila vazia: nenhum evento pendente.")
@@ -272,3 +290,7 @@ def register_cli(app: Flask) -> None:
             click.echo(f"empresa {row['company_id']}: pendentes={row['pending']} esgotados={row['dead']}")
 
     app.cli.add_command(worker_cli)
+
+    from app.ops_cli import register_ops_cli
+
+    register_ops_cli(app)

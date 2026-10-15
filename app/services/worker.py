@@ -52,6 +52,7 @@ DEFAULT_INTERVALS = {
     TASK_TOKENS: 24 * 3600,
 }
 
+HEARTBEAT_SECONDS = 300  # linha “worker: ativo” a cada 5 min (alerta de worker parado)
 BACKOFF_BASE_SECONDS = 60
 BACKOFF_MAX_SECONDS = 6 * 3600
 
@@ -203,6 +204,49 @@ def queue_status() -> list[dict]:
     return rows
 
 
+def queue_metrics(now: datetime | None = None) -> dict:
+    """Resumo da fila para monitoramento (``flask worker status --check``): totais, empresas com
+    fila e idade (segundos) do evento pendente mais antigo. Não devolve dado de cliente."""
+    now = now or _now()
+    limit = max_attempts()
+    pending_total = dead_total = 0
+    companies = 0
+    oldest: datetime | None = None
+    try:
+        for company_id in company_ids():
+            rls.set_context(company_id=company_id)
+            base = select(func.count()).select_from(DomainEvent).where(
+                DomainEvent.company_id == company_id, DomainEvent.published_at.is_(None)
+            )
+            pending = db.session.execute(base.where(DomainEvent.attempts < limit)).scalar_one()
+            dead = db.session.execute(base.where(DomainEvent.attempts >= limit)).scalar_one()
+            if pending:
+                first = db.session.execute(
+                    select(func.min(DomainEvent.created_at)).where(
+                        DomainEvent.company_id == company_id,
+                        DomainEvent.published_at.is_(None),
+                        DomainEvent.attempts < limit,
+                    )
+                ).scalar_one()
+                first = _aware(first)
+                if first is not None and (oldest is None or first < oldest):
+                    oldest = first
+            if pending or dead:
+                companies += 1
+            pending_total += pending
+            dead_total += dead
+        db.session.rollback()
+    finally:
+        rls.set_context(company_id=None)
+    age = max(0, int((now - oldest).total_seconds())) if oldest is not None else 0
+    return {
+        "pending": pending_total,
+        "dead": dead_total,
+        "companies": companies,
+        "oldest_pending_seconds": age,
+    }
+
+
 # ------------------------------------------------------------------ tarefas agendadas
 
 
@@ -295,7 +339,14 @@ class Loop:
 
     def run(self) -> None:
         logger.info("worker iniciado: tarefas %s, intervalo %ss", ",".join(self.tasks), self.interval)
+        last_beat = time.monotonic()
+        cycles = 0
         while not self.stop.is_set():
             self.cycle()
+            cycles += 1
+            if time.monotonic() - last_beat >= HEARTBEAT_SECONDS:
+                # Sinal de vida para o alerta “worker mudo” (docs/plano/operacao.md): sem dado.
+                logger.info("worker: ativo (ciclos=%d)", cycles)
+                last_beat = time.monotonic()
             self.stop.wait(self.interval)
         logger.info("worker parado")
