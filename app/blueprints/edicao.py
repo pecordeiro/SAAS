@@ -12,6 +12,7 @@ from flask import Blueprint, abort, flash, g, redirect, render_template, url_for
 from flask_login import current_user
 
 from app.extensions import db
+from app.formatting import br_number
 from app.forms_production import ActivityEditForm, ConfirmForm, MoveForm, ProjectEditForm, RenameForm
 from app.models import ROLE_SUPERVISOR, Activity, Project, ProgressEntry, Stage
 from app.services import entitlements
@@ -41,7 +42,9 @@ def inject_read_only():
 # ---------------------------------------------------------------- projeto
 
 
-def _edit_page(project: Project, form: ProjectEditForm, status: int = 200, error: str | None = None):
+def _edit_page(
+    project: Project, form: ProjectEditForm, status: int = 200, error: str | None = None, conflict: dict | None = None
+):
     stages = [(s, svc.active_activities(s)) for s in svc.active_stages(project)]
     return (
         render_template(
@@ -50,6 +53,7 @@ def _edit_page(project: Project, form: ProjectEditForm, status: int = 200, error
             form=form,
             stages=stages,
             error=error,
+            conflict=conflict,
             comparison=tsvc.compare(project) if project.template_version_id else None,
             confirm_form=ConfirmForm(formdata=None),
         ),
@@ -147,6 +151,16 @@ def _back(project_id):
     return redirect(url_for("edicao.project_edit", project_id=project_id), 303)
 
 
+def _conflict_page(project_id, obj_id, exc: svc.EditConflict, mine: dict, current_text: str):
+    """409: nada foi gravado. A tela mostra o valor ATUAL e devolve o que a pessoa digitou,
+    já com a versão atual — salvar de novo é a confirmação consciente de sobrescrever."""
+    db.session.rollback()
+    project = get_or_404(Project, project_id)
+    message = f"{exc} Agora: {current_text}. Confira e salve de novo para confirmar a sua versão."
+    conflict = {"id": obj_id, "message": message, "mine": mine}
+    return _edit_page(project, ProjectEditForm(obj=project), 409, conflict=conflict)
+
+
 @bp.post("/etapas/<uuid:stage_id>/renomear")
 @tenant_required(ROLE_SUPERVISOR)
 def stage_rename(stage_id):
@@ -155,7 +169,16 @@ def stage_rename(stage_id):
     if not form.validate():
         flash("Informe o nome da etapa.", "erro")
         return _back(stage.project_id)
-    svc.rename_stage(stage, form.name.data)
+    try:
+        svc.rename_stage(stage, form.name.data, form.version.data, user_id=current_user.id)
+    except svc.EditConflict as exc:
+        return _conflict_page(
+            stage.project_id, stage.id, exc, {"name": form.name.data}, f"“{exc.current['name']}”"
+        )
+    except svc.EditError as exc:
+        db.session.rollback()
+        flash(str(exc), "erro")
+        return _back(stage.project_id)
     db.session.commit()
     flash("Etapa renomeada.", "sucesso")
     return _back(stage.project_id)
@@ -195,7 +218,20 @@ def activity_edit(activity_id):
     if not form.validate():
         flash("Informe nome e tempo ideal (min) válidos.", "erro")
         return _back(project_id)
-    svc.update_activity(activity, form.name.data, form.ideal_minutes.data)
+    try:
+        svc.update_activity(activity, form.name.data, form.ideal_minutes.data, form.version.data, user_id=current_user.id)
+    except svc.EditConflict as exc:
+        cur = exc.current
+        current_text = (
+            f"“{cur['name']}”, {br_number(cur['ideal_minutes'], 2)} min, "
+            f"{cur['units_done']} de {activity.stage.project.quantity} peças"
+        )
+        mine = {"name": form.name.data, "ideal_minutes": form.ideal_minutes.data}
+        return _conflict_page(project_id, activity.id, exc, mine, current_text)
+    except svc.EditError as exc:
+        db.session.rollback()
+        flash(str(exc), "erro")
+        return _back(project_id)
     db.session.commit()
     flash("Atividade atualizada.", "sucesso")
     return _back(project_id)

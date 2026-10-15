@@ -61,13 +61,16 @@
     <h2 class="section-title" id="estrutura-titulo"><span>Etapas e atividades</span><span class="num">{{ stages|length }}</span></h2>
     <p class="muted text-sm">Arquivar tira da tela e dos cálculos, mas os registros continuam no histórico e na exportação.</p>
     {%- for stage, activities in stages %}
+    {%- set sc = conflict if conflict and conflict.id == stage.id else none %}
     <article class="card stack" id="etapa-{{ stage.id }}">
+      {%- if sc %}{{ alert("warning", sc.message, role="alert") }}{% endif %}
       <div class="cluster">
         <form class="cluster" method="post" action="{{ url_for('edicao.stage_rename', stage_id=stage.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="version" value="{{ stage.version }}">
           <label class="visually-hidden" for="etapa-nome-{{ stage.id }}">Nome da etapa</label>
-          <input class="field__input" id="etapa-nome-{{ stage.id }}" name="name" value="{{ stage.name }}" maxlength="160" required>
-          {{ button("Renomear", "secondary") }}
+          <input class="field__input" id="etapa-nome-{{ stage.id }}" name="name" value="{{ sc.mine.name if sc else stage.name }}" maxlength="160" required>
+          {{ button("Confirmar e salvar" if sc else "Renomear", "primary" if sc else "secondary") }}
         </form>
         {{ move_buttons(url_for('edicao.stage_move', stage_id=stage.id)) }}
         <form method="post" action="{{ url_for('edicao.stage_archive', stage_id=stage.id) }}">
@@ -76,15 +79,18 @@
         </form>
       </div>
       {%- for activity in activities %}
+      {%- set ac = conflict if conflict and conflict.id == activity.id else none %}
+      {%- if ac %}{{ alert("warning", ac.message, role="alert") }}{% endif %}
       <div class="cluster" id="atividade-{{ activity.id }}">
         <form class="cluster" method="post" action="{{ url_for('edicao.activity_edit', activity_id=activity.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="version" value="{{ activity.version }}">
           <label class="visually-hidden" for="atv-nome-{{ activity.id }}">Atividade</label>
-          <input class="field__input" id="atv-nome-{{ activity.id }}" name="name" value="{{ activity.name }}" maxlength="160" required>
+          <input class="field__input" id="atv-nome-{{ activity.id }}" name="name" value="{{ ac.mine.name if ac else activity.name }}" maxlength="160" required>
           <label class="visually-hidden" for="atv-min-{{ activity.id }}">Tempo ideal (min)</label>
-          <input class="field__input" id="atv-min-{{ activity.id }}" name="ideal_minutes" value="{{ activity.ideal_minutes }}" inputmode="decimal" required>
+          <input class="field__input" id="atv-min-{{ activity.id }}" name="ideal_minutes" value="{{ ac.mine.ideal_minutes if ac else activity.ideal_minutes }}" inputmode="decimal" required>
           <span class="muted text-sm">min · {{ activity.units_done }}/{{ project.quantity }}</span>
-          {{ button("Salvar", "secondary") }}
+          {{ button("Confirmar e salvar" if ac else "Salvar", "primary" if ac else "secondary") }}
         </form>
         {{ move_buttons(url_for('edicao.activity_move', activity_id=activity.id)) }}
         <form method="post" action="{{ url_for('edicao.activity_archive', activity_id=activity.id) }}">

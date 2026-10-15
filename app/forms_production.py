@@ -55,6 +55,8 @@ class ProjectEditForm(BaseForm):
 
 class RenameForm(BaseForm):
     name = StringField("Nome", filters=[_strip], validators=[DataRequired(), Length(max=160)])
+    # Etapa D: versão que a tela leu (controle otimista → 409 com o valor atual).
+    version = IntegerField(validators=[Optional(), NumberRange(min=1)])
 
 
 class ActivityEditForm(BaseForm):
@@ -62,6 +64,7 @@ class ActivityEditForm(BaseForm):
     ideal_minutes = DecimalField(
         "Tempo ideal (min)", places=2, validators=[InputRequired(), NumberRange(min=Decimal("0"), max=Decimal("100000"))]
     )
+    version = IntegerField(validators=[Optional(), NumberRange(min=1)])
 
 
 class MoveForm(BaseForm):

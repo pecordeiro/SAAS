@@ -28,6 +28,17 @@ class EditError(Exception):
     """Edição inválida (mensagem pronta para a tela)."""
 
 
+class EditConflict(EditError):
+    """Etapa D: o registro mudou desde que a tela foi aberta (``version`` diferente) → 409.
+
+    ``current`` traz o valor ATUAL (para a tela mostrar e pedir confirmação); nada foi gravado."""
+
+    def __init__(self, message: str, current: dict, version: int):
+        super().__init__(message)
+        self.current = current
+        self.version = version
+
+
 @dataclass
 class NewActivity:
     name: str
@@ -352,18 +363,73 @@ def _clean_name(name: str | None, what: str) -> str:
     return name
 
 
-def rename_stage(stage: Stage, name: str) -> None:
-    stage.name = _clean_name(name, "etapa")
-    db.session.flush()
+def _stage_state(stage: Stage) -> dict:
+    return {"name": stage.name}
 
 
-def update_activity(activity: Activity, name: str, ideal_minutes: Decimal | None) -> None:
+def _activity_state(activity: Activity) -> dict:
+    return {"name": activity.name, "ideal_minutes": activity.ideal_minutes, "units_done": activity.units_done}
+
+
+def _guarded_update(model, obj, expected_version: int | None, values: dict, state, conflict_message: str) -> None:
+    """UPDATE condicional por ``version`` (controle otimista, como no registro de peças).
+
+    ``expected_version`` diferente da atual (ou outra gravação entre a leitura e a escrita)
+    → ``EditConflict`` com o valor atual; ``None`` = sem conferência (chamadas internas)."""
+    if expected_version is not None and expected_version != obj.version:
+        raise EditConflict(conflict_message, state(obj), obj.version)
+    result = db.session.execute(
+        update(model)
+        .where(model.id == obj.id, model.company_id == obj.company_id, model.version == obj.version)
+        .values(**values, version=model.version + 1)
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:  # pragma: no cover - corrida rara entre duas abas
+        db.session.refresh(obj)
+        raise EditConflict(conflict_message, state(obj), obj.version)
+    db.session.refresh(obj)
+
+
+STAGE_CONFLICT = "Outra pessoa alterou esta etapa enquanto você editava."
+ACTIVITY_CONFLICT = "Esta atividade mudou enquanto você editava."
+
+
+def rename_stage(stage: Stage, name: str, expected_version: int | None = None, user_id: uuid.UUID | None = None) -> None:
+    """Renomeia a etapa. ``expected_version`` velha → ``EditConflict`` (409 na rota)."""
+    name = _clean_name(name, "etapa")
+    before = stage.name
+    _guarded_update(Stage, stage, expected_version, {"name": name}, _stage_state, STAGE_CONFLICT)
+    if before != name:
+        audit.record(
+            audit.STAGE_RENAMED, company_id=stage.company_id, actor_user_id=user_id,
+            object_type="project", object_id=stage.project_id, details={"stage": name, "antes": before},
+        )
+
+
+def update_activity(
+    activity: Activity,
+    name: str,
+    ideal_minutes: Decimal | None,
+    expected_version: int | None = None,
+    user_id: uuid.UUID | None = None,
+) -> None:
+    """Edita nome e tempo ideal. ``expected_version`` velha (alguém editou, registrou peças
+    ou moveu a atividade) → ``EditConflict`` com o valor atual (409 na rota)."""
     name = _clean_name(name, "atividade")
     if ideal_minutes is None or ideal_minutes < 0:
         raise EditError("Tempo ideal inválido.")
-    activity.name = name
-    activity.ideal_minutes = ideal_minutes
-    db.session.flush()
+    before = {"name": activity.name, "ideal_minutes": str(activity.ideal_minutes)}
+    _guarded_update(
+        Activity, activity, expected_version, {"name": name, "ideal_minutes": ideal_minutes},
+        _activity_state, ACTIVITY_CONFLICT,
+    )
+    after = {"name": activity.name, "ideal_minutes": str(activity.ideal_minutes)}
+    if before != after:
+        audit.record(
+            audit.ACTIVITY_UPDATED, company_id=activity.company_id, actor_user_id=user_id,
+            object_type="project", object_id=activity.stage.project_id,
+            details={"activity": activity.name, "antes": before, "depois": after},
+        )
 
 
 def _sorted(items: list) -> list:

@@ -41,6 +41,12 @@ PROJECT_DUPLICATED = "project.duplicated"
 PROJECT_IMPORTED = "project.imported"
 STAGE_ARCHIVED = "stage.archived"
 ACTIVITY_ARCHIVED = "activity.archived"
+# Etapa D — colaboração.
+STAGE_RENAMED = "stage.renamed"
+ACTIVITY_UPDATED = "activity.updated"
+ACTIVITY_ASSIGNED = "activity.assigned"
+ACTIVITY_MOVED = "activity.moved"
+STAGES_REORDERED = "stages.reordered"
 TEMPLATE_VERSION_APPLIED = "template.version_applied"
 TEMPLATE_ARCHIVED = "template.archived"
 PROGRESS_UNDONE = "progress.undone"
@@ -73,6 +79,11 @@ ACTION_LABELS = {
     PROJECT_IMPORTED: "Projeto importado",
     STAGE_ARCHIVED: "Etapa arquivada",
     ACTIVITY_ARCHIVED: "Atividade arquivada",
+    STAGE_RENAMED: "Etapa renomeada",
+    ACTIVITY_UPDATED: "Atividade editada",
+    ACTIVITY_ASSIGNED: "Responsável da atividade alterado",
+    ACTIVITY_MOVED: "Atividade movida",
+    STAGES_REORDERED: "Etapas reordenadas",
     TEMPLATE_VERSION_APPLIED: "Versão do modelo aplicada",
     TEMPLATE_ARCHIVED: "Modelo arquivado",
     PROGRESS_UNDONE: "Registro desfeito",
