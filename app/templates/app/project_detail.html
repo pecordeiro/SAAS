@@ -24,6 +24,7 @@
     {% include "app/detail/_meta.html" %}
   </div>
   <div class="page-header__actions">
+    {{ button("Painel", "secondary", icon="chart", href=url_for('app.project_dashboard', project_id=project.id)) }}
     {{ button("Histórico", "secondary", icon="history", href=url_for('app.project_history', project_id=project.id)) }}
     {%- if can_edit %}
     <details class="action-menu">

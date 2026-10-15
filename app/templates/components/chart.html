@@ -57,3 +57,142 @@
   {%- endif %}
 </figure>
 {%- endmacro %}
+
+{#
+  ===== Etapa E — gráficos do painel do projeto =====
+  Todos SVG do servidor, sem script e sem estilo inline (CSP). Geometria vem de
+  app/services/charts.py via app/services/dashboard.py; aqui só se imprime. Cor nunca sozinha:
+  cada série tem texto (legenda e valores), cada gráfico tem <title>/<desc> e os números
+  também aparecem em texto/tabela. O SVG decorativo fica aria-hidden quando o texto ao lado já diz tudo.
+#}
+
+{# Medidor de 270° (progresso geral). Decorativo: o número grande fica ao lado, em HTML. #}
+{% macro gauge(m) -%}
+<svg class="gauge" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+  <circle class="gauge__track" cx="50" cy="50" r="40" pathLength="100" stroke-dasharray="{{ m.trilho }}" transform="rotate(135 50 50)"></circle>
+  <circle class="gauge__fill" cx="50" cy="50" r="40" pathLength="100" stroke-dasharray="{{ m.preenchido }}" transform="rotate(135 50 50)"></circle>
+</svg>
+{%- endmacro %}
+
+{# Legenda: itens = lista de (classe da série, texto). O quadrado é decorativo; o texto identifica. #}
+{% macro legend(items) -%}
+<ul class="legend" role="list">
+  {%- for cls, text in items %}
+  <li class="legend__item"><span class="legend__swatch legend__swatch--{{ cls }}" aria-hidden="true"></span>{{ text }}</li>
+  {%- endfor %}
+</ul>
+{%- endmacro %}
+
+{# Barras agrupadas por etapa: tarefas × unidades. O rótulo é link para lançar peças na etapa. #}
+{% macro grouped_bars(etapas, project_id) -%}
+{{ legend([("a", "Pelas tarefas (conta as parciais)"), ("b", "Unidades 100% prontas ÷ previstas")]) }}
+<ul class="gbars" role="list">
+  {%- for e in etapas %}
+  {%- set pa = [e.r.progresso, 1]|min * 100 -%}
+  {%- set pb = [e.pct_unidades, 1]|min * 100 -%}
+  <li class="gbars__row">
+    <a class="gbars__label" href="{{ url_for('app.project_detail', project_id=project_id, etapa=e.id, _anchor='etapa-' ~ e.id) }}">{{ e.n }}. {{ e.name }}<span class="visually-hidden"> — abrir para lançar peças</span></a>
+    <span class="gbars__vals num"><span class="visually-hidden">Tarefas </span>{{ e.r.progresso|pct(0) }}<span class="gbars__sep" aria-hidden="true"> · </span><span class="visually-hidden">, unidades </span>{{ e.pct_unidades|pct(0) }}</span>
+    <svg class="gbars__svg" viewBox="0 0 100 14" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <rect class="chart__track" x="0" y="0" width="100" height="6"></rect>
+      <rect class="chart__bar" x="0" y="0" width="{{ '%.2f'|format(pa) }}" height="6"></rect>
+      <rect class="chart__track" x="0" y="8" width="100" height="6"></rect>
+      <rect class="chart__bar chart__bar--b" x="0" y="8" width="{{ '%.2f'|format(pb) }}" height="6"></rect>
+    </svg>
+  </li>
+  {%- endfor %}
+</ul>
+{%- endmacro %}
+
+{# Rosca de status das etapas. r = charts.rosca(...). O centro mostra feitas/total em texto. #}
+{% macro donut(r, centro, sub, title) -%}
+<div class="donut">
+  <svg class="donut__svg" viewBox="0 0 100 100" role="img" aria-labelledby="donut-t">
+    <title id="donut-t">{{ title }}: {% for s in r.segmentos %}{{ s.label }} {{ s.value }}{% if not loop.last %}; {% endif %}{% endfor %}</title>
+    <circle class="donut__track" cx="50" cy="50" r="38" pathLength="100"></circle>
+    {%- for s in r.segmentos if s.arc %}
+    <circle class="donut__arc donut__arc--{{ s.key }}" cx="50" cy="50" r="38" pathLength="100" stroke-dasharray="{{ s.arc.dash }}" stroke-dashoffset="{{ s.arc.offset }}" transform="rotate(-90 50 50)"></circle>
+    {%- endfor %}
+    <text class="donut__main" x="50" y="52" text-anchor="middle" font-size="15">{{ centro }}</text>
+    <text class="donut__sub" x="50" y="64" text-anchor="middle" font-size="7.5">{{ sub }}</text>
+  </svg>
+  <ul class="legend legend--stack" role="list">
+    {%- for s in r.segmentos %}
+    <li class="legend__item"><span class="legend__swatch legend__swatch--{{ s.key }}" aria-hidden="true"></span><span>{{ s.label }}</span><span class="legend__count num">{{ s.value }}</span></li>
+    {%- endfor %}
+  </ul>
+</div>
+{%- endmacro %}
+
+{# Treemap: área = peso da etapa no projeto; faixa no pé = progresso pelas tarefas; fundo = situação. #}
+{% macro treemap_chart(d, title) -%}
+<svg class="treemap" viewBox="0 0 {{ d.treemap_w }} {{ d.treemap_h }}" role="img" aria-labelledby="treemap-t treemap-d">
+  <title id="treemap-t">{{ title }}</title>
+  <desc id="treemap-d">Cada retângulo é uma etapa; a área mostra quanto ela pesa no tempo total de uma unidade. Os mesmos valores estão na tabela de etapas.</desc>
+  {%- for c in d.treemap %}
+  <g class="tm tm--{{ c.classe }}">
+    <title>{{ c.etapa.n }}. {{ c.etapa.name }} — pesa {{ c.etapa.r.peso_no_projeto|pct(1) }}; progresso {{ c.etapa.r.progresso|pct(0) }}; {{ c.etapa.r.status }}</title>
+    <rect class="tm__cell" x="{{ c.x }}" y="{{ c.y }}" width="{{ c.w }}" height="{{ c.h }}"></rect>
+    <rect class="tm__bar" x="{{ c.x }}" y="{{ c.faixa_y }}" width="{{ c.faixa_w }}" height="1.3"></rect>
+    {%- if c.nome %}
+    <text class="tm__name" x="{{ c.x + 1.2 }}" y="{{ c.y + 4.2 }}" font-size="{{ d.treemap_font }}">{{ c.nome }}</text>
+    <text class="tm__pct" x="{{ c.x + 1.2 }}" y="{{ c.y + 8 }}" font-size="{{ d.treemap_font }}">{{ c.etapa.r.peso_no_projeto|pct(0) }}</text>
+    {%- elif c.mostra_pct %}
+    <text class="tm__name" x="{{ c.x + 1 }}" y="{{ c.y + 3.8 }}" font-size="{{ d.treemap_font }}">{{ c.curto }}</text>
+    <text class="tm__pct" x="{{ c.x + 1 }}" y="{{ c.y + 7 }}" font-size="{{ d.treemap_font }}">{{ c.etapa.r.peso_no_projeto|pct(0) }}</text>
+    {%- endif %}
+  </g>
+  {%- endfor %}
+</svg>
+{%- endmacro %}
+
+{# Colunas empilhadas: horas trabalhadas × faltam por etapa. g = charts.colunas(...). #}
+{% macro stacked_columns(g, title, desc) -%}
+{%- set casas = 1 if g.teto < 10 else 0 -%}
+<div class="chart-scroll" tabindex="0" role="region" aria-label="{{ title }} (arraste para o lado para ver todas as etapas)">
+  <svg class="cols" width="{{ g.w }}" height="{{ g.h }}" viewBox="0 0 {{ g.w }} {{ g.h }}" role="img" aria-labelledby="cols-h-t cols-h-d">
+    <title id="cols-h-t">{{ title }}</title>
+    <desc id="cols-h-d">{{ desc }}</desc>
+    {%- for t in g.ticks %}
+    <line class="cols__grid" x1="{{ g.x0 }}" x2="{{ g.x1 }}" y1="{{ t.y }}" y2="{{ t.y }}"></line>
+    <text class="cols__tick" x="{{ g.x0 - 4 }}" y="{{ t.y + 3.5 }}" text-anchor="end" font-size="10">{{ t.value|num(casas) }} h</text>
+    {%- endfor %}
+    {%- for c in g.cols %}
+    <g class="cols__col">
+      <title>{{ c.title }}: {{ c.segs[0].valor|horas(true) }} trabalhadas, {{ c.segs[1].valor|horas(true) }} faltam</title>
+      {%- for s in c.segs if s.h > 0 %}
+      <rect class="cols__seg cols__seg--{{ s.serie }}" x="{{ s.x }}" y="{{ s.y }}" width="{{ s.w }}" height="{{ s.h }}"></rect>
+      {%- endfor %}
+      <text class="cols__label" x="{{ c.cx }}" y="{{ g.label_y }}" text-anchor="middle" font-size="10">{{ c.label }}</text>
+    </g>
+    {%- endfor %}
+    <line class="cols__axis" x1="{{ g.x0 }}" x2="{{ g.x1 }}" y1="{{ g.base }}" y2="{{ g.base }}"></line>
+  </svg>
+</div>
+{%- endmacro %}
+
+{# Colunas de equipe × prazo: dias úteis por nº de pessoas; a equipe atual leva o texto “hoje”. #}
+{% macro team_columns(g, title, desc) -%}
+<div class="chart-scroll" tabindex="0" role="region" aria-label="{{ title }}">
+  <svg class="cols cols--team" width="{{ g.w }}" height="{{ g.h }}" viewBox="0 0 {{ g.w }} {{ g.h }}" role="img" aria-labelledby="cols-e-t cols-e-d">
+    <title id="cols-e-t">{{ title }}</title>
+    <desc id="cols-e-d">{{ desc }}</desc>
+    {%- for t in g.ticks %}
+    <line class="cols__grid" x1="{{ g.x0 }}" x2="{{ g.x1 }}" y1="{{ t.y }}" y2="{{ t.y }}"></line>
+    <text class="cols__tick" x="{{ g.x0 - 4 }}" y="{{ t.y + 3.5 }}" text-anchor="end" font-size="10">{{ t.value|num(1) }} d</text>
+    {%- endfor %}
+    {%- for c in g.cols %}
+    <g class="cols__col{% if c.destaque %} is-current{% endif %}">
+      <title>{{ c.title }}: {% if c.dias is none %}sem horas por dia definidas{% else %}{{ c.dias|num(1) }} dias úteis{% endif %}{% if c.destaque %} (equipe atual){% endif %}</title>
+      {%- for s in c.segs if s.h > 0 %}
+      <rect class="cols__seg cols__seg--dias{% if c.destaque %} is-current{% endif %}" x="{{ s.x }}" y="{{ s.y }}" width="{{ s.w }}" height="{{ s.h }}"></rect>
+      {%- endfor %}
+      <text class="cols__value" x="{{ c.cx }}" y="{{ c.topo - 4 }}" text-anchor="middle" font-size="10">{{ c.dias|num(1) if c.dias is not none else "—" }}</text>
+      <text class="cols__label" x="{{ c.cx }}" y="{{ g.label_y }}" text-anchor="middle" font-size="10">{{ c.label }}</text>
+      {%- if c.destaque %}<text class="cols__now" x="{{ c.cx }}" y="{{ g.label_y + 12 }}" text-anchor="middle" font-size="9">hoje</text>{% endif %}
+    </g>
+    {%- endfor %}
+    <line class="cols__axis" x1="{{ g.x0 }}" x2="{{ g.x1 }}" y1="{{ g.base }}" y2="{{ g.base }}"></line>
+  </svg>
+</div>
+{%- endmacro %}

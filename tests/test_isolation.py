@@ -103,7 +103,7 @@ def test_toda_rota_com_uuid_tem_caso_de_isolamento(app_factory, flags):
     """Varre o url_map (com e sem as flags que registram blueprints) e falha se alguma rota
     com <uuid:> não tiver caso A/B. Rota com dois <uuid:> também precisa estar listada."""
     app = app_factory(flags)
-    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI + ROUTES_ETAPA_D
+    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI + ROUTES_ETAPA_D + ROUTES_ETAPA_E
     cobertas = {template.replace("{id}", "") for _, template, _, _ in todas}
     # Etapa C: /interno é da plataforma (sem empresa na URL); acesso cruzado = não ser equipe → 404,
     # coberto por tests/test_etapa_c_interno.py::test_interno_e_404_para_quem_nao_e_equipe.
@@ -622,6 +622,35 @@ ROUTES_ETAPA_D = [
         lambda t: {"stage_id": str(t.stage_id), "position": 1, "version": 1},
     ),
 ]
+
+
+# Etapa E — painel do projeto (somente leitura). Dono de A pedindo o painel de B → 404, sem
+# vazar nenhum número de B; na própria empresa → 200. Também com ?etapa= de outra empresa.
+ROUTES_ETAPA_E = [
+    ("GET", "/app/projetos/{id}/painel", "project_id", None),
+]
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_ETAPA_E)
+def test_etapa_e_recurso_de_outra_empresa_responde_404(client, app, tenants, method, template, field, data):
+    a, b = tenants
+    with app.app_context():
+        before = _snapshot(b.company_id)
+    login(client, app, a.owner_email)
+    for suffix in ("", f"?tabela=unidades&etapa={a.stage_id}", f"?etapa={b.stage_id}"):
+        assert _call(client, app, method, template.format(id=getattr(b, field)) + suffix, data).status_code == 404
+    with app.app_context():
+        assert _snapshot(b.company_id) == before
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_ETAPA_E)
+def test_etapa_e_mesma_rota_funciona_na_propria_empresa(client, app, tenants, method, template, field, data):
+    a, b = tenants
+    login(client, app, a.owner_email)
+    response = _call(client, app, method, template.format(id=getattr(a, field)), data)
+    assert response.status_code == 200
+    # nada da empresa B aparece no painel de A
+    assert "Projeto B" not in response.get_data(as_text=True)
 
 
 def _etapa_d_data(data, tenant):

@@ -17,7 +17,7 @@ from app.formatting import br_hours, local_dt
 from app.forms import ActivityForm, ProgressForm, StageForm
 from app.forms_production import ProjectFromTemplateForm
 from app.models import ROLE_OPERATOR, ROLE_SUPERVISOR, Activity, Project, Stage, Template
-from app.services import audit, calc, exporter
+from app.services import audit, calc, dashboard, exporter
 from app.services import projects as svc
 from app.services import templates as tsvc
 from app.services.holidays import holidays_for
@@ -268,7 +268,7 @@ def project_new_summary():
 # ---------------------------------------------------------------- detalhe
 
 
-def _detail_ctx(project: Project, *, errors=None, conflicts=None, deltas=None) -> dict:
+def _detail_ctx(project: Project, *, errors=None, conflicts=None, deltas=None, open_stage=None) -> dict:
     result = svc.summary(project)
     stages = svc.active_stages(project)
     rows = []
@@ -279,6 +279,9 @@ def _detail_ctx(project: Project, *, errors=None, conflicts=None, deltas=None) -
     deadline = _deadline(project, result, project_status)
     # Etapa atual = primeira não concluída: vem aberta; as demais ficam recolhidas.
     current_stage = next((s.id for s, sr, _ in rows if sr.status != calc.STATUS_CONCLUIDA), None)
+    # Vindo do painel (?etapa=): abre a etapa pedida, só se for deste projeto (id solto é ignorado).
+    if open_stage is not None and any(s.id == open_stage for s, _, _ in rows):
+        current_stage = open_stage
     progress_series = [
         {"label": s.name, "value": sr.progresso, "max": 1, "text": f"{sr.progresso * 100:.0f}%", "done": sr.progresso >= 1}
         for s, sr, _ in rows
@@ -320,9 +323,9 @@ def _detail_ctx(project: Project, *, errors=None, conflicts=None, deltas=None) -
 
 
 def _render_detail(project: Project, *, errors=None, conflicts=None, deltas=None, status: int = 200,
-                   only_activity=None, toast: str | None = None, fragment: bool = False):
+                   only_activity=None, toast: str | None = None, fragment: bool = False, open_stage=None):
     """Página inteira; com ``fragment`` (registro via HTMX), só os pedaços que mudam (hx-swap-oob)."""
-    ctx = _detail_ctx(project, errors=errors, conflicts=conflicts, deltas=deltas)
+    ctx = _detail_ctx(project, errors=errors, conflicts=conflicts, deltas=deltas, open_stage=open_stage)
     if fragment:
         ctx.update(only_activity=only_activity, toast=toast, oob=True)
         return render_template("app/detail/_oob.html", **ctx), status
@@ -333,7 +336,7 @@ def _render_detail(project: Project, *, errors=None, conflicts=None, deltas=None
 @tenant_required(ROLE_OPERATOR)
 def project_detail(project_id):
     project = get_or_404(Project, project_id)
-    return _render_detail(project)
+    return _render_detail(project, open_stage=_uuid_arg("etapa"))
 
 
 @bp.get("/projetos/<uuid:project_id>/atualizar")
@@ -346,6 +349,38 @@ def project_refresh(project_id):
     response = Response(render_template("app/detail/_oob.html", **ctx), mimetype="text/html")
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+# ---------------------------------------------------------------- painel do projeto (Etapa E)
+
+DASHBOARD_TABLES = (("tarefas", "Tabela 1 · Tarefas"), ("unidades", "Tabela 2 · Unidades"))
+
+
+@bp.get("/projetos/<uuid:project_id>/painel")
+@tenant_required(ROLE_OPERATOR)
+def project_dashboard(project_id):
+    """Painel completo do projeto: KPIs, gráficos SVG e tabela de etapas. Só leitura; todos os
+    números vêm de calc.py (servidor) e a geometria dos gráficos de charts.py (ADR-0009)."""
+    project = get_or_404(Project, project_id)
+    result = svc.summary(project)
+    stages = svc.active_stages(project)
+    status = _project_status(project, result)
+    table = request.args.get("tabela", "tarefas")
+    table = table if table in dict(DASHBOARD_TABLES) else "tarefas"
+    data = dashboard.build(
+        stages, result, quantity=project.quantity, people=project.people, hours_per_day=float(project.hours_per_day)
+    )
+    return render_template(
+        "app/project_dashboard.html",
+        project=project,
+        result=result,
+        d=data,
+        project_status=status,
+        deadline=_deadline(project, result, status),
+        table=table,
+        table_tabs=DASHBOARD_TABLES,
+        can_edit=g.membership.has_role(ROLE_SUPERVISOR),
+    )
 
 
 # ---------------------------------------------------------------- progresso por pessoa (Etapa D)

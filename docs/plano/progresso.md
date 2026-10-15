@@ -836,3 +836,14 @@ critérios de pronto da anterior estiverem marcados.
     lá valem Subir/Descer e “Mover”.
   - Conferência visual das telas novas (edição com alças, `/pessoas`, painel no detalhe).
   - Rodar a suíte em PostgreSQL (`TEST_DATABASE_URL`) e a migration no PG.
+
+## Etapa E — dashboard completo do projeto
+
+- [x] `calc.py` (puro): `razao`, `equipe_x_prazo` (aba Equipe, 1–6 pessoas), `contagem_status`, `etapas_sem_tempo`, `tempo_trabalhado_min/h` (etapa e projeto). Paridade com `acompanhamento_montagem_v4.xlsx` em `tests/test_calc.py::test_paridade_dashboard_com_planilha_de_referencia` (Tabela 1, Tabela 2, totais, status, resumo final 377–385, equipe × prazo).
+- [x] `app/services/charts.py` (puro, só geometria: medidor, rosca, colunas empilhadas, treemap squarified) e `app/services/dashboard.py` (monta o contexto a partir do `ResultadoProjeto`; sem Flask/banco). Testes em `tests/test_charts.py` e `tests/test_etapa_e.py`.
+- [x] Rota `GET /app/projetos/<uuid>/painel` (operador+, só leitura) + `?tabela=tarefas|unidades`; botão “Painel” no detalhe. Detalhe aceita `?etapa=<uuid>` (só etapa do próprio projeto; id solto é ignorado) para abrir a etapa clicada e lançar peças.
+- [x] Tela: 6 KPIs (progresso geral em medidor, unidades prontas, unidades concluídas, tarefas, tempo que falta, dias úteis até o prazo), tarefas × unidades (barras agrupadas), status (rosca), peso (treemap), horas trabalhadas × faltam (colunas empilhadas), equipe × prazo, tabelas 1 e 2 com clique para lançar. SVG no servidor, `<title>`/`<desc>`/aria, texto ao lado de toda cor, só tokens, sem script/estilo inline/CDN.
+- [x] Teste A/B em `tests/test_isolation.py` (`ROUTES_ETAPA_E`, inclui `?etapa=` de outra empresa).
+- [ ] Não feito de propósito: destaque de etapas futuras “aguardando peça” (o campo não existe; não foi criado).
+- [ ] Suíte em PostgreSQL não rodada (banco local ocupado). Conferência visual feita por captura automática (375/768/1280, claro/escuro, sem rolagem horizontal da página); revisão humana pendente. Treemap tem texto pequeno no celular (a tabela repete os valores).
+- Testes SQLite: tudo verde (painel, calc, charts, isolamento, visual, fase6 com manifesto de assets reconstruído).

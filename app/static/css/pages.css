@@ -524,3 +524,89 @@
     .section-nav { flex-direction: column; border-bottom: 0; position: sticky; top: var(--space-6); }
   }
 }
+
+/* =================== Painel do projeto (Etapa E) =================== */
+@layer components {
+  .dash-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+  @media (min-width: 64em) {
+    .dash-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+  }
+  .kpi--gauge { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: var(--space-4); }
+  @media (min-width: 64em) {
+    .kpi--gauge { grid-column: auto; }
+  }
+  .kpi__gauge { flex: none; width: calc(2.5 * var(--space-12)); }
+  .kpi__gauge-text { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+  .gauge { display: block; width: 100%; height: auto; }
+  .gauge__track, .gauge__fill { fill: none; stroke-width: 10; stroke-linecap: round; }
+  .gauge__track { stroke: var(--color-track); }
+  .gauge__fill { stroke: var(--color-primary); }
+
+  .dash-grid { display: grid; gap: var(--space-6); margin-top: var(--space-6); }
+  .dash-grid > * { min-width: 0; }
+  @media (min-width: 64em) {
+    .dash-grid { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
+  }
+
+  /* Legenda (cor + texto) */
+  .legend { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin-bottom: var(--space-3); font-size: var(--font-size-sm); }
+  .legend__item { display: inline-flex; align-items: center; gap: var(--space-2); }
+  .legend__swatch { flex: none; width: var(--space-3); height: var(--space-3); border-radius: var(--radius-sm); background: var(--color-border); }
+  .legend__swatch--a, .legend__swatch--trabalhadas { background: var(--color-primary); }
+  .legend__swatch--b, .legend__swatch--faltam { background: var(--color-accent); }
+  .legend__swatch--done { background: var(--color-success); }
+  .legend__swatch--doing { background: var(--color-accent); }
+  .legend__swatch--todo { background: var(--color-border); }
+  .legend--stack { flex-direction: column; flex-wrap: nowrap; margin: 0; min-width: 0; flex: 1 1 calc(3 * var(--space-12)); }
+  .legend--stack .legend__item { display: flex; }
+  .legend__count { margin-left: auto; font-weight: var(--font-weight-semibold); }
+
+  /* Barras agrupadas por etapa */
+  .gbars { list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
+  .gbars__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-1) var(--space-3); align-items: baseline; }
+  .gbars__label { font-size: var(--font-size-sm); overflow-wrap: anywhere; color: var(--color-text); text-decoration: none; }
+  .gbars__label:hover { color: var(--color-primary); text-decoration: underline; }
+  @media (pointer: coarse) {
+    .gbars__label { display: inline-flex; align-items: center; min-height: var(--touch-min); }
+  }
+  .gbars__vals { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); white-space: nowrap; }
+  .gbars__svg { grid-column: 1 / -1; display: block; width: 100%; height: var(--space-4); border-radius: var(--radius-sm); }
+  .chart__bar--b { fill: var(--color-accent); }
+
+  /* Rosca */
+  .donut { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4) var(--space-6); }
+  .donut__svg { flex: none; display: block; width: calc(4 * var(--space-12)); max-width: 100%; height: auto; }
+  .donut__track, .donut__arc { fill: none; stroke-width: 14; }
+  .donut__track { stroke: var(--color-track); }
+  .donut__arc--done { stroke: var(--color-success); }
+  .donut__arc--doing { stroke: var(--color-accent); }
+  .donut__arc--todo { stroke: var(--color-border); }
+  .donut__main { fill: var(--color-text); font-weight: var(--font-weight-bold); }
+  .donut__sub { fill: var(--color-text-muted); }
+
+  /* Treemap */
+  .treemap { display: block; width: 100%; height: auto; }
+  .tm__cell { stroke: var(--color-surface); stroke-width: 0.6; fill: var(--color-surface-2); }
+  .tm--done .tm__cell { fill: var(--color-success-subtle); }
+  .tm--doing .tm__cell { fill: var(--color-warning-subtle); }
+  .tm--todo .tm__cell { fill: var(--color-surface-2); }
+  .tm__bar { fill: var(--color-primary); }
+  .tm__name { fill: var(--color-text); font-weight: var(--font-weight-semibold); }
+  .tm__pct { fill: var(--color-text-muted); }
+
+  /* Colunas (horas por etapa; equipe × prazo): rolagem só dentro do gráfico */
+  .chart-scroll { overflow-x: auto; }
+  .chart-scroll:focus-visible { outline: var(--focus-width) solid var(--color-focus); outline-offset: var(--focus-offset); }
+  .cols { display: block; min-width: 100%; max-width: none; height: auto; }
+  .cols--team { min-width: 0; max-width: calc(10 * var(--space-12)); }
+  .cols__grid { stroke: var(--color-border-subtle); stroke-width: 1; }
+  .cols__axis { stroke: var(--color-border); stroke-width: 1; }
+  .cols__tick, .cols__label { fill: var(--color-text-muted); }
+  .cols__value { fill: var(--color-text); font-weight: var(--font-weight-semibold); }
+  .cols__now { fill: var(--color-primary); font-weight: var(--font-weight-bold); }
+  .cols__seg--trabalhadas { fill: var(--color-primary); }
+  .cols__seg--faltam { fill: var(--color-accent); }
+  .cols__seg--dias { fill: var(--color-primary-subtle); stroke: var(--color-primary); stroke-width: 1; }
+  .cols__seg--dias.is-current { fill: var(--color-primary); }
+  .donut text, .treemap text, .cols text { font-family: var(--font-sans); font-variant-numeric: var(--font-numeric); }
+}
