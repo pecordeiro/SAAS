@@ -33,6 +33,12 @@ Etapa B (planos novos): Essencial R$ 249,90 (3 projetos, 3 pessoas), Profissiona
 consulta (só `flask billing-admin set-plan --company <uuid> --plan implantacao --reason "..."`).
 Teste grátis de 14 dias só no Essencial e no Profissional. Em produção `APP_BASE_URL` (https)
 é obrigatório: sem ele o app não sobe.
+Etapa D (colaboração): autoria de cada lançamento no detalhe e no histórico (inclusive quem
+desfez), edição de etapa/atividade com `version` e 409 com o valor atual, responsável por
+atividade (supervisor+, só membro ativo da empresa; evento interno `activity.assigned`),
+progresso por pessoa (`calc.progresso_por_pessoa`, tela `/app/projetos/<id>/pessoas`) e
+arrastar etapas/atividades na edição (`static/js/arrastar.js`, sem biblioteca; Subir/Descer e
+“Mover” continuam sem JS). Migration `d4a8c2e6f1b3`.
 Progresso por fase em [`docs/plano/progresso.md`](docs/plano/progresso.md).
 
 Variáveis da Fase 4 (opcionais): `READ_ONLY_ENFORCED` (padrão 1: sem assinatura ativa a

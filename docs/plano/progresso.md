@@ -775,3 +775,64 @@ critérios de pronto da anterior estiverem marcados.
 - [x] `/interno` (lista com filtro por estado, detalhe, mudar estado + anotação): só `staff.is_staff` (equipe ativa, MFA, e-mail confirmado); qualquer outra pessoa, logada ou não, recebe 404; `Cache-Control: no-store`; CSRF; estado validado no servidor; auditoria sem o texto da anotação. Decisão: acesso pelo login normal do sistema, com MFA obrigatório para a conta de equipe.
 - Testes: `tests/test_etapa_c_interno.py` (abertura única, 404 para anônimo/dono/não-equipe/sem MFA, fluxo da equipe, CLI, LGPD).
 - Pendências: telas do `/interno` ainda sem conferência visual (375/768/1280, claro/escuro); aviso por e-mail à equipe ao abrir a requisição entra com o worker (Etapa F).
+
+## Etapa D — colaboração
+- Status: concluída (pendências abaixo) · 2026-10-15
+- Entregas:
+  - [x] Schema: migration `d4a8c2e6f1b3` (down `c7d3e9a1b5f2`): `stages.version` (padrão 1,
+    CHECK ≥ 1) e `activities.assignee_id` (FK `users` ON DELETE SET NULL, índice
+    `company_id, assignee_id`). Upgrade → downgrade → upgrade sem drift em SQLite.
+  - [x] Autoria: cada atividade do detalhe mostra o responsável e o último lançamento (quem,
+    quanto, quando — `projects.last_entries`, uma consulta); o histórico já mostrava o autor e
+    agora mostra quem desfez cada registro desfeito (`projects.undo_entries`).
+  - [x] Edição com concorrência: renomear etapa e editar nome/tempo da atividade levam a
+    `version` lida pela tela; UPDATE condicional (`_guarded_update`) → `EditConflict` → 409 na
+    tela de edição com o valor atual e o que a pessoa digitou, já com a versão atual (salvar de
+    novo = confirmação). A versão da atividade é a mesma do registro de peças: registrar, editar
+    ou mover invalidam telas abertas (de propósito). Sem `version` no POST continua aceito
+    (como no registro). Auditoria `stage.renamed` e `activity.updated`.
+  - [x] Atribuição: `POST /app/atividades/<id>/responsavel` (supervisor+). `assign_activity`
+    só aceita membro ATIVO da mesma empresa (vínculo `usable()`, sem acesso de suporte, usuário
+    ativo); outro id (outra empresa, desativado, inexistente, inválido) → 404. Auditoria
+    `activity.assigned`; ao atribuir, evento INTERNO `activity.assigned` só com ids (projeto,
+    etapa, atividade, responsável) — gancho da notificação por e-mail da Etapa F; não sai em
+    webhook de cliente (`INTERNAL_EVENT_TYPES`). Desativar a pessoa limpa as atribuições dela na
+    empresa (`clear_assignments`, contado na auditoria).
+  - [x] Progresso por pessoa: `calc.progresso_por_pessoa` (puro) agrega lançamentos por pessoa
+    no período (saldo de peças, registros, desfazeres, horas-padrão = Σ delta × tempo ideal,
+    dias ativos, saldo por atividade) e as atividades atribuídas por responsável (concluídas,
+    peças/previstas, progresso ponderado por tempo como `progresso_tarefas`).
+    `GET /app/projetos/<id>/pessoas?periodo=7|30|90|tudo` (supervisor+) e painel
+    “Pessoas · 7 dias” no detalhe (só supervisor+; o operador não vê). Datas no fuso da empresa.
+  - [x] Arrastar: `POST /app/projetos/<id>/etapas/ordem` (lista COMPLETA, campo `order`
+    repetido; id fora do projeto/empresa → 404; lista diferente das etapas atuais ou repetida →
+    409; auditoria `stages.reordered`) e `POST /app/atividades/<id>/posicionar` (`stage_id`,
+    `position`, `version`; etapa de outro projeto/empresa → 404; versão velha → 409; renumera
+    origem e destino, incrementa a versão, audita `activity.moved`, recalcula o status do
+    projeto). UI: `app/static/js/arrastar.js` (HTML5 drag-and-drop nativo, sem biblioteca, só
+    pela alça ⠿, carregado só na tela de edição via `asset_urls("arrastar.js")` e no manifesto
+    do `build_assets`); o JS só preenche e envia formulários POST com CSRF. Sem JS: Subir/Descer
+    e o seletor “Mover” (para outra etapa, vai para o fim).
+- Critérios de pronto:
+  - [x] Testes novos verdes (`tests/test_etapa_d.py`, 17 casos) e antigos verdes em SQLite
+  - [x] Teste A/B para cada rota nova (`ROUTES_ETAPA_D` em `tests/test_isolation.py`, com ids
+    da própria empresa e da outra no corpo; casos extras: responsável de B na atividade de A,
+    etapa de B ao mover/reordenar no projeto de A)
+  - [x] `calc.py` continua puro (teste AST); nenhum cálculo no template/JS
+  - [ ] Suíte em PostgreSQL 16 (não rodada: banco local ocupado por outro processo)
+  - [ ] Telas conferidas em 375/768/1280 claro/escuro (sem navegador nesta sessão; só tokens,
+    `test_visual` verde)
+  - [x] Revisão de segurança do diff (manual)
+- Testes: SQLite `565 passed, 57 skipped, 3 xfailed` (antes da etapa: 528 passed).
+- /security-review (manual): company_id sempre da sessão; ids do corpo (`assignee_id`,
+  `stage_id`, `order`) resolvidos na empresa da sessão/projeto da URL; papéis checados na rota
+  (supervisor+) e esconder controles não substitui a recusa (testes 403); evento sem nome/e-mail.
+- Decisões tomadas (confirmar com o usuário): progresso por pessoa visível só para
+  supervisor+ (dado de desempenho individual); mover/editar invalida a versão compartilhada da
+  atividade; reordenar etapas não incrementa `stages.version` (versão protege o nome).
+- Pendências:
+  - Etapa F: consumir `activity.assigned` (e-mail ao responsável).
+  - Arrastar no toque (celular): o DnD nativo do HTML5 não funciona em navegadores móveis;
+    lá valem Subir/Descer e “Mover”.
+  - Conferência visual das telas novas (edição com alças, `/pessoas`, painel no detalhe).
+  - Rodar a suíte em PostgreSQL (`TEST_DATABASE_URL`) e a migration no PG.
