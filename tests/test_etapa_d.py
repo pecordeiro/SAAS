@@ -246,3 +246,129 @@ def test_tela_de_pessoas_mostra_numeros_do_servidor(client, app, tenants):
         assert "operator A" in page and "Atividade 1 +4" in page and "0 de 1 concluída" in page
     detail = text_of(client.get(f"/app/projetos/{a.project_id}"))
     assert "Pessoas · 7 dias" in detail and "Ver progresso por pessoa" in detail
+
+
+# ================================================================ 5) arrastar / mover
+
+
+def _three_stages(app, tenant):
+    """Projeto de A com etapas [Etapa 1 (Atividade 1, Atividade 2), E2 (B1), E3 ()]."""
+    from app.models import Project, Stage
+
+    with app.app_context():
+        project = db.session.get(Project, tenant.project_id)
+        s2 = svc.add_stage(project, "E2", [svc.NewActivity("B1", 5)])
+        s3 = svc.add_stage(project, "E3", [])
+        db.session.commit()
+        return tenant.stage_id, s2.id, s3.id
+
+
+def _stage_order(app, project_id):
+    from app.models import Project
+
+    with app.app_context():
+        return [s.name for s in svc.active_stages(db.session.get(Project, project_id))]
+
+
+def test_reordenar_etapas_com_a_lista_completa(client, app, tenants):
+    from app.models import AuditLog
+
+    a, _ = tenants
+    s1, s2, s3 = _three_stages(app, a)
+    login(client, app, a.supervisor_email)
+    url = f"/app/projetos/{a.project_id}/etapas/ordem"
+    response = client.post(url, data={"order": [str(s3), str(s1), str(s2)], "csrf_token": _csrf(client, app)})
+    assert response.status_code == 303
+    assert _stage_order(app, a.project_id) == ["E3", "Etapa 1", "E2"]
+    with app.app_context():
+        log = db.session.query(AuditLog).filter_by(action="stages.reordered").one()
+        assert log.details["ordem"] == ["E3", "Etapa 1", "E2"]
+    # Lista incompleta ou repetida (alguém incluiu/arquivou etapa): 409, nada muda.
+    for bad in ([str(s1), str(s2)], [str(s1), str(s1), str(s2), str(s3)]):
+        response = client.post(url, data={"order": bad, "csrf_token": _csrf(client, app)})
+        assert response.status_code == 409
+        assert "A lista de etapas mudou" in response.get_data(as_text=True)
+    assert _stage_order(app, a.project_id) == ["E3", "Etapa 1", "E2"]
+    # Sem ordem → 400; operador → 403.
+    assert client.post(url, data={"csrf_token": _csrf(client, app)}).status_code == 400
+    op = app.test_client()
+    login(op, app, a.operator_email)
+    assert op.post(url, data={"order": [str(s1), str(s2), str(s3)], "csrf_token": _csrf(op, app)}).status_code == 403
+
+
+def _csrf(client, app):
+    from tests.conftest import csrf_token
+
+    return csrf_token(client, app)
+
+
+def test_mover_atividade_para_outra_etapa_com_versao(client, app, tenants):
+    from app.models import AuditLog, Stage
+
+    a, _ = tenants
+    s1, s2, s3 = _three_stages(app, a)
+    login(client, app, a.supervisor_email)
+    url = f"/app/atividades/{a.activity_id}/posicionar"
+    assert post(client, app, url, {"stage_id": str(s2), "position": 0, "version": 1}).status_code == 303
+    with app.app_context():
+        activity = db.session.get(Activity, a.activity_id)
+        assert activity.stage_id == s2 and activity.version == 2
+        assert [x.name for x in svc.active_activities(db.session.get(Stage, s2))] == ["Atividade 1", "B1"]
+        assert [x.name for x in svc.active_activities(db.session.get(Stage, s1))] == ["Atividade 2"]
+        assert [x.position for x in db.session.get(Stage, s1).activities] == [0]
+        log = db.session.query(AuditLog).filter_by(action="activity.moved").one()
+        assert log.details == {"activity": "Atividade 1", "stage": "E2", "de": "Etapa 1", "posicao": 1}
+    # Versão velha (outra aba) → 409 com onde ela está agora; nada muda.
+    response = post(client, app, url, {"stage_id": str(s3), "position": 0, "version": 1})
+    assert response.status_code == 409
+    assert "Agora ela está em “E2”" in text_of(response)
+    with app.app_context():
+        assert db.session.get(Activity, a.activity_id).stage_id == s2
+    # Posição além do fim vai para o fim (seletor “Mover para” sem JS manda 100000).
+    assert post(client, app, url, {"stage_id": str(s2), "position": 100000, "version": 2}).status_code == 303
+    with app.app_context():
+        assert [x.name for x in svc.active_activities(db.session.get(Stage, s2))] == ["B1", "Atividade 1"]
+    # Etapa vazia aceita a atividade; operador não move.
+    assert post(client, app, url, {"stage_id": str(s3), "position": 0, "version": 3}).status_code == 303
+    op = app.test_client()
+    login(op, app, a.operator_email)
+    assert post(op, app, url, {"stage_id": str(s1), "position": 0}).status_code == 403
+    assert post(client, app, url, {"stage_id": "nao-e-uuid", "position": 0}).status_code == 404
+    assert post(client, app, url, {"stage_id": str(s1), "position": -1}).status_code == 400
+
+
+def test_mover_atividade_para_etapa_de_outro_projeto_da_mesma_empresa_responde_404(client, app, tenants):
+    from decimal import Decimal
+
+    from app.models import Company
+
+    a, _ = tenants
+    with app.app_context():
+        other = svc.create_project(
+            db.session.get(Company, a.company_id), name="Outro", quantity=3, start_date=None, due_date=None,
+            people=1, hours_per_day=Decimal("8"), stages=[svc.NewStage("Fora", [])], check_limits=False,
+        )
+        db.session.commit()
+        foreign_stage = other.stages[0].id
+    login(client, app, a.supervisor_email)
+    url = f"/app/atividades/{a.activity_id}/posicionar"
+    assert post(client, app, url, {"stage_id": str(foreign_stage), "position": 0}).status_code == 404
+    order_url = f"/app/projetos/{a.project_id}/etapas/ordem"
+    data = {"order": [str(a.stage_id), str(foreign_stage)], "csrf_token": _csrf(client, app)}
+    assert client.post(order_url, data=data).status_code == 404
+    with app.app_context():
+        assert db.session.get(Activity, a.activity_id).stage_id == a.stage_id
+
+
+def test_tela_de_edicao_tem_arrastar_e_alternativas_sem_js(client, app, tenants):
+    a, _ = tenants
+    _three_stages(app, a)
+    login(client, app, a.supervisor_email)
+    page = client.get(f"/app/projetos/{a.project_id}/editar").get_data(as_text=True)
+    assert re.search(r'<script src="/static/(dist/arrastar\.[0-9a-f]{10}\.js|js/arrastar\.js)" defer>', page)
+    assert 'id="ordem-etapas"' in page and 'id="mover-atividade"' in page
+    assert 'data-sort-list="stages"' in page and page.count('data-sort-list="activities"') == 3
+    assert page.count('name="direction" value="up"') >= 4  # Subir/Descer continuam
+    assert "Mover Atividade 1 para a etapa" in page  # seletor sem JS
+    # Outras telas não carregam o script de arrastar.
+    assert "arrastar" not in client.get(f"/app/projetos/{a.project_id}").get_data(as_text=True)

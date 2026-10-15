@@ -19,6 +19,7 @@ ONE_YEAR = 60 * 60 * 24 * 365
 SOURCE_FALLBACK = {
     "site.css": [f"css/{n}.css" for n in ("tokens", "base", "layout", "components", "pages", "utilities")],
     "app.js": ["js/app.js"],
+    "arrastar.js": ["js/arrastar.js"],  # Etapa D: só na tela de edição do projeto
     "htmx.js": ["js/htmx.min.js"],
 }
 

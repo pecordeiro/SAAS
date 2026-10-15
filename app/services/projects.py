@@ -549,18 +549,81 @@ def move_activity(activity: Activity, direction: int) -> bool:
     return moved
 
 
-def reorder_stages(project: Project, ordered_ids: list) -> None:
-    """Nova ordem das etapas ativas (lista com todos os ids ativos, sem repetir)."""
+class OrderConflict(EditError):
+    """A lista enviada não bate com as etapas atuais (alguém incluiu/arquivou) → 409."""
+
+
+def reorder_stages(project: Project, ordered_ids: list, user_id: uuid.UUID | None = None) -> bool:
+    """Nova ordem das etapas ativas (lista com TODOS os ids ativos, sem repetir). O navegador
+    só manda a ordem; quem decide é aqui: lista diferente das etapas atuais → ``OrderConflict``.
+    Arquivadas ficam no fim. Audita quando a ordem muda. Devolve se mudou."""
     live = active_stages(project)
     wanted = [str(i) for i in ordered_ids]
-    if sorted(wanted) != sorted(str(s.id) for s in live):
-        raise EditError("A nova ordem precisa conter todas as etapas do projeto.")
+    if len(wanted) != len(set(wanted)) or sorted(wanted) != sorted(str(s.id) for s in live):
+        raise OrderConflict("A lista de etapas mudou desde que a tela foi aberta. Confira a ordem atual e tente de novo.")
+    before = [str(s.id) for s in live]
     by_id = {str(s.id): s for s in live}
     archived = [s for s in _sorted(project.stages) if s.archived_at is not None]
     for pos, stage in enumerate([by_id[i] for i in wanted] + archived):
         stage.position = pos
     db.session.flush()
     db.session.expire(project, ["stages"])
+    changed = before != wanted
+    if changed:
+        audit.record(
+            audit.STAGES_REORDERED, company_id=project.company_id, actor_user_id=user_id,
+            object_type="project", object_id=project.id,
+            details={"ordem": [by_id[i].name for i in wanted]},
+        )
+    return changed
+
+
+def _renumber(stage: Stage, live_order: list[Activity]) -> None:
+    archived = [a for a in _sorted(stage.activities) if a.archived_at is not None and a not in live_order]
+    for pos, act in enumerate(live_order + archived):
+        act.position = pos
+
+
+def move_activity_to(
+    activity: Activity,
+    target: Stage,
+    position: int,
+    expected_version: int | None,
+    user_id: uuid.UUID | None = None,
+) -> None:
+    """Põe a atividade na etapa ``target`` (mesmo projeto) na posição ``position`` (0 = topo;
+    acima do fim vai para o fim). Arrastar e o seletor “Mover para” chegam aqui.
+
+    Regras no servidor: etapa de outro projeto → ``EditError`` (rota → 404); ``version`` velha
+    → ``EditConflict`` (409); incrementa a versão, renumera origem e destino, audita e
+    recalcula o status do projeto (a etapa de destino pode deixar de estar concluída)."""
+    source = activity.stage
+    if target.project_id != source.project_id or target.company_id != activity.company_id:
+        raise EditError("Etapa de destino inválida.")
+    if expected_version is not None and expected_version != activity.version:
+        raise EditConflict(ACTIVITY_CONFLICT, _activity_state(activity), activity.version)
+    old_index = [a.id for a in active_activities(source)].index(activity.id) if activity.archived_at is None else 0
+    _guarded_update(Activity, activity, expected_version, {"stage_id": target.id}, _activity_state, ACTIVITY_CONFLICT)
+    db.session.expire(source, ["activities"])
+    db.session.expire(target, ["activities"])
+    others = [a for a in _sorted(target.activities) if a.archived_at is None and a.id != activity.id]
+    pos = max(0, min(position, len(others)))
+    others.insert(pos, activity)
+    _renumber(target, others)
+    if source.id != target.id:
+        _renumber(source, [a for a in _sorted(source.activities) if a.archived_at is None])
+    db.session.flush()
+    db.session.expire(source, ["activities"])
+    db.session.expire(target, ["activities"])
+    project = target.project
+    db.session.expire(project, ["stages"])
+    _sync_status(project)
+    if source.id != target.id or old_index != pos:
+        audit.record(
+            audit.ACTIVITY_MOVED, company_id=activity.company_id, actor_user_id=user_id,
+            object_type="project", object_id=project.id,
+            details={"activity": activity.name, "stage": target.name, "de": source.name, "posicao": pos + 1},
+        )
 
 
 def archive_stage(stage: Stage, user_id: uuid.UUID | None) -> None:

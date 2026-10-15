@@ -616,6 +616,11 @@ def test_fase8_cobranca_negada_a_supervisor_e_operador(app, tenants, url):
 ROUTES_ETAPA_D = [
     ("POST", "/app/atividades/{id}/responsavel", "activity_id", lambda t: {"assignee_id": str(t.owner_id)}),
     ("GET", "/app/projetos/{id}/pessoas", "project_id", None),
+    ("POST", "/app/projetos/{id}/etapas/ordem", "project_id", lambda t: {"order": [str(t.stage_id)]}),
+    (
+        "POST", "/app/atividades/{id}/posicionar", "activity_id",
+        lambda t: {"stage_id": str(t.stage_id), "position": 1, "version": 1},
+    ),
 ]
 
 
@@ -657,4 +662,19 @@ def test_etapa_d_responsavel_de_outra_empresa_responde_404_e_nada_grava(client, 
         assert post(client, app, url, {"assignee_id": bad}).status_code == 404
     with app.app_context():
         assert db.session.get(Activity, a.activity_id).assignee_id is None
+        assert _snapshot(a.company_id) == before_a and _snapshot(b.company_id) == before_b
+
+
+def test_etapa_d_arrastar_com_etapa_de_outra_empresa_responde_404_e_nada_grava(client, app, tenants):
+    """Atividade/projeto de A com id de etapa de B no corpo: 404, nada muda nas duas empresas."""
+    a, b = tenants
+    with app.app_context():
+        before_a, before_b = _snapshot(a.company_id), _snapshot(b.company_id)
+    login(client, app, a.owner_email)
+    move = f"/app/atividades/{a.activity_id}/posicionar"
+    assert post(client, app, move, {"stage_id": str(b.stage_id), "position": 0, "version": 1}).status_code == 404
+    order = f"/app/projetos/{a.project_id}/etapas/ordem"
+    assert post(client, app, order, {"order": [str(b.stage_id)]}).status_code == 404
+    assert post(client, app, order, {"order": [str(a.stage_id), str(b.stage_id)]}).status_code == 404
+    with app.app_context():
         assert _snapshot(a.company_id) == before_a and _snapshot(b.company_id) == before_b

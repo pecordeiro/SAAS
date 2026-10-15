@@ -7,6 +7,11 @@
 {% set nav_current = "projects" %}
 {% set nav_project = project %}
 {% block title %}Editar · {{ project.name }}{% endblock %}
+{% block head_extra %}
+  {%- for src in asset_urls("arrastar.js") %}
+  <script src="{{ src }}" defer></script>
+  {%- endfor %}
+{% endblock %}
 {% block content %}
 {#
   Edição do projeto (Fase 4, supervisor+): dados, etapas e atividades (renomear, ↑/↓,
@@ -60,11 +65,24 @@
   <section class="stack" aria-labelledby="estrutura-titulo">
     <h2 class="section-title" id="estrutura-titulo"><span>Etapas e atividades</span><span class="num">{{ stages|length }}</span></h2>
     <p class="muted text-sm">Arquivar tira da tela e dos cálculos, mas os registros continuam no histórico e na exportação.</p>
+    <p class="muted text-sm js-only">Arraste pela alça ⠿ para reordenar etapas ou levar uma atividade para outra etapa; os botões Subir/Descer e “Mover” fazem o mesmo sem arrastar.</p>
+    {#- Etapa D: o arrastar só preenche e envia estes formulários; o servidor valida e decide. #}
+    <form id="ordem-etapas" method="post" action="{{ url_for('edicao.stages_reorder', project_id=project.id) }}" hidden>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
+    <form id="mover-atividade" method="post" action="" hidden>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="stage_id" value="">
+      <input type="hidden" name="position" value="">
+      <input type="hidden" name="version" value="">
+    </form>
+    <div class="stack sort-list" data-sort-list="stages" data-sort-form="ordem-etapas">
     {%- for stage, activities in stages %}
     {%- set sc = conflict if conflict and conflict.id == stage.id else none %}
-    <article class="card stack" id="etapa-{{ stage.id }}">
+    <article class="card stack sort-item" id="etapa-{{ stage.id }}" data-sort-id="{{ stage.id }}">
       {%- if sc %}{{ alert("warning", sc.message, role="alert") }}{% endif %}
       <div class="cluster">
+        <span class="drag-handle js-only" data-drag-handle title="Arrastar a etapa" aria-hidden="true">⠿</span>
         <form class="cluster" method="post" action="{{ url_for('edicao.stage_rename', stage_id=stage.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="version" value="{{ stage.version }}">
@@ -78,10 +96,12 @@
           {{ button("Arquivar etapa", "ghost") }}
         </form>
       </div>
+      <div class="stack sort-list" data-sort-list="activities" data-drop-stage="{{ stage.id }}">
       {%- for activity in activities %}
       {%- set ac = conflict if conflict and conflict.id == activity.id else none %}
       {%- if ac %}{{ alert("warning", ac.message, role="alert") }}{% endif %}
-      <div class="cluster" id="atividade-{{ activity.id }}">
+      <div class="cluster sort-item" id="atividade-{{ activity.id }}" data-sort-id="{{ activity.id }}" data-version="{{ activity.version }}" data-move-url="{{ url_for('edicao.activity_position', activity_id=activity.id) }}">
+        <span class="drag-handle js-only" data-drag-handle title="Arrastar a atividade" aria-hidden="true">⠿</span>
         <form class="cluster" method="post" action="{{ url_for('edicao.activity_edit', activity_id=activity.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="version" value="{{ activity.version }}">
@@ -102,6 +122,18 @@
           {{ button("Atribuir", "secondary") }}
         </form>
         {{ move_buttons(url_for('edicao.activity_move', activity_id=activity.id)) }}
+        {%- if stages|length > 1 %}
+        <form class="cluster" method="post" action="{{ url_for('edicao.activity_position', activity_id=activity.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="version" value="{{ activity.version }}">
+          <input type="hidden" name="position" value="100000">
+          <label class="visually-hidden" for="atv-etapa-{{ activity.id }}">Mover {{ activity.name }} para a etapa</label>
+          <select class="field__input" id="atv-etapa-{{ activity.id }}" name="stage_id">
+            {%- for other, _acts in stages %}<option value="{{ other.id }}"{% if other.id == stage.id %} selected{% endif %}>{{ other.name }}</option>{% endfor %}
+          </select>
+          {{ button("Mover", "ghost") }}
+        </form>
+        {%- endif %}
         <form method="post" action="{{ url_for('edicao.activity_archive', activity_id=activity.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           {{ button("Arquivar", "ghost") }}
@@ -110,8 +142,10 @@
       {%- else %}
       <p class="muted text-sm">Sem atividades. Inclua pela tela do projeto.</p>
       {%- endfor %}
+      </div>
     </article>
     {%- endfor %}
+    </div>
   </section>
 </div>
 

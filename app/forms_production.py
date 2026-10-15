@@ -74,6 +74,15 @@ class AssignForm(BaseForm):
     assignee_id = StringField(filters=[_strip], validators=[Optional(), Length(max=36)])
 
 
+class PositionForm(BaseForm):
+    """Etapa D: mover a atividade (arrastar ou “Mover para”). O navegador só manda a
+    intenção; etapa, posição e versão são conferidas no servidor."""
+
+    stage_id = StringField(filters=[_strip], validators=[DataRequired(), Length(max=36)])
+    position = IntegerField(validators=[InputRequired(), NumberRange(min=0, max=100000)])
+    version = IntegerField(validators=[Optional(), NumberRange(min=1)])
+
+
 class MoveForm(BaseForm):
     direction = HiddenField(validators=[AnyOf(["up", "down"])])
 

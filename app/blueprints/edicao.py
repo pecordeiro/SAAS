@@ -10,12 +10,21 @@ from __future__ import annotations
 
 import uuid
 
-from flask import Blueprint, abort, flash, g, redirect, render_template, url_for
+from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 from flask_login import current_user
 
 from app.extensions import db
 from app.formatting import br_number
-from app.forms_production import ActivityEditForm, AssignForm, ConfirmForm, MoveForm, ProjectEditForm, RenameForm
+from app.forms import BaseForm
+from app.forms_production import (
+    ActivityEditForm,
+    AssignForm,
+    ConfirmForm,
+    MoveForm,
+    PositionForm,
+    ProjectEditForm,
+    RenameForm,
+)
 from app.models import ROLE_SUPERVISOR, Activity, Project, ProgressEntry, Stage
 from app.services import entitlements
 from app.services import projects as svc
@@ -199,6 +208,36 @@ def stage_move(stage_id):
     return _back(stage.project_id)
 
 
+@bp.post("/projetos/<uuid:project_id>/etapas/ordem")
+@tenant_required(ROLE_SUPERVISOR)
+def stages_reorder(project_id):
+    """Etapa D (arrastar): recebe a ordem COMPLETA das etapas (campo ``order`` repetido).
+    Id que não é etapa ativa deste projeto na empresa da sessão → 404; lista que não bate
+    com as etapas atuais (alguém incluiu/arquivou) → 409 com a ordem atual na tela."""
+    project = get_or_404(Project, project_id)
+    if not BaseForm().validate():
+        abort(400)
+    ordered = request.form.getlist("order")
+    if not ordered or len(ordered) > 500:
+        abort(400)
+    live = {str(s.id) for s in svc.active_stages(project)}
+    for raw in ordered:
+        if raw not in live:
+            stage = get_or_404(Stage, raw)  # de outra empresa/arquivada/inexistente → 404
+            if stage.project_id != project.id:
+                abort(404)
+    try:
+        changed = svc.reorder_stages(project, ordered, current_user.id)
+    except svc.OrderConflict as exc:
+        db.session.rollback()
+        project = get_or_404(Project, project_id)
+        return _edit_page(project, ProjectEditForm(obj=project), 409, error=str(exc))
+    db.session.commit()
+    if changed:
+        flash("Ordem das etapas salva.", "sucesso")
+    return _back(project.id)
+
+
 @bp.post("/etapas/<uuid:stage_id>/arquivar")
 @tenant_required(ROLE_SUPERVISOR)
 def stage_archive(stage_id):
@@ -263,6 +302,38 @@ def activity_assign(activity_id):
     db.session.commit()
     if changed:
         flash("Responsável definido." if assignee_id else "Atividade sem responsável.", "sucesso")
+    return _back(project_id)
+
+
+@bp.post("/atividades/<uuid:activity_id>/posicionar")
+@tenant_required(ROLE_SUPERVISOR)
+def activity_position(activity_id):
+    """Etapa D: põe a atividade numa etapa (do MESMO projeto) e posição — arrastar ou o
+    seletor “Mover para” (sem JS). Etapa de outra empresa/projeto → 404; versão velha → 409."""
+    activity = get_or_404(Activity, activity_id)
+    form = PositionForm()
+    if not form.validate():
+        abort(400)
+    target = get_or_404(Stage, form.stage_id.data)
+    project_id = activity.stage.project_id
+    if target.project_id != project_id:
+        abort(404)
+    try:
+        svc.move_activity_to(activity, target, form.position.data, form.version.data, current_user.id)
+    except svc.EditConflict as exc:
+        db.session.rollback()
+        project = get_or_404(Project, project_id)
+        current = get_or_404(Activity, activity_id)
+        message = (
+            f"{exc} Agora ela está em “{current.stage.name}”. Confira a posição e mova de novo para confirmar."
+        )
+        conflict = {"id": current.id, "message": message, "mine": {"name": current.name, "ideal_minutes": current.ideal_minutes}}
+        return _edit_page(project, ProjectEditForm(obj=project), 409, conflict=conflict)
+    except svc.EditError:
+        db.session.rollback()
+        abort(404)
+    db.session.commit()
+    flash("Atividade movida.", "sucesso")
     return _back(project_id)
 
 

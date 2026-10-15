@@ -5,6 +5,7 @@ Uso:  python scripts/build_assets.py [--check]
 Saída em ``app/static/dist/``:
 - ``site.<hash>.css``  = tokens + base + layout + components + pages + utilities, minificado
 - ``app.<hash>.js``    = ``static/js/app.js`` minificado
+- ``arrastar.<hash>.js`` = ``static/js/arrastar.js`` minificado (só na edição do projeto)
 - ``htmx.<hash>.js``   = ``static/js/htmx.min.js`` copiado (já vem minificado)
 - ``manifest.json``    = {"site.css": "dist/site.<hash>.css", ...}
 
@@ -40,10 +41,12 @@ def build_outputs() -> dict[str, tuple[str, bytes]]:
     css = "\n".join((STATIC / "css" / f"{n}.css").read_text(encoding="utf-8") for n in CSS_ORDER)
     css_min = rcssmin.cssmin(css).encode("utf-8")
     js_min = rjsmin.jsmin((STATIC / "js" / "app.js").read_text(encoding="utf-8")).encode("utf-8")
+    drag_min = rjsmin.jsmin((STATIC / "js" / "arrastar.js").read_text(encoding="utf-8")).encode("utf-8")
     htmx = (STATIC / "js" / "htmx.min.js").read_bytes()
     return {
         "site.css": (f"site.{_digest(css_min)}.css", css_min),
         "app.js": (f"app.{_digest(js_min)}.js", js_min),
+        "arrastar.js": (f"arrastar.{_digest(drag_min)}.js", drag_min),
         "htmx.js": (f"htmx.{_digest(htmx)}.js", htmx),
     }
 
