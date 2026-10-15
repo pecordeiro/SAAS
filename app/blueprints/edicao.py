@@ -8,12 +8,14 @@ arquivado = 404). Também registra, para o app inteiro, a resposta 402 de
 
 from __future__ import annotations
 
+import uuid
+
 from flask import Blueprint, abort, flash, g, redirect, render_template, url_for
 from flask_login import current_user
 
 from app.extensions import db
 from app.formatting import br_number
-from app.forms_production import ActivityEditForm, ConfirmForm, MoveForm, ProjectEditForm, RenameForm
+from app.forms_production import ActivityEditForm, AssignForm, ConfirmForm, MoveForm, ProjectEditForm, RenameForm
 from app.models import ROLE_SUPERVISOR, Activity, Project, ProgressEntry, Stage
 from app.services import entitlements
 from app.services import projects as svc
@@ -54,6 +56,7 @@ def _edit_page(
             stages=stages,
             error=error,
             conflict=conflict,
+            members=svc.assignable_members(project.company_id),
             comparison=tsvc.compare(project) if project.template_version_id else None,
             confirm_form=ConfirmForm(formdata=None),
         ),
@@ -234,6 +237,32 @@ def activity_edit(activity_id):
         return _back(project_id)
     db.session.commit()
     flash("Atividade atualizada.", "sucesso")
+    return _back(project_id)
+
+
+@bp.post("/atividades/<uuid:activity_id>/responsavel")
+@tenant_required(ROLE_SUPERVISOR)
+def activity_assign(activity_id):
+    """Etapa D: um responsável por atividade (supervisor+). Pessoa que não é membro ativo
+    da empresa da sessão (outra empresa, desativada, inexistente, suporte) → 404."""
+    activity = get_or_404(Activity, activity_id)
+    form = AssignForm()
+    if not form.validate():
+        abort(400)
+    raw = form.assignee_id.data or ""
+    try:
+        assignee_id = uuid.UUID(raw) if raw else None
+    except ValueError:
+        abort(404)
+    project_id = activity.stage.project_id
+    try:
+        changed = svc.assign_activity(activity, assignee_id, current_user.id)
+    except svc.AssignError:
+        db.session.rollback()
+        abort(404)
+    db.session.commit()
+    if changed:
+        flash("Responsável definido." if assignee_id else "Atividade sem responsável.", "sucesso")
     return _back(project_id)
 
 

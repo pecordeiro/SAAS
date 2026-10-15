@@ -67,6 +67,13 @@ class ActivityEditForm(BaseForm):
     version = IntegerField(validators=[Optional(), NumberRange(min=1)])
 
 
+class AssignForm(BaseForm):
+    """Etapa D: responsável da atividade. Vazio = sem responsável. O id é só uma intenção:
+    o serviço confere que é membro ativo da empresa da sessão."""
+
+    assignee_id = StringField(filters=[_strip], validators=[Optional(), Length(max=36)])
+
+
 class MoveForm(BaseForm):
     direction = HiddenField(validators=[AnyOf(["up", "down"])])
 

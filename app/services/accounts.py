@@ -644,7 +644,14 @@ def deactivate_member(member: Membership) -> None:
     ).scalar_one()
     if not others:
         bump_session_version(member.user)
-    _audit(audit.MEMBER_DEACTIVATED, member.company_id, "membership", member.id, {"user_id": str(member.user_id)})
+    # Etapa D: quem sai da equipe deixa de ser responsável pelas atividades desta empresa.
+    from app.services.projects import clear_assignments
+
+    cleared = clear_assignments(member.company_id, member.user_id)
+    _audit(
+        audit.MEMBER_DEACTIVATED, member.company_id, "membership", member.id,
+        {"user_id": str(member.user_id), "assignments_cleared": cleared},
+    )
     db.session.commit()
 
 

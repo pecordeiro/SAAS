@@ -107,3 +107,80 @@ def test_tela_de_edicao_envia_a_versao(client, app, tenants):
     login(client, app, a.supervisor_email)
     page = client.get(f"/app/projetos/{a.project_id}/editar").get_data(as_text=True)
     assert page.count('name="version" value="1"') >= 3  # etapa + 2 atividades
+
+
+# ================================================================ 3) atribuição
+
+
+def _assign(client, app, activity_id, user_id):
+    return post(client, app, f"/app/atividades/{activity_id}/responsavel", {"assignee_id": str(user_id or "")})
+
+
+def test_supervisor_atribui_audita_e_grava_evento_interno_so_com_ids(client, app, tenants):
+    from app.models import AuditLog, DomainEvent
+    from app.services import events
+
+    a, _ = tenants
+    login(client, app, a.supervisor_email)
+    assert _assign(client, app, a.activity_id, a.operator_id).status_code == 303
+    with app.app_context():
+        assert db.session.get(Activity, a.activity_id).assignee_id == a.operator_id
+        log = db.session.query(AuditLog).filter_by(company_id=a.company_id, action="activity.assigned").one()
+        assert log.details["para"] == str(a.operator_id)
+        event = db.session.query(DomainEvent).filter_by(company_id=a.company_id, type="activity.assigned").one()
+        assert set(event.payload) == {"project_id", "stage_id", "activity_id", "assignee_user_id"}
+        assert "@" not in str(event.payload) and "operator A" not in str(event.payload)
+        assert events.ACTIVITY_ASSIGNED in events.INTERNAL_EVENT_TYPES
+        assert events.ACTIVITY_ASSIGNED not in events.PUBLIC_EVENT_TYPES
+    page = text_of(client.get(f"/app/projetos/{a.project_id}"))
+    assert "Resp.: operator A" in page
+    # Tirar o responsável: audita, sem evento novo.
+    assert _assign(client, app, a.activity_id, None).status_code == 303
+    with app.app_context():
+        assert db.session.get(Activity, a.activity_id).assignee_id is None
+        assert db.session.query(DomainEvent).filter_by(type="activity.assigned").count() == 1
+        assert db.session.query(AuditLog).filter_by(action="activity.assigned").count() == 2
+
+
+def test_operador_nao_atribui(client, app, tenants):
+    a, _ = tenants
+    login(client, app, a.operator_email)
+    assert _assign(client, app, a.activity_id, a.operator_id).status_code == 403
+    with app.app_context():
+        assert db.session.get(Activity, a.activity_id).assignee_id is None
+
+
+def test_membro_desativado_nao_pode_ser_responsavel_e_perde_atribuicoes(client, app, tenants):
+    from app.models import Membership
+    from app.services import accounts
+
+    a, _ = tenants
+    login(client, app, a.owner_email)
+    assert _assign(client, app, a.activity_id, a.operator_id).status_code == 303
+    with app.app_context():
+        member = db.session.query(Membership).filter_by(user_id=a.operator_id).one()
+        accounts.deactivate_member(member)
+        assert db.session.get(Activity, a.activity_id).assignee_id is None
+    assert _assign(client, app, a.activity_id, a.operator_id).status_code == 404
+    page = client.get(f"/app/projetos/{a.project_id}/editar").get_data(as_text=True)
+    assert str(a.operator_id) not in page  # não aparece na lista de responsáveis
+
+
+def test_suporte_da_plataforma_nao_e_responsavel(app, tenants):
+    from app.models import Membership
+
+    a, _ = tenants
+    with app.app_context():
+        user = User(email="suporte@plataforma.com", name="Suporte", password_hash="x")
+        db.session.add(user)
+        db.session.flush()
+        db.session.add(Membership(company_id=a.company_id, user_id=user.id, role="supervisor", is_support=True))
+        db.session.commit()
+        assert user.id not in {u.id for u in svc.assignable_members(a.company_id)}
+        activity = db.session.get(Activity, a.activity_id)
+        try:
+            svc.assign_activity(activity, user.id, None)
+        except svc.AssignError:
+            pass
+        else:  # pragma: no cover
+            raise AssertionError("suporte não pode ser responsável")

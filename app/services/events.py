@@ -22,8 +22,11 @@ PROJECT_COMPLETED = "project.completed"
 # Etapa B: gancho da Etapa C (requisição de identidade visual ao contratar Empresa/Implantação).
 # Evento INTERNO da plataforma: não sai em webhook de cliente (ver PUBLIC_EVENT_TYPES).
 PLAN_VISUAL_CUSTOM_CONTRACTED = "plan.visual_custom_contracted"
+# Etapa D: gancho da notificação por e-mail ao responsável (Etapa F, worker). INTERNO e só
+# com ids (projeto, etapa, atividade, responsável): o worker busca o contato na hora de enviar.
+ACTIVITY_ASSIGNED = "activity.assigned"
 PUBLIC_EVENT_TYPES = (PROJECT_CREATED, ACTIVITY_PROGRESS_UPDATED, STAGE_COMPLETED, PROJECT_COMPLETED)
-INTERNAL_EVENT_TYPES = (PLAN_VISUAL_CUSTOM_CONTRACTED,)
+INTERNAL_EVENT_TYPES = (PLAN_VISUAL_CUSTOM_CONTRACTED, ACTIVITY_ASSIGNED)
 EVENT_TYPES = PUBLIC_EVENT_TYPES + INTERNAL_EVENT_TYPES
 
 

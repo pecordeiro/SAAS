@@ -103,7 +103,7 @@ def test_toda_rota_com_uuid_tem_caso_de_isolamento(app_factory, flags):
     """Varre o url_map (com e sem as flags que registram blueprints) e falha se alguma rota
     com <uuid:> não tiver caso A/B. Rota com dois <uuid:> também precisa estar listada."""
     app = app_factory(flags)
-    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI
+    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI + ROUTES_ETAPA_D
     cobertas = {template.replace("{id}", "") for _, template, _, _ in todas}
     # Etapa C: /interno é da plataforma (sem empresa na URL); acesso cruzado = não ser equipe → 404,
     # coberto por tests/test_etapa_c_interno.py::test_interno_e_404_para_quem_nao_e_equipe.
@@ -607,3 +607,53 @@ def test_fase8_cobranca_negada_a_supervisor_e_operador(app, tenants, url):
         login(other, app, email)
         assert other.get(url).status_code == 403
         assert post(other, app, "/app/assinatura/cancelar").status_code == 403
+
+
+# ================================================================ Etapa D — colaboração
+# Mesmo contrato: owner de A pedindo recurso de B → 404 e nada muda em B (nem auditoria nem
+# eventos); na própria empresa a rota funciona. ``data`` pode ser função do Tenant (ids reais).
+
+ROUTES_ETAPA_D = [
+    ("POST", "/app/atividades/{id}/responsavel", "activity_id", lambda t: {"assignee_id": str(t.owner_id)}),
+]
+
+
+def _etapa_d_data(data, tenant):
+    return data(tenant) if callable(data) else data
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_ETAPA_D)
+def test_etapa_d_recurso_de_outra_empresa_responde_404(client, app, tenants, method, template, field, data):
+    a, b = tenants
+    with app.app_context():
+        before = _snapshot(b.company_id)
+    login(client, app, a.owner_email)
+    # Dados com ids da PRÓPRIA empresa de quem ataca, e também com ids de B.
+    for payload in (_etapa_d_data(data, a), _etapa_d_data(data, b)):
+        response = _call(client, app, method, template.format(id=getattr(b, field)), payload)
+        assert response.status_code == 404
+    with app.app_context():
+        assert _snapshot(b.company_id) == before
+        assert db.session.get(Activity, b.activity_id).assignee_id is None
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_ETAPA_D)
+def test_etapa_d_mesma_rota_funciona_na_propria_empresa(client, app, tenants, method, template, field, data):
+    a, _ = tenants
+    login(client, app, a.owner_email)
+    response = _call(client, app, method, template.format(id=getattr(a, field)), _etapa_d_data(data, a))
+    assert response.status_code in (200, 302, 303)
+
+
+def test_etapa_d_responsavel_de_outra_empresa_responde_404_e_nada_grava(client, app, tenants):
+    """Atividade de A, pessoa de B: o id do formulário é resolvido na empresa da atividade."""
+    a, b = tenants
+    with app.app_context():
+        before_a, before_b = _snapshot(a.company_id), _snapshot(b.company_id)
+    login(client, app, a.owner_email)
+    url = f"/app/atividades/{a.activity_id}/responsavel"
+    for bad in (str(b.owner_id), str(b.operator_id), "nao-e-uuid", "00000000-0000-0000-0000-000000000000"):
+        assert post(client, app, url, {"assignee_id": bad}).status_code == 404
+    with app.app_context():
+        assert db.session.get(Activity, a.activity_id).assignee_id is None
+        assert _snapshot(a.company_id) == before_a and _snapshot(b.company_id) == before_b

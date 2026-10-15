@@ -314,6 +314,91 @@ def undone_ids(entries: list[ProgressEntry]) -> set[uuid.UUID]:
     )
 
 
+# ---------------------------------------------------------------- atribuição (Etapa D)
+
+
+class AssignError(Exception):
+    """Responsável inválido: não é membro ATIVO da empresa da atividade (rota → 404)."""
+
+
+def _assignable_stmt(company_id: uuid.UUID):
+    from app.models import Membership, User
+
+    return (
+        select(User)
+        .join(Membership, Membership.user_id == User.id)
+        .where(
+            Membership.company_id == company_id,
+            Membership.usable(),  # ativo e, se temporário, no prazo
+            Membership.is_support.is_(False),  # acesso de suporte da plataforma não é equipe
+            User.active.is_(True),
+        )
+    )
+
+
+def assignable_members(company_id: uuid.UUID) -> list:
+    """Pessoas que podem ser responsáveis (membros ativos da empresa, sem suporte)."""
+    from app.models import User
+
+    return list(db.session.execute(_assignable_stmt(company_id).order_by(User.name)).scalars())
+
+
+def assign_activity(activity: Activity, assignee_id: uuid.UUID | None, user_id: uuid.UUID | None) -> bool:
+    """Define (ou tira, com ``None``) o responsável da atividade. Só membro ATIVO da MESMA
+    empresa da atividade; qualquer outro id → ``AssignError``. Audita e, ao atribuir, grava o
+    evento interno ``activity.assigned`` (só ids). Devolve se mudou algo."""
+    from app.models import User
+
+    if assignee_id is not None:
+        member = db.session.execute(
+            _assignable_stmt(activity.company_id).where(User.id == assignee_id)
+        ).scalar_one_or_none()
+        if member is None:
+            raise AssignError("Pessoa não encontrada na equipe.")
+    previous = activity.assignee_id
+    if previous == assignee_id:
+        return False
+    activity.assignee_id = assignee_id
+    db.session.flush()
+    stage = activity.stage
+    audit.record(
+        audit.ACTIVITY_ASSIGNED,
+        company_id=activity.company_id,
+        actor_user_id=user_id,
+        object_type="project",
+        object_id=stage.project_id,
+        details={
+            "stage": stage.name,
+            "activity": activity.name,
+            "de": str(previous) if previous else None,
+            "para": str(assignee_id) if assignee_id else None,
+        },
+    )
+    if assignee_id is not None:
+        events.emit(
+            activity.company_id,
+            events.ACTIVITY_ASSIGNED,
+            {
+                "project_id": stage.project_id,
+                "stage_id": stage.id,
+                "activity_id": activity.id,
+                "assignee_user_id": assignee_id,
+            },
+        )
+    return True
+
+
+def clear_assignments(company_id: uuid.UUID, user_id: uuid.UUID) -> int:
+    """Pessoa desativada na empresa deixa de ser responsável pelas atividades dela."""
+    result = db.session.execute(
+        update(Activity)
+        .where(Activity.company_id == company_id, Activity.assignee_id == user_id)
+        .values(assignee_id=None)
+        .execution_options(synchronize_session=False)
+    )
+    return result.rowcount or 0
+
+
 # ---------------------------------------------------------------- edição (Fase 4)
 
 
