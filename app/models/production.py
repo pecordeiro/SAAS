@@ -67,6 +67,7 @@ class Stage(UUIDPk, Timestamps, TenantMixin, db.Model):
     __table_args__ = (
         Index("ix_stages_company_project_position", "company_id", "project_id", "position"),
         CheckConstraint("position >= 0", name="position_nonnegative"),
+        CheckConstraint("version >= 1", name="version_positive"),
     )
 
     project_id: Mapped[uuid.UUID] = mapped_column(
@@ -75,6 +76,8 @@ class Stage(UUIDPk, Timestamps, TenantMixin, db.Model):
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Etapa D: controle otimista na edição (renomear) — 409 com o valor atual.
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
     project: Mapped[Project] = relationship(back_populates="stages")
     activities: Mapped[list["Activity"]] = relationship(
@@ -86,6 +89,7 @@ class Activity(UUIDPk, Timestamps, TenantMixin, db.Model):
     __tablename__ = "activities"
     __table_args__ = (
         Index("ix_activities_company_stage_position", "company_id", "stage_id", "position"),
+        Index("ix_activities_company_assignee", "company_id", "assignee_id"),
         CheckConstraint("ideal_minutes >= 0", name="ideal_minutes_nonnegative"),
         CheckConstraint("units_done >= 0", name="units_done_nonnegative"),
         CheckConstraint("version >= 1", name="version_positive"),
@@ -100,8 +104,12 @@ class Activity(UUIDPk, Timestamps, TenantMixin, db.Model):
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Etapa D: um responsável (membro ATIVO da mesma empresa — conferido no serviço,
+    # ``projects.assign_activity``). Pessoa apagada → NULL.
+    assignee_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"))
 
     stage: Mapped[Stage] = relationship(back_populates="activities")
+    assignee = relationship("User", foreign_keys=[assignee_id])
 
 
 class ProgressEntry(UUIDPk, TenantMixin, db.Model):
