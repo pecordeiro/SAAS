@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Motion de apresentação — 20 s</title>
+<meta name="viewport" content="width=1600">
+<style>
+@font-face{font-family:"Geist";src:url("../../../app/static/fonts/geist-latin-400-normal.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"Geist";src:url("../../../app/static/fonts/geist-latin-500-normal.woff2") format("woff2");font-weight:500}
+@font-face{font-family:"Geist";src:url("../../../app/static/fonts/geist-latin-600-normal.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"Geist";src:url("../../../app/static/fonts/geist-latin-700-normal.woff2") format("woff2");font-weight:700}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#0B0F14;height:100%;overflow:hidden}
+body{font-family:Geist,system-ui,sans-serif;color:#11161F;font-variant-numeric:tabular-nums}
+#wrap{position:fixed;inset:0;display:grid;place-items:center}
+#stage{position:relative;width:1600px;height:1200px;background:#EEF1F5;overflow:hidden;transform-origin:center;flex:none}
+#stage::before{content:"";position:absolute;left:50%;top:-340px;width:1500px;height:900px;transform:translateX(-50%);background:radial-gradient(closest-side,rgba(39,89,240,.14),rgba(39,89,240,0));pointer-events:none}
+.layer{position:absolute;inset:0;will-change:transform,opacity}
+.abs{position:absolute}
+.card{background:#fff;border:1px solid #E4E8EE;border-radius:24px}
+.bd{display:inline-flex;align-items:center;height:32px;padding:0 14px;border-radius:999px;font-size:16px;font-weight:600;white-space:nowrap}
+.bd-info{background:#EAF0FE;color:#1F49C9}.bd-ok{background:#E3F4EA;color:#0E6B3C}.bd-n{background:#EEF1F5;color:#3D4654}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:60px;padding:0 30px;border-radius:16px;font-size:22px;font-weight:600;white-space:nowrap}
+.btn-p{background:#2759F0;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 10px 24px -8px rgba(39,89,240,.6)}
+.btn-s{background:#fff;color:#11161F;border:1px solid #D5DBE3}
+.lab{font-size:17px;color:#4A5462}
+.big{font-size:40px;font-weight:700;letter-spacing:-.03em}
+.rv{will-change:transform,opacity}
+/* ---- app ---- */
+#persp{position:absolute;inset:0;perspective:2600px}
+#app{position:absolute;left:50px;top:100px;width:1500px;height:1000px;background:#EEF1F5;border:1px solid #DCE2EA;border-radius:32px;overflow:hidden;transform-origin:50% 0;box-shadow:0 60px 100px -40px rgba(17,22,31,.35)}
+#side{position:absolute;left:0;top:0;bottom:0;width:250px;background:#fff;border-right:1px solid #E4E8EE;padding:28px 18px;display:flex;flex-direction:column;gap:8px}
+.nav{display:flex;align-items:center;gap:12px;height:52px;padding:0 14px;border-radius:14px;font-size:19px;color:#3D4654;font-weight:500}
+.nav.on{background:#EAF0FE;color:#1F49C9;font-weight:600}
+#main{position:absolute;left:250px;top:0;right:0;bottom:0}
+.pane{position:absolute;inset:0;padding:34px 36px}
+.kpi{padding:22px 24px;height:128px;display:flex;flex-direction:column;justify-content:space-between}
+.th{font-size:15px;font-weight:600;color:#5A6472}
+.row{display:flex;align-items:center;gap:16px;height:68px;border-top:1px solid #EEF1F5;padding:0 24px;font-size:19px}
+.plus{width:64px;height:44px;border-radius:12px;background:#EAF0FE;color:#1F49C9;font-weight:700;font-size:19px;display:grid;place-items:center}
+#cursor{position:absolute;left:0;top:0;z-index:50;pointer-events:none;opacity:0}
+#ring{position:absolute;left:-30px;top:-30px;width:60px;height:60px;border-radius:50%;border:3px solid #2759F0;opacity:0}
+#toast{position:absolute;left:50%;bottom:34px;margin-left:-290px;width:580px;height:68px;border-radius:18px;background:#11161F;color:#fff;display:flex;align-items:center;gap:14px;padding:0 14px 0 22px;font-size:19px;opacity:0;z-index:40;box-shadow:0 24px 40px -14px rgba(17,22,31,.5)}
+#tip{position:absolute;background:#11161F;color:#fff;border-radius:12px;padding:10px 14px;font-size:17px;white-space:nowrap;opacity:0}
+.mcard{padding:26px;height:238px;display:flex;flex-direction:column;gap:16px}
+/* ---- pricing ---- */
+.plan{position:absolute;top:450px;width:440px;height:580px;padding:40px;display:flex;flex-direction:column;gap:24px;border-radius:32px;background:#fff;border:1px solid #E4E8EE}
+.plan.f{border:3px solid #2759F0;box-shadow:0 40px 70px -30px rgba(39,89,240,.5)}
+.li{display:flex;gap:14px;align-items:center;font-size:24px;color:#3D4654}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+
+<!-- A. logo -->
+<div class="layer" id="sLogo" style="display:grid;place-items:center">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:40px">
+    <svg id="mark" width="260" height="260" viewBox="0 0 40 40" aria-hidden="true">
+      <rect id="tile" width="40" height="40" rx="11" fill="#2759F0"/>
+      <path id="a1" pathLength="1" d="M9 27 A11 11 0 0 1 13.85 17.88" fill="none" stroke="#fff" stroke-width="5"/>
+      <path id="a2" pathLength="1" d="M14.84 17.29 A11 11 0 0 1 25.16 17.29" fill="none" stroke="#fff" stroke-width="5"/>
+      <path id="a3" pathLength="1" d="M26.15 17.88 A11 11 0 0 1 31 27" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="5"/>
+      <circle id="dot" cx="20" cy="27" r="2.6" fill="#fff"/>
+    </svg>
+    <div id="word" style="font-size:96px;font-weight:700;letter-spacing:-.035em;white-space:nowrap"></div>
+  </div>
+</div>
+
+<!-- B. hero -->
+<div class="layer" id="sHero" style="text-align:center">
+  <div id="h1" style="position:absolute;left:0;right:0;top:110px;font-size:132px;line-height:1;font-weight:700;letter-spacing:-.045em"></div>
+  <div id="lead" style="position:absolute;left:230px;right:230px;top:420px;font-size:32px;line-height:1.45;color:#4A5462">Unidades concluídas, horas que faltam e prazo em dias úteis — do celular da fábrica ao computador do escritório.</div>
+  <div id="cta" style="position:absolute;left:0;right:0;top:540px;display:flex;gap:18px;justify-content:center"><span class="btn btn-p">Começar teste grátis de 14 dias</span><span class="btn btn-s">Ver preços</span></div>
+</div>
+
+<!-- C. app -->
+<div id="persp"><div id="app">
+  <div id="side">
+    <div style="display:flex;align-items:center;gap:12px;padding:0 8px 22px" id="sideLogo"></div>
+    <div class="nav on" id="navProj"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg>Projetos</div>
+    <div class="nav" id="navModelos"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Modelos de etapas</div>
+    <div class="nav" id="navImportar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Importar</div>
+    <div class="nav"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/></svg>Usuários</div>
+    <div class="nav"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg>API</div>
+    <div style="margin-top:auto;background:#2759F0;color:#fff;border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:10px"><b style="font-size:19px">Teste grátis</b><span style="font-size:16px;color:#DCE6FD">Faltam 9 dias do plano Profissional.</span><div style="height:7px;border-radius:7px;background:rgba(255,255,255,.25)"><div style="width:36%;height:7px;border-radius:7px;background:#fff"></div></div></div>
+  </div>
+  <div id="main">
+    <!-- pane 1: projeto -->
+    <div class="pane" id="p1">
+      <div class="rv" data-d="0" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:26px">
+        <div><div class="lab" style="margin-bottom:6px">‹ Projetos</div><div style="display:flex;align-items:center;gap:14px"><span style="font-size:42px;font-weight:700;letter-spacing:-.035em">Lote 2026-014</span><span class="bd bd-info">Em andamento</span><span class="bd bd-ok">No prazo</span></div></div>
+        <span class="btn btn-p" style="height:52px;font-size:19px">Exportar</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+        <div class="card kpi rv" data-d=".08"><span class="lab">Unidades concluídas</span><span class="big" id="k1">0</span></div>
+        <div class="card kpi rv" data-d=".16"><span class="lab">Horas que faltam</span><span class="big" id="k2">0&nbsp;h</span></div>
+        <div class="card kpi rv" data-d=".24"><span class="lab">Prazo previsto</span><span class="big" id="k3">0</span></div>
+        <div class="card kpi rv" data-d=".32"><span class="lab">Data limite</span><span class="big">22/10</span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 390px;gap:16px;margin-top:16px">
+        <div class="card rv" data-d=".4" style="padding:22px 24px;height:318px;position:relative" id="chartCard">
+          <div style="font-size:20px;font-weight:600">Peças registradas por dia</div>
+          <svg id="chart" width="700" height="220" viewBox="0 0 700 220" style="position:absolute;left:24px;top:64px">
+            <defs><linearGradient id="ar" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#2759F0" stop-opacity=".2"/><stop offset="1" stop-color="#2759F0" stop-opacity="0"/></linearGradient></defs>
+            <g stroke="#EEF1F5"><line x1="0" x2="700" y1="20" y2="20"/><line x1="0" x2="700" y1="85" y2="85"/><line x1="0" x2="700" y1="150" y2="150"/><line x1="0" x2="700" y1="215" y2="215"/></g>
+            <path id="area" fill="url(#ar)"/>
+            <path id="line" pathLength="1" fill="none" stroke="#2759F0" stroke-width="3.5" stroke-linejoin="round" stroke-dasharray="1" stroke-dashoffset="1"/>
+            <line id="vline" y1="0" y2="220" stroke="#B8C1CD" opacity="0"/>
+            <circle id="vdot" r="7" fill="#2759F0" stroke="#fff" stroke-width="3" opacity="0"/>
+          </svg>
+          <div id="tip"></div>
+        </div>
+        <div class="card rv" data-d=".48" style="padding:22px 24px;height:318px;display:flex;flex-direction:column;align-items:center">
+          <div style="font-size:20px;font-weight:600;align-self:flex-start">Progresso geral</div>
+          <svg viewBox="0 0 240 132" width="330" height="182" style="margin-top:28px"><path d="M24 120 A96 96 0 0 1 216 120" fill="none" stroke="#E3E8F0" stroke-width="26" stroke-dasharray="3 2.6"/><path id="garc" d="M24 120" fill="none" stroke="#2759F0" stroke-width="26" stroke-dasharray="3 2.6"/></svg>
+          <div style="margin-top:-74px;text-align:center"><div style="font-size:52px;font-weight:700;letter-spacing:-.03em" id="gtxt">0%</div><div class="lab" style="font-size:16px">das horas do lote</div></div>
+        </div>
+      </div>
+      <div class="card rv" data-d=".56" style="margin-top:16px;overflow:hidden">
+        <div style="padding:18px 24px 14px;display:flex;justify-content:space-between"><span style="font-size:20px;font-weight:600">Atividades</span><span class="lab" style="font-size:16px">Toque em +1 a cada unidade terminada.</span></div>
+        <div id="rows"></div>
+      </div>
+    </div>
+    <!-- pane 2: modelos -->
+    <div class="pane" id="p2" style="opacity:0">
+      <div style="margin-bottom:26px"><div style="font-size:42px;font-weight:700;letter-spacing:-.035em">Modelos de etapas</div><div class="lab" style="margin-top:8px;font-size:20px">Roteiros de montagem reaproveitáveis. Cada mudança vira uma versão nova.</div></div>
+      <div id="mgrid" style="display:grid;grid-template-columns:1fr 1fr;gap:20px"></div>
+    </div>
+    <!-- pane 3: importar -->
+    <div class="pane" id="p3" style="opacity:0">
+      <div style="margin-bottom:22px"><div style="font-size:42px;font-weight:700;letter-spacing:-.035em">Importar projeto</div><div class="lab" style="margin-top:8px;font-size:20px">CSV do modelo do site, XLSX exportado ou a sua planilha de controle.</div></div>
+      <div class="card" style="padding:30px;display:flex;align-items:center;gap:22px">
+        <span style="width:64px;height:64px;border-radius:16px;background:#E3F4EA;color:#0E6B3C;display:grid;place-items:center;font-weight:700;font-size:16px">XLSX</span>
+        <div style="flex:1"><div style="display:flex;justify-content:space-between;font-size:22px;font-weight:600"><span>controle-producao-2026.xlsx</span><span id="ipct">0%</span></div><div style="height:10px;border-radius:10px;background:#E3E8F0;margin-top:14px;overflow:hidden"><div id="ibar" style="height:100%;width:0;background:#2759F0;border-radius:10px"></div></div><div class="lab" id="icap" style="margin-top:12px;font-size:18px">Lendo linhas e conferindo tempos…</div></div>
+      </div>
+      <div class="card" id="iprev" style="margin-top:20px;overflow:hidden;opacity:0">
+        <div style="padding:20px 26px;display:flex;align-items:center;gap:14px"><span style="font-size:22px;font-weight:600">Pré-visualização</span><span class="bd bd-info">Planilha de referência</span><span class="lab" style="margin-left:auto;font-size:19px">10 unidades · 4 etapas · 9 atividades</span></div>
+        <div id="irows"></div>
+      </div>
+    </div>
+    <div id="toast"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6EE7A0" stroke-width="2.6"><path d="M5 12l5 5L20 7"/></svg><span style="flex:1">Registrado +1 em <b>Fixar painel lateral</b></span><span style="background:rgba(255,255,255,.14);border-radius:12px;padding:10px 16px;font-weight:600;font-size:17px">Desfazer</span></div>
+  </div>
+  <div id="cursor"><div id="ring"></div><svg width="34" height="34" viewBox="0 0 24 24" style="filter:drop-shadow(0 4px 6px rgba(17,22,31,.35))"><path d="M5 3l14 8-6 1.8L10.2 19z" fill="#11161F" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+</div></div>
+
+<!-- D. preços -->
+<div class="layer" id="sPrice">
+  <div id="pT" style="position:absolute;left:0;right:0;top:120px;text-align:center;font-size:92px;line-height:1.02;font-weight:700;letter-spacing:-.04em">Um plano para cada<br>tamanho de fábrica</div>
+  <div id="pS" style="position:absolute;left:0;right:0;top:330px;text-align:center;font-size:30px;color:#4A5462">14 dias grátis no Profissional. Cancele quando quiser.</div>
+  <div class="plan" id="pl0" style="left:100px"><div style="font-size:28px;font-weight:600">Essencial</div><div style="font-size:84px;font-weight:700;letter-spacing:-.04em;line-height:1">R$&nbsp;149<span style="font-size:26px;font-weight:400;color:#5A6472;letter-spacing:0">/mês</span></div><span class="btn btn-s" style="justify-content:center">Começar teste grátis</span><div style="border-top:1px solid #E4E8EE;padding-top:26px;display:flex;flex-direction:column;gap:20px"><div class="li"><i class="ck"></i>3 projetos ativos</div><div class="li"><i class="ck"></i>5 usuários</div></div></div>
+  <div class="plan f" id="pl1" style="left:580px"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:28px;font-weight:600">Profissional</span><span class="bd bd-info">Mais escolhido</span></div><div style="font-size:84px;font-weight:700;letter-spacing:-.04em;line-height:1">R$&nbsp;349<span style="font-size:26px;font-weight:400;color:#5A6472;letter-spacing:0">/mês</span></div><span class="btn btn-p" style="justify-content:center">Começar teste grátis</span><div style="border-top:1px solid #E4E8EE;padding-top:26px;display:flex;flex-direction:column;gap:20px"><div class="li"><i class="ck"></i>15 projetos ativos</div><div class="li"><i class="ck"></i>25 usuários</div><div class="li"><i class="ck"></i>Papéis e auditoria</div></div></div>
+  <div class="plan" id="pl2" style="left:1060px"><div style="font-size:28px;font-weight:600">Empresa</div><div style="font-size:84px;font-weight:700;letter-spacing:-.04em;line-height:1">R$&nbsp;799<span style="font-size:26px;font-weight:400;color:#5A6472;letter-spacing:0">/mês</span></div><span class="btn btn-s" style="justify-content:center">Começar teste grátis</span><div style="border-top:1px solid #E4E8EE;padding-top:26px;display:flex;flex-direction:column;gap:20px"><div class="li"><i class="ck"></i>Projetos ilimitados</div><div class="li"><i class="ck"></i>100 usuários</div><div class="li"><i class="ck"></i>Duas etapas obrigatória</div><div class="li"><i class="ck"></i>API de integração</div></div></div>
+</div>
+
+<!-- E. final -->
+<div class="layer" id="sEnd">
+  <div id="endPanel" style="position:absolute;inset:40px;background:#2759F0;border-radius:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:34px;color:#fff;text-align:center;overflow:hidden">
+    <div id="eLogo"></div>
+    <div id="eH" style="font-size:128px;line-height:1;font-weight:700;letter-spacing:-.045em"></div>
+    <div id="eS" style="font-size:34px;color:#DCE6FD">Cadastre a empresa e importe a planilha hoje.</div>
+    <span id="eB" class="btn" style="height:76px;padding:0 44px;font-size:28px;background:#fff;color:#1A43C4;border-radius:20px;margin-top:10px">Começar teste grátis</span>
+    <div id="eF" style="font-size:22px;color:#DCE6FD">14 dias grátis · sem cartão · em português</div>
+  </div>
+</div>
+
+</div></div>
+
+<script>
+/* ===== configuração ===== */
+const BRAND='[Nome]';           // troque aqui o nome do produto antes de regravar
+const DURATION=20, W=1600, H=1200;
+
+const $=s=>document.querySelector(s);
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const seg=(t,a,b)=>clamp((t-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const eob=x=>{const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)};
+const lerp=(a,b,x)=>a+(b-a)*x;
+const fmt=(n,d=0)=>n.toFixed(d).replace('.',',');
+
+/* ===== montagem do DOM ===== */
+function markSvg(size,tile,glyph){return `<svg width="${size}" height="${size}" viewBox="0 0 40 40"><rect width="40" height="40" rx="11" fill="${tile}"/><path d="M9 27 A11 11 0 0 1 13.85 17.88" fill="none" stroke="${glyph}" stroke-width="5"/><path d="M14.84 17.29 A11 11 0 0 1 25.16 17.29" fill="none" stroke="${glyph}" stroke-width="5"/><path d="M26.15 17.88 A11 11 0 0 1 31 27" fill="none" stroke="${glyph}" stroke-opacity=".45" stroke-width="5"/><circle cx="20" cy="27" r="2.6" fill="${glyph}"/></svg>`}
+$('#sideLogo').innerHTML=markSvg(40,'#2759F0','#fff')+`<span style="font-size:24px;font-weight:700;letter-spacing:-.02em">${BRAND}</span>`;
+$('#eLogo').innerHTML=`<div style="display:flex;align-items:center;gap:20px">${markSvg(84,'#fff','#2759F0')}<span style="font-size:52px;font-weight:700;letter-spacing:-.03em">${BRAND}</span></div>`;
+$('#word').innerHTML=[...BRAND].map(c=>`<span class="ch" style="display:inline-block;opacity:0">${c===' '?'&nbsp;':c}</span>`).join('');
+const words=(sel,txt)=>{$(sel).innerHTML=txt.split('|').map(line=>'<div>'+line.split(' ').map(w=>`<span class="w" style="display:inline-block;opacity:0;margin:0 .13em">${w}</span>`).join('')+'</div>').join('')};
+words('#h1','Saiba onde cada|lote está.'); words('#eH','Saiba onde cada|lote está.');
+document.querySelectorAll('.ck').forEach(e=>{e.outerHTML='<svg class="ckk" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2759F0" stroke-width="2.6" style="flex:none;opacity:0"><path d="M5 12l5 5L20 7"/></svg>'});
+
+const ACTS=[['Fixar painel lateral','Montagem mecânica','#D9731A',6],['Soldar base','Montagem mecânica','#D9731A',7],['Montar transportador','Montagem mecânica','#D9731A',4],['Passar chicote','Elétrica','#0F8A7A',5]];
+$('#rows').innerHTML=ACTS.map((a,i)=>`<div class="row"><b style="width:300px">${a[0]}</b><span style="width:240px;display:flex;align-items:center;gap:10px;color:#3D4654"><i style="width:11px;height:11px;border-radius:3px;background:${a[2]}"></i>${a[1]}</span><div style="flex:1;height:9px;border-radius:9px;background:#EEF1F5;overflow:hidden"><div class="rb" style="height:100%;border-radius:9px;background:${a[2]};width:${a[3]*10}%"></div></div><b class="rt" style="width:64px;text-align:right">${a[3]}/10</b><span class="plus"${i===0?' id="plus"':''}>+1</span></div>`).join('');
+const MODELS=[['Envasadora EV-200','v3','4','23,5 h','2',[225,575,360,205],'10/10/2026'],['Painel elétrico PE-40','v3','3','9,5 h','1',[120,330,120],'04/10/2026'],['Bancada inox BI-3','v1','3','6 h','1',[140,160,60],'18/09/2026'],['Esteira modular EM-6','v2','4','9,7 h','1',[90,260,140,90],'12/09/2026']];
+const SC=['#2759F0','#D9731A','#0F8A7A','#A04BD0'];
+$('#mgrid').innerHTML=MODELS.map(m=>`<div class="card mcard mg"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:26px;font-weight:600">${m[0]}</span><span class="bd bd-info">${m[1]}</span></div><div style="display:flex;gap:4px;height:12px">${m[5].map((w,i)=>`<span style="flex:${w};background:${SC[i]};border-radius:4px"></span>`).join('')}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);font-size:17px;color:#5A6472"><div><div style="font-size:30px;font-weight:700;color:#11161F">${m[2]}</div>etapas</div><div><div style="font-size:30px;font-weight:700;color:#11161F">${m[3]}</div>por unidade</div><div><div style="font-size:30px;font-weight:700;color:#11161F">${m[4]}</div>projetos</div></div><div style="border-top:1px solid #EEF1F5;padding-top:12px;font-size:16px;color:#5A6472">Atualizado em ${m[6]}</div></div>`).join('');
+const IR=[['Preparação','Cortar chapas','90','10/10'],['Preparação','Dobrar estrutura','135','9/10'],['Montagem mecânica','Soldar base','160','7/10'],['Testes e inspeção','Teste funcional','160','4/10']];
+$('#irows').innerHTML=IR.map(r=>`<div class="row ir" style="height:60px;font-size:18px"><span style="width:300px">${r[0]}</span><b style="flex:1">${r[1]}</b><span style="width:120px">${r[2]} min</span><span style="width:100px;text-align:right">${r[3]}</span></div>`).join('');
+
+/* gráfico */
+const SERIES=[6,9,7,12,10,8,14,11,9,13,15,10,12,16], LABELS=['23/09','24/09','25/09','26/09','29/09','30/09','01/10','02/10','03/10','06/10','07/10','08/10','09/10','10/10'];
+const CW=700,CH=220,PTS=SERIES.map((v,i)=>[i*CW/(SERIES.length-1),CH-10-(v/20)*(CH-30)]);
+const LD='M'+PTS.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L');
+$('#line').setAttribute('d',LD); $('#area').setAttribute('d',LD+` L${CW} ${CH} L0 ${CH} Z`);
+function gaugePath(v){const a=Math.PI-Math.PI*v/100;const x=120+96*Math.cos(a),y=120-96*Math.sin(a);return v<=0.2?'M24 120':`M24 120 A96 96 0 0 1 ${x.toFixed(2)} ${y.toFixed(2)}`}
+
+/* posição de elementos dentro do #app (sem depender de transform) */
+const APP=$('#app');
+function centerIn(el){let x=0,y=0,e=el;while(e&&e!==APP){x+=e.offsetLeft;y+=e.offsetTop;e=e.offsetParent}return [x+el.offsetWidth/2,y+el.offsetHeight/2]}
+let T={};
+function measure(){
+  T.plus=centerIn($('#plus')); T.nm=centerIn($('#navModelos')); T.ni=centerIn($('#navImportar'));
+  let x=0,y=0,e=$('#chartCard'); while(e&&e!==APP){x+=e.offsetLeft;y+=e.offsetTop;e=e.offsetParent} T.chart=[x+24,y+64];
+  T.mc=centerIn(document.querySelectorAll('.mg')[1]);
+}
+
+/* ===== quadro ===== */
+function frame(t){
+  /* A — logo */
+  const sl=$('#sLogo'); const out=seg(t,2.55,3.1);
+  sl.style.opacity=t>3.15?0:1-eio(out); sl.style.transform=`scale(${1+.12*eio(out)}) translateY(${-30*eio(out)}px)`;
+  $('#tile').setAttribute('transform',`translate(${20-20*eob(seg(t,0,.6))} ${20-20*eob(seg(t,0,.6))}) scale(${eob(seg(t,0,.6))})`);
+  [['a1',.35,.8],['a2',.55,1.0],['a3',.75,1.2]].forEach(([id,a,b])=>{const p=$('#'+id);p.setAttribute('stroke-dasharray','1');p.setAttribute('stroke-dashoffset',String(1-eo(seg(t,a,b))))});
+  const dp=eob(seg(t,1.0,1.4)); $('#dot').setAttribute('r',String(2.6*dp));
+  document.querySelectorAll('#word .ch').forEach((c,i)=>{const o=eo(seg(t,1.25+i*.07,1.6+i*.07));c.style.opacity=o;c.style.transform=`translateY(${(1-o)*26}px)`});
+
+  /* B — hero */
+  const hero=$('#sHero'); const ho=1-seg(t,5.4,6.0);
+  hero.style.opacity=ho; hero.style.transform=`translateY(${-70*eio(seg(t,5.4,6.1))}px)`;
+  document.querySelectorAll('#h1 .w').forEach((w,i)=>{const o=eo(seg(t,2.95+i*.09,3.5+i*.09));w.style.opacity=o;w.style.transform=`translateY(${(1-o)*40}px)`;w.style.filter=`blur(${(1-o)*10}px)`});
+  $('#lead').style.opacity=eo(seg(t,3.5,4.1)); $('#lead').style.transform=`translateY(${(1-eo(seg(t,3.5,4.1)))*24}px)`;
+  $('#cta').style.opacity=eo(seg(t,3.75,4.35)); $('#cta').style.transform=`translateY(${(1-eo(seg(t,3.75,4.35)))*24}px)`;
+
+  /* C — app */
+  const rise=eio(seg(t,3.9,5.3)), zoom=eio(seg(t,5.5,6.5)), exit=eio(seg(t,15.2,15.85));
+  const rx=lerp(lerp(26,14,rise),0,zoom);
+  const ty=lerp(lerp(1300,600,rise),0,zoom)+30*exit;
+  const sc=lerp(.82,1,zoom)*(1+.035*seg(t,6.6,15.0))*(1-.06*exit);
+  APP.style.transform=`translateY(${ty}px) rotateX(${rx}deg) scale(${sc})`;
+  APP.style.opacity=(t<3.85?0:1)*(1-exit);
+
+  const c=eo(seg(t,4.7,5.7)), k=eio(seg(t,8.45,9.25));
+  document.querySelectorAll('#p1 .rv').forEach(e=>{const d=parseFloat(e.dataset.d);const o=eo(seg(t,4.3+d,4.85+d));e.style.opacity=o;e.style.transform=`translateY(${(1-o)*26}px)`});
+  const prog=lerp(56,61,k), hrs=lerp(100,94,k), days=lerp(4.2,3.9,k);
+  $('#k1').innerHTML=`${Math.round(4*c)}<span style="font-size:24px;color:#5A6472;font-weight:500">/10</span>`;
+  $('#k2').innerHTML=`${Math.round(hrs*c)}&nbsp;h`;
+  $('#k3').innerHTML=`${fmt(days*c,1)} <span style="font-size:22px;color:#5A6472;font-weight:500">dias úteis</span>`;
+  $('#garc').setAttribute('d',gaugePath(prog*c)); $('#gtxt').textContent=Math.round(prog*c)+'%';
+  const dr=eo(seg(t,4.9,6.2)); $('#line').setAttribute('stroke-dashoffset',String(1-dr)); $('#area').style.opacity=dr;
+  const rows=document.querySelectorAll('#rows .row');
+  const d0=lerp(6,7,k); rows[0].querySelector('.rb').style.width=d0*10+'%'; rows[0].querySelector('.rt').textContent=Math.round(d0)+'/10';
+  const press=seg(t,8.3,8.4)*(1-seg(t,8.4,8.55)); $('#plus').style.transform=`scale(${1-.1*press})`; $('#plus').style.background=k>0.02?'#2759F0':'#EAF0FE'; $('#plus').style.color=k>0.02?'#fff':'#1F49C9';
+  if(k>=0.02&&k<1){}
+  const ti=seg(t,8.5,8.8), to=seg(t,10.3,10.6); $('#toast').style.opacity=ti*(1-to); $('#toast').style.transform=`translateY(${(1-eo(ti))*34}px)`;
+
+  /* painéis */
+  const p1o=1-seg(t,11.4,11.9), p2i=seg(t,11.5,12.1), p2o=seg(t,13.2,13.65), p3i=seg(t,13.3,13.9);
+  $('#p1').style.opacity=p1o; $('#p1').style.transform=`translateX(${-40*eo(seg(t,11.4,11.9))}px)`; $('#p1').style.visibility=p1o<=0?'hidden':'visible';
+  $('#p2').style.opacity=eo(p2i)*(1-p2o); $('#p2').style.transform=`translateX(${(1-eo(p2i))*50-40*eo(p2o)}px)`;
+  $('#p3').style.opacity=eo(p3i); $('#p3').style.transform=`translateX(${(1-eo(p3i))*50}px)`;
+  const hov=seg(t,12.2,12.5)*(1-seg(t,12.95,13.2));
+  document.querySelectorAll('.mg').forEach((m,i)=>{const o=eo(seg(t,11.75+i*.1,12.25+i*.1));m.style.opacity=o;m.style.transform=`translateY(${(1-o)*28+(i===1?-8*hov:0)}px)`;m.style.boxShadow=i===1&&hov>0?`0 24px 40px -22px rgba(39,89,240,${.5*hov})`:'none';m.style.borderColor=i===1&&hov>0?'#B8C7F6':'#E4E8EE'});
+  const pane=t<11.45?1:t<13.25?2:3;
+  [['#navProj',1],['#navModelos',2],['#navImportar',3]].forEach(([s,n])=>{const e=$(s);e.classList.toggle('on',n===pane)});
+  const ip=eio(seg(t,13.95,14.75)); $('#ibar').style.width=ip*100+'%'; $('#ipct').textContent=Math.round(ip*100)+'%'; $('#icap').textContent=ip>=1?'Pronto: 10 unidades, 4 etapas, 9 atividades.':'Lendo linhas e conferindo tempos…'; $('#icap').style.color=ip>=1?'#0E6B3C':'#4A5462';
+  const iv=eo(seg(t,14.75,15.15)); $('#iprev').style.opacity=iv; $('#iprev').style.transform=`translateY(${(1-iv)*30}px)`;
+  document.querySelectorAll('.ir').forEach((r,i)=>{const o=eo(seg(t,14.85+i*.07,15.2+i*.07));r.style.opacity=o});
+
+  /* cursor + tooltip */
+  const hx0=T.chart[0]+PTS[2][0], hx1=T.chart[0]+PTS[11][0], hy=T.chart[1]+90;
+  const KF=[[6.3,1560,760],[7.9,T.plus[0]+8,T.plus[1]+6],[8.38,T.plus[0]+8,T.plus[1]+6],[9.5,hx0,hy],[10.8,hx1,hy],[11.4,T.nm[0]-10,T.nm[1]],[12.2,T.mc[0],T.mc[1]-10],[12.95,T.mc[0]+40,T.mc[1]+10],[13.2,T.ni[0]-10,T.ni[1]],[14.3,1000,520],[14.9,1060,560]];
+  let cx=KF[0][1],cy=KF[0][2];
+  if(t>=KF[KF.length-1][0]){cx=KF[KF.length-1][1];cy=KF[KF.length-1][2]}
+  else for(let i=0;i<KF.length-1;i++){const a=KF[i],b=KF[i+1];if(t>=a[0]&&t<b[0]){const x=eio(seg(t,a[0],b[0]));cx=lerp(a[1],b[1],x);cy=lerp(a[2],b[2],x);break}}
+  const cur=$('#cursor'); cur.style.opacity=(seg(t,6.3,6.6))*(1-seg(t,14.6,15.0));
+  cur.style.transform=`translate(${cx}px,${cy}px)`;
+  let ring=0; [8.4,11.42,13.22].forEach(ct=>{const x=seg(t,ct,ct+.5);if(x>0&&x<1)ring=Math.max(ring,x)});
+  $('#ring').style.opacity=ring>0?(1-ring)*.7:0; $('#ring').style.transform=`scale(${.4+1.6*ring})`;
+  const inChart=t>9.55&&t<10.95; const idx=clamp(Math.round((cx-T.chart[0])/(CW/(SERIES.length-1))),0,SERIES.length-1);
+  const px=PTS[idx][0], py=PTS[idx][1];
+  const vis=inChart?1:0; $('#vline').setAttribute('opacity',vis*.9); $('#vdot').setAttribute('opacity',vis);
+  $('#vline').setAttribute('x1',px);$('#vline').setAttribute('x2',px);$('#vdot').setAttribute('cx',px);$('#vdot').setAttribute('cy',py);
+  const tip=$('#tip'); tip.style.opacity=vis; tip.innerHTML=`<b>${SERIES[idx]} peças</b> <span style="color:#B8C1CD">${LABELS[idx]}</span>`; tip.style.left=(24+px-60)+'px'; tip.style.top=(64+py-62)+'px';
+
+  /* D — preços */
+  const sp=$('#sPrice'); sp.style.opacity=t<15.35?0:1;
+  const pt=eo(seg(t,15.5,16.1)); $('#pT').style.opacity=pt; $('#pT').style.transform=`translateY(${(1-pt)*30}px)`;
+  const ps=eo(seg(t,15.7,16.3)); $('#pS').style.opacity=ps; $('#pS').style.transform=`translateY(${(1-ps)*20}px)`;
+  [0,1,2].forEach(i=>{const o=eo(seg(t,15.85+i*.14,16.55+i*.14));const e=$('#pl'+i);e.style.opacity=o;e.style.transform=`translateY(${(1-o)*80-(i===1?22*eo(seg(t,16.7,17.2)):0)}px)`});
+  document.querySelectorAll('.ckk').forEach((e,i)=>{const o=eob(seg(t,16.5+i*.09,16.85+i*.09));e.style.opacity=clamp(o);e.style.transform=`scale(${o})`});
+
+  /* E — final */
+  const se=$('#sEnd'); const ep=eio(seg(t,17.7,18.5));
+  se.style.opacity=t<17.65?0:1;
+  $('#endPanel').style.transform=`scale(${lerp(.55,1,ep)})`; $('#endPanel').style.borderRadius=lerp(180,64,ep)+'px'; $('#endPanel').style.opacity=clamp(ep*2.5);
+  $('#eLogo').style.opacity=eo(seg(t,18.15,18.6)); $('#eLogo').style.transform=`translateY(${(1-eo(seg(t,18.15,18.6)))*20}px)`;
+  document.querySelectorAll('#eH .w').forEach((w,i)=>{const o=eo(seg(t,18.3+i*.1,18.85+i*.1));w.style.opacity=o;w.style.transform=`translateY(${(1-o)*40}px)`;w.style.filter=`blur(${(1-o)*10}px)`});
+  $('#eS').style.opacity=eo(seg(t,18.85,19.3)); $('#eB').style.opacity=eo(seg(t,19.0,19.4)); $('#eF').style.opacity=eo(seg(t,19.25,19.65));
+  const pulse=t>19.4?Math.sin((t-19.4)*Math.PI*2*1.1):0;
+  $('#eB').style.transform=`scale(${1+.035*Math.max(0,pulse)})`; $('#eB').style.boxShadow=`0 0 0 ${Math.max(0,pulse)*16}px rgba(255,255,255,${.22*(1-Math.max(0,pulse))})`;
+}
+window.renderAt=t=>frame(t);
+
+/* ===== escala e reprodução ===== */
+function fit(){const s=Math.min(innerWidth/W,innerHeight/H);$('#stage').style.transform=`scale(${s})`}
+const CAP=location.search.includes('capture');
+document.fonts.ready.then(()=>{
+  measure(); frame(0);
+  if(CAP){window.__ready=true;return}
+  fit(); addEventListener('resize',fit);
+  const t0=performance.now(); (function loop(n){frame(((n-t0)/1000)%DURATION);requestAnimationFrame(loop)})(t0);
+});
+</script>
+</body>
+</html>
