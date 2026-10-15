@@ -260,6 +260,8 @@
   .activity__open--static { padding-right: var(--space-4); }
   .activity__name { min-width: 0; overflow-wrap: anywhere; }
   .activity__units { font-weight: var(--font-weight-semibold); white-space: nowrap; }
+  /* Etapa D: autoria (responsável e último lançamento) embaixo do nome. */
+  .activity__by { display: block; font-size: var(--font-size-sm); font-weight: var(--font-weight-regular); overflow-wrap: anywhere; }
   .activity__plus { pointer-events: none; }
 
   /* Folha de registro (celular) */

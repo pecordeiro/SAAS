@@ -295,6 +295,7 @@ def _detail_ctx(project: Project, *, errors=None, conflicts=None, deltas=None) -
         deadline=deadline,
         current_stage=current_stage,
         recent=svc.history(project, limit=5),
+        last_entries=svc.last_entries(project),
         forecast=deadline["forecast"],
         errors=errors or {},
         conflicts=conflicts or {},
@@ -366,7 +367,8 @@ def _history_page(project: Project | None, general_route: bool = False):
         entries, total = svc.history_page(
             project, activity_id=activity.id if activity else None, user_id=user_id, page=page, per_page=HISTORY_PER_PAGE
         )
-    undone = svc.undone_ids(entries)
+    undone_by = svc.undo_entries(entries)
+    undone = set(undone_by)
     totals = svc.running_totals(entries)
     # Agrupa por dia (fuso da empresa) para a lista.
     days: OrderedDict = OrderedDict()
@@ -401,6 +403,7 @@ def _history_page(project: Project | None, general_route: bool = False):
         days=days,
         per_day=per_day,
         undone=undone,
+        undone_by=undone_by,
         totals=totals,
         total=total,
         page=page,

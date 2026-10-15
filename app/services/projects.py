@@ -621,6 +621,35 @@ def history_page(
     return entries, total
 
 
+def undo_entries(entries: list[ProgressEntry]) -> dict[uuid.UUID, ProgressEntry]:
+    """{id do registro desfeito: lançamento que o desfez} (para “desfeito por Fulano”)."""
+    if not entries:
+        return {}
+    rows = db.session.execute(
+        scoped(ProgressEntry).where(ProgressEntry.reverts_entry_id.in_([e.id for e in entries]))
+    ).scalars()
+    return {r.reverts_entry_id: r for r in rows}
+
+
+def last_entries(project: Project) -> dict[uuid.UUID, ProgressEntry]:
+    """Último lançamento de cada atividade do projeto ({activity_id: registro}): autoria na
+    linha da atividade (“último: Fulano +2”). Uma consulta, pela empresa da sessão."""
+    latest = (
+        select(ProgressEntry.activity_id, func.max(ProgressEntry.at).label("at"))
+        .join(Activity, Activity.id == ProgressEntry.activity_id)
+        .join(Stage, Stage.id == Activity.stage_id)
+        .where(ProgressEntry.company_id == current_company_id(), Stage.project_id == project.id)
+        .group_by(ProgressEntry.activity_id)
+        .subquery()
+    )
+    rows = db.session.execute(
+        scoped(ProgressEntry)
+        .join(latest, (latest.c.activity_id == ProgressEntry.activity_id) & (latest.c.at == ProgressEntry.at))
+        .order_by(ProgressEntry.id)
+    ).scalars()
+    return {e.activity_id: e for e in rows}
+
+
 def running_totals(entries: list[ProgressEntry]) -> dict[uuid.UUID, tuple[int, int]]:
     """{id do registro: (antes, depois)} = peças da atividade antes e depois do lançamento
     (soma acumulada dos lançamentos, desfazeres incluídos). Para o “6 → 7 de 10”."""

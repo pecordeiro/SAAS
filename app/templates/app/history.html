@@ -84,7 +84,7 @@
       <td class="history-row__range is-num is-plain muted">{% if tot %}{{ tot[0] }} → {{ tot[1] }} de {{ e.activity.stage.project.quantity }}{% endif %}</td>
       <td class="is-plain">
         {%- if e.reverts_entry_id %}{{ badge("desfazer", "neutral") }}
-        {%- elif e.id in undone %}{{ badge("desfeito", "neutral") }}
+        {%- elif e.id in undone %}{{ badge("desfeito", "neutral") }}{% set rev = undone_by.get(e.id) %}{% if rev %} <span class="muted text-sm history-row__undone-by">por {{ rev.user.name if rev.user else "—" }}</span>{% endif %}
         {%- elif can_undo and e.delta > 0 and not e.activity.archived_at and not e.activity.stage.archived_at and not e.activity.stage.project.archived_at %}<a class="btn btn--ghost" href="{{ url_for('edicao.entry_undo', entry_id=e.id) }}">Desfazer</a>
         {%- endif %}
       </td>
