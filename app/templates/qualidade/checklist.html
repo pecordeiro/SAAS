@@ -91,7 +91,7 @@
     {%- for i in inspections %}
       <tr>
         <td class="num" data-label="Aberta em"><a class="row-link" href="{{ url_for('qualidade.inspection', inspection_id=i.id) }}">{{ i.created_at|datahora }}</a></td>
-        <td data-label="Unidade">{{ i.unit.serial if i.unit is defined and i.unit else "—" }}</td>
+        <td data-label="Unidade">{{ i.unit.serial if i.unit else "—" }}</td>
         <td data-label="Situação">{% if i.status == "signed" %}{{ badge("Assinada", "success", "check") }}{% else %}{{ badge("Rascunho", "neutral", "circle") }}{% endif %}</td>
         <td data-label="Assinatura">{% if i.signed_at %}{{ i.signed_by.name if i.signed_by else "Pessoa removida" }} · <span class="num">{{ i.signed_at|datahora }}</span>{% else %}—{% endif %}</td>
       </tr>

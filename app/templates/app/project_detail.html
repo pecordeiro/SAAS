@@ -27,6 +27,7 @@
   <div class="page-header__actions">
     {{ button("Painel", "secondary", icon="chart", href=url_for('app.project_dashboard', project_id=project.id)) }}
     {{ button("Histórico", "secondary", icon="history", href=url_for('app.project_history', project_id=project.id)) }}
+    {{ button("Unidades", "secondary", icon="package", href=url_for('qualidade.units', project_id=project.id)) }}
     {%- if can_edit %}
     <details class="action-menu">
       <summary class="btn btn--secondary" aria-label="Mais ações do projeto">{{ icon("more") }}<span>Ações</span></summary>

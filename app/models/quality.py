@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Uuid, event
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, Uuid, event
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.extensions import db
@@ -126,6 +126,7 @@ class StageInspection(UUIDPk, TenantMixin, db.Model):
     __tablename__ = "stage_inspections"
     __table_args__ = (
         Index("ix_stage_inspections_company_stage_created", "company_id", "stage_id", "created_at"),
+        Index("ix_stage_inspections_company_unit", "company_id", "unit_id"),
         CheckConstraint("status IN ('draft', 'signed')", name="status_valid"),
         CheckConstraint(
             "status <> 'signed' OR (signed_at IS NOT NULL AND signed_by_id IS NOT NULL)", name="signed_has_signature"
@@ -141,8 +142,11 @@ class StageInspection(UUIDPk, TenantMixin, db.Model):
     # Assinatura: quem estava autenticado e quando (relógio do servidor). Nunca vem do formulário.
     signed_by_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"))
     signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Bloco 3: inspeção de uma unidade (número de série) — opcional.
+    unit_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("units.id", ondelete="RESTRICT"))
 
     stage = relationship("Stage")
+    unit = relationship("Unit")
     created_by = relationship("User", foreign_keys=[created_by_id])
     signed_by = relationship("User", foreign_keys=[signed_by_id])
 
@@ -201,3 +205,38 @@ def _answer_locked_no_update(mapper, connection, target):
 def _answer_locked_no_delete(mapper, connection, target):
     if _locked_before(target):
         raise RuntimeError("Resposta assinada não pode ser apagada.")
+
+
+# ---------------------------------------------------------------- unidades / número de série (bloco 3)
+#
+# Rastreabilidade: cada equipamento do projeto pode ter um número de série. NÃO muda o cálculo —
+# o progresso continua vindo de ``activities.units_done`` (calc.py). Lançamentos de peça e
+# inspeções podem apontar para a unidade (``unit_id`` opcional).
+
+UNIT_SERIAL_MAX = 60
+UNIT_IN_PROGRESS = "in_progress"
+UNIT_DONE = "done"
+UNIT_SHIPPED = "shipped"
+UNIT_SCRAPPED = "scrapped"
+UNIT_STATUSES = (UNIT_IN_PROGRESS, UNIT_DONE, UNIT_SHIPPED, UNIT_SCRAPPED)
+
+
+class Unit(UUIDPk, TenantMixin, db.Model):
+    __tablename__ = "units"
+    __table_args__ = (
+        UniqueConstraint("company_id", "project_id", "serial", name="uq_units_company_project_serial"),
+        Index("ix_units_company_serial", "company_id", "serial"),
+        CheckConstraint("status IN ('in_progress', 'done', 'shipped', 'scrapped')", name="status_valid"),
+        CheckConstraint("length(serial) >= 1", name="serial_not_empty"),
+        CheckConstraint("version >= 1", name="version_positive"),
+    )
+
+    project_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False)
+    serial: Mapped[str] = mapped_column(String(UNIT_SERIAL_MAX), nullable=False)
+    status: Mapped[str] = mapped_column(String(15), nullable=False, default=UNIT_IN_PROGRESS)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+
+    project = relationship("Project")

@@ -138,17 +138,12 @@ def start_inspection(stage: Stage, user_id: uuid.UUID | None, unit=None) -> Stag
         StageInspection.stage_id == stage.id,
         StageInspection.status == INSPECTION_DRAFT,
     )
-    if hasattr(StageInspection, "unit_id"):
-        unit_id = unit.id if unit is not None else None
-        query = query.where(
-            StageInspection.unit_id.is_(None) if unit_id is None else StageInspection.unit_id == unit_id
-        )
+    unit_id = unit.id if unit is not None else None
+    query = query.where(StageInspection.unit_id.is_(None) if unit_id is None else StageInspection.unit_id == unit_id)
     existing = db.session.execute(query.limit(1)).scalar_one_or_none()
     if existing is not None:
         return existing
-    inspection = StageInspection(company_id=stage.company_id, stage_id=stage.id, created_by_id=user_id)
-    if unit is not None:
-        inspection.unit_id = unit.id
+    inspection = StageInspection(company_id=stage.company_id, stage_id=stage.id, created_by_id=user_id, unit_id=unit_id)
     db.session.add(inspection)
     db.session.flush()
     return inspection

@@ -103,7 +103,7 @@ def test_toda_rota_com_uuid_tem_caso_de_isolamento(app_factory, flags):
     """Varre o url_map (com e sem as flags que registram blueprints) e falha se alguma rota
     com <uuid:> não tiver caso A/B. Rota com dois <uuid:> também precisa estar listada."""
     app = app_factory(flags)
-    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI + ROUTES_ETAPA_D + ROUTES_ETAPA_E + ROUTES_ETAPA_F + ROUTES_ETAPA_G + ROUTES_ETAPA_G_CHECKLIST
+    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI + ROUTES_ETAPA_D + ROUTES_ETAPA_E + ROUTES_ETAPA_F + ROUTES_ETAPA_G + ROUTES_ETAPA_G_CHECKLIST + ROUTES_ETAPA_G_UNIDADES
     cobertas = {template.replace("{id}", "") for _, template, _, _ in todas}
     # Etapa C: /interno é da plataforma (sem empresa na URL); acesso cruzado = não ser equipe → 404,
     # coberto por tests/test_etapa_c_interno.py::test_interno_e_404_para_quem_nao_e_equipe.
@@ -986,3 +986,91 @@ def test_etapa_g_checklist_item_de_b_na_inspecao_de_a_responde_404(client, app, 
         assert db.session.query(InspectionAnswer).filter_by(item_id=b.item_id, company_id=a.company_id).count() == 0
     assert _snapshot_checklist(app, b) == before_b
     assert _snapshot_checklist(app, a)["answers"] == before_a["answers"]
+
+
+# Bloco 3: unidades (número de série). Atividade/unidade de B no corpo de uma rota de A → 404.
+
+from app.models import Unit  # noqa: E402
+
+
+def _make_tenant_units(label: str) -> TenantG:
+    from app.services import units as units_svc
+
+    base = make_tenant(label)
+    project = db.session.get(Project, base.project_id)
+    [unit] = units_svc.import_list(project, f"SERIE-{label}", None)
+    db.session.commit()
+    return TenantG(base, unit_id=unit.id)
+
+
+@pytest.fixture()
+def tenants_units(app):
+    with app.app_context():
+        return _make_tenant_units("A"), _make_tenant_units("B")
+
+
+ROUTES_ETAPA_G_UNIDADES = [
+    ("GET", "/app/projetos/{id}/unidades", "project_id", None),
+    ("POST", "/app/projetos/{id}/unidades/gerar", "project_id", {"prefix": "INV-", "start": 1, "count": 1, "width": 2}),
+    ("POST", "/app/projetos/{id}/unidades/importar", "project_id", {"serials": "INVASORA-1"}),
+    ("GET", "/app/unidades/{id}", "unit_id", None),
+    ("POST", "/app/unidades/{id}/status", "unit_id", {"status": "scrapped"}),
+    ("POST", "/app/unidades/{id}/registrar", "unit_id", lambda t: {"activity_id": str(t.activity_id)}),
+]
+
+
+def _snapshot_units(app, t) -> dict:
+    with app.app_context():
+        q = db.session.query
+        return {
+            "base": _snapshot(t.company_id),
+            "units": sorted((u.serial, u.status, u.version) for u in q(Unit).filter_by(company_id=t.company_id)),
+            "unit_entries": q(ProgressEntry).filter(ProgressEntry.company_id == t.company_id, ProgressEntry.unit_id.isnot(None)).count(),
+        }
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_ETAPA_G_UNIDADES)
+def test_etapa_g_unidades_recurso_de_outra_empresa_responde_404(client, app, tenants_units, method, template, field, data):
+    a, b = tenants_units
+    before = _snapshot_units(app, b)
+    login(client, app, a.owner_email)
+    for payload_tenant in (a, b):
+        response = _call_g(client, app, method, template.format(id=getattr(b, field)), data, payload_tenant)
+        assert response.status_code == 404
+        assert b"SERIE-B" not in response.data
+    assert _snapshot_units(app, b) == before
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_ETAPA_G_UNIDADES)
+def test_etapa_g_unidades_mesma_rota_funciona_na_propria_empresa(client, app, tenants_units, method, template, field, data):
+    a, b = tenants_units
+    before_b = _snapshot_units(app, b)
+    login(client, app, a.owner_email)
+    response = _call_g(client, app, method, template.format(id=getattr(a, field)), data, a)
+    assert response.status_code in (200, 302, 303)
+    assert _snapshot_units(app, b) == before_b
+
+
+def test_etapa_g_unidades_ids_de_b_no_corpo_e_busca(client, app, tenants_units):
+    a, b = tenants_units
+    before_a, before_b = _snapshot_units(app, a), _snapshot_units(app, b)
+    login(client, app, a.owner_email)
+    # unidade de A + atividade de B → 404
+    assert post(client, app, f"/app/unidades/{a.unit_id}/registrar", {"activity_id": str(b.activity_id)}).status_code == 404
+    # inspeção numa etapa de A com unidade de B → 404
+    from app.services import checklists as checklists_svc
+
+    with app.app_context():
+        checklists_svc.add_item(db.session.get(Stage, a.stage_id), "Torque", None)
+        db.session.commit()
+    assert post(client, app, f"/app/etapas/{a.stage_id}/inspecoes", {"unit_id": str(b.unit_id)}).status_code == 404
+    with app.app_context():
+        assert db.session.query(StageInspection).count() == 0
+    # busca só na empresa da sessão
+    page = client.get("/app/unidades?q=SERIE").get_data(as_text=True)
+    assert "SERIE-A" in page and "SERIE-B" not in page and str(b.unit_id) not in page
+    own = client.get(f"/app/projetos/{a.project_id}/unidades?q=SERIE-B").get_data(as_text=True)
+    assert str(b.unit_id) not in own and "Nada encontrado" in own  # a página só repete o termo buscado
+    after_a = _snapshot_units(app, a)  # A ganhou só o item de checklist do próprio teste
+    assert (after_a["units"], after_a["unit_entries"]) == (before_a["units"], before_a["unit_entries"])
+    assert _snapshot_units(app, b) == before_b

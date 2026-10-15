@@ -58,6 +58,9 @@ CHECKLIST_ITEM_ARCHIVED = "checklist.item_archived"
 STAGE_CHECKLIST_REQUIRED = "stage.checklist_required"
 INSPECTION_SIGNED = "inspection.signed"
 INSPECTION_CORRECTED = "inspection.corrected"
+# Etapa G — unidades (número de série).
+UNITS_CREATED = "units.created"
+UNIT_STATUS_CHANGED = "unit.status_changed"
 TEMPLATE_VERSION_APPLIED = "template.version_applied"
 TEMPLATE_ARCHIVED = "template.archived"
 PROGRESS_UNDONE = "progress.undone"
@@ -103,6 +106,8 @@ ACTION_LABELS = {
     STAGE_CHECKLIST_REQUIRED: "Exigência de checklist alterada",
     INSPECTION_SIGNED: "Inspeção assinada",
     INSPECTION_CORRECTED: "Inspeção corrigida",
+    UNITS_CREATED: "Números de série cadastrados",
+    UNIT_STATUS_CHANGED: "Status da unidade alterado",
     TEMPLATE_VERSION_APPLIED: "Versão do modelo aplicada",
     TEMPLATE_ARCHIVED: "Modelo arquivado",
     PROGRESS_UNDONE: "Registro desfeito",

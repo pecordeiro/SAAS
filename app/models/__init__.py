@@ -59,4 +59,5 @@ from app.models.quality import (  # noqa: F401,E402  (Etapa G)
     StageChecklistItem,
     StageInspection,
     TemplateChecklistItem,
+    Unit,
 )

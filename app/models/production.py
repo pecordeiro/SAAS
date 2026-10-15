@@ -136,6 +136,7 @@ class ProgressEntry(UUIDPk, TenantMixin, db.Model):
     __table_args__ = (
         Index("ix_progress_entries_company_activity_at", "company_id", "activity_id", "at"),
         Index("ix_progress_entries_company_at", "company_id", "at"),
+        Index("ix_progress_entries_company_unit", "company_id", "unit_id"),
         CheckConstraint("delta <> 0", name="delta_nonzero"),
         CheckConstraint("reverts_entry_id IS NULL OR delta < 0", name="reversal_negative"),
     )
@@ -149,6 +150,9 @@ class ProgressEntry(UUIDPk, TenantMixin, db.Model):
     reverts_entry_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("progress_entries.id", ondelete="RESTRICT"), unique=True
     )
+    # Etapa G: unidade (número de série) do lançamento — rastreabilidade opcional; não muda o
+    # cálculo (o progresso continua em activities.units_done).
+    unit_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("units.id", ondelete="RESTRICT"))
 
     activity: Mapped[Activity] = relationship()
     user = relationship("User")

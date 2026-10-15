@@ -166,7 +166,14 @@ def add_activity(stage: Stage, new_activity: NewActivity, position: int | None =
     return activity
 
 
-def register_progress(activity: Activity, delta: int, expected_version: int | None, user_id: uuid.UUID) -> ProgressEntry:
+def register_progress(
+    activity: Activity,
+    delta: int,
+    expected_version: int | None,
+    user_id: uuid.UUID,
+    *,
+    unit_id: uuid.UUID | None = None,
+) -> ProgressEntry:
     """Soma `delta` peças à atividade, grava o histórico e incrementa a versão.
 
     Regras: delta ≥ 1; peças concluídas nunca passam das previstas (quantidade do projeto).
@@ -199,7 +206,9 @@ def register_progress(activity: Activity, delta: int, expected_version: int | No
     if result.rowcount != 1:
         db.session.rollback()
         raise ConflictError("Esta atividade foi atualizada por outra pessoa. Confira os números e tente de novo.")
-    entry = ProgressEntry(company_id=activity.company_id, activity_id=activity.id, user_id=user_id, delta=delta)
+    entry = ProgressEntry(
+        company_id=activity.company_id, activity_id=activity.id, user_id=user_id, delta=delta, unit_id=unit_id
+    )
     db.session.add(entry)
     db.session.flush()
     db.session.refresh(activity)
@@ -290,6 +299,7 @@ def undo_progress(entry: ProgressEntry, user_id: uuid.UUID) -> ProgressEntry:
         user_id=user_id,
         delta=-entry.delta,
         reverts_entry_id=entry.id,
+        unit_id=entry.unit_id,  # Etapa G: o desfazer fica na mesma unidade
     )
     db.session.add(reversal)
     db.session.flush()
@@ -446,6 +456,11 @@ def update_project(
         raise EditError(f"Já há {most} peças registradas numa atividade: a quantidade não pode ser menor.")
     if due_date and start_date and due_date < start_date:
         raise EditError("O prazo não pode ser antes do início.")
+    from app.services.units import count_units
+
+    units = count_units(project)
+    if quantity < units:
+        raise EditError(f"O projeto tem {units} números de série cadastrados: a quantidade não pode ser menor.")
     before = {"name": project.name, "quantity": project.quantity}
     project.name = name
     project.product = (product or "").strip() or None

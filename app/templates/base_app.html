@@ -30,6 +30,10 @@
 {%- if config.get("FEATURE_PUBLIC_API") and current_membership and current_membership.has_role("owner") -%}
   {%- set _ = nav_items.append({"key": "api", "label": "API", "href": url_for("api_tokens_ui.tokens_index"), "icon": "chart"}) -%}
 {%- endif -%}
+{#- Etapa G: busca por número de série (todos os papéis; depois dos itens da navegação inferior). -#}
+{%- if current_membership -%}
+  {%- set _ = nav_items.append({"key": "units", "label": "Unidades", "href": url_for("qualidade.units_search"), "icon": "package"}) -%}
+{%- endif -%}
 {#- Fase 7: Privacidade e dados (LGPD) — só proprietário. -#}
 {%- if current_membership and current_membership.has_role("owner") -%}
   {%- set _ = nav_items.append({"key": "privacy", "label": "Privacidade", "href": url_for("lgpd.index"), "icon": "info"}) -%}

@@ -12,7 +12,7 @@ from flask import Blueprint, Response, abort, current_app, flash, g, redirect, r
 from flask_login import current_user
 
 from app.extensions import db, limiter
-from app.models import ROLE_OPERATOR, ROLE_SUPERVISOR, Activity, Stage
+from app.models import ROLE_OPERATOR, ROLE_SUPERVISOR, Activity, Project, Stage, Unit
 from app.models.quality import (
     CHECKLIST_ITEM_MAX,
     CHECKLIST_NOTE_MAX,
@@ -22,8 +22,11 @@ from app.models.quality import (
     StageChecklistItem,
     StageInspection,
 )
+from app.services import audit
 from app.services import checklists as checklists_svc
 from app.services import comments as comments_svc
+from app.services import projects as projects_svc
+from app.services import units as units_svc
 from app.services import photos as photos_svc
 from app.services import storage as storage_mod
 from app.tenancy import get_or_404, tenant_required
@@ -175,11 +178,7 @@ def photo_delete(photo_id):
 
 
 def _units_for_select(stage: Stage) -> list:
-    """Unidades do projeto para escolher na inspeção (bloco 3; vazio sem o módulo)."""
-    try:
-        from app.services import units as units_svc
-    except ImportError:  # pragma: no cover - antes do bloco 3
-        return []
+    """Unidades do projeto para escolher na inspeção (opcional)."""
     return units_svc.list_units(stage.project)
 
 
@@ -250,8 +249,6 @@ def inspection_start(stage_id):
     unit = None
     raw_unit = (request.form.get("unit_id") or "").strip()
     if raw_unit:
-        from app.models import Unit
-
         unit = get_or_404(Unit, raw_unit)  # de outra empresa → 404
         if unit.project_id != stage.project_id:
             abort(404)
@@ -342,3 +339,155 @@ def inspection_correct(inspection_id):
     db.session.commit()
     flash("Correção registrada. A resposta anterior continua no histórico.", "sucesso")
     return redirect(url_for("qualidade.inspection", inspection_id=inspection.id, _anchor=f"item-{item.id}"), 303)
+
+
+# ================================================================ unidades / número de série (bloco 3)
+# Rastreabilidade (não muda o cálculo). Supervisor+ cria e muda status; operador+ vê, busca e
+# registra uma atividade numa unidade. Limite = quantidade do projeto (no serviço).
+
+
+def _int_form(name: str, default: int | None = None) -> int | None:
+    try:
+        return int((request.form.get(name) or "").strip())
+    except ValueError:
+        return default
+
+
+def _units_page(project: Project, *, status: int = 200, error: str | None = None, form=None):
+    q = (request.args.get("q") or "").strip()[:60]
+    units = units_svc.search(q, project) if q else units_svc.list_units(project)
+    return (
+        render_template(
+            "qualidade/unidades.html",
+            project=project,
+            units=units,
+            total=units_svc.count_units(project),
+            q=q,
+            labels=units_svc.STATUS_LABELS,
+            can_manage=g.membership.has_role(ROLE_SUPERVISOR),
+            error=error,
+            form=form or {},
+        ),
+        status,
+    )
+
+
+@bp.get("/projetos/<uuid:project_id>/unidades")
+@tenant_required(ROLE_OPERATOR)
+def units(project_id):
+    return _units_page(get_or_404(Project, project_id))
+
+
+@bp.post("/projetos/<uuid:project_id>/unidades/gerar")
+@tenant_required(ROLE_SUPERVISOR)
+def units_generate(project_id):
+    project = get_or_404(Project, project_id)
+    try:
+        created = units_svc.generate(
+            project,
+            request.form.get("prefix"),
+            _int_form("start", -1),
+            _int_form("count", 0),
+            _int_form("width", 0),
+            current_user.id,
+        )
+    except units_svc.UnitError as exc:
+        db.session.rollback()
+        return _units_page(project, status=400, error=str(exc), form=request.form)
+    db.session.commit()
+    flash(f"{len(created)} números de série cadastrados.", "sucesso")
+    return redirect(url_for("qualidade.units", project_id=project.id), 303)
+
+
+@bp.post("/projetos/<uuid:project_id>/unidades/importar")
+@tenant_required(ROLE_SUPERVISOR)
+def units_import(project_id):
+    project = get_or_404(Project, project_id)
+    try:
+        created = units_svc.import_list(project, request.form.get("serials"), current_user.id)
+    except units_svc.UnitError as exc:
+        db.session.rollback()
+        return _units_page(project, status=400, error=str(exc), form=request.form)
+    db.session.commit()
+    flash(f"{len(created)} números de série cadastrados.", "sucesso")
+    return redirect(url_for("qualidade.units", project_id=project.id), 303)
+
+
+@bp.get("/unidades")
+@tenant_required(ROLE_OPERATOR)
+def units_search():
+    """Busca por número de série em todos os projetos ativos da empresa da sessão."""
+    q = (request.args.get("q") or "").strip()[:60]
+    return render_template(
+        "qualidade/unidades_busca.html", q=q, units=units_svc.search(q), labels=units_svc.STATUS_LABELS
+    )
+
+
+def _unit_page(unit: Unit, *, status: int = 200, error: str | None = None):
+    project = unit.project
+    hist = units_svc.history(unit)
+    activities = [
+        (stage, activity)
+        for stage in projects_svc.active_stages(project)
+        for activity in projects_svc.active_activities(stage)
+    ]
+    return (
+        render_template(
+            "qualidade/unidade.html",
+            unit=unit,
+            project=project,
+            h=hist,
+            labels=units_svc.STATUS_LABELS,
+            action_labels=audit.ACTION_LABELS,
+            results=checklists_svc.RESULT_LABELS,
+            activities=activities,
+            can_manage=g.membership.has_role(ROLE_SUPERVISOR),
+            error=error,
+        ),
+        status,
+    )
+
+
+@bp.get("/unidades/<uuid:unit_id>")
+@tenant_required(ROLE_OPERATOR)
+def unit_detail(unit_id):
+    """Histórico completo da unidade (lançamentos, inspeções, mudanças de status)."""
+    return _unit_page(get_or_404(Unit, unit_id, include_archived=True))
+
+
+@bp.post("/unidades/<uuid:unit_id>/status")
+@tenant_required(ROLE_SUPERVISOR)
+def unit_status(unit_id):
+    unit = get_or_404(Unit, unit_id)
+    try:
+        units_svc.set_status(unit, request.form.get("status", ""), current_user.id, _int_form("version"))
+    except units_svc.UnitConflict as exc:
+        db.session.rollback()
+        return _unit_page(get_or_404(Unit, unit_id), status=409, error=str(exc))
+    except units_svc.UnitError as exc:
+        db.session.rollback()
+        return _unit_page(get_or_404(Unit, unit_id), status=400, error=str(exc))
+    db.session.commit()
+    flash("Status da unidade atualizado.", "sucesso")
+    return redirect(url_for("qualidade.unit_detail", unit_id=unit.id), 303)
+
+
+@bp.post("/unidades/<uuid:unit_id>/registrar")
+@tenant_required(ROLE_OPERATOR)
+def unit_register(unit_id):
+    """+1 peça na atividade escolhida, ligada a esta unidade. Atividade de outro projeto/empresa → 404."""
+    unit = get_or_404(Unit, unit_id)
+    activity = get_or_404(Activity, request.form.get("activity_id", ""))
+    if activity.stage.project_id != unit.project_id:
+        abort(404)
+    try:
+        units_svc.register_for_unit(unit, activity, current_user.id, _int_form("version"))
+    except projects_svc.ConflictError as exc:
+        db.session.rollback()
+        return _unit_page(get_or_404(Unit, unit_id), status=409, error=str(exc))
+    except (units_svc.UnitError, projects_svc.ProgressError) as exc:
+        db.session.rollback()
+        return _unit_page(get_or_404(Unit, unit_id), status=400, error=str(exc))
+    db.session.commit()
+    flash(f"+1 em {activity.name} · unidade {unit.serial}.", "sucesso")
+    return redirect(url_for("qualidade.unit_detail", unit_id=unit.id), 303)
