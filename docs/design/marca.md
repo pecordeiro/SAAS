@@ -1,5 +1,13 @@
 # Marca — 3 direções e a recomendada
 
+> **Identidade vigente (2026-10-15): “Prumo Noturno”** — claro e arejado, azul ação `#2759F0`,
+> cards brancos de cantos grandes sobre fundo névoa, fonte única Geist (OFL), símbolo em forma de
+> medidor segmentado. Substitui a direção A abaixo (petróleo + amarelo + Barlow/IBM Plex); as três
+> direções originais ficam como histórico. O **nome comercial ainda não foi decidido**: o wordmark é
+> texto em HTML, então trocar o nome não exige novo arquivo de imagem (ver ADR-0013).
+> Valores em `tokens.css`; contraste em `contraste.md`.
+
+
 Status: proposta para aprovação (Fase 1, decisão D1 do `prd.md`) · Atualizado: 2026-10-13
 
 Produzido sem o Claude Design (ver ADR-0008). **Você pode trocar a direção ou o nome a

@@ -1,5 +1,5 @@
 /* =========================================================================
-   Controle de Produção — tokens do design system (direção "Prumo")
+   Controle de Produção — tokens do design system (direção "Prumo", identidade clara e arejada (2026-10))
    Fonte da verdade: docs/design/tokens.css  →  copiado para
    app/static/css/tokens.css na Fase 2. NÃO renomeie variáveis: templates,
    macros e o teste de "nenhuma cor solta" dependem destes nomes.
@@ -21,45 +21,44 @@
   color-scheme: light;
 
   /* ---------- Cores: tema claro (padrão) ---------- */
-  --color-bg: #F3F5F6;              /* fundo da página */
+  --color-bg: #EEF1F5;              /* fundo da página (névoa) */
   --color-surface: #FFFFFF;         /* cards, tabelas, modais */
-  --color-surface-2: #E9EDF0;       /* cabeçalho de tabela, zebra, trilhos, hover de linha */
-  --color-text: #151A1F;            /* texto principal (grafite) */
-  --color-text-muted: #4D5964;      /* texto secundário, legendas, rótulos */
-  --color-border: #727F8A;          /* borda de componente (campo, botão secundário) ≥ 3:1 */
-  --color-border-subtle: #D5DBE0;   /* divisória decorativa (não identifica componente) */
+  --color-surface-2: #E6EAF0;       /* cabeçalho de tabela, zebra, trilhos, hover de linha */
+  --color-text: #11161F;            /* texto principal */
+  --color-text-muted: #4A5462;      /* texto secundário, legendas, rótulos */
+  --color-border: #7B8795;          /* borda de componente (campo, botão secundário) ≥ 3:1 */
+  --color-border-subtle: #E4E8EE;   /* divisória decorativa (não identifica componente) */
 
-  --color-primary: #0B5D72;         /* azul petróleo: ação principal, links, progresso */
-  --color-primary-hover: #084A5B;
+  --color-primary: #2759F0;         /* azul ação: botão principal, links, progresso */
+  --color-primary-hover: #1A43C4;
   --color-primary-contrast: #FFFFFF;/* texto/ícone sobre --color-primary */
-  --color-primary-subtle: #E1EFF3;  /* item de menu ativo, destaque leve */
+  --color-primary-subtle: #EAF0FE;  /* item de menu ativo, destaque leve */
 
-  --color-accent: #F2B705;          /* amarelo sinalização: marca e destaques gráficos.
-                                       Nunca como texto sobre fundo claro. */
-  --color-accent-contrast: #151A1F; /* texto sobre --color-accent */
+  --color-accent: #D9731A;          /* laranja: segunda série dos gráficos. Nunca como texto. */
+  --color-accent-contrast: #11161F; /* texto sobre --color-accent */
 
-  --color-success: #1D7238;
-  --color-success-subtle: #E2F1E6;
+  --color-success: #0E6B3C;
+  --color-success-subtle: #E3F4EA;
   --color-warning: #8F5300;
-  --color-warning-subtle: #FBEFD9;
+  --color-warning-subtle: #FDF1DC;
   --color-danger: #B3261E;
   --color-danger-hover: #8F1E18;
   --color-danger-contrast: #FFFFFF;
-  --color-danger-subtle: #FBE6E4;
-  --color-neutral: #55616C;
-  --color-neutral-subtle: #E9EDF0;
+  --color-danger-subtle: #FCE8E6;
+  --color-neutral: #4A5462;
+  --color-neutral-subtle: #E6EAF0;
 
-  --color-focus: #1B5FD1;           /* anel de foco (azul, distinto do primário) */
-  --color-inverse-surface: #151A1F; /* toast */
-  --color-inverse-text: #F3F5F6;
-  --color-track: #D5DBE0;           /* trilho da barra de progresso / gráfico */
-  --color-overlay: rgb(21 26 31 / 0.55); /* fundo atrás do modal */
+  --color-focus: #2759F0;           /* anel de foco; o vão de 2 px na cor do fundo o separa do botão azul */
+  --color-inverse-surface: #11161F; /* toast */
+  --color-inverse-text: #EEF1F5;
+  --color-track: #DDE3EB;           /* trilho da barra de progresso / gráfico */
+  --color-overlay: rgb(17 22 31 / 0.5); /* fundo atrás do modal */
 
   /* ---------- Tipografia ---------- */
   /* Fontes servidas pelo próprio site (woff2 em app/static/fonts/, licença OFL). */
-  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  --font-display: "Barlow Semi Condensed", "IBM Plex Sans", system-ui, "Arial Narrow", Arial, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --font-sans: "Geist", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: "Geist", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
 
   /* Escala de 6 tamanhos (rem; 1rem = 16px) */
   --font-size-sm: 0.875rem;   /* 14px — legendas, metadados, cabeçalho de tabela */
@@ -68,6 +67,7 @@
   --font-size-xl: 1.5rem;     /* 24px — título de página no celular */
   --font-size-2xl: 2rem;      /* 32px — título de página desktop, número de indicador no celular */
   --font-size-3xl: 3rem;      /* 48px — número de indicador desktop, valor do stepper */
+  --font-size-4xl: 4.5rem;    /* 72px — título da página inicial no desktop */
 
   --font-weight-regular: 400;
   --font-weight-medium: 500;
@@ -79,6 +79,7 @@
   --line-height-normal: 1.5;  /* texto corrido, tabelas */
 
   --letter-spacing-caps: 0.04em; /* rótulos em caixa alta (indicadores, cabeçalho de tabela) */
+  --letter-spacing-tight: -0.03em; /* títulos e números grandes */
 
   /* Dados numéricos: aplicar em tabelas, indicadores, stepper, datas */
   --font-numeric: tabular-nums;  /* uso: font-variant-numeric: var(--font-numeric); */
@@ -98,19 +99,21 @@
   --space-12: 3rem;    /* 48px */
 
   /* ---------- Raios ---------- */
-  --radius-sm: 4px;     /* selos, campos pequenos */
-  --radius-md: 6px;     /* botões, campos */
-  --radius-lg: 10px;    /* cards, modais */
-  --radius-pill: 999px; /* barra de progresso */
+  --radius-sm: 8px;     /* selos, campos pequenos */
+  --radius-md: 12px;    /* botões, campos */
+  --radius-lg: 20px;    /* cards, modais */
+  --radius-pill: 999px; /* barra de progresso, selos */
 
   /* ---------- Bordas ---------- */
   --border-width: 1px;
   --border-width-strong: 2px; /* campo com erro, card selecionado */
 
   /* ---------- Sombras ---------- */
-  --shadow-1: 0 1px 2px rgb(21 26 31 / 0.08);                                    /* card */
-  --shadow-2: 0 2px 4px rgb(21 26 31 / 0.08), 0 4px 12px rgb(21 26 31 / 0.08);   /* menu, toast */
-  --shadow-3: 0 8px 24px rgb(21 26 31 / 0.18), 0 2px 6px rgb(21 26 31 / 0.10);   /* modal, folha inferior */
+  --shadow-1: 0 1px 2px rgb(17 22 31 / 0.05);                                    /* card */
+  --shadow-2: 0 2px 4px rgb(17 22 31 / 0.05), 0 8px 24px -8px rgb(17 22 31 / 0.18);  /* menu, toast */
+  --shadow-3: 0 24px 48px -16px rgb(17 22 31 / 0.32), 0 2px 6px rgb(17 22 31 / 0.08); /* modal, folha inferior */
+
+  --shadow-primary: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 6px 16px -6px rgb(39 89 240 / 0.6); /* botão principal */
 
   /* ---------- Foco visível ---------- */
   --focus-width: 3px;
@@ -153,74 +156,76 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --color-bg: #0E1215;
-    --color-surface: #161B20;
-    --color-surface-2: #1F262C;
-    --color-text: #E7EBEE;
-    --color-text-muted: #A2ADB7;
-    --color-border: #6F7C87;
-    --color-border-subtle: #2C353D;
-    --color-primary: #5BBBD1;
-    --color-primary-hover: #82CDDF;
-    --color-primary-contrast: #0E1215;
-    --color-primary-subtle: #12333C;
-    --color-accent: #F5C030;
-    --color-accent-contrast: #0E1215;
+    --color-bg: #0B0F14;
+    --color-surface: #141A21;
+    --color-surface-2: #1D252E;
+    --color-text: #EDF1F5;
+    --color-text-muted: #A3AEBA;
+    --color-border: #6E7B88;
+    --color-border-subtle: #27313B;
+    --color-primary: #8AA6FF;
+    --color-primary-hover: #ADC0FF;
+    --color-primary-contrast: #0B0F14;
+    --color-primary-subtle: #18265A;
+    --color-accent: #F29A4A;
+    --color-accent-contrast: #0B0F14;
     --color-success: #5CC985;
-    --color-success-subtle: #16301F;
+    --color-success-subtle: #15301F;
     --color-warning: #F2B755;
     --color-warning-subtle: #33260F;
     --color-danger: #FF8A7F;
     --color-danger-hover: #FFA59C;
-    --color-danger-contrast: #0E1215;
+    --color-danger-contrast: #0B0F14;
     --color-danger-subtle: #3A1A18;
-    --color-neutral: #A2ADB7;
+    --color-neutral: #A3AEBA;
     --color-neutral-subtle: #252D34;
-    --color-focus: #7DB0FF;
-    --color-inverse-surface: #E7EBEE;
-    --color-inverse-text: #0E1215;
-    --color-track: #2C353D;
+    --color-focus: #8AA6FF;
+    --color-inverse-surface: #EDF1F5;
+    --color-inverse-text: #0B0F14;
+    --color-track: #27313B;
     --color-overlay: rgb(0 0 0 / 0.65);
     --shadow-1: 0 1px 2px rgb(0 0 0 / 0.40);
     --shadow-2: 0 2px 4px rgb(0 0 0 / 0.40), 0 4px 12px rgb(0 0 0 / 0.35);
     --shadow-3: 0 8px 24px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.40);
+    --shadow-primary: inset 0 1px 0 rgb(255 255 255 / 0.30), 0 6px 16px -6px rgb(138 166 255 / 0.45);
   }
 }
 
 /* ---------- Tema escuro fixado pelo usuário ---------- */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-bg: #0E1215;
-  --color-surface: #161B20;
-  --color-surface-2: #1F262C;
-  --color-text: #E7EBEE;
-  --color-text-muted: #A2ADB7;
-  --color-border: #6F7C87;
-  --color-border-subtle: #2C353D;
-  --color-primary: #5BBBD1;
-  --color-primary-hover: #82CDDF;
-  --color-primary-contrast: #0E1215;
-  --color-primary-subtle: #12333C;
-  --color-accent: #F5C030;
-  --color-accent-contrast: #0E1215;
+  --color-bg: #0B0F14;
+  --color-surface: #141A21;
+  --color-surface-2: #1D252E;
+  --color-text: #EDF1F5;
+  --color-text-muted: #A3AEBA;
+  --color-border: #6E7B88;
+  --color-border-subtle: #27313B;
+  --color-primary: #8AA6FF;
+  --color-primary-hover: #ADC0FF;
+  --color-primary-contrast: #0B0F14;
+  --color-primary-subtle: #18265A;
+  --color-accent: #F29A4A;
+  --color-accent-contrast: #0B0F14;
   --color-success: #5CC985;
-  --color-success-subtle: #16301F;
+  --color-success-subtle: #15301F;
   --color-warning: #F2B755;
   --color-warning-subtle: #33260F;
   --color-danger: #FF8A7F;
   --color-danger-hover: #FFA59C;
-  --color-danger-contrast: #0E1215;
+  --color-danger-contrast: #0B0F14;
   --color-danger-subtle: #3A1A18;
-  --color-neutral: #A2ADB7;
+  --color-neutral: #A3AEBA;
   --color-neutral-subtle: #252D34;
-  --color-focus: #7DB0FF;
-  --color-inverse-surface: #E7EBEE;
-  --color-inverse-text: #0E1215;
-  --color-track: #2C353D;
+  --color-focus: #8AA6FF;
+  --color-inverse-surface: #EDF1F5;
+  --color-inverse-text: #0B0F14;
+  --color-track: #27313B;
   --color-overlay: rgb(0 0 0 / 0.65);
   --shadow-1: 0 1px 2px rgb(0 0 0 / 0.40);
   --shadow-2: 0 2px 4px rgb(0 0 0 / 0.40), 0 4px 12px rgb(0 0 0 / 0.35);
   --shadow-3: 0 8px 24px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.40);
+  --shadow-primary: inset 0 1px 0 rgb(255 255 255 / 0.30), 0 6px 16px -6px rgb(138 166 255 / 0.45);
 }
 
 /* ---------- Movimento reduzido ---------- */

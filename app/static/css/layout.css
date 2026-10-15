@@ -238,14 +238,6 @@
     background: var(--color-primary-subtle);
     color: var(--color-primary);
   }
-  .sidebar__item[aria-current="page"]::before {
-    content: "";
-    position: absolute;
-    inset: var(--space-2) auto var(--space-2) calc(-1 * var(--space-3));
-    width: calc(3 * var(--border-width));
-    background: var(--color-primary);
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  }
   .sidebar__footer {
     margin-top: auto;
     padding: var(--space-4) var(--space-3) 0;
@@ -301,8 +293,6 @@
     font-family: var(--font-sans);
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-semibold);
-    letter-spacing: var(--letter-spacing-caps);
-    text-transform: uppercase;
     color: var(--color-text-muted);
   }
 

@@ -33,9 +33,9 @@
     transition: background-color var(--duration-fast) var(--easing-standard),
       transform var(--duration-fast) var(--easing-standard);
   }
-  .btn:active { transform: translateY(var(--border-width)); }
+  .btn:active { transform: scale(0.98); }
 
-  .btn--primary { background: var(--color-primary); color: var(--color-primary-contrast); }
+  .btn--primary { background: var(--color-primary); color: var(--color-primary-contrast); box-shadow: var(--shadow-primary); }
   .btn--primary:hover,
   .btn--primary:active { background: var(--color-primary-hover); color: var(--color-primary-contrast); }
 
@@ -106,6 +106,7 @@
   }
   textarea.field__input { min-height: calc(3 * var(--control-height)); resize: vertical; }
   .field__input:hover { border-color: var(--color-text-muted); }
+  .field__input:focus-visible { border-color: var(--color-primary); box-shadow: 0 0 0 calc(4 * var(--border-width)) var(--color-primary-subtle); outline-offset: 0; }
   .field__input:disabled,
   .field__input[readonly] {
     background: var(--color-surface-2);
@@ -281,8 +282,6 @@
     background: var(--color-surface-2);
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-semibold);
-    letter-spacing: var(--letter-spacing-caps);
-    text-transform: uppercase;
     color: var(--color-text-muted);
     white-space: nowrap;
   }
@@ -371,8 +370,6 @@
   .kpi__label {
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-semibold);
-    letter-spacing: var(--letter-spacing-caps);
-    text-transform: uppercase;
     color: var(--color-text-muted);
   }
   .kpi__value {
