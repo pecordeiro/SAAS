@@ -299,6 +299,11 @@ def contagem_status(etapas: Iterable[ResultadoEtapa]) -> dict[str, int]:
     return contagem
 
 
+def etapas_sem_tempo(etapas: Iterable[ResultadoEtapa]) -> int:
+    """Etapas ainda sem tempo definido (resumo final B385: COUNTIF(tempo por robô, 0))."""
+    return sum(1 for e in etapas if not e.tempo_unidade_min)
+
+
 # ---------------------------------------------------------------------------
 # Resumos
 # ---------------------------------------------------------------------------

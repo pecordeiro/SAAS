@@ -454,6 +454,8 @@ def test_paridade_dashboard_com_planilha_de_referencia():
         assert contagem[nome] == status_excel.count(nome), nome
     assert contagem[calc.STATUS_CONCLUIDA] == ws["B378"].value and sum(contagem.values()) == ws["C378"].value
 
+    assert calc.etapas_sem_tempo(r.etapas) == ws["B385"].value  # etapas sem tempo definido (treemap)
+
     # --- KPIs (resumo final 377–384)
     assert r.unidades_concluidas == ws["B377"].value and r.previstas == ws["C377"].value
     assert calc.razao(r.unidades_concluidas, r.previstas) == pytest.approx(ws["D377"].value, abs=TOL)
