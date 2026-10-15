@@ -23,12 +23,19 @@ Fase 7. **Rascunho técnico — precisa de revisão jurídica antes do go-live (
 | Dados de cobrança (nome/CPF/CNPJ do responsável, e-mail) | responsável pela assinatura | Asaas (não guardamos cartão); `payments`/`subscriptions` só ids e valores | cobrar | execução de contrato (V); obrigação legal fiscal (II) |
 | Cookies | visitantes e usuários | navegador | sessão, “dispositivo confiável”, tema | estritamente necessários (sem consentimento); tema é preferência |
 
+| Fotos de evidência (Etapa G) | pode aparecer pessoa/rosto na foto; quem enviou | armazenamento S3/R2 (objeto) + `activity_photos` (metadados) | prova de montagem / não conformidade | execução de contrato (V) com a empresa; a empresa é controladora |
+| Comentários e respostas de inspeção (Etapa G) | autor (usuário); texto livre pode citar pessoas | `activity_comments`, `inspection_answers` | qualidade e rastreabilidade | execução de contrato (V) |
+
+Fotos: GPS, modelo da câmera e demais metadados EXIF são removidos no envio (reencode); a
+interface avisa para não fotografar pessoas sem necessidade.
+
 Não coletamos dados sensíveis (art. 5º, II) nem de crianças. Não há rastreamento de
 marketing nem cookies de terceiros.
 
 ## Operadores (suboperadores)
 | Operador | O que recebe | Onde | Transferência internacional |
 |---|---|---|---|
+| Cloudflare R2 ou AWS S3 (fotos de evidência, Etapa G — só se `STORAGE_BACKEND=s3`) | arquivos de foto (sem metadados EXIF) | região a escolher (R2: jurisdição configurável) | provável — art. 33, II; DPA do provedor |
 | Render (hospedagem app + PostgreSQL + Redis) | todos os dados | EUA (região a confirmar; avaliar região mais próxima) | sim — art. 33, II (cláusulas contratuais/DPA do provedor) e informar na política |
 | Resend (e-mail transacional) | e-mail, nome, conteúdo do e-mail | EUA | sim — idem |
 | Asaas (pagamentos) | dados de cobrança | Brasil | não |
@@ -55,6 +62,11 @@ marketing nem cookies de terceiros.
   segredos (hashes, segredo TOTP). Usuário individual: perfil mostra os próprios dados;
   pedidos fora disso pelo e-mail do encarregado (prazo: 15 dias).
 - **Correção**: perfil (nome, e-mail com reconfirmação).
+- **Fotos (Etapa G)**: a exportação traz `activity_photos.csv` com os METADADOS (atividade,
+  data, quem enviou, tamanho, SHA-256); os arquivos não vão no ZIP (gerado em memória) — o
+  titular abre cada foto na tela ou pede a cópia ao encarregado. Apagar uma foto (supervisor+)
+  remove o arquivo do armazenamento antes da linha. O expurgo da empresa apaga todos os
+  arquivos antes das linhas; se o armazenamento falhar, o expurgo é desfeito e roda de novo.
 - **Eliminação**: empresa — *Excluir a empresa* (senha + nome), carência de 30 dias,
   cancelável, aviso por e-mail a todos os proprietários; depois `flask lgpd-purge` apaga
   todas as linhas com o `company_id`, os usuários sem vínculo com outra empresa (com tokens,

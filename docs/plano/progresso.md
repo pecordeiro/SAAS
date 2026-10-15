@@ -940,3 +940,91 @@ critérios de pronto da anterior estiverem marcados.
   - Eventos esgotados não são apagados pela retenção (só os publicados): acompanhar com
     `flask worker status`.
 
+
+## Etapa G — qualidade (fotos e comentários, checklist de inspeção, número de série)
+- Status: concluída em SQLite (pendências abaixo) · 2026-10-15 · branch `claude/etapa-g-qualidade`
+- ADR: **0011 (proposto, confirmar)** — armazenamento S3 compatível com SigV4 próprio (sem boto3),
+  fotos só por rota autenticada, checklist só sinaliza, unidades como rastreabilidade.
+- Entregas:
+  - [x] **Bloco 1 — fotos e comentários por atividade** (`/app/atividades/<id>/evidencias`):
+    `app/services/storage.py` (interface; `local` em `instance/uploads` só dev/test — produção
+    recusa no boot; `s3` para R2/AWS/MinIO com SigV4 conferido pelo vetor da AWS; `none` = fotos
+    desligadas, padrão em produção sem `STORAGE_*`). `app/services/photos.py`: magic bytes
+    (JPEG/PNG/WebP), dimensões ≤ 40 MP antes de decodificar, decodificação com Pillow, reencode
+    para JPEG sem EXIF/GPS/ICC + miniatura, ≤ 5 MB (teto de corpo só nesta rota via
+    `InMemoryUploadRequest.max_content_length`), 20 por atividade, 5000 por empresa, rate limit;
+    chave `<company_id>/fotos/<uuid>.jpg`; objeto antes da linha (falha → objeto apagado);
+    SHA-256 conferido na leitura. `/app/fotos/<uuid>` (`?tamanho=mini`): `Content-Type` fixo,
+    `nosniff`, `Cache-Control: private`, CSP `sandbox`. Comentários 1..1000 (operador+);
+    supervisor+ apaga foto/comentário com auditoria sem o conteúdo. Link “Fotos e comentários”
+    por etapa no detalhe. Migration `b6e1f4a2c9d3`.
+  - [x] **Bloco 2 — checklist de inspeção**: itens no modelo (`template_checklist_items`, entram
+    na assinatura da versão — mudar o checklist cria versão nova) e “exigir checklist” por etapa
+    do modelo; copiados ao projeto (`stage_checklist_items`) na criação, ao duplicar e ao aplicar
+    versão (itens novos entram, nenhum é apagado). Supervisor+ inclui/arquiva itens e liga a
+    exigência na tela da etapa (`/app/etapas/<id>/checklist`). Inspeção (`stage_inspections`):
+    rascunho (operador+, UPDATE condicional por `version` → 409) → assinada (usuário da sessão +
+    hora do servidor; todo item ativo respondido; “não conforme” exige observação). Depois:
+    respostas com `locked_at` e guarda ORM; correção = nova linha `supersedes_id` (UNIQUE) +
+    motivo, só supervisor+, a antiga fica e aparece no histórico do item. Selo “Checklist
+    pendente/assinado” no resumo da etapa — **só sinal**, registro de peças livre (teste).
+    Migration `c8f2a5d1e7b4`.
+  - [x] **Bloco 3 — unidades**: `units` (série única por empresa+projeto, normalizada em
+    maiúsculas, status em produção/concluída/expedida/refugada com `version`), supervisor+ gera
+    faixa (prefixo + início + dígitos) ou cola lista; limite = `quantity` do projeto (e a
+    quantidade não pode descer abaixo das unidades). `progress_entries.unit_id` e
+    `stage_inspections.unit_id` opcionais. “Registrar nesta unidade” = +1 pela regra normal
+    (`register_progress`), uma vez por atividade+unidade (desfazer libera; o compensatório leva
+    a unidade). `/app/projetos/<id>/unidades` (lista, busca, cadastro), `/app/unidades/<id>`
+    (histórico: lançamentos, inspeções, mudanças de status), `/app/unidades?q=` (busca na
+    empresa, `LIKE` com escape) e item “Unidades” no menu. `calc.py` intocado; teste prova que
+    cadastrar unidades não muda o resumo. Migration `d9a3b6e2f8c5`.
+  - [x] LGPD: expurgo apaga os objetos de foto antes das linhas (falha do armazenamento desfaz o
+    expurgo; `objects_deleted` no resultado, no CLI e em `platform_audit_logs`); exportação lista
+    os metadados das fotos e explica no LEIA-ME que os arquivos não vão no ZIP.
+  - [x] Docs: ADR-0011, `seguranca.md` (fotos, checklist, unidades), `lgpd.md` (inventário,
+    operador R2/S3, exportação/expurgo de fotos), README, `.env.example` (`STORAGE_*`, limites).
+    Dependência nova: `Pillow==12.3.0`.
+- Critérios de pronto:
+  - [x] Testes novos verdes: `test_etapa_g_evidencias.py` (32, inclui não-imagem com `.jpg`,
+    GIF, SVG, PDF, magic de JPEG falso, polyglot JPEG+HTML+ZIP, > 5 MB nos dois tetos, PNG com
+    3,6 bilhões de pixels declarados, objeto adulterado), `test_etapa_g_storage.py` (22),
+    `test_etapa_g_checklist.py` (10), `test_etapa_g_unidades.py` (10)
+  - [x] Teste A/B para CADA rota nova (`ROUTES_ETAPA_G`, `ROUTES_ETAPA_G_CHECKLIST`,
+    `ROUTES_ETAPA_G_UNIDADES` em `tests/test_isolation.py`, com ids da própria empresa e da outra
+    no corpo; objeto no armazenamento de B conferido intacto; casos extras: item de B na
+    inspeção de A, unidade de B na inspeção de A, atividade de B na unidade de A, busca)
+  - [x] RLS: 7 tabelas novas em `RLS_TABLES` com política `tenant_isolation` nas migrations;
+    `test_schema` verde; `flask db heads` = `d9a3b6e2f8c5`; upgrade → downgrade → upgrade +
+    `flask db check` sem drift em SQLite para cada migration
+  - [x] Tokens CSS (só `var(--…)`, `test_visual` verde), CSP sem inline, manifesto de assets
+    reconstruído
+  - [ ] Suíte e migrations em PostgreSQL 16 (não rodadas: banco local é de outro processo)
+  - [ ] Telas conferidas em 375/768/1280 claro/escuro (sem navegador nesta sessão)
+  - [x] Revisão de segurança do diff (manual, tabela em `seguranca.md`)
+- Testes: SQLite `763 passed, 66 skipped, 3 xfailed` (~8 min; antes da etapa: 646 passed).
+- Decisões a confirmar com o usuário (ADR-0011):
+  - S3 compatível com SigV4 próprio (sem boto3); R2 recomendado; produção sem `STORAGE_*` sobe
+    com fotos desligadas.
+  - Tudo reencodado para JPEG (PNG/WebP com transparência ganham fundo branco); lado máximo
+    2560 px; miniatura 480 px.
+  - Limites 5 MB, 20 fotos/atividade, 5000/empresa por configuração — não ligados ao plano.
+  - Exportação LGPD só com metadados das fotos (arquivos fora do ZIP).
+  - Apagar comentário/foto = remoção de verdade + auditoria sem o conteúdo (não “soft delete”).
+  - Checklist: operador+ assina; correção só supervisor+; “exigir” só sinaliza.
+  - Unidade: série em maiúsculas; registrar na unidade é sempre +1 e uma vez por
+    atividade+unidade; menu “Unidades” para todos os papéis.
+- Pendências / verificar no PostgreSQL:
+  - `TEST_DATABASE_URL` com a suíte inteira; `tests/test_migrations.py` (roundtrip das 3
+    migrations, ADD COLUMN em `stages`/`template_stages`, batch de `progress_entries` e
+    `stage_inspections` com a FK nova); `tests/test_rls.py` (as 7 tabelas novas entram no
+    parametrize de `RLS_TABLES`: consulta crua sem contexto = 0 linhas); expurgo LGPD com RLS
+    forçado apagando fotos; o ramo da migration que liga ENABLE/FORCE quando o RLS já está ativo;
+    `length(body)`/`length(serial)` nos CHECK; busca `LIKE ... ESCAPE '\'` no PG.
+  - Homologar R2 de verdade (PUT/GET/DELETE com a chave restrita; `addressing=path`,
+    região `auto`) — a rede deste ambiente não foi usada.
+  - Conferência visual: evidências, checklist, inspeção, unidades, unidade, busca, selos no
+    detalhe e campo de checklist no editor de modelo.
+  - Sem varredura de objetos órfãos no bucket (falha ao apagar depois do commit só loga
+    `photos.orphan_object`); sem cópia dos arquivos de foto na exportação LGPD.
+  - API v1 não expõe fotos/checklist/unidades.

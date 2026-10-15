@@ -48,6 +48,14 @@ reconciliação do Asaas e limpeza de tokens. Etapa “aguardando peça” (supe
 com selo na lista, no detalhe e no painel. Preferências de e-mail em `/conta/perfil`.
 Migrations `e2b7f1c3a9d0`, `f3c8a2d4b1e5`, `a5d9e3f7c2b8`. Runbook:
 [`docs/plano/worker.md`](docs/plano/worker.md).
+Etapa G (qualidade, ADR-0011): fotos e comentários por atividade
+(`/app/atividades/<id>/evidencias`; fotos validadas pelo conteúdo, reencodadas sem EXIF/GPS,
+servidas só por `/app/fotos/<uuid>` com login; armazenamento local em dev/test e S3/R2 em
+produção — `STORAGE_*`), checklist de inspeção por etapa (itens no modelo, assinatura =
+usuário + hora do servidor, correção registrada; “exigir checklist” só sinaliza) e número de
+série por unidade (`/app/projetos/<id>/unidades`, `/app/unidades/<id>`, busca em
+`/app/unidades`; rastreabilidade, o cálculo não muda). Migrations `b6e1f4a2c9d3`,
+`c8f2a5d1e7b4`, `d9a3b6e2f8c5`.
 Progresso por fase em [`docs/plano/progresso.md`](docs/plano/progresso.md).
 
 Variáveis da Fase 4 (opcionais): `READ_ONLY_ENFORCED` (padrão 1: sem assinatura ativa a
@@ -234,6 +242,18 @@ flask worker status              # eventos pendentes/esgotados por empresa
 Sem o worker rodando, nada de e-mail de atribuição, alertas ou relatório semanal sai (os
 eventos ficam na fila). Detalhes, retentativas e variáveis em
 [`docs/plano/worker.md`](docs/plano/worker.md).
+
+### Fotos de evidência (Etapa G)
+
+Em development/test as fotos vão para `instance/uploads/` (fora de `static`, nunca servidas
+direto). Em produção o padrão é **fotos desligadas** (`STORAGE_BACKEND` vazio = `none`); para
+ligar, crie um bucket **privado** (Cloudflare R2 recomendado; AWS S3/MinIO também servem) e uma
+chave com permissão só de Put/Get/DeleteObject nele, e defina `STORAGE_BACKEND=s3`,
+`STORAGE_S3_ENDPOINT` (https), `STORAGE_S3_BUCKET`, `STORAGE_S3_REGION` (`auto` no R2),
+`STORAGE_S3_ADDRESSING` (`path` no R2, `virtual` na AWS), `STORAGE_S3_ACCESS_KEY_ID` e
+`STORAGE_S3_SECRET_ACCESS_KEY`. `STORAGE_BACKEND=local` em produção derruba o boot. Limites:
+5 MB por foto, `PHOTOS_MAX_PER_ACTIVITY` (20), `PHOTOS_MAX_PER_COMPANY` (5000),
+`PHOTO_UPLOAD_RATE_LIMIT`. O expurgo LGPD apaga os arquivos antes das linhas.
 
 ### Produção
 

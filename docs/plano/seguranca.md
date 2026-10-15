@@ -68,6 +68,24 @@ legítimo de um cúmplice.
 | T | fórmula/CSV injection | fórmulas nunca avaliadas (`data_only`); exportação neutraliza `= + - @ TAB CR` | `services/exporter.py`; `tests/test_fase4_*`, `test_exportacao_neutraliza_formula` |
 | I | arquivo em disco | multipart lido em `BytesIO` (nada em /tmp nem pasta pública) | `security.py::InMemoryUploadRequest`; `test_upload_fica_em_memoria` |
 
+### Fotos de evidência (Etapa G, ADR-0011)
+| STRIDE | Ameaça | Mitigação | Código / teste |
+|---|---|---|---|
+| T/E | arquivo malicioso com extensão de imagem (HTML, SVG com script, PDF, polyglot) | tipo pelos magic bytes (só JPEG/PNG/WebP), decodificação completa com Pillow, reencode para JPEG novo (bytes extras e metadados somem); nome e extensão enviados ignorados | `services/photos.py::process`; `tests/test_etapa_g_evidencias.py::test_upload_malicioso_*`, `test_polyglot_*` |
+| D | bomba de descompressão / arquivo enorme | dimensões do cabeçalho ≤ `PHOTO_MAX_PIXELS` antes de decodificar, `DecompressionBombWarning` vira erro; corpo ≤ `PHOTO_MAX_REQUEST_BYTES` só nesta rota (413 antes de ler), foto ≤ 5 MB; `PHOTO_UPLOAD_RATE_LIMIT`; N por atividade e por empresa | `security.py::InMemoryUploadRequest`; `test_imagem_enorme_*`, `test_foto_acima_de_5_mb_*`, `test_outras_rotas_continuam_com_o_teto_global` |
+| I | GPS/dados da câmera vazando | reencode sem EXIF/ICC/XMP | `test_foto_valida_e_reencodada_sem_exif_gps_*` |
+| I | foto de outra empresa / link público | bucket privado, sem URL pública ou pré-assinada; só `/app/fotos/<uuid>` com `get_or_404` (404 cruzado); chave `<company_id>/fotos/<uuid>.jpg` gerada no servidor e validada por regex (sem traversal) | `services/storage.py::check_key`; `tests/test_isolation.py::test_etapa_g_*`, `tests/test_etapa_g_storage.py` |
+| T | conteúdo trocado no bucket servido como foto | SHA-256 da imagem gravada conferido na leitura; resposta com `Content-Type: image/jpeg` fixo, `nosniff`, CSP `default-src 'none'; sandbox`, `Cache-Control: private` | `test_objeto_adulterado_*` |
+| I | chave do S3 em log/erro | segredos só por env; erros do provedor sem URL assinada nem chave; `repr` sem segredo | `test_s3_*` |
+
+### Checklist e unidades (Etapa G)
+| STRIDE | Ameaça | Mitigação | Código / teste |
+|---|---|---|---|
+| S/R | assinatura forjada (outro usuário, data retroativa) | `signed_by_id`/`signed_at` vêm da sessão e do relógio do servidor; campos do formulário ignorados | `services/checklists.py::sign`; `test_fluxo_completo_assinatura_do_servidor_*` |
+| T/R | alterar resposta assinada sem rastro | `locked_at` + guarda ORM (UPDATE/DELETE recusados); correção = nova linha (`supersedes_id` UNIQUE) com motivo, só supervisor+, auditada | idem |
+| I/T | item/unidade/atividade de outra empresa no corpo | ids resolvidos com `get_or_404` e conferidos contra a etapa/projeto da URL → 404 | `test_etapa_g_checklist_item_de_b_*`, `test_etapa_g_unidades_ids_de_b_*` |
+| T | busca por série com curinga SQL | `LIKE` com escape de `%`/`_` | `test_busca_por_serie_escapa_curingas` |
+
 ### Webhooks do Asaas (Fase 8, `app/blueprints/webhooks.py`)
 | STRIDE | Ameaça | Mitigação |
 |---|---|---|
