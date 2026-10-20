@@ -5,6 +5,8 @@
   "description": "Prospecção B2B assistida da Montco: n8n + Google Sheets + Claude, com aprovação humana",
   "scripts": {
     "test": "node --test \"tests/*.test.js\"",
-    "build": "node scripts/build-workflows.js"
+    "build": "node scripts/build-workflows.js",
+    "start": "node server/index.js",
+    "demo": "AI_MODE=mock DB_PATH=:memory: node server/index.js"
   }
 }

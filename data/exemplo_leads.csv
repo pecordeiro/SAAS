@@ -1,4 +1,4 @@
-nome,cnpj,site,cidade,uf,segmento,produtos,fonte_url,fonte_aquisicao
-Alfa Automacao Ficticia Ltda,,https://www.alfa-ficticia.example,Campinas,SP,Automação industrial,Linhas de montagem sob encomenda,https://www.alfa-ficticia.example/produtos,csv_manual
-Beta Paineis Ficticios,,http://beta-paineis.example/,Sorocaba,SP,Painéis elétricos,Painéis de comando sob projeto,https://beta-paineis.example/sobre,csv_manual
-Alfa Automacao Ficticia,,alfa-ficticia.example,Campinas,SP,Automação industrial,,https://diretorio.example/alfa,diretorio_exemplo
+nome,cnpj,site,cidade,uf,segmento,produtos,fonte_url,fonte_trecho,fonte_aquisicao
+Alfa Automacao Ficticia Ltda,,https://www.alfa-ficticia.example,Campinas,SP,Automação industrial,Linhas de montagem,https://www.alfa-ficticia.example/produtos,"A Alfa Ficticia fabrica máquinas de automação sob encomenda. Cada projeto é personalizado e montado em diversas etapas na nossa fábrica.",csv_manual
+Beta Paineis Ficticios,,http://beta-paineis.example/,Sorocaba,SP,Painéis elétricos,Painéis de comando,https://beta-paineis.example/sobre,"A Beta produz painéis elétricos de comando sob projeto para linhas de produção.",csv_manual
+Alfa Automacao Ficticia,,alfa-ficticia.example,Campinas,SP,Automação industrial,,https://diretorio.example/alfa,,diretorio_exemplo
