@@ -1,0 +1,774 @@
+{
+  "name": "Montco 02 — Qualificar e gerar rascunho",
+  "nodes": [
+    {
+      "id": "n10",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "path": "montco-qualify",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "montco-montco-qualify"
+    },
+    {
+      "id": "n11",
+      "name": "Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        240,
+        300
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "resource": "sheet",
+        "operation": "getAll",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{$env.GOOGLE_SHEET_ID}}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Leads"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n12",
+      "name": "Fontes",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        300
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "resource": "sheet",
+        "operation": "getAll",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{$env.GOOGLE_SHEET_ID}}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Fontes"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n13",
+      "name": "Config",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        300
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "resource": "sheet",
+        "operation": "getAll",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{$env.GOOGLE_SHEET_ID}}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Config"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n14",
+      "name": "Supressao",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        300
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "resource": "sheet",
+        "operation": "getAll",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{$env.GOOGLE_SHEET_ID}}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Supressao"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n15",
+      "name": "Selecionar lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// CSV mínimo (RFC 4180): aspas, vírgulas e quebras de linha dentro de campos.\nfunction parseCsv(text) {\n  const rows = [];\n  let row = [], field = '', inQ = false;\n  const s = String(text || '').replace(/^﻿/, '');\n  for (let i = 0; i < s.length; i++) {\n    const c = s[i];\n    if (inQ) {\n      if (c === '\"' && s[i + 1] === '\"') { field += '\"'; i++; }\n      else if (c === '\"') inQ = false;\n      else field += c;\n    } else if (c === '\"') inQ = true;\n    else if (c === ',' || c === ';') { row.push(field); field = ''; }\n    else if (c === '\\n' || c === '\\r') {\n      if (c === '\\r' && s[i + 1] === '\\n') i++;\n      row.push(field); field = '';\n      if (row.some(v => v !== '')) rows.push(row);\n      row = [];\n    } else field += c;\n  }\n  row.push(field);\n  if (row.some(v => v !== '')) rows.push(row);\n  if (!rows.length) return [];\n  const head = rows[0].map(h => h.trim());\n  return rows.slice(1).map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || '').trim()])));\n}\n\nfunction toCsv(records, columns) {\n  const cols = columns || [...new Set(records.flatMap(r => Object.keys(r)))];\n  const esc = v => {\n    v = v == null ? '' : String(v);\n    // evita injeção de fórmulas ao abrir no Excel/Sheets\n    if (/^[=+\\-@]/.test(v)) v = \"'\" + v;\n    return /[\",\\n\\r;]/.test(v) ? '\"' + v.replace(/\"/g, '\"\"') + '\"' : v;\n  };\n  return [cols.join(','), ...records.map(r => cols.map(c => esc(r[c])).join(','))].join('\\n');\n}\n\nfunction normalizeDomain(url) {\n  if (!url) return '';\n  let h = String(url).trim().toLowerCase();\n  h = h.replace(/^[a-z]+:\\/\\//, '').replace(/^www\\./, '').split(/[\\/?#]/)[0].split(':')[0];\n  return /^[a-z0-9.-]+\\.[a-z]{2,}$/.test(h) ? h : '';\n}\n\nfunction normalizeCnpj(v) {\n  const d = String(v || '').replace(/\\D/g, '');\n  return d.length === 14 ? d : '';\n}\n\nfunction validCnpj(v) {\n  const d = normalizeCnpj(v);\n  if (!d || /^(\\d)\\1+$/.test(d)) return false;\n  const calc = len => {\n    let sum = 0, pos = len - 7;\n    for (let i = len; i >= 1; i--) { sum += d[len - i] * pos--; if (pos < 2) pos = 9; }\n    const r = sum % 11;\n    return r < 2 ? 0 : 11 - r;\n  };\n  return calc(12) === +d[12] && calc(13) === +d[13];\n}\n\nfunction normalizeName(n) {\n  return String(n || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')\n    .replace(/\\b(ltda|me|epp|eireli|s\\/?a|sa|industria|comercio|e)\\b/g, ' ')\n    .replace(/[^a-z0-9]+/g, ' ').trim();\n}\n\n// Chaves fortes: CNPJ e domínio. Chave fraca (nome+UF) só sinaliza \"possível duplicado\".\nfunction keysFor(lead) {\n  return {\n    cnpj: validCnpj(lead.cnpj) ? normalizeCnpj(lead.cnpj) : '',\n    domain: normalizeDomain(lead.site),\n    weak: normalizeName(lead.nome) && lead.uf ? normalizeName(lead.nome) + '|' + String(lead.uf).toUpperCase() : '',\n  };\n}\n\nfunction findDuplicate(candidate, existing) {\n  const k = keysFor(candidate);\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.cnpj && k.cnpj === ek.cnpj) return { lead: e, match: 'cnpj', strong: true };\n    if (k.domain && k.domain === ek.domain) return { lead: e, match: 'dominio', strong: true };\n  }\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.weak && k.weak === ek.weak) return { lead: e, match: 'nome_uf', strong: false };\n  }\n  return null;\n}\n\n// Preenche apenas campos vazios; nunca sobrescreve dado existente.\nfunction mergeLead(existing, incoming) {\n  const out = { ...existing };\n  for (const [k, v] of Object.entries(incoming)) if (!out[k] && v) out[k] = v;\n  return out;\n}\n\nconst FACTORS = {\n  A: 'Compatibilidade com fabricação/montagem',\n  B: 'Complexidade aparente dos equipamentos',\n  C: 'Indícios de produção sob encomenda',\n  D: 'Número de etapas/tipos de produto',\n  E: 'Porte e público-alvo',\n  F: 'Canal comercial apropriado',\n  G: 'Operação produtiva própria',\n};\nconst DEFAULT_WEIGHTS = { A: 25, B: 15, C: 20, D: 10, E: 10, F: 10, G: 10 };\n\n// factors: { A: { value: 0..1 | null, level: 'fato'|'inferencia'|'hipotese', evidence: [urls] } }\n// Fator desconhecido (value null) NÃO penaliza: entra com valor neutro e fica listado em \"unknown\".\nfunction computeScore(factors, weights = DEFAULT_WEIGHTS, neutral = 0.5) {\n  const total = Object.values(weights).reduce((a, b) => a + b, 0) || 1;\n  let sum = 0;\n  const breakdown = {}, unknown = [];\n  for (const k of Object.keys(weights)) {\n    const f = factors[k] || {};\n    const known = typeof f.value === 'number' && !isNaN(f.value);\n    const v = known ? Math.min(1, Math.max(0, f.value)) : neutral;\n    if (!known) unknown.push(k);\n    const pts = (v * weights[k] * 100) / total;\n    breakdown[k] = { points: Math.round(pts * 10) / 10, weight: weights[k], known, level: f.level || (known ? 'inferencia' : 'desconhecido'), evidence: f.evidence || [] };\n    sum += pts;\n  }\n  const knownWeight = Object.keys(weights).filter(k => !unknown.includes(k)).reduce((a, k) => a + weights[k], 0);\n  return { score: Math.round(sum), breakdown, unknown, confidence: Math.round((knownWeight / total) * 100) / 100 };\n}\n\nfunction norm(v) { return String(v || '').trim().toLowerCase(); }\n\nfunction isSuppressed(lead, list) {\n  const emails = new Set(), domains = new Set(), ids = new Set();\n  for (const s of list || []) {\n    if (s.email) emails.add(norm(s.email));\n    if (s.dominio) domains.add(norm(s.dominio));\n    if (s.lead_id) ids.add(s.lead_id);\n  }\n  const d = normalizeDomain(lead.site);\n  const em = norm(lead.email);\n  if (ids.has(lead.id)) return true;\n  if (d && domains.has(d)) return true;\n  if (em && (emails.has(em) || domains.has(em.split('@')[1]))) return true;\n  return false;\n}\n\nconst DEFAULT_STAGES = [\n  'identificada', 'pesquisada', 'qualificado', 'aguardando_aprovacao', 'aprovada', 'contato_realizado',\n  'resposta_recebida', 'reuniao_agendada', 'diagnostico_realizado', 'demonstracao_apresentada',\n  'proposta_enviada', 'negociacao', 'cliente', 'perdido',\n];\nconst PROMO_STAGES = ['aguardando_aprovacao', 'aprovada'];\n\n// Transição: registra data/ator e aplica regras de interrupção.\nfunction transition(lead, to, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  if (!stages.includes(to)) throw new Error('Etapa inválida: ' + to);\n  if (lead.nao_contatar && PROMO_STAGES.concat('contato_realizado').includes(to)) {\n    throw new Error('Lead marcado como não contatar: ação promocional bloqueada');\n  }\n  const at = opts.at || new Date().toISOString();\n  const entry = { de: lead.status, para: to, em: at, por: opts.by || 'usuario', motivo: opts.reason || '' };\n  const next = { ...lead, status: to, atualizado_em: at, historico: [...(lead.historico || []), entry] };\n  if (to === 'perdido' && !opts.reason) throw new Error('Informe o motivo da perda');\n  if (to === 'resposta_recebida' || to === 'perdido') next.proxima_acao = next.proxima_acao || '';\n  return next;\n}\n\nfunction markDoNotContact(lead, opts = {}) {\n  const at = opts.at || new Date().toISOString();\n  return {\n    ...lead, nao_contatar: true, proxima_acao: '', atualizado_em: at,\n    historico: [...(lead.historico || []), { de: lead.status, para: lead.status, em: at, por: opts.by || 'usuario', motivo: 'nao_contatar: ' + (opts.reason || '') }],\n  };\n}\n\nfunction suggestNextAction(lead) {\n  if (lead.nao_contatar) return 'Nenhuma (não contatar)';\n  const m = {\n    identificada: 'Pesquisar a empresa em fontes oficiais',\n    pesquisada: 'Qualificar e revisar a pontuação',\n    qualificado: 'Gerar rascunho de abordagem',\n    aguardando_aprovacao: 'Revisar, editar e aprovar o rascunho',\n    aprovada: 'Enviar manualmente e marcar como enviado',\n    contato_realizado: 'Aguardar resposta; revisar manualmente após alguns dias úteis',\n    resposta_recebida: 'Responder e propor 20 min de conversa',\n    reuniao_agendada: 'Preparar roteiro de diagnóstico',\n    diagnostico_realizado: 'Avaliar demonstração',\n    demonstracao_apresentada: 'Avaliar proposta',\n    proposta_enviada: 'Fazer acompanhamento manual',\n    negociacao: 'Definir próximos passos com o decisor',\n  };\n  return m[lead.status] || '';\n}\n\nconst DEFAULT_RULES = {\n  maxWords: 180,\n  // Afirmações de dor que exigem evidência; o rascunho não pode afirmá-las.\n  bannedClaims: [/vocês? (usa|usam|trabalha|trabalham) com planilhas?/i, /sofre[mr]?\\b/i, /atrasos? (constantes|frequentes)/i, /desperd[ií]cio/i, /falta de estoque/i, /garantimos?/i, /aumente .* em \\d+%/i, /resultados? garantidos?/i],\n  placeholders: /\\[[^\\]]+\\]|\\{\\{[^}]+\\}\\}/,\n};\n\n// cfg: { allowedLinks:[urls configuradas], nonExistingFeatures:[termos], suppression:[...] }\nfunction validateDraft(draft, lead, cfg = {}) {\n  const errors = [], warnings = [];\n  const body = String(draft.corpo || ''), subject = String(draft.assunto || '');\n  const rules = { ...DEFAULT_RULES, ...(cfg.rules || {}) };\n  if (!subject.trim()) errors.push('Assunto vazio');\n  if (!body.trim()) errors.push('Corpo vazio');\n  if (rules.placeholders.test(subject + body)) errors.push('Placeholders não preenchidos');\n  if (body.split(/\\s+/).filter(Boolean).length > rules.maxWords) warnings.push('Mensagem longa');\n  for (const re of rules.bannedClaims) if (re.test(body)) errors.push('Afirmação sem evidência: ' + re);\n  for (const t of cfg.nonExistingFeatures || []) if (t && body.toLowerCase().includes(t.toLowerCase())) errors.push('Menciona funcionalidade inexistente: ' + t);\n  const allowed = new Set((cfg.allowedLinks || []).map(u => u.replace(/\\/$/, '')));\n  for (const u of body.match(/https?:\\/\\/[^\\s)>\"]+/g) || []) {\n    if (!allowed.has(u.replace(/[.,;]$/, '').replace(/\\/$/, ''))) errors.push('Link não configurado: ' + u);\n  }\n  if (!lead.fontes || !lead.fontes.length) errors.push('Lead sem fonte registrada');\n  if (lead.email && !lead.email_fonte) errors.push('E-mail sem URL de origem');\n  if (lead.nao_contatar || isSuppressed(lead, cfg.suppression)) errors.push('Lead em lista de supressão');\n  return { ok: errors.length === 0, errors, warnings };\n}\n\n// Conversão só é exibida quando o denominador atinge minSample; senão, \"amostra insuficiente\".\nfunction computeMetrics(leads, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  const minSample = opts.minSample || 20;\n  const reached = Object.fromEntries(stages.map(s => [s, 0]));\n  const idx = s => stages.indexOf(s);\n  for (const l of leads) {\n    const visited = new Set((l.historico || []).map(h => h.para).concat(l.status));\n    // etapa atingida = visitada ou posterior à maior visitada (exceto \"perdido\")\n    const max = Math.max(-1, ...[...visited].filter(s => s !== 'perdido').map(idx));\n    stages.forEach((s, i) => { if (s !== 'perdido' && (i <= max || visited.has(s))) reached[s]++; });\n    if (visited.has('perdido')) reached['perdido']++;\n  }\n  const conversions = [];\n  const chain = stages.filter(s => s !== 'perdido');\n  for (let i = 1; i < chain.length; i++) {\n    const from = reached[chain[i - 1]], to = reached[chain[i]];\n    conversions.push({ de: chain[i - 1], para: chain[i], base: from, atingiram: to,\n      taxa: from >= minSample ? Math.round((to / from) * 1000) / 10 : null,\n      nota: from >= minSample ? 'observado' : 'amostra insuficiente (<' + minSample + ')' });\n  }\n  const count = (key, f = x => x) => {\n    const o = {};\n    for (const l of leads) { const v = f(l[key]) || 'não informado'; o[v] = (o[v] || 0) + 1; }\n    return o;\n  };\n  const lost = {};\n  for (const l of leads) if (l.status === 'perdido') { const m = l.motivo_perda || 'não informado'; lost[m] = (lost[m] || 0) + 1; }\n  return {\n    total: leads.length, porEtapa: reached, conversoes: conversions,\n    porSegmento: count('segmento'), porFonte: count('fonte_aquisicao'), motivosPerda: lost,\n    proximasAcoes: leads.filter(l => l.proxima_acao && !l.nao_contatar).map(l => ({ id: l.id, nome: l.nome, acao: l.proxima_acao, data: l.proxima_acao_data || '' })),\n    tipo: 'observado',\n  };\n}\n\nconst STAGES = DEFAULT_STAGES;\nconst bool = v => ['true', 'sim', '1', 'x'].includes(String(v || '').toLowerCase());\nconst normLead = l => ({ ...l, nao_contatar: bool(l.nao_contatar) });\nconst cfgMap = rows => Object.fromEntries(rows.filter(r => r.json && r.json.chave).map(r => [r.json.chave, String(r.json.valor || '')]));\nconst list = s => String(s || '').split(';').map(x => x.trim()).filter(Boolean);\nconst esc = s => String(s == null ? '' : s).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\nconst now = () => new Date().toISOString();\nfunction requireToken(token) {\n  const t = $env.REVIEW_UI_TOKEN;\n  if (!t) throw new Error('REVIEW_UI_TOKEN não configurado: recusando requisição');\n  if (token !== t) throw new Error('Não autorizado');\n}\nfunction hashId(s) { let h = 5381; for (const c of s) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return 'L' + h.toString(36); }\n\n\nconst inp = $('Webhook').first().json;\nrequireToken((inp.headers || {})['x-token'] || (inp.query || {}).token);\nconst id = (inp.body || {}).lead_id;\nconst lead = $('Leads').all().map(i => i.json).find(l => l.id === id);\nif (!lead) throw new Error('Lead não encontrado: ' + id);\nconst L = normLead(lead);\nif (L.nao_contatar || isSuppressed(L, $('Supressao').all().map(i => i.json))) throw new Error('Lead em supressão: nada será gerado');\nif (!normalizeDomain(L.site)) throw new Error('Lead sem site oficial válido: cadastre o site ou adicione fontes manualmente');\nreturn [{ json: { site_url: /^https?:/i.test(L.site) ? L.site : 'https://' + L.site } }];"
+      }
+    },
+    {
+      "id": "n16",
+      "name": "Buscar site oficial",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "GET",
+        "url": "={{$json.site_url}}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "n17",
+      "name": "Montar qualificação",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// CSV mínimo (RFC 4180): aspas, vírgulas e quebras de linha dentro de campos.\nfunction parseCsv(text) {\n  const rows = [];\n  let row = [], field = '', inQ = false;\n  const s = String(text || '').replace(/^﻿/, '');\n  for (let i = 0; i < s.length; i++) {\n    const c = s[i];\n    if (inQ) {\n      if (c === '\"' && s[i + 1] === '\"') { field += '\"'; i++; }\n      else if (c === '\"') inQ = false;\n      else field += c;\n    } else if (c === '\"') inQ = true;\n    else if (c === ',' || c === ';') { row.push(field); field = ''; }\n    else if (c === '\\n' || c === '\\r') {\n      if (c === '\\r' && s[i + 1] === '\\n') i++;\n      row.push(field); field = '';\n      if (row.some(v => v !== '')) rows.push(row);\n      row = [];\n    } else field += c;\n  }\n  row.push(field);\n  if (row.some(v => v !== '')) rows.push(row);\n  if (!rows.length) return [];\n  const head = rows[0].map(h => h.trim());\n  return rows.slice(1).map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || '').trim()])));\n}\n\nfunction toCsv(records, columns) {\n  const cols = columns || [...new Set(records.flatMap(r => Object.keys(r)))];\n  const esc = v => {\n    v = v == null ? '' : String(v);\n    // evita injeção de fórmulas ao abrir no Excel/Sheets\n    if (/^[=+\\-@]/.test(v)) v = \"'\" + v;\n    return /[\",\\n\\r;]/.test(v) ? '\"' + v.replace(/\"/g, '\"\"') + '\"' : v;\n  };\n  return [cols.join(','), ...records.map(r => cols.map(c => esc(r[c])).join(','))].join('\\n');\n}\n\nfunction normalizeDomain(url) {\n  if (!url) return '';\n  let h = String(url).trim().toLowerCase();\n  h = h.replace(/^[a-z]+:\\/\\//, '').replace(/^www\\./, '').split(/[\\/?#]/)[0].split(':')[0];\n  return /^[a-z0-9.-]+\\.[a-z]{2,}$/.test(h) ? h : '';\n}\n\nfunction normalizeCnpj(v) {\n  const d = String(v || '').replace(/\\D/g, '');\n  return d.length === 14 ? d : '';\n}\n\nfunction validCnpj(v) {\n  const d = normalizeCnpj(v);\n  if (!d || /^(\\d)\\1+$/.test(d)) return false;\n  const calc = len => {\n    let sum = 0, pos = len - 7;\n    for (let i = len; i >= 1; i--) { sum += d[len - i] * pos--; if (pos < 2) pos = 9; }\n    const r = sum % 11;\n    return r < 2 ? 0 : 11 - r;\n  };\n  return calc(12) === +d[12] && calc(13) === +d[13];\n}\n\nfunction normalizeName(n) {\n  return String(n || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')\n    .replace(/\\b(ltda|me|epp|eireli|s\\/?a|sa|industria|comercio|e)\\b/g, ' ')\n    .replace(/[^a-z0-9]+/g, ' ').trim();\n}\n\n// Chaves fortes: CNPJ e domínio. Chave fraca (nome+UF) só sinaliza \"possível duplicado\".\nfunction keysFor(lead) {\n  return {\n    cnpj: validCnpj(lead.cnpj) ? normalizeCnpj(lead.cnpj) : '',\n    domain: normalizeDomain(lead.site),\n    weak: normalizeName(lead.nome) && lead.uf ? normalizeName(lead.nome) + '|' + String(lead.uf).toUpperCase() : '',\n  };\n}\n\nfunction findDuplicate(candidate, existing) {\n  const k = keysFor(candidate);\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.cnpj && k.cnpj === ek.cnpj) return { lead: e, match: 'cnpj', strong: true };\n    if (k.domain && k.domain === ek.domain) return { lead: e, match: 'dominio', strong: true };\n  }\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.weak && k.weak === ek.weak) return { lead: e, match: 'nome_uf', strong: false };\n  }\n  return null;\n}\n\n// Preenche apenas campos vazios; nunca sobrescreve dado existente.\nfunction mergeLead(existing, incoming) {\n  const out = { ...existing };\n  for (const [k, v] of Object.entries(incoming)) if (!out[k] && v) out[k] = v;\n  return out;\n}\n\nconst FACTORS = {\n  A: 'Compatibilidade com fabricação/montagem',\n  B: 'Complexidade aparente dos equipamentos',\n  C: 'Indícios de produção sob encomenda',\n  D: 'Número de etapas/tipos de produto',\n  E: 'Porte e público-alvo',\n  F: 'Canal comercial apropriado',\n  G: 'Operação produtiva própria',\n};\nconst DEFAULT_WEIGHTS = { A: 25, B: 15, C: 20, D: 10, E: 10, F: 10, G: 10 };\n\n// factors: { A: { value: 0..1 | null, level: 'fato'|'inferencia'|'hipotese', evidence: [urls] } }\n// Fator desconhecido (value null) NÃO penaliza: entra com valor neutro e fica listado em \"unknown\".\nfunction computeScore(factors, weights = DEFAULT_WEIGHTS, neutral = 0.5) {\n  const total = Object.values(weights).reduce((a, b) => a + b, 0) || 1;\n  let sum = 0;\n  const breakdown = {}, unknown = [];\n  for (const k of Object.keys(weights)) {\n    const f = factors[k] || {};\n    const known = typeof f.value === 'number' && !isNaN(f.value);\n    const v = known ? Math.min(1, Math.max(0, f.value)) : neutral;\n    if (!known) unknown.push(k);\n    const pts = (v * weights[k] * 100) / total;\n    breakdown[k] = { points: Math.round(pts * 10) / 10, weight: weights[k], known, level: f.level || (known ? 'inferencia' : 'desconhecido'), evidence: f.evidence || [] };\n    sum += pts;\n  }\n  const knownWeight = Object.keys(weights).filter(k => !unknown.includes(k)).reduce((a, k) => a + weights[k], 0);\n  return { score: Math.round(sum), breakdown, unknown, confidence: Math.round((knownWeight / total) * 100) / 100 };\n}\n\nfunction norm(v) { return String(v || '').trim().toLowerCase(); }\n\nfunction isSuppressed(lead, list) {\n  const emails = new Set(), domains = new Set(), ids = new Set();\n  for (const s of list || []) {\n    if (s.email) emails.add(norm(s.email));\n    if (s.dominio) domains.add(norm(s.dominio));\n    if (s.lead_id) ids.add(s.lead_id);\n  }\n  const d = normalizeDomain(lead.site);\n  const em = norm(lead.email);\n  if (ids.has(lead.id)) return true;\n  if (d && domains.has(d)) return true;\n  if (em && (emails.has(em) || domains.has(em.split('@')[1]))) return true;\n  return false;\n}\n\nconst DEFAULT_STAGES = [\n  'identificada', 'pesquisada', 'qualificado', 'aguardando_aprovacao', 'aprovada', 'contato_realizado',\n  'resposta_recebida', 'reuniao_agendada', 'diagnostico_realizado', 'demonstracao_apresentada',\n  'proposta_enviada', 'negociacao', 'cliente', 'perdido',\n];\nconst PROMO_STAGES = ['aguardando_aprovacao', 'aprovada'];\n\n// Transição: registra data/ator e aplica regras de interrupção.\nfunction transition(lead, to, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  if (!stages.includes(to)) throw new Error('Etapa inválida: ' + to);\n  if (lead.nao_contatar && PROMO_STAGES.concat('contato_realizado').includes(to)) {\n    throw new Error('Lead marcado como não contatar: ação promocional bloqueada');\n  }\n  const at = opts.at || new Date().toISOString();\n  const entry = { de: lead.status, para: to, em: at, por: opts.by || 'usuario', motivo: opts.reason || '' };\n  const next = { ...lead, status: to, atualizado_em: at, historico: [...(lead.historico || []), entry] };\n  if (to === 'perdido' && !opts.reason) throw new Error('Informe o motivo da perda');\n  if (to === 'resposta_recebida' || to === 'perdido') next.proxima_acao = next.proxima_acao || '';\n  return next;\n}\n\nfunction markDoNotContact(lead, opts = {}) {\n  const at = opts.at || new Date().toISOString();\n  return {\n    ...lead, nao_contatar: true, proxima_acao: '', atualizado_em: at,\n    historico: [...(lead.historico || []), { de: lead.status, para: lead.status, em: at, por: opts.by || 'usuario', motivo: 'nao_contatar: ' + (opts.reason || '') }],\n  };\n}\n\nfunction suggestNextAction(lead) {\n  if (lead.nao_contatar) return 'Nenhuma (não contatar)';\n  const m = {\n    identificada: 'Pesquisar a empresa em fontes oficiais',\n    pesquisada: 'Qualificar e revisar a pontuação',\n    qualificado: 'Gerar rascunho de abordagem',\n    aguardando_aprovacao: 'Revisar, editar e aprovar o rascunho',\n    aprovada: 'Enviar manualmente e marcar como enviado',\n    contato_realizado: 'Aguardar resposta; revisar manualmente após alguns dias úteis',\n    resposta_recebida: 'Responder e propor 20 min de conversa',\n    reuniao_agendada: 'Preparar roteiro de diagnóstico',\n    diagnostico_realizado: 'Avaliar demonstração',\n    demonstracao_apresentada: 'Avaliar proposta',\n    proposta_enviada: 'Fazer acompanhamento manual',\n    negociacao: 'Definir próximos passos com o decisor',\n  };\n  return m[lead.status] || '';\n}\n\nconst DEFAULT_RULES = {\n  maxWords: 180,\n  // Afirmações de dor que exigem evidência; o rascunho não pode afirmá-las.\n  bannedClaims: [/vocês? (usa|usam|trabalha|trabalham) com planilhas?/i, /sofre[mr]?\\b/i, /atrasos? (constantes|frequentes)/i, /desperd[ií]cio/i, /falta de estoque/i, /garantimos?/i, /aumente .* em \\d+%/i, /resultados? garantidos?/i],\n  placeholders: /\\[[^\\]]+\\]|\\{\\{[^}]+\\}\\}/,\n};\n\n// cfg: { allowedLinks:[urls configuradas], nonExistingFeatures:[termos], suppression:[...] }\nfunction validateDraft(draft, lead, cfg = {}) {\n  const errors = [], warnings = [];\n  const body = String(draft.corpo || ''), subject = String(draft.assunto || '');\n  const rules = { ...DEFAULT_RULES, ...(cfg.rules || {}) };\n  if (!subject.trim()) errors.push('Assunto vazio');\n  if (!body.trim()) errors.push('Corpo vazio');\n  if (rules.placeholders.test(subject + body)) errors.push('Placeholders não preenchidos');\n  if (body.split(/\\s+/).filter(Boolean).length > rules.maxWords) warnings.push('Mensagem longa');\n  for (const re of rules.bannedClaims) if (re.test(body)) errors.push('Afirmação sem evidência: ' + re);\n  for (const t of cfg.nonExistingFeatures || []) if (t && body.toLowerCase().includes(t.toLowerCase())) errors.push('Menciona funcionalidade inexistente: ' + t);\n  const allowed = new Set((cfg.allowedLinks || []).map(u => u.replace(/\\/$/, '')));\n  for (const u of body.match(/https?:\\/\\/[^\\s)>\"]+/g) || []) {\n    if (!allowed.has(u.replace(/[.,;]$/, '').replace(/\\/$/, ''))) errors.push('Link não configurado: ' + u);\n  }\n  if (!lead.fontes || !lead.fontes.length) errors.push('Lead sem fonte registrada');\n  if (lead.email && !lead.email_fonte) errors.push('E-mail sem URL de origem');\n  if (lead.nao_contatar || isSuppressed(lead, cfg.suppression)) errors.push('Lead em lista de supressão');\n  return { ok: errors.length === 0, errors, warnings };\n}\n\n// Conversão só é exibida quando o denominador atinge minSample; senão, \"amostra insuficiente\".\nfunction computeMetrics(leads, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  const minSample = opts.minSample || 20;\n  const reached = Object.fromEntries(stages.map(s => [s, 0]));\n  const idx = s => stages.indexOf(s);\n  for (const l of leads) {\n    const visited = new Set((l.historico || []).map(h => h.para).concat(l.status));\n    // etapa atingida = visitada ou posterior à maior visitada (exceto \"perdido\")\n    const max = Math.max(-1, ...[...visited].filter(s => s !== 'perdido').map(idx));\n    stages.forEach((s, i) => { if (s !== 'perdido' && (i <= max || visited.has(s))) reached[s]++; });\n    if (visited.has('perdido')) reached['perdido']++;\n  }\n  const conversions = [];\n  const chain = stages.filter(s => s !== 'perdido');\n  for (let i = 1; i < chain.length; i++) {\n    const from = reached[chain[i - 1]], to = reached[chain[i]];\n    conversions.push({ de: chain[i - 1], para: chain[i], base: from, atingiram: to,\n      taxa: from >= minSample ? Math.round((to / from) * 1000) / 10 : null,\n      nota: from >= minSample ? 'observado' : 'amostra insuficiente (<' + minSample + ')' });\n  }\n  const count = (key, f = x => x) => {\n    const o = {};\n    for (const l of leads) { const v = f(l[key]) || 'não informado'; o[v] = (o[v] || 0) + 1; }\n    return o;\n  };\n  const lost = {};\n  for (const l of leads) if (l.status === 'perdido') { const m = l.motivo_perda || 'não informado'; lost[m] = (lost[m] || 0) + 1; }\n  return {\n    total: leads.length, porEtapa: reached, conversoes: conversions,\n    porSegmento: count('segmento'), porFonte: count('fonte_aquisicao'), motivosPerda: lost,\n    proximasAcoes: leads.filter(l => l.proxima_acao && !l.nao_contatar).map(l => ({ id: l.id, nome: l.nome, acao: l.proxima_acao, data: l.proxima_acao_data || '' })),\n    tipo: 'observado',\n  };\n}\n\nconst STAGES = DEFAULT_STAGES;\nconst bool = v => ['true', 'sim', '1', 'x'].includes(String(v || '').toLowerCase());\nconst normLead = l => ({ ...l, nao_contatar: bool(l.nao_contatar) });\nconst cfgMap = rows => Object.fromEntries(rows.filter(r => r.json && r.json.chave).map(r => [r.json.chave, String(r.json.valor || '')]));\nconst list = s => String(s || '').split(';').map(x => x.trim()).filter(Boolean);\nconst esc = s => String(s == null ? '' : s).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\nconst now = () => new Date().toISOString();\nfunction requireToken(token) {\n  const t = $env.REVIEW_UI_TOKEN;\n  if (!t) throw new Error('REVIEW_UI_TOKEN não configurado: recusando requisição');\n  if (token !== t) throw new Error('Não autorizado');\n}\nfunction hashId(s) { let h = 5381; for (const c of s) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return 'L' + h.toString(36); }\n\n\nif (!$env.ANTHROPIC_MODEL) throw new Error('ANTHROPIC_MODEL não configurado');\nconst id = $('Webhook').first().json.body.lead_id;\nconst lead = normLead($('Leads').all().map(i => i.json).find(l => l.id === id));\nconst html = String(($input.first() || { json: {} }).json.data || ($input.first() || { json: {} }).json.body || '');\nconst text = html.replace(/<script[\\s\\S]*?<\\/script>|<style[\\s\\S]*?<\\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim().slice(0, 8000);\nconst siteUrl = $('Selecionar lead').first().json.site_url;\nconst fontes = $('Fontes').all().map(i => i.json).filter(f => f.lead_id === id);\nconst fetched = !!text;\nconst cfg = cfgMap($('Config').all());\nconst weights = Object.fromEntries(Object.keys(DEFAULT_WEIGHTS).map(k => [k, Number(cfg['peso_' + k]) || DEFAULT_WEIGHTS[k]]));\nconst material = '<fontes>\\n' + (fetched ? '[' + siteUrl + ' | consultado em ' + now() + ']\\n' + text + '\\n' : '') +\n  fontes.map(f => '[' + f.url + ']\\n' + (f.trecho || '')).join('\\n') + '\\n</fontes>\\nEmpresa: ' + lead.nome + ' (' + (lead.cidade || '') + '/' + (lead.uf || '') + ')';\nreturn [{ json: { id, fetched, siteUrl, weights, cfg, request: { model: $env.ANTHROPIC_MODEL, max_tokens: 2000, system: \"Você qualifica empresas brasileiras para a Montco, um SaaS de acompanhamento de ordens de produção, etapas de montagem, horas e previsão de entrega para fabricantes de máquinas e equipamentos sob encomenda.\\n\\nUse SOMENTE o material em <fontes>. Não use conhecimento externo sobre a empresa e não invente nada.\\nPara cada fator A–G devolva: value (0 a 1) OU null se não houver informação suficiente; level (\\\"fato\\\" se está literalmente na fonte, \\\"inferencia\\\" se é dedução razoável, \\\"hipotese\\\" se precisa ser confirmada em conversa); evidence (lista de URLs das fontes que sustentam); note (1 frase).\\nFalta de informação NÃO é falta de potencial: use null, nunca um valor baixo.\\nNão afirme atrasos, desperdício, falta de estoque ou uso de planilhas: se for relevante, coloque em \\\"hipoteses\\\".\\n\\nFatores: A fabricação/montagem; B complexidade dos equipamentos; C produção sob encomenda; D número de etapas/tipos de produto; E porte e público-alvo (PME industrial); F canal comercial apropriado; G operação produtiva própria.\\n\\nResponda APENAS com JSON:\\n{\\\"factors\\\":{\\\"A\\\":{\\\"value\\\":0.8,\\\"level\\\":\\\"fato\\\",\\\"evidence\\\":[\\\"url\\\"],\\\"note\\\":\\\"\\\"},\\\"B\\\":{},\\\"C\\\":{},\\\"D\\\":{},\\\"E\\\":{},\\\"F\\\":{},\\\"G\\\":{}},\\n \\\"segmento\\\":\\\"\\\", \\\"produtos\\\":[\\\"\\\"], \\\"fatos\\\":[{\\\"texto\\\":\\\"\\\",\\\"url\\\":\\\"\\\"}], \\\"inferencias\\\":[\\\"\\\"], \\\"hipoteses\\\":[\\\"\\\"],\\n \\\"desconhecido\\\":[\\\"\\\"], \\\"gancho\\\":\\\"fato verificado e específico, ou vazio\\\", \\\"hipotese_problema\\\":\\\"\\\"}\\n\", messages: [{ role: 'user', content: material }] } } }];"
+      }
+    },
+    {
+      "id": "n18",
+      "name": "Claude: qualificar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Anthropic (header x-api-key)"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request) }}",
+        "options": {
+          "timeout": 60000
+        }
+      }
+    },
+    {
+      "id": "n19",
+      "name": "Pontuar e montar e-mail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// CSV mínimo (RFC 4180): aspas, vírgulas e quebras de linha dentro de campos.\nfunction parseCsv(text) {\n  const rows = [];\n  let row = [], field = '', inQ = false;\n  const s = String(text || '').replace(/^﻿/, '');\n  for (let i = 0; i < s.length; i++) {\n    const c = s[i];\n    if (inQ) {\n      if (c === '\"' && s[i + 1] === '\"') { field += '\"'; i++; }\n      else if (c === '\"') inQ = false;\n      else field += c;\n    } else if (c === '\"') inQ = true;\n    else if (c === ',' || c === ';') { row.push(field); field = ''; }\n    else if (c === '\\n' || c === '\\r') {\n      if (c === '\\r' && s[i + 1] === '\\n') i++;\n      row.push(field); field = '';\n      if (row.some(v => v !== '')) rows.push(row);\n      row = [];\n    } else field += c;\n  }\n  row.push(field);\n  if (row.some(v => v !== '')) rows.push(row);\n  if (!rows.length) return [];\n  const head = rows[0].map(h => h.trim());\n  return rows.slice(1).map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || '').trim()])));\n}\n\nfunction toCsv(records, columns) {\n  const cols = columns || [...new Set(records.flatMap(r => Object.keys(r)))];\n  const esc = v => {\n    v = v == null ? '' : String(v);\n    // evita injeção de fórmulas ao abrir no Excel/Sheets\n    if (/^[=+\\-@]/.test(v)) v = \"'\" + v;\n    return /[\",\\n\\r;]/.test(v) ? '\"' + v.replace(/\"/g, '\"\"') + '\"' : v;\n  };\n  return [cols.join(','), ...records.map(r => cols.map(c => esc(r[c])).join(','))].join('\\n');\n}\n\nfunction normalizeDomain(url) {\n  if (!url) return '';\n  let h = String(url).trim().toLowerCase();\n  h = h.replace(/^[a-z]+:\\/\\//, '').replace(/^www\\./, '').split(/[\\/?#]/)[0].split(':')[0];\n  return /^[a-z0-9.-]+\\.[a-z]{2,}$/.test(h) ? h : '';\n}\n\nfunction normalizeCnpj(v) {\n  const d = String(v || '').replace(/\\D/g, '');\n  return d.length === 14 ? d : '';\n}\n\nfunction validCnpj(v) {\n  const d = normalizeCnpj(v);\n  if (!d || /^(\\d)\\1+$/.test(d)) return false;\n  const calc = len => {\n    let sum = 0, pos = len - 7;\n    for (let i = len; i >= 1; i--) { sum += d[len - i] * pos--; if (pos < 2) pos = 9; }\n    const r = sum % 11;\n    return r < 2 ? 0 : 11 - r;\n  };\n  return calc(12) === +d[12] && calc(13) === +d[13];\n}\n\nfunction normalizeName(n) {\n  return String(n || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')\n    .replace(/\\b(ltda|me|epp|eireli|s\\/?a|sa|industria|comercio|e)\\b/g, ' ')\n    .replace(/[^a-z0-9]+/g, ' ').trim();\n}\n\n// Chaves fortes: CNPJ e domínio. Chave fraca (nome+UF) só sinaliza \"possível duplicado\".\nfunction keysFor(lead) {\n  return {\n    cnpj: validCnpj(lead.cnpj) ? normalizeCnpj(lead.cnpj) : '',\n    domain: normalizeDomain(lead.site),\n    weak: normalizeName(lead.nome) && lead.uf ? normalizeName(lead.nome) + '|' + String(lead.uf).toUpperCase() : '',\n  };\n}\n\nfunction findDuplicate(candidate, existing) {\n  const k = keysFor(candidate);\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.cnpj && k.cnpj === ek.cnpj) return { lead: e, match: 'cnpj', strong: true };\n    if (k.domain && k.domain === ek.domain) return { lead: e, match: 'dominio', strong: true };\n  }\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.weak && k.weak === ek.weak) return { lead: e, match: 'nome_uf', strong: false };\n  }\n  return null;\n}\n\n// Preenche apenas campos vazios; nunca sobrescreve dado existente.\nfunction mergeLead(existing, incoming) {\n  const out = { ...existing };\n  for (const [k, v] of Object.entries(incoming)) if (!out[k] && v) out[k] = v;\n  return out;\n}\n\nconst FACTORS = {\n  A: 'Compatibilidade com fabricação/montagem',\n  B: 'Complexidade aparente dos equipamentos',\n  C: 'Indícios de produção sob encomenda',\n  D: 'Número de etapas/tipos de produto',\n  E: 'Porte e público-alvo',\n  F: 'Canal comercial apropriado',\n  G: 'Operação produtiva própria',\n};\nconst DEFAULT_WEIGHTS = { A: 25, B: 15, C: 20, D: 10, E: 10, F: 10, G: 10 };\n\n// factors: { A: { value: 0..1 | null, level: 'fato'|'inferencia'|'hipotese', evidence: [urls] } }\n// Fator desconhecido (value null) NÃO penaliza: entra com valor neutro e fica listado em \"unknown\".\nfunction computeScore(factors, weights = DEFAULT_WEIGHTS, neutral = 0.5) {\n  const total = Object.values(weights).reduce((a, b) => a + b, 0) || 1;\n  let sum = 0;\n  const breakdown = {}, unknown = [];\n  for (const k of Object.keys(weights)) {\n    const f = factors[k] || {};\n    const known = typeof f.value === 'number' && !isNaN(f.value);\n    const v = known ? Math.min(1, Math.max(0, f.value)) : neutral;\n    if (!known) unknown.push(k);\n    const pts = (v * weights[k] * 100) / total;\n    breakdown[k] = { points: Math.round(pts * 10) / 10, weight: weights[k], known, level: f.level || (known ? 'inferencia' : 'desconhecido'), evidence: f.evidence || [] };\n    sum += pts;\n  }\n  const knownWeight = Object.keys(weights).filter(k => !unknown.includes(k)).reduce((a, k) => a + weights[k], 0);\n  return { score: Math.round(sum), breakdown, unknown, confidence: Math.round((knownWeight / total) * 100) / 100 };\n}\n\nfunction norm(v) { return String(v || '').trim().toLowerCase(); }\n\nfunction isSuppressed(lead, list) {\n  const emails = new Set(), domains = new Set(), ids = new Set();\n  for (const s of list || []) {\n    if (s.email) emails.add(norm(s.email));\n    if (s.dominio) domains.add(norm(s.dominio));\n    if (s.lead_id) ids.add(s.lead_id);\n  }\n  const d = normalizeDomain(lead.site);\n  const em = norm(lead.email);\n  if (ids.has(lead.id)) return true;\n  if (d && domains.has(d)) return true;\n  if (em && (emails.has(em) || domains.has(em.split('@')[1]))) return true;\n  return false;\n}\n\nconst DEFAULT_STAGES = [\n  'identificada', 'pesquisada', 'qualificado', 'aguardando_aprovacao', 'aprovada', 'contato_realizado',\n  'resposta_recebida', 'reuniao_agendada', 'diagnostico_realizado', 'demonstracao_apresentada',\n  'proposta_enviada', 'negociacao', 'cliente', 'perdido',\n];\nconst PROMO_STAGES = ['aguardando_aprovacao', 'aprovada'];\n\n// Transição: registra data/ator e aplica regras de interrupção.\nfunction transition(lead, to, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  if (!stages.includes(to)) throw new Error('Etapa inválida: ' + to);\n  if (lead.nao_contatar && PROMO_STAGES.concat('contato_realizado').includes(to)) {\n    throw new Error('Lead marcado como não contatar: ação promocional bloqueada');\n  }\n  const at = opts.at || new Date().toISOString();\n  const entry = { de: lead.status, para: to, em: at, por: opts.by || 'usuario', motivo: opts.reason || '' };\n  const next = { ...lead, status: to, atualizado_em: at, historico: [...(lead.historico || []), entry] };\n  if (to === 'perdido' && !opts.reason) throw new Error('Informe o motivo da perda');\n  if (to === 'resposta_recebida' || to === 'perdido') next.proxima_acao = next.proxima_acao || '';\n  return next;\n}\n\nfunction markDoNotContact(lead, opts = {}) {\n  const at = opts.at || new Date().toISOString();\n  return {\n    ...lead, nao_contatar: true, proxima_acao: '', atualizado_em: at,\n    historico: [...(lead.historico || []), { de: lead.status, para: lead.status, em: at, por: opts.by || 'usuario', motivo: 'nao_contatar: ' + (opts.reason || '') }],\n  };\n}\n\nfunction suggestNextAction(lead) {\n  if (lead.nao_contatar) return 'Nenhuma (não contatar)';\n  const m = {\n    identificada: 'Pesquisar a empresa em fontes oficiais',\n    pesquisada: 'Qualificar e revisar a pontuação',\n    qualificado: 'Gerar rascunho de abordagem',\n    aguardando_aprovacao: 'Revisar, editar e aprovar o rascunho',\n    aprovada: 'Enviar manualmente e marcar como enviado',\n    contato_realizado: 'Aguardar resposta; revisar manualmente após alguns dias úteis',\n    resposta_recebida: 'Responder e propor 20 min de conversa',\n    reuniao_agendada: 'Preparar roteiro de diagnóstico',\n    diagnostico_realizado: 'Avaliar demonstração',\n    demonstracao_apresentada: 'Avaliar proposta',\n    proposta_enviada: 'Fazer acompanhamento manual',\n    negociacao: 'Definir próximos passos com o decisor',\n  };\n  return m[lead.status] || '';\n}\n\nconst DEFAULT_RULES = {\n  maxWords: 180,\n  // Afirmações de dor que exigem evidência; o rascunho não pode afirmá-las.\n  bannedClaims: [/vocês? (usa|usam|trabalha|trabalham) com planilhas?/i, /sofre[mr]?\\b/i, /atrasos? (constantes|frequentes)/i, /desperd[ií]cio/i, /falta de estoque/i, /garantimos?/i, /aumente .* em \\d+%/i, /resultados? garantidos?/i],\n  placeholders: /\\[[^\\]]+\\]|\\{\\{[^}]+\\}\\}/,\n};\n\n// cfg: { allowedLinks:[urls configuradas], nonExistingFeatures:[termos], suppression:[...] }\nfunction validateDraft(draft, lead, cfg = {}) {\n  const errors = [], warnings = [];\n  const body = String(draft.corpo || ''), subject = String(draft.assunto || '');\n  const rules = { ...DEFAULT_RULES, ...(cfg.rules || {}) };\n  if (!subject.trim()) errors.push('Assunto vazio');\n  if (!body.trim()) errors.push('Corpo vazio');\n  if (rules.placeholders.test(subject + body)) errors.push('Placeholders não preenchidos');\n  if (body.split(/\\s+/).filter(Boolean).length > rules.maxWords) warnings.push('Mensagem longa');\n  for (const re of rules.bannedClaims) if (re.test(body)) errors.push('Afirmação sem evidência: ' + re);\n  for (const t of cfg.nonExistingFeatures || []) if (t && body.toLowerCase().includes(t.toLowerCase())) errors.push('Menciona funcionalidade inexistente: ' + t);\n  const allowed = new Set((cfg.allowedLinks || []).map(u => u.replace(/\\/$/, '')));\n  for (const u of body.match(/https?:\\/\\/[^\\s)>\"]+/g) || []) {\n    if (!allowed.has(u.replace(/[.,;]$/, '').replace(/\\/$/, ''))) errors.push('Link não configurado: ' + u);\n  }\n  if (!lead.fontes || !lead.fontes.length) errors.push('Lead sem fonte registrada');\n  if (lead.email && !lead.email_fonte) errors.push('E-mail sem URL de origem');\n  if (lead.nao_contatar || isSuppressed(lead, cfg.suppression)) errors.push('Lead em lista de supressão');\n  return { ok: errors.length === 0, errors, warnings };\n}\n\n// Conversão só é exibida quando o denominador atinge minSample; senão, \"amostra insuficiente\".\nfunction computeMetrics(leads, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  const minSample = opts.minSample || 20;\n  const reached = Object.fromEntries(stages.map(s => [s, 0]));\n  const idx = s => stages.indexOf(s);\n  for (const l of leads) {\n    const visited = new Set((l.historico || []).map(h => h.para).concat(l.status));\n    // etapa atingida = visitada ou posterior à maior visitada (exceto \"perdido\")\n    const max = Math.max(-1, ...[...visited].filter(s => s !== 'perdido').map(idx));\n    stages.forEach((s, i) => { if (s !== 'perdido' && (i <= max || visited.has(s))) reached[s]++; });\n    if (visited.has('perdido')) reached['perdido']++;\n  }\n  const conversions = [];\n  const chain = stages.filter(s => s !== 'perdido');\n  for (let i = 1; i < chain.length; i++) {\n    const from = reached[chain[i - 1]], to = reached[chain[i]];\n    conversions.push({ de: chain[i - 1], para: chain[i], base: from, atingiram: to,\n      taxa: from >= minSample ? Math.round((to / from) * 1000) / 10 : null,\n      nota: from >= minSample ? 'observado' : 'amostra insuficiente (<' + minSample + ')' });\n  }\n  const count = (key, f = x => x) => {\n    const o = {};\n    for (const l of leads) { const v = f(l[key]) || 'não informado'; o[v] = (o[v] || 0) + 1; }\n    return o;\n  };\n  const lost = {};\n  for (const l of leads) if (l.status === 'perdido') { const m = l.motivo_perda || 'não informado'; lost[m] = (lost[m] || 0) + 1; }\n  return {\n    total: leads.length, porEtapa: reached, conversoes: conversions,\n    porSegmento: count('segmento'), porFonte: count('fonte_aquisicao'), motivosPerda: lost,\n    proximasAcoes: leads.filter(l => l.proxima_acao && !l.nao_contatar).map(l => ({ id: l.id, nome: l.nome, acao: l.proxima_acao, data: l.proxima_acao_data || '' })),\n    tipo: 'observado',\n  };\n}\n\nconst STAGES = DEFAULT_STAGES;\nconst bool = v => ['true', 'sim', '1', 'x'].includes(String(v || '').toLowerCase());\nconst normLead = l => ({ ...l, nao_contatar: bool(l.nao_contatar) });\nconst cfgMap = rows => Object.fromEntries(rows.filter(r => r.json && r.json.chave).map(r => [r.json.chave, String(r.json.valor || '')]));\nconst list = s => String(s || '').split(';').map(x => x.trim()).filter(Boolean);\nconst esc = s => String(s == null ? '' : s).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\nconst now = () => new Date().toISOString();\nfunction requireToken(token) {\n  const t = $env.REVIEW_UI_TOKEN;\n  if (!t) throw new Error('REVIEW_UI_TOKEN não configurado: recusando requisição');\n  if (token !== t) throw new Error('Não autorizado');\n}\nfunction hashId(s) { let h = 5381; for (const c of s) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return 'L' + h.toString(36); }\n\n\nconst prev = $('Montar qualificação').first().json;\nconst txt = (($input.first().json.content || [])[0] || {}).text || '';\nlet q; try { q = JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}') + 1)); } catch (e) { throw new Error('Resposta da IA não é JSON válido'); }\n// Mantém apenas evidências com URL: sem URL, o fator vira desconhecido.\nfor (const k of Object.keys(q.factors || {})) { const f = q.factors[k]; if (!f.evidence || !f.evidence.length) { f.value = null; f.level = 'hipotese'; } }\nconst s = computeScore(q.factors || {}, prev.weights);\nconst cfg = prev.cfg;\nconst links = ['link_apresentacao', 'link_site', 'link_formulario'].map(k => cfg[k]).filter(Boolean);\nconst fatos = (q.fatos || []).filter(f => f.url);\nconst emailReq = { model: $env.ANTHROPIC_MODEL, max_tokens: 1500, system: \"Escreva um e-mail de primeiro contato em português brasileiro para uma empresa, em nome do remetente indicado.\\nRegras:\\n- Profissional, natural, objetivo; no máximo ~120 palavras.\\n- Mencione apenas fatos presentes em \\\"fatos\\\" (com fonte). Nunca invente detalhes, elogios ou familiaridade com o processo interno da empresa.\\n- Não afirme problemas (atrasos, planilhas, desperdício). Pode perguntar COMO a empresa acompanha as montagens e prevê entregas.\\n- Descreva a Montco só com as funcionalidades listadas em \\\"funcionalidades_existentes\\\". Não cite recursos fora da lista.\\n- Só inclua links presentes em \\\"links_permitidos\\\".\\n- Objetivo: convidar para uma conversa de ~20 minutos (conceito \\\"Raio-X do Prazo\\\": diagnóstico da previsibilidade de produção). Sem pressão de venda.\\n- Sem placeholders. Assine com o nome e contato do remetente.\\n- Se \\\"fatos\\\" tiver informação suficiente, devolva 2 versões (a e b) com ganchos diferentes; caso contrário, 1 versão genérica do segmento confirmado.\\nResponda APENAS com JSON: {\\\"versoes\\\":[{\\\"assunto\\\":\\\"\\\",\\\"corpo\\\":\\\"\\\"}]}\\n\",\n  messages: [{ role: 'user', content: JSON.stringify({ empresa: $('Leads').all().map(i => i.json).find(l => l.id === prev.id).nome, segmento: q.segmento, fatos, gancho: q.gancho,\n    funcionalidades_existentes: list(cfg.funcionalidades_existentes), links_permitidos: links, remetente: { nome: cfg.remetente_nome || $env.SENDER_NAME, contato: cfg.remetente_contato || $env.SENDER_CONTACT } }) }] };\nif (!list(cfg.funcionalidades_existentes).length) throw new Error('Config.funcionalidades_existentes vazio: defina o que a Montco realmente faz antes de gerar e-mails');\nreturn [{ json: { request: emailReq, q, s } }];"
+      }
+    },
+    {
+      "id": "n20",
+      "name": "Claude: rascunho",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Anthropic (header x-api-key)"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request) }}",
+        "options": {
+          "timeout": 60000
+        }
+      }
+    },
+    {
+      "id": "n21",
+      "name": "Validar e preparar gravações",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// CSV mínimo (RFC 4180): aspas, vírgulas e quebras de linha dentro de campos.\nfunction parseCsv(text) {\n  const rows = [];\n  let row = [], field = '', inQ = false;\n  const s = String(text || '').replace(/^﻿/, '');\n  for (let i = 0; i < s.length; i++) {\n    const c = s[i];\n    if (inQ) {\n      if (c === '\"' && s[i + 1] === '\"') { field += '\"'; i++; }\n      else if (c === '\"') inQ = false;\n      else field += c;\n    } else if (c === '\"') inQ = true;\n    else if (c === ',' || c === ';') { row.push(field); field = ''; }\n    else if (c === '\\n' || c === '\\r') {\n      if (c === '\\r' && s[i + 1] === '\\n') i++;\n      row.push(field); field = '';\n      if (row.some(v => v !== '')) rows.push(row);\n      row = [];\n    } else field += c;\n  }\n  row.push(field);\n  if (row.some(v => v !== '')) rows.push(row);\n  if (!rows.length) return [];\n  const head = rows[0].map(h => h.trim());\n  return rows.slice(1).map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || '').trim()])));\n}\n\nfunction toCsv(records, columns) {\n  const cols = columns || [...new Set(records.flatMap(r => Object.keys(r)))];\n  const esc = v => {\n    v = v == null ? '' : String(v);\n    // evita injeção de fórmulas ao abrir no Excel/Sheets\n    if (/^[=+\\-@]/.test(v)) v = \"'\" + v;\n    return /[\",\\n\\r;]/.test(v) ? '\"' + v.replace(/\"/g, '\"\"') + '\"' : v;\n  };\n  return [cols.join(','), ...records.map(r => cols.map(c => esc(r[c])).join(','))].join('\\n');\n}\n\nfunction normalizeDomain(url) {\n  if (!url) return '';\n  let h = String(url).trim().toLowerCase();\n  h = h.replace(/^[a-z]+:\\/\\//, '').replace(/^www\\./, '').split(/[\\/?#]/)[0].split(':')[0];\n  return /^[a-z0-9.-]+\\.[a-z]{2,}$/.test(h) ? h : '';\n}\n\nfunction normalizeCnpj(v) {\n  const d = String(v || '').replace(/\\D/g, '');\n  return d.length === 14 ? d : '';\n}\n\nfunction validCnpj(v) {\n  const d = normalizeCnpj(v);\n  if (!d || /^(\\d)\\1+$/.test(d)) return false;\n  const calc = len => {\n    let sum = 0, pos = len - 7;\n    for (let i = len; i >= 1; i--) { sum += d[len - i] * pos--; if (pos < 2) pos = 9; }\n    const r = sum % 11;\n    return r < 2 ? 0 : 11 - r;\n  };\n  return calc(12) === +d[12] && calc(13) === +d[13];\n}\n\nfunction normalizeName(n) {\n  return String(n || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')\n    .replace(/\\b(ltda|me|epp|eireli|s\\/?a|sa|industria|comercio|e)\\b/g, ' ')\n    .replace(/[^a-z0-9]+/g, ' ').trim();\n}\n\n// Chaves fortes: CNPJ e domínio. Chave fraca (nome+UF) só sinaliza \"possível duplicado\".\nfunction keysFor(lead) {\n  return {\n    cnpj: validCnpj(lead.cnpj) ? normalizeCnpj(lead.cnpj) : '',\n    domain: normalizeDomain(lead.site),\n    weak: normalizeName(lead.nome) && lead.uf ? normalizeName(lead.nome) + '|' + String(lead.uf).toUpperCase() : '',\n  };\n}\n\nfunction findDuplicate(candidate, existing) {\n  const k = keysFor(candidate);\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.cnpj && k.cnpj === ek.cnpj) return { lead: e, match: 'cnpj', strong: true };\n    if (k.domain && k.domain === ek.domain) return { lead: e, match: 'dominio', strong: true };\n  }\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.weak && k.weak === ek.weak) return { lead: e, match: 'nome_uf', strong: false };\n  }\n  return null;\n}\n\n// Preenche apenas campos vazios; nunca sobrescreve dado existente.\nfunction mergeLead(existing, incoming) {\n  const out = { ...existing };\n  for (const [k, v] of Object.entries(incoming)) if (!out[k] && v) out[k] = v;\n  return out;\n}\n\nconst FACTORS = {\n  A: 'Compatibilidade com fabricação/montagem',\n  B: 'Complexidade aparente dos equipamentos',\n  C: 'Indícios de produção sob encomenda',\n  D: 'Número de etapas/tipos de produto',\n  E: 'Porte e público-alvo',\n  F: 'Canal comercial apropriado',\n  G: 'Operação produtiva própria',\n};\nconst DEFAULT_WEIGHTS = { A: 25, B: 15, C: 20, D: 10, E: 10, F: 10, G: 10 };\n\n// factors: { A: { value: 0..1 | null, level: 'fato'|'inferencia'|'hipotese', evidence: [urls] } }\n// Fator desconhecido (value null) NÃO penaliza: entra com valor neutro e fica listado em \"unknown\".\nfunction computeScore(factors, weights = DEFAULT_WEIGHTS, neutral = 0.5) {\n  const total = Object.values(weights).reduce((a, b) => a + b, 0) || 1;\n  let sum = 0;\n  const breakdown = {}, unknown = [];\n  for (const k of Object.keys(weights)) {\n    const f = factors[k] || {};\n    const known = typeof f.value === 'number' && !isNaN(f.value);\n    const v = known ? Math.min(1, Math.max(0, f.value)) : neutral;\n    if (!known) unknown.push(k);\n    const pts = (v * weights[k] * 100) / total;\n    breakdown[k] = { points: Math.round(pts * 10) / 10, weight: weights[k], known, level: f.level || (known ? 'inferencia' : 'desconhecido'), evidence: f.evidence || [] };\n    sum += pts;\n  }\n  const knownWeight = Object.keys(weights).filter(k => !unknown.includes(k)).reduce((a, k) => a + weights[k], 0);\n  return { score: Math.round(sum), breakdown, unknown, confidence: Math.round((knownWeight / total) * 100) / 100 };\n}\n\nfunction norm(v) { return String(v || '').trim().toLowerCase(); }\n\nfunction isSuppressed(lead, list) {\n  const emails = new Set(), domains = new Set(), ids = new Set();\n  for (const s of list || []) {\n    if (s.email) emails.add(norm(s.email));\n    if (s.dominio) domains.add(norm(s.dominio));\n    if (s.lead_id) ids.add(s.lead_id);\n  }\n  const d = normalizeDomain(lead.site);\n  const em = norm(lead.email);\n  if (ids.has(lead.id)) return true;\n  if (d && domains.has(d)) return true;\n  if (em && (emails.has(em) || domains.has(em.split('@')[1]))) return true;\n  return false;\n}\n\nconst DEFAULT_STAGES = [\n  'identificada', 'pesquisada', 'qualificado', 'aguardando_aprovacao', 'aprovada', 'contato_realizado',\n  'resposta_recebida', 'reuniao_agendada', 'diagnostico_realizado', 'demonstracao_apresentada',\n  'proposta_enviada', 'negociacao', 'cliente', 'perdido',\n];\nconst PROMO_STAGES = ['aguardando_aprovacao', 'aprovada'];\n\n// Transição: registra data/ator e aplica regras de interrupção.\nfunction transition(lead, to, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  if (!stages.includes(to)) throw new Error('Etapa inválida: ' + to);\n  if (lead.nao_contatar && PROMO_STAGES.concat('contato_realizado').includes(to)) {\n    throw new Error('Lead marcado como não contatar: ação promocional bloqueada');\n  }\n  const at = opts.at || new Date().toISOString();\n  const entry = { de: lead.status, para: to, em: at, por: opts.by || 'usuario', motivo: opts.reason || '' };\n  const next = { ...lead, status: to, atualizado_em: at, historico: [...(lead.historico || []), entry] };\n  if (to === 'perdido' && !opts.reason) throw new Error('Informe o motivo da perda');\n  if (to === 'resposta_recebida' || to === 'perdido') next.proxima_acao = next.proxima_acao || '';\n  return next;\n}\n\nfunction markDoNotContact(lead, opts = {}) {\n  const at = opts.at || new Date().toISOString();\n  return {\n    ...lead, nao_contatar: true, proxima_acao: '', atualizado_em: at,\n    historico: [...(lead.historico || []), { de: lead.status, para: lead.status, em: at, por: opts.by || 'usuario', motivo: 'nao_contatar: ' + (opts.reason || '') }],\n  };\n}\n\nfunction suggestNextAction(lead) {\n  if (lead.nao_contatar) return 'Nenhuma (não contatar)';\n  const m = {\n    identificada: 'Pesquisar a empresa em fontes oficiais',\n    pesquisada: 'Qualificar e revisar a pontuação',\n    qualificado: 'Gerar rascunho de abordagem',\n    aguardando_aprovacao: 'Revisar, editar e aprovar o rascunho',\n    aprovada: 'Enviar manualmente e marcar como enviado',\n    contato_realizado: 'Aguardar resposta; revisar manualmente após alguns dias úteis',\n    resposta_recebida: 'Responder e propor 20 min de conversa',\n    reuniao_agendada: 'Preparar roteiro de diagnóstico',\n    diagnostico_realizado: 'Avaliar demonstração',\n    demonstracao_apresentada: 'Avaliar proposta',\n    proposta_enviada: 'Fazer acompanhamento manual',\n    negociacao: 'Definir próximos passos com o decisor',\n  };\n  return m[lead.status] || '';\n}\n\nconst DEFAULT_RULES = {\n  maxWords: 180,\n  // Afirmações de dor que exigem evidência; o rascunho não pode afirmá-las.\n  bannedClaims: [/vocês? (usa|usam|trabalha|trabalham) com planilhas?/i, /sofre[mr]?\\b/i, /atrasos? (constantes|frequentes)/i, /desperd[ií]cio/i, /falta de estoque/i, /garantimos?/i, /aumente .* em \\d+%/i, /resultados? garantidos?/i],\n  placeholders: /\\[[^\\]]+\\]|\\{\\{[^}]+\\}\\}/,\n};\n\n// cfg: { allowedLinks:[urls configuradas], nonExistingFeatures:[termos], suppression:[...] }\nfunction validateDraft(draft, lead, cfg = {}) {\n  const errors = [], warnings = [];\n  const body = String(draft.corpo || ''), subject = String(draft.assunto || '');\n  const rules = { ...DEFAULT_RULES, ...(cfg.rules || {}) };\n  if (!subject.trim()) errors.push('Assunto vazio');\n  if (!body.trim()) errors.push('Corpo vazio');\n  if (rules.placeholders.test(subject + body)) errors.push('Placeholders não preenchidos');\n  if (body.split(/\\s+/).filter(Boolean).length > rules.maxWords) warnings.push('Mensagem longa');\n  for (const re of rules.bannedClaims) if (re.test(body)) errors.push('Afirmação sem evidência: ' + re);\n  for (const t of cfg.nonExistingFeatures || []) if (t && body.toLowerCase().includes(t.toLowerCase())) errors.push('Menciona funcionalidade inexistente: ' + t);\n  const allowed = new Set((cfg.allowedLinks || []).map(u => u.replace(/\\/$/, '')));\n  for (const u of body.match(/https?:\\/\\/[^\\s)>\"]+/g) || []) {\n    if (!allowed.has(u.replace(/[.,;]$/, '').replace(/\\/$/, ''))) errors.push('Link não configurado: ' + u);\n  }\n  if (!lead.fontes || !lead.fontes.length) errors.push('Lead sem fonte registrada');\n  if (lead.email && !lead.email_fonte) errors.push('E-mail sem URL de origem');\n  if (lead.nao_contatar || isSuppressed(lead, cfg.suppression)) errors.push('Lead em lista de supressão');\n  return { ok: errors.length === 0, errors, warnings };\n}\n\n// Conversão só é exibida quando o denominador atinge minSample; senão, \"amostra insuficiente\".\nfunction computeMetrics(leads, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  const minSample = opts.minSample || 20;\n  const reached = Object.fromEntries(stages.map(s => [s, 0]));\n  const idx = s => stages.indexOf(s);\n  for (const l of leads) {\n    const visited = new Set((l.historico || []).map(h => h.para).concat(l.status));\n    // etapa atingida = visitada ou posterior à maior visitada (exceto \"perdido\")\n    const max = Math.max(-1, ...[...visited].filter(s => s !== 'perdido').map(idx));\n    stages.forEach((s, i) => { if (s !== 'perdido' && (i <= max || visited.has(s))) reached[s]++; });\n    if (visited.has('perdido')) reached['perdido']++;\n  }\n  const conversions = [];\n  const chain = stages.filter(s => s !== 'perdido');\n  for (let i = 1; i < chain.length; i++) {\n    const from = reached[chain[i - 1]], to = reached[chain[i]];\n    conversions.push({ de: chain[i - 1], para: chain[i], base: from, atingiram: to,\n      taxa: from >= minSample ? Math.round((to / from) * 1000) / 10 : null,\n      nota: from >= minSample ? 'observado' : 'amostra insuficiente (<' + minSample + ')' });\n  }\n  const count = (key, f = x => x) => {\n    const o = {};\n    for (const l of leads) { const v = f(l[key]) || 'não informado'; o[v] = (o[v] || 0) + 1; }\n    return o;\n  };\n  const lost = {};\n  for (const l of leads) if (l.status === 'perdido') { const m = l.motivo_perda || 'não informado'; lost[m] = (lost[m] || 0) + 1; }\n  return {\n    total: leads.length, porEtapa: reached, conversoes: conversions,\n    porSegmento: count('segmento'), porFonte: count('fonte_aquisicao'), motivosPerda: lost,\n    proximasAcoes: leads.filter(l => l.proxima_acao && !l.nao_contatar).map(l => ({ id: l.id, nome: l.nome, acao: l.proxima_acao, data: l.proxima_acao_data || '' })),\n    tipo: 'observado',\n  };\n}\n\nconst STAGES = DEFAULT_STAGES;\nconst bool = v => ['true', 'sim', '1', 'x'].includes(String(v || '').toLowerCase());\nconst normLead = l => ({ ...l, nao_contatar: bool(l.nao_contatar) });\nconst cfgMap = rows => Object.fromEntries(rows.filter(r => r.json && r.json.chave).map(r => [r.json.chave, String(r.json.valor || '')]));\nconst list = s => String(s || '').split(';').map(x => x.trim()).filter(Boolean);\nconst esc = s => String(s == null ? '' : s).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\nconst now = () => new Date().toISOString();\nfunction requireToken(token) {\n  const t = $env.REVIEW_UI_TOKEN;\n  if (!t) throw new Error('REVIEW_UI_TOKEN não configurado: recusando requisição');\n  if (token !== t) throw new Error('Não autorizado');\n}\nfunction hashId(s) { let h = 5381; for (const c of s) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return 'L' + h.toString(36); }\n\n\nconst id = $('Montar qualificação').first().json.id;\nconst prev = $('Montar qualificação').first().json, { q, s } = $('Pontuar e montar e-mail').first().json;\nconst txt = (($input.first().json.content || [])[0] || {}).text || '';\nlet e; try { e = JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}') + 1)); } catch (x) { throw new Error('Rascunho da IA não é JSON válido'); }\nconst lead = normLead($('Leads').all().map(i => i.json).find(l => l.id === id));\nconst cfg = prev.cfg, t = now();\nconst fontesAll = $('Fontes').all().map(i => i.json).filter(f => f.lead_id === id).map(f => f.url).concat(prev.fetched ? [prev.siteUrl] : []);\nconst vctx = { ...lead, fontes: fontesAll };\nconst vcfg = { allowedLinks: ['link_apresentacao', 'link_site', 'link_formulario'].map(k => cfg[k]).filter(Boolean), nonExistingFeatures: list(cfg.funcionalidades_inexistentes), suppression: $('Supressao').all().map(i => i.json) };\nconst fila = (e.versoes || []).slice(0, 2).map((v, i) => { const r = validateDraft(v, vctx, vcfg);\n  return { draft_id: id + '-' + t + '-' + (i + 1), lead_id: id, versao: i + 1, assunto: v.assunto, corpo: v.corpo, validacao: r.ok ? 'ok' + (r.warnings.length ? ' (' + r.warnings.join('; ') + ')' : '') : 'BLOQUEADO: ' + r.errors.join(' | '), estado: r.ok ? 'pendente' : 'rejeitado', criado_em: t, atualizado_em: t }; });\nconst temPendente = fila.some(f => f.estado === 'pendente');\nconst status = temPendente ? 'aguardando_aprovacao' : 'qualificado';\nconst updated = { ...lead, nao_contatar: lead.nao_contatar ? 'TRUE' : '', segmento: q.segmento || lead.segmento, produtos: (q.produtos || []).join('; ') || lead.produtos, score: s.score,\n  justificativa: 'Fatos: ' + (q.fatos || []).map(f => f.texto + ' (' + f.url + ')').join(' | ') + ' || Inferências: ' + (q.inferencias || []).join(' | ') + ' || Hipóteses (confirmar em conversa): ' + (q.hipoteses || []).join(' | ') + ' || Confiança: ' + s.confidence,\n  desconhecido: (q.desconhecido || []).concat(s.unknown.map(k => 'fator ' + k)).join('; '), hipotese_problema: q.hipotese_problema || '', gancho: q.gancho || '',\n  ultima_pesquisa: t, status, atualizado_em: t };\nconst hist = { em: t, lead_id: id, evento: 'qualificacao_ia', de: lead.status, para: status, por: 'ia', detalhes: 'score=' + s.score + '; rascunhos=' + fila.length };\nconst fonteRow = prev.fetched ? [{ lead_id: id, url: prev.siteUrl, data_pesquisa: t, tipo: 'site_oficial', trecho: '', nivel: 'fato' }] : [];\nreturn [{ json: { lead: updated, fila, hist, fonteRow } }];"
+      }
+    },
+    {
+      "id": "n22",
+      "name": "Item lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// CSV mínimo (RFC 4180): aspas, vírgulas e quebras de linha dentro de campos.\nfunction parseCsv(text) {\n  const rows = [];\n  let row = [], field = '', inQ = false;\n  const s = String(text || '').replace(/^﻿/, '');\n  for (let i = 0; i < s.length; i++) {\n    const c = s[i];\n    if (inQ) {\n      if (c === '\"' && s[i + 1] === '\"') { field += '\"'; i++; }\n      else if (c === '\"') inQ = false;\n      else field += c;\n    } else if (c === '\"') inQ = true;\n    else if (c === ',' || c === ';') { row.push(field); field = ''; }\n    else if (c === '\\n' || c === '\\r') {\n      if (c === '\\r' && s[i + 1] === '\\n') i++;\n      row.push(field); field = '';\n      if (row.some(v => v !== '')) rows.push(row);\n      row = [];\n    } else field += c;\n  }\n  row.push(field);\n  if (row.some(v => v !== '')) rows.push(row);\n  if (!rows.length) return [];\n  const head = rows[0].map(h => h.trim());\n  return rows.slice(1).map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || '').trim()])));\n}\n\nfunction toCsv(records, columns) {\n  const cols = columns || [...new Set(records.flatMap(r => Object.keys(r)))];\n  const esc = v => {\n    v = v == null ? '' : String(v);\n    // evita injeção de fórmulas ao abrir no Excel/Sheets\n    if (/^[=+\\-@]/.test(v)) v = \"'\" + v;\n    return /[\",\\n\\r;]/.test(v) ? '\"' + v.replace(/\"/g, '\"\"') + '\"' : v;\n  };\n  return [cols.join(','), ...records.map(r => cols.map(c => esc(r[c])).join(','))].join('\\n');\n}\n\nfunction normalizeDomain(url) {\n  if (!url) return '';\n  let h = String(url).trim().toLowerCase();\n  h = h.replace(/^[a-z]+:\\/\\//, '').replace(/^www\\./, '').split(/[\\/?#]/)[0].split(':')[0];\n  return /^[a-z0-9.-]+\\.[a-z]{2,}$/.test(h) ? h : '';\n}\n\nfunction normalizeCnpj(v) {\n  const d = String(v || '').replace(/\\D/g, '');\n  return d.length === 14 ? d : '';\n}\n\nfunction validCnpj(v) {\n  const d = normalizeCnpj(v);\n  if (!d || /^(\\d)\\1+$/.test(d)) return false;\n  const calc = len => {\n    let sum = 0, pos = len - 7;\n    for (let i = len; i >= 1; i--) { sum += d[len - i] * pos--; if (pos < 2) pos = 9; }\n    const r = sum % 11;\n    return r < 2 ? 0 : 11 - r;\n  };\n  return calc(12) === +d[12] && calc(13) === +d[13];\n}\n\nfunction normalizeName(n) {\n  return String(n || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')\n    .replace(/\\b(ltda|me|epp|eireli|s\\/?a|sa|industria|comercio|e)\\b/g, ' ')\n    .replace(/[^a-z0-9]+/g, ' ').trim();\n}\n\n// Chaves fortes: CNPJ e domínio. Chave fraca (nome+UF) só sinaliza \"possível duplicado\".\nfunction keysFor(lead) {\n  return {\n    cnpj: validCnpj(lead.cnpj) ? normalizeCnpj(lead.cnpj) : '',\n    domain: normalizeDomain(lead.site),\n    weak: normalizeName(lead.nome) && lead.uf ? normalizeName(lead.nome) + '|' + String(lead.uf).toUpperCase() : '',\n  };\n}\n\nfunction findDuplicate(candidate, existing) {\n  const k = keysFor(candidate);\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.cnpj && k.cnpj === ek.cnpj) return { lead: e, match: 'cnpj', strong: true };\n    if (k.domain && k.domain === ek.domain) return { lead: e, match: 'dominio', strong: true };\n  }\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.weak && k.weak === ek.weak) return { lead: e, match: 'nome_uf', strong: false };\n  }\n  return null;\n}\n\n// Preenche apenas campos vazios; nunca sobrescreve dado existente.\nfunction mergeLead(existing, incoming) {\n  const out = { ...existing };\n  for (const [k, v] of Object.entries(incoming)) if (!out[k] && v) out[k] = v;\n  return out;\n}\n\nconst FACTORS = {\n  A: 'Compatibilidade com fabricação/montagem',\n  B: 'Complexidade aparente dos equipamentos',\n  C: 'Indícios de produção sob encomenda',\n  D: 'Número de etapas/tipos de produto',\n  E: 'Porte e público-alvo',\n  F: 'Canal comercial apropriado',\n  G: 'Operação produtiva própria',\n};\nconst DEFAULT_WEIGHTS = { A: 25, B: 15, C: 20, D: 10, E: 10, F: 10, G: 10 };\n\n// factors: { A: { value: 0..1 | null, level: 'fato'|'inferencia'|'hipotese', evidence: [urls] } }\n// Fator desconhecido (value null) NÃO penaliza: entra com valor neutro e fica listado em \"unknown\".\nfunction computeScore(factors, weights = DEFAULT_WEIGHTS, neutral = 0.5) {\n  const total = Object.values(weights).reduce((a, b) => a + b, 0) || 1;\n  let sum = 0;\n  const breakdown = {}, unknown = [];\n  for (const k of Object.keys(weights)) {\n    const f = factors[k] || {};\n    const known = typeof f.value === 'number' && !isNaN(f.value);\n    const v = known ? Math.min(1, Math.max(0, f.value)) : neutral;\n    if (!known) unknown.push(k);\n    const pts = (v * weights[k] * 100) / total;\n    breakdown[k] = { points: Math.round(pts * 10) / 10, weight: weights[k], known, level: f.level || (known ? 'inferencia' : 'desconhecido'), evidence: f.evidence || [] };\n    sum += pts;\n  }\n  const knownWeight = Object.keys(weights).filter(k => !unknown.includes(k)).reduce((a, k) => a + weights[k], 0);\n  return { score: Math.round(sum), breakdown, unknown, confidence: Math.round((knownWeight / total) * 100) / 100 };\n}\n\nfunction norm(v) { return String(v || '').trim().toLowerCase(); }\n\nfunction isSuppressed(lead, list) {\n  const emails = new Set(), domains = new Set(), ids = new Set();\n  for (const s of list || []) {\n    if (s.email) emails.add(norm(s.email));\n    if (s.dominio) domains.add(norm(s.dominio));\n    if (s.lead_id) ids.add(s.lead_id);\n  }\n  const d = normalizeDomain(lead.site);\n  const em = norm(lead.email);\n  if (ids.has(lead.id)) return true;\n  if (d && domains.has(d)) return true;\n  if (em && (emails.has(em) || domains.has(em.split('@')[1]))) return true;\n  return false;\n}\n\nconst DEFAULT_STAGES = [\n  'identificada', 'pesquisada', 'qualificado', 'aguardando_aprovacao', 'aprovada', 'contato_realizado',\n  'resposta_recebida', 'reuniao_agendada', 'diagnostico_realizado', 'demonstracao_apresentada',\n  'proposta_enviada', 'negociacao', 'cliente', 'perdido',\n];\nconst PROMO_STAGES = ['aguardando_aprovacao', 'aprovada'];\n\n// Transição: registra data/ator e aplica regras de interrupção.\nfunction transition(lead, to, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  if (!stages.includes(to)) throw new Error('Etapa inválida: ' + to);\n  if (lead.nao_contatar && PROMO_STAGES.concat('contato_realizado').includes(to)) {\n    throw new Error('Lead marcado como não contatar: ação promocional bloqueada');\n  }\n  const at = opts.at || new Date().toISOString();\n  const entry = { de: lead.status, para: to, em: at, por: opts.by || 'usuario', motivo: opts.reason || '' };\n  const next = { ...lead, status: to, atualizado_em: at, historico: [...(lead.historico || []), entry] };\n  if (to === 'perdido' && !opts.reason) throw new Error('Informe o motivo da perda');\n  if (to === 'resposta_recebida' || to === 'perdido') next.proxima_acao = next.proxima_acao || '';\n  return next;\n}\n\nfunction markDoNotContact(lead, opts = {}) {\n  const at = opts.at || new Date().toISOString();\n  return {\n    ...lead, nao_contatar: true, proxima_acao: '', atualizado_em: at,\n    historico: [...(lead.historico || []), { de: lead.status, para: lead.status, em: at, por: opts.by || 'usuario', motivo: 'nao_contatar: ' + (opts.reason || '') }],\n  };\n}\n\nfunction suggestNextAction(lead) {\n  if (lead.nao_contatar) return 'Nenhuma (não contatar)';\n  const m = {\n    identificada: 'Pesquisar a empresa em fontes oficiais',\n    pesquisada: 'Qualificar e revisar a pontuação',\n    qualificado: 'Gerar rascunho de abordagem',\n    aguardando_aprovacao: 'Revisar, editar e aprovar o rascunho',\n    aprovada: 'Enviar manualmente e marcar como enviado',\n    contato_realizado: 'Aguardar resposta; revisar manualmente após alguns dias úteis',\n    resposta_recebida: 'Responder e propor 20 min de conversa',\n    reuniao_agendada: 'Preparar roteiro de diagnóstico',\n    diagnostico_realizado: 'Avaliar demonstração',\n    demonstracao_apresentada: 'Avaliar proposta',\n    proposta_enviada: 'Fazer acompanhamento manual',\n    negociacao: 'Definir próximos passos com o decisor',\n  };\n  return m[lead.status] || '';\n}\n\nconst DEFAULT_RULES = {\n  maxWords: 180,\n  // Afirmações de dor que exigem evidência; o rascunho não pode afirmá-las.\n  bannedClaims: [/vocês? (usa|usam|trabalha|trabalham) com planilhas?/i, /sofre[mr]?\\b/i, /atrasos? (constantes|frequentes)/i, /desperd[ií]cio/i, /falta de estoque/i, /garantimos?/i, /aumente .* em \\d+%/i, /resultados? garantidos?/i],\n  placeholders: /\\[[^\\]]+\\]|\\{\\{[^}]+\\}\\}/,\n};\n\n// cfg: { allowedLinks:[urls configuradas], nonExistingFeatures:[termos], suppression:[...] }\nfunction validateDraft(draft, lead, cfg = {}) {\n  const errors = [], warnings = [];\n  const body = String(draft.corpo || ''), subject = String(draft.assunto || '');\n  const rules = { ...DEFAULT_RULES, ...(cfg.rules || {}) };\n  if (!subject.trim()) errors.push('Assunto vazio');\n  if (!body.trim()) errors.push('Corpo vazio');\n  if (rules.placeholders.test(subject + body)) errors.push('Placeholders não preenchidos');\n  if (body.split(/\\s+/).filter(Boolean).length > rules.maxWords) warnings.push('Mensagem longa');\n  for (const re of rules.bannedClaims) if (re.test(body)) errors.push('Afirmação sem evidência: ' + re);\n  for (const t of cfg.nonExistingFeatures || []) if (t && body.toLowerCase().includes(t.toLowerCase())) errors.push('Menciona funcionalidade inexistente: ' + t);\n  const allowed = new Set((cfg.allowedLinks || []).map(u => u.replace(/\\/$/, '')));\n  for (const u of body.match(/https?:\\/\\/[^\\s)>\"]+/g) || []) {\n    if (!allowed.has(u.replace(/[.,;]$/, '').replace(/\\/$/, ''))) errors.push('Link não configurado: ' + u);\n  }\n  if (!lead.fontes || !lead.fontes.length) errors.push('Lead sem fonte registrada');\n  if (lead.email && !lead.email_fonte) errors.push('E-mail sem URL de origem');\n  if (lead.nao_contatar || isSuppressed(lead, cfg.suppression)) errors.push('Lead em lista de supressão');\n  return { ok: errors.length === 0, errors, warnings };\n}\n\n// Conversão só é exibida quando o denominador atinge minSample; senão, \"amostra insuficiente\".\nfunction computeMetrics(leads, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  const minSample = opts.minSample || 20;\n  const reached = Object.fromEntries(stages.map(s => [s, 0]));\n  const idx = s => stages.indexOf(s);\n  for (const l of leads) {\n    const visited = new Set((l.historico || []).map(h => h.para).concat(l.status));\n    // etapa atingida = visitada ou posterior à maior visitada (exceto \"perdido\")\n    const max = Math.max(-1, ...[...visited].filter(s => s !== 'perdido').map(idx));\n    stages.forEach((s, i) => { if (s !== 'perdido' && (i <= max || visited.has(s))) reached[s]++; });\n    if (visited.has('perdido')) reached['perdido']++;\n  }\n  const conversions = [];\n  const chain = stages.filter(s => s !== 'perdido');\n  for (let i = 1; i < chain.length; i++) {\n    const from = reached[chain[i - 1]], to = reached[chain[i]];\n    conversions.push({ de: chain[i - 1], para: chain[i], base: from, atingiram: to,\n      taxa: from >= minSample ? Math.round((to / from) * 1000) / 10 : null,\n      nota: from >= minSample ? 'observado' : 'amostra insuficiente (<' + minSample + ')' });\n  }\n  const count = (key, f = x => x) => {\n    const o = {};\n    for (const l of leads) { const v = f(l[key]) || 'não informado'; o[v] = (o[v] || 0) + 1; }\n    return o;\n  };\n  const lost = {};\n  for (const l of leads) if (l.status === 'perdido') { const m = l.motivo_perda || 'não informado'; lost[m] = (lost[m] || 0) + 1; }\n  return {\n    total: leads.length, porEtapa: reached, conversoes: conversions,\n    porSegmento: count('segmento'), porFonte: count('fonte_aquisicao'), motivosPerda: lost,\n    proximasAcoes: leads.filter(l => l.proxima_acao && !l.nao_contatar).map(l => ({ id: l.id, nome: l.nome, acao: l.proxima_acao, data: l.proxima_acao_data || '' })),\n    tipo: 'observado',\n  };\n}\n\nconst STAGES = DEFAULT_STAGES;\nconst bool = v => ['true', 'sim', '1', 'x'].includes(String(v || '').toLowerCase());\nconst normLead = l => ({ ...l, nao_contatar: bool(l.nao_contatar) });\nconst cfgMap = rows => Object.fromEntries(rows.filter(r => r.json && r.json.chave).map(r => [r.json.chave, String(r.json.valor || '')]));\nconst list = s => String(s || '').split(';').map(x => x.trim()).filter(Boolean);\nconst esc = s => String(s == null ? '' : s).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\nconst now = () => new Date().toISOString();\nfunction requireToken(token) {\n  const t = $env.REVIEW_UI_TOKEN;\n  if (!t) throw new Error('REVIEW_UI_TOKEN não configurado: recusando requisição');\n  if (token !== t) throw new Error('Não autorizado');\n}\nfunction hashId(s) { let h = 5381; for (const c of s) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return 'L' + h.toString(36); }\n\nreturn [{ json: $input.first().json.lead }];"
+      }
+    },
+    {
+      "id": "n23",
+      "name": "Atualizar lead",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3120,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{$env.GOOGLE_SHEET_ID}}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Leads"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": null,
+          "matchingColumns": [
+            "id"
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n24",
+      "name": "Itens fila",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3360,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// CSV mínimo (RFC 4180): aspas, vírgulas e quebras de linha dentro de campos.\nfunction parseCsv(text) {\n  const rows = [];\n  let row = [], field = '', inQ = false;\n  const s = String(text || '').replace(/^﻿/, '');\n  for (let i = 0; i < s.length; i++) {\n    const c = s[i];\n    if (inQ) {\n      if (c === '\"' && s[i + 1] === '\"') { field += '\"'; i++; }\n      else if (c === '\"') inQ = false;\n      else field += c;\n    } else if (c === '\"') inQ = true;\n    else if (c === ',' || c === ';') { row.push(field); field = ''; }\n    else if (c === '\\n' || c === '\\r') {\n      if (c === '\\r' && s[i + 1] === '\\n') i++;\n      row.push(field); field = '';\n      if (row.some(v => v !== '')) rows.push(row);\n      row = [];\n    } else field += c;\n  }\n  row.push(field);\n  if (row.some(v => v !== '')) rows.push(row);\n  if (!rows.length) return [];\n  const head = rows[0].map(h => h.trim());\n  return rows.slice(1).map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || '').trim()])));\n}\n\nfunction toCsv(records, columns) {\n  const cols = columns || [...new Set(records.flatMap(r => Object.keys(r)))];\n  const esc = v => {\n    v = v == null ? '' : String(v);\n    // evita injeção de fórmulas ao abrir no Excel/Sheets\n    if (/^[=+\\-@]/.test(v)) v = \"'\" + v;\n    return /[\",\\n\\r;]/.test(v) ? '\"' + v.replace(/\"/g, '\"\"') + '\"' : v;\n  };\n  return [cols.join(','), ...records.map(r => cols.map(c => esc(r[c])).join(','))].join('\\n');\n}\n\nfunction normalizeDomain(url) {\n  if (!url) return '';\n  let h = String(url).trim().toLowerCase();\n  h = h.replace(/^[a-z]+:\\/\\//, '').replace(/^www\\./, '').split(/[\\/?#]/)[0].split(':')[0];\n  return /^[a-z0-9.-]+\\.[a-z]{2,}$/.test(h) ? h : '';\n}\n\nfunction normalizeCnpj(v) {\n  const d = String(v || '').replace(/\\D/g, '');\n  return d.length === 14 ? d : '';\n}\n\nfunction validCnpj(v) {\n  const d = normalizeCnpj(v);\n  if (!d || /^(\\d)\\1+$/.test(d)) return false;\n  const calc = len => {\n    let sum = 0, pos = len - 7;\n    for (let i = len; i >= 1; i--) { sum += d[len - i] * pos--; if (pos < 2) pos = 9; }\n    const r = sum % 11;\n    return r < 2 ? 0 : 11 - r;\n  };\n  return calc(12) === +d[12] && calc(13) === +d[13];\n}\n\nfunction normalizeName(n) {\n  return String(n || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')\n    .replace(/\\b(ltda|me|epp|eireli|s\\/?a|sa|industria|comercio|e)\\b/g, ' ')\n    .replace(/[^a-z0-9]+/g, ' ').trim();\n}\n\n// Chaves fortes: CNPJ e domínio. Chave fraca (nome+UF) só sinaliza \"possível duplicado\".\nfunction keysFor(lead) {\n  return {\n    cnpj: validCnpj(lead.cnpj) ? normalizeCnpj(lead.cnpj) : '',\n    domain: normalizeDomain(lead.site),\n    weak: normalizeName(lead.nome) && lead.uf ? normalizeName(lead.nome) + '|' + String(lead.uf).toUpperCase() : '',\n  };\n}\n\nfunction findDuplicate(candidate, existing) {\n  const k = keysFor(candidate);\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.cnpj && k.cnpj === ek.cnpj) return { lead: e, match: 'cnpj', strong: true };\n    if (k.domain && k.domain === ek.domain) return { lead: e, match: 'dominio', strong: true };\n  }\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.weak && k.weak === ek.weak) return { lead: e, match: 'nome_uf', strong: false };\n  }\n  return null;\n}\n\n// Preenche apenas campos vazios; nunca sobrescreve dado existente.\nfunction mergeLead(existing, incoming) {\n  const out = { ...existing };\n  for (const [k, v] of Object.entries(incoming)) if (!out[k] && v) out[k] = v;\n  return out;\n}\n\nconst FACTORS = {\n  A: 'Compatibilidade com fabricação/montagem',\n  B: 'Complexidade aparente dos equipamentos',\n  C: 'Indícios de produção sob encomenda',\n  D: 'Número de etapas/tipos de produto',\n  E: 'Porte e público-alvo',\n  F: 'Canal comercial apropriado',\n  G: 'Operação produtiva própria',\n};\nconst DEFAULT_WEIGHTS = { A: 25, B: 15, C: 20, D: 10, E: 10, F: 10, G: 10 };\n\n// factors: { A: { value: 0..1 | null, level: 'fato'|'inferencia'|'hipotese', evidence: [urls] } }\n// Fator desconhecido (value null) NÃO penaliza: entra com valor neutro e fica listado em \"unknown\".\nfunction computeScore(factors, weights = DEFAULT_WEIGHTS, neutral = 0.5) {\n  const total = Object.values(weights).reduce((a, b) => a + b, 0) || 1;\n  let sum = 0;\n  const breakdown = {}, unknown = [];\n  for (const k of Object.keys(weights)) {\n    const f = factors[k] || {};\n    const known = typeof f.value === 'number' && !isNaN(f.value);\n    const v = known ? Math.min(1, Math.max(0, f.value)) : neutral;\n    if (!known) unknown.push(k);\n    const pts = (v * weights[k] * 100) / total;\n    breakdown[k] = { points: Math.round(pts * 10) / 10, weight: weights[k], known, level: f.level || (known ? 'inferencia' : 'desconhecido'), evidence: f.evidence || [] };\n    sum += pts;\n  }\n  const knownWeight = Object.keys(weights).filter(k => !unknown.includes(k)).reduce((a, k) => a + weights[k], 0);\n  return { score: Math.round(sum), breakdown, unknown, confidence: Math.round((knownWeight / total) * 100) / 100 };\n}\n\nfunction norm(v) { return String(v || '').trim().toLowerCase(); }\n\nfunction isSuppressed(lead, list) {\n  const emails = new Set(), domains = new Set(), ids = new Set();\n  for (const s of list || []) {\n    if (s.email) emails.add(norm(s.email));\n    if (s.dominio) domains.add(norm(s.dominio));\n    if (s.lead_id) ids.add(s.lead_id);\n  }\n  const d = normalizeDomain(lead.site);\n  const em = norm(lead.email);\n  if (ids.has(lead.id)) return true;\n  if (d && domains.has(d)) return true;\n  if (em && (emails.has(em) || domains.has(em.split('@')[1]))) return true;\n  return false;\n}\n\nconst DEFAULT_STAGES = [\n  'identificada', 'pesquisada', 'qualificado', 'aguardando_aprovacao', 'aprovada', 'contato_realizado',\n  'resposta_recebida', 'reuniao_agendada', 'diagnostico_realizado', 'demonstracao_apresentada',\n  'proposta_enviada', 'negociacao', 'cliente', 'perdido',\n];\nconst PROMO_STAGES = ['aguardando_aprovacao', 'aprovada'];\n\n// Transição: registra data/ator e aplica regras de interrupção.\nfunction transition(lead, to, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  if (!stages.includes(to)) throw new Error('Etapa inválida: ' + to);\n  if (lead.nao_contatar && PROMO_STAGES.concat('contato_realizado').includes(to)) {\n    throw new Error('Lead marcado como não contatar: ação promocional bloqueada');\n  }\n  const at = opts.at || new Date().toISOString();\n  const entry = { de: lead.status, para: to, em: at, por: opts.by || 'usuario', motivo: opts.reason || '' };\n  const next = { ...lead, status: to, atualizado_em: at, historico: [...(lead.historico || []), entry] };\n  if (to === 'perdido' && !opts.reason) throw new Error('Informe o motivo da perda');\n  if (to === 'resposta_recebida' || to === 'perdido') next.proxima_acao = next.proxima_acao || '';\n  return next;\n}\n\nfunction markDoNotContact(lead, opts = {}) {\n  const at = opts.at || new Date().toISOString();\n  return {\n    ...lead, nao_contatar: true, proxima_acao: '', atualizado_em: at,\n    historico: [...(lead.historico || []), { de: lead.status, para: lead.status, em: at, por: opts.by || 'usuario', motivo: 'nao_contatar: ' + (opts.reason || '') }],\n  };\n}\n\nfunction suggestNextAction(lead) {\n  if (lead.nao_contatar) return 'Nenhuma (não contatar)';\n  const m = {\n    identificada: 'Pesquisar a empresa em fontes oficiais',\n    pesquisada: 'Qualificar e revisar a pontuação',\n    qualificado: 'Gerar rascunho de abordagem',\n    aguardando_aprovacao: 'Revisar, editar e aprovar o rascunho',\n    aprovada: 'Enviar manualmente e marcar como enviado',\n    contato_realizado: 'Aguardar resposta; revisar manualmente após alguns dias úteis',\n    resposta_recebida: 'Responder e propor 20 min de conversa',\n    reuniao_agendada: 'Preparar roteiro de diagnóstico',\n    diagnostico_realizado: 'Avaliar demonstração',\n    demonstracao_apresentada: 'Avaliar proposta',\n    proposta_enviada: 'Fazer acompanhamento manual',\n    negociacao: 'Definir próximos passos com o decisor',\n  };\n  return m[lead.status] || '';\n}\n\nconst DEFAULT_RULES = {\n  maxWords: 180,\n  // Afirmações de dor que exigem evidência; o rascunho não pode afirmá-las.\n  bannedClaims: [/vocês? (usa|usam|trabalha|trabalham) com planilhas?/i, /sofre[mr]?\\b/i, /atrasos? (constantes|frequentes)/i, /desperd[ií]cio/i, /falta de estoque/i, /garantimos?/i, /aumente .* em \\d+%/i, /resultados? garantidos?/i],\n  placeholders: /\\[[^\\]]+\\]|\\{\\{[^}]+\\}\\}/,\n};\n\n// cfg: { allowedLinks:[urls configuradas], nonExistingFeatures:[termos], suppression:[...] }\nfunction validateDraft(draft, lead, cfg = {}) {\n  const errors = [], warnings = [];\n  const body = String(draft.corpo || ''), subject = String(draft.assunto || '');\n  const rules = { ...DEFAULT_RULES, ...(cfg.rules || {}) };\n  if (!subject.trim()) errors.push('Assunto vazio');\n  if (!body.trim()) errors.push('Corpo vazio');\n  if (rules.placeholders.test(subject + body)) errors.push('Placeholders não preenchidos');\n  if (body.split(/\\s+/).filter(Boolean).length > rules.maxWords) warnings.push('Mensagem longa');\n  for (const re of rules.bannedClaims) if (re.test(body)) errors.push('Afirmação sem evidência: ' + re);\n  for (const t of cfg.nonExistingFeatures || []) if (t && body.toLowerCase().includes(t.toLowerCase())) errors.push('Menciona funcionalidade inexistente: ' + t);\n  const allowed = new Set((cfg.allowedLinks || []).map(u => u.replace(/\\/$/, '')));\n  for (const u of body.match(/https?:\\/\\/[^\\s)>\"]+/g) || []) {\n    if (!allowed.has(u.replace(/[.,;]$/, '').replace(/\\/$/, ''))) errors.push('Link não configurado: ' + u);\n  }\n  if (!lead.fontes || !lead.fontes.length) errors.push('Lead sem fonte registrada');\n  if (lead.email && !lead.email_fonte) errors.push('E-mail sem URL de origem');\n  if (lead.nao_contatar || isSuppressed(lead, cfg.suppression)) errors.push('Lead em lista de supressão');\n  return { ok: errors.length === 0, errors, warnings };\n}\n\n// Conversão só é exibida quando o denominador atinge minSample; senão, \"amostra insuficiente\".\nfunction computeMetrics(leads, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  const minSample = opts.minSample || 20;\n  const reached = Object.fromEntries(stages.map(s => [s, 0]));\n  const idx = s => stages.indexOf(s);\n  for (const l of leads) {\n    const visited = new Set((l.historico || []).map(h => h.para).concat(l.status));\n    // etapa atingida = visitada ou posterior à maior visitada (exceto \"perdido\")\n    const max = Math.max(-1, ...[...visited].filter(s => s !== 'perdido').map(idx));\n    stages.forEach((s, i) => { if (s !== 'perdido' && (i <= max || visited.has(s))) reached[s]++; });\n    if (visited.has('perdido')) reached['perdido']++;\n  }\n  const conversions = [];\n  const chain = stages.filter(s => s !== 'perdido');\n  for (let i = 1; i < chain.length; i++) {\n    const from = reached[chain[i - 1]], to = reached[chain[i]];\n    conversions.push({ de: chain[i - 1], para: chain[i], base: from, atingiram: to,\n      taxa: from >= minSample ? Math.round((to / from) * 1000) / 10 : null,\n      nota: from >= minSample ? 'observado' : 'amostra insuficiente (<' + minSample + ')' });\n  }\n  const count = (key, f = x => x) => {\n    const o = {};\n    for (const l of leads) { const v = f(l[key]) || 'não informado'; o[v] = (o[v] || 0) + 1; }\n    return o;\n  };\n  const lost = {};\n  for (const l of leads) if (l.status === 'perdido') { const m = l.motivo_perda || 'não informado'; lost[m] = (lost[m] || 0) + 1; }\n  return {\n    total: leads.length, porEtapa: reached, conversoes: conversions,\n    porSegmento: count('segmento'), porFonte: count('fonte_aquisicao'), motivosPerda: lost,\n    proximasAcoes: leads.filter(l => l.proxima_acao && !l.nao_contatar).map(l => ({ id: l.id, nome: l.nome, acao: l.proxima_acao, data: l.proxima_acao_data || '' })),\n    tipo: 'observado',\n  };\n}\n\nconst STAGES = DEFAULT_STAGES;\nconst bool = v => ['true', 'sim', '1', 'x'].includes(String(v || '').toLowerCase());\nconst normLead = l => ({ ...l, nao_contatar: bool(l.nao_contatar) });\nconst cfgMap = rows => Object.fromEntries(rows.filter(r => r.json && r.json.chave).map(r => [r.json.chave, String(r.json.valor || '')]));\nconst list = s => String(s || '').split(';').map(x => x.trim()).filter(Boolean);\nconst esc = s => String(s == null ? '' : s).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\nconst now = () => new Date().toISOString();\nfunction requireToken(token) {\n  const t = $env.REVIEW_UI_TOKEN;\n  if (!t) throw new Error('REVIEW_UI_TOKEN não configurado: recusando requisição');\n  if (token !== t) throw new Error('Não autorizado');\n}\nfunction hashId(s) { let h = 5381; for (const c of s) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return 'L' + h.toString(36); }\n\nreturn $('Validar e preparar gravações').first().json.fila.map(f => ({ json: f }));"
+      }
+    },
+    {
+      "id": "n25",
+      "name": "Gravar fila",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3600,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{$env.GOOGLE_SHEET_ID}}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Fila"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": null,
+          "matchingColumns": []
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n26",
+      "name": "Item histórico",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3840,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// CSV mínimo (RFC 4180): aspas, vírgulas e quebras de linha dentro de campos.\nfunction parseCsv(text) {\n  const rows = [];\n  let row = [], field = '', inQ = false;\n  const s = String(text || '').replace(/^﻿/, '');\n  for (let i = 0; i < s.length; i++) {\n    const c = s[i];\n    if (inQ) {\n      if (c === '\"' && s[i + 1] === '\"') { field += '\"'; i++; }\n      else if (c === '\"') inQ = false;\n      else field += c;\n    } else if (c === '\"') inQ = true;\n    else if (c === ',' || c === ';') { row.push(field); field = ''; }\n    else if (c === '\\n' || c === '\\r') {\n      if (c === '\\r' && s[i + 1] === '\\n') i++;\n      row.push(field); field = '';\n      if (row.some(v => v !== '')) rows.push(row);\n      row = [];\n    } else field += c;\n  }\n  row.push(field);\n  if (row.some(v => v !== '')) rows.push(row);\n  if (!rows.length) return [];\n  const head = rows[0].map(h => h.trim());\n  return rows.slice(1).map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || '').trim()])));\n}\n\nfunction toCsv(records, columns) {\n  const cols = columns || [...new Set(records.flatMap(r => Object.keys(r)))];\n  const esc = v => {\n    v = v == null ? '' : String(v);\n    // evita injeção de fórmulas ao abrir no Excel/Sheets\n    if (/^[=+\\-@]/.test(v)) v = \"'\" + v;\n    return /[\",\\n\\r;]/.test(v) ? '\"' + v.replace(/\"/g, '\"\"') + '\"' : v;\n  };\n  return [cols.join(','), ...records.map(r => cols.map(c => esc(r[c])).join(','))].join('\\n');\n}\n\nfunction normalizeDomain(url) {\n  if (!url) return '';\n  let h = String(url).trim().toLowerCase();\n  h = h.replace(/^[a-z]+:\\/\\//, '').replace(/^www\\./, '').split(/[\\/?#]/)[0].split(':')[0];\n  return /^[a-z0-9.-]+\\.[a-z]{2,}$/.test(h) ? h : '';\n}\n\nfunction normalizeCnpj(v) {\n  const d = String(v || '').replace(/\\D/g, '');\n  return d.length === 14 ? d : '';\n}\n\nfunction validCnpj(v) {\n  const d = normalizeCnpj(v);\n  if (!d || /^(\\d)\\1+$/.test(d)) return false;\n  const calc = len => {\n    let sum = 0, pos = len - 7;\n    for (let i = len; i >= 1; i--) { sum += d[len - i] * pos--; if (pos < 2) pos = 9; }\n    const r = sum % 11;\n    return r < 2 ? 0 : 11 - r;\n  };\n  return calc(12) === +d[12] && calc(13) === +d[13];\n}\n\nfunction normalizeName(n) {\n  return String(n || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')\n    .replace(/\\b(ltda|me|epp|eireli|s\\/?a|sa|industria|comercio|e)\\b/g, ' ')\n    .replace(/[^a-z0-9]+/g, ' ').trim();\n}\n\n// Chaves fortes: CNPJ e domínio. Chave fraca (nome+UF) só sinaliza \"possível duplicado\".\nfunction keysFor(lead) {\n  return {\n    cnpj: validCnpj(lead.cnpj) ? normalizeCnpj(lead.cnpj) : '',\n    domain: normalizeDomain(lead.site),\n    weak: normalizeName(lead.nome) && lead.uf ? normalizeName(lead.nome) + '|' + String(lead.uf).toUpperCase() : '',\n  };\n}\n\nfunction findDuplicate(candidate, existing) {\n  const k = keysFor(candidate);\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.cnpj && k.cnpj === ek.cnpj) return { lead: e, match: 'cnpj', strong: true };\n    if (k.domain && k.domain === ek.domain) return { lead: e, match: 'dominio', strong: true };\n  }\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.weak && k.weak === ek.weak) return { lead: e, match: 'nome_uf', strong: false };\n  }\n  return null;\n}\n\n// Preenche apenas campos vazios; nunca sobrescreve dado existente.\nfunction mergeLead(existing, incoming) {\n  const out = { ...existing };\n  for (const [k, v] of Object.entries(incoming)) if (!out[k] && v) out[k] = v;\n  return out;\n}\n\nconst FACTORS = {\n  A: 'Compatibilidade com fabricação/montagem',\n  B: 'Complexidade aparente dos equipamentos',\n  C: 'Indícios de produção sob encomenda',\n  D: 'Número de etapas/tipos de produto',\n  E: 'Porte e público-alvo',\n  F: 'Canal comercial apropriado',\n  G: 'Operação produtiva própria',\n};\nconst DEFAULT_WEIGHTS = { A: 25, B: 15, C: 20, D: 10, E: 10, F: 10, G: 10 };\n\n// factors: { A: { value: 0..1 | null, level: 'fato'|'inferencia'|'hipotese', evidence: [urls] } }\n// Fator desconhecido (value null) NÃO penaliza: entra com valor neutro e fica listado em \"unknown\".\nfunction computeScore(factors, weights = DEFAULT_WEIGHTS, neutral = 0.5) {\n  const total = Object.values(weights).reduce((a, b) => a + b, 0) || 1;\n  let sum = 0;\n  const breakdown = {}, unknown = [];\n  for (const k of Object.keys(weights)) {\n    const f = factors[k] || {};\n    const known = typeof f.value === 'number' && !isNaN(f.value);\n    const v = known ? Math.min(1, Math.max(0, f.value)) : neutral;\n    if (!known) unknown.push(k);\n    const pts = (v * weights[k] * 100) / total;\n    breakdown[k] = { points: Math.round(pts * 10) / 10, weight: weights[k], known, level: f.level || (known ? 'inferencia' : 'desconhecido'), evidence: f.evidence || [] };\n    sum += pts;\n  }\n  const knownWeight = Object.keys(weights).filter(k => !unknown.includes(k)).reduce((a, k) => a + weights[k], 0);\n  return { score: Math.round(sum), breakdown, unknown, confidence: Math.round((knownWeight / total) * 100) / 100 };\n}\n\nfunction norm(v) { return String(v || '').trim().toLowerCase(); }\n\nfunction isSuppressed(lead, list) {\n  const emails = new Set(), domains = new Set(), ids = new Set();\n  for (const s of list || []) {\n    if (s.email) emails.add(norm(s.email));\n    if (s.dominio) domains.add(norm(s.dominio));\n    if (s.lead_id) ids.add(s.lead_id);\n  }\n  const d = normalizeDomain(lead.site);\n  const em = norm(lead.email);\n  if (ids.has(lead.id)) return true;\n  if (d && domains.has(d)) return true;\n  if (em && (emails.has(em) || domains.has(em.split('@')[1]))) return true;\n  return false;\n}\n\nconst DEFAULT_STAGES = [\n  'identificada', 'pesquisada', 'qualificado', 'aguardando_aprovacao', 'aprovada', 'contato_realizado',\n  'resposta_recebida', 'reuniao_agendada', 'diagnostico_realizado', 'demonstracao_apresentada',\n  'proposta_enviada', 'negociacao', 'cliente', 'perdido',\n];\nconst PROMO_STAGES = ['aguardando_aprovacao', 'aprovada'];\n\n// Transição: registra data/ator e aplica regras de interrupção.\nfunction transition(lead, to, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  if (!stages.includes(to)) throw new Error('Etapa inválida: ' + to);\n  if (lead.nao_contatar && PROMO_STAGES.concat('contato_realizado').includes(to)) {\n    throw new Error('Lead marcado como não contatar: ação promocional bloqueada');\n  }\n  const at = opts.at || new Date().toISOString();\n  const entry = { de: lead.status, para: to, em: at, por: opts.by || 'usuario', motivo: opts.reason || '' };\n  const next = { ...lead, status: to, atualizado_em: at, historico: [...(lead.historico || []), entry] };\n  if (to === 'perdido' && !opts.reason) throw new Error('Informe o motivo da perda');\n  if (to === 'resposta_recebida' || to === 'perdido') next.proxima_acao = next.proxima_acao || '';\n  return next;\n}\n\nfunction markDoNotContact(lead, opts = {}) {\n  const at = opts.at || new Date().toISOString();\n  return {\n    ...lead, nao_contatar: true, proxima_acao: '', atualizado_em: at,\n    historico: [...(lead.historico || []), { de: lead.status, para: lead.status, em: at, por: opts.by || 'usuario', motivo: 'nao_contatar: ' + (opts.reason || '') }],\n  };\n}\n\nfunction suggestNextAction(lead) {\n  if (lead.nao_contatar) return 'Nenhuma (não contatar)';\n  const m = {\n    identificada: 'Pesquisar a empresa em fontes oficiais',\n    pesquisada: 'Qualificar e revisar a pontuação',\n    qualificado: 'Gerar rascunho de abordagem',\n    aguardando_aprovacao: 'Revisar, editar e aprovar o rascunho',\n    aprovada: 'Enviar manualmente e marcar como enviado',\n    contato_realizado: 'Aguardar resposta; revisar manualmente após alguns dias úteis',\n    resposta_recebida: 'Responder e propor 20 min de conversa',\n    reuniao_agendada: 'Preparar roteiro de diagnóstico',\n    diagnostico_realizado: 'Avaliar demonstração',\n    demonstracao_apresentada: 'Avaliar proposta',\n    proposta_enviada: 'Fazer acompanhamento manual',\n    negociacao: 'Definir próximos passos com o decisor',\n  };\n  return m[lead.status] || '';\n}\n\nconst DEFAULT_RULES = {\n  maxWords: 180,\n  // Afirmações de dor que exigem evidência; o rascunho não pode afirmá-las.\n  bannedClaims: [/vocês? (usa|usam|trabalha|trabalham) com planilhas?/i, /sofre[mr]?\\b/i, /atrasos? (constantes|frequentes)/i, /desperd[ií]cio/i, /falta de estoque/i, /garantimos?/i, /aumente .* em \\d+%/i, /resultados? garantidos?/i],\n  placeholders: /\\[[^\\]]+\\]|\\{\\{[^}]+\\}\\}/,\n};\n\n// cfg: { allowedLinks:[urls configuradas], nonExistingFeatures:[termos], suppression:[...] }\nfunction validateDraft(draft, lead, cfg = {}) {\n  const errors = [], warnings = [];\n  const body = String(draft.corpo || ''), subject = String(draft.assunto || '');\n  const rules = { ...DEFAULT_RULES, ...(cfg.rules || {}) };\n  if (!subject.trim()) errors.push('Assunto vazio');\n  if (!body.trim()) errors.push('Corpo vazio');\n  if (rules.placeholders.test(subject + body)) errors.push('Placeholders não preenchidos');\n  if (body.split(/\\s+/).filter(Boolean).length > rules.maxWords) warnings.push('Mensagem longa');\n  for (const re of rules.bannedClaims) if (re.test(body)) errors.push('Afirmação sem evidência: ' + re);\n  for (const t of cfg.nonExistingFeatures || []) if (t && body.toLowerCase().includes(t.toLowerCase())) errors.push('Menciona funcionalidade inexistente: ' + t);\n  const allowed = new Set((cfg.allowedLinks || []).map(u => u.replace(/\\/$/, '')));\n  for (const u of body.match(/https?:\\/\\/[^\\s)>\"]+/g) || []) {\n    if (!allowed.has(u.replace(/[.,;]$/, '').replace(/\\/$/, ''))) errors.push('Link não configurado: ' + u);\n  }\n  if (!lead.fontes || !lead.fontes.length) errors.push('Lead sem fonte registrada');\n  if (lead.email && !lead.email_fonte) errors.push('E-mail sem URL de origem');\n  if (lead.nao_contatar || isSuppressed(lead, cfg.suppression)) errors.push('Lead em lista de supressão');\n  return { ok: errors.length === 0, errors, warnings };\n}\n\n// Conversão só é exibida quando o denominador atinge minSample; senão, \"amostra insuficiente\".\nfunction computeMetrics(leads, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  const minSample = opts.minSample || 20;\n  const reached = Object.fromEntries(stages.map(s => [s, 0]));\n  const idx = s => stages.indexOf(s);\n  for (const l of leads) {\n    const visited = new Set((l.historico || []).map(h => h.para).concat(l.status));\n    // etapa atingida = visitada ou posterior à maior visitada (exceto \"perdido\")\n    const max = Math.max(-1, ...[...visited].filter(s => s !== 'perdido').map(idx));\n    stages.forEach((s, i) => { if (s !== 'perdido' && (i <= max || visited.has(s))) reached[s]++; });\n    if (visited.has('perdido')) reached['perdido']++;\n  }\n  const conversions = [];\n  const chain = stages.filter(s => s !== 'perdido');\n  for (let i = 1; i < chain.length; i++) {\n    const from = reached[chain[i - 1]], to = reached[chain[i]];\n    conversions.push({ de: chain[i - 1], para: chain[i], base: from, atingiram: to,\n      taxa: from >= minSample ? Math.round((to / from) * 1000) / 10 : null,\n      nota: from >= minSample ? 'observado' : 'amostra insuficiente (<' + minSample + ')' });\n  }\n  const count = (key, f = x => x) => {\n    const o = {};\n    for (const l of leads) { const v = f(l[key]) || 'não informado'; o[v] = (o[v] || 0) + 1; }\n    return o;\n  };\n  const lost = {};\n  for (const l of leads) if (l.status === 'perdido') { const m = l.motivo_perda || 'não informado'; lost[m] = (lost[m] || 0) + 1; }\n  return {\n    total: leads.length, porEtapa: reached, conversoes: conversions,\n    porSegmento: count('segmento'), porFonte: count('fonte_aquisicao'), motivosPerda: lost,\n    proximasAcoes: leads.filter(l => l.proxima_acao && !l.nao_contatar).map(l => ({ id: l.id, nome: l.nome, acao: l.proxima_acao, data: l.proxima_acao_data || '' })),\n    tipo: 'observado',\n  };\n}\n\nconst STAGES = DEFAULT_STAGES;\nconst bool = v => ['true', 'sim', '1', 'x'].includes(String(v || '').toLowerCase());\nconst normLead = l => ({ ...l, nao_contatar: bool(l.nao_contatar) });\nconst cfgMap = rows => Object.fromEntries(rows.filter(r => r.json && r.json.chave).map(r => [r.json.chave, String(r.json.valor || '')]));\nconst list = s => String(s || '').split(';').map(x => x.trim()).filter(Boolean);\nconst esc = s => String(s == null ? '' : s).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\nconst now = () => new Date().toISOString();\nfunction requireToken(token) {\n  const t = $env.REVIEW_UI_TOKEN;\n  if (!t) throw new Error('REVIEW_UI_TOKEN não configurado: recusando requisição');\n  if (token !== t) throw new Error('Não autorizado');\n}\nfunction hashId(s) { let h = 5381; for (const c of s) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return 'L' + h.toString(36); }\n\nreturn [{ json: $('Validar e preparar gravações').first().json.hist }];"
+      }
+    },
+    {
+      "id": "n27",
+      "name": "Gravar histórico",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        4080,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{$env.GOOGLE_SHEET_ID}}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Historico"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": null,
+          "matchingColumns": []
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n28",
+      "name": "Itens fonte",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4320,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// CSV mínimo (RFC 4180): aspas, vírgulas e quebras de linha dentro de campos.\nfunction parseCsv(text) {\n  const rows = [];\n  let row = [], field = '', inQ = false;\n  const s = String(text || '').replace(/^﻿/, '');\n  for (let i = 0; i < s.length; i++) {\n    const c = s[i];\n    if (inQ) {\n      if (c === '\"' && s[i + 1] === '\"') { field += '\"'; i++; }\n      else if (c === '\"') inQ = false;\n      else field += c;\n    } else if (c === '\"') inQ = true;\n    else if (c === ',' || c === ';') { row.push(field); field = ''; }\n    else if (c === '\\n' || c === '\\r') {\n      if (c === '\\r' && s[i + 1] === '\\n') i++;\n      row.push(field); field = '';\n      if (row.some(v => v !== '')) rows.push(row);\n      row = [];\n    } else field += c;\n  }\n  row.push(field);\n  if (row.some(v => v !== '')) rows.push(row);\n  if (!rows.length) return [];\n  const head = rows[0].map(h => h.trim());\n  return rows.slice(1).map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || '').trim()])));\n}\n\nfunction toCsv(records, columns) {\n  const cols = columns || [...new Set(records.flatMap(r => Object.keys(r)))];\n  const esc = v => {\n    v = v == null ? '' : String(v);\n    // evita injeção de fórmulas ao abrir no Excel/Sheets\n    if (/^[=+\\-@]/.test(v)) v = \"'\" + v;\n    return /[\",\\n\\r;]/.test(v) ? '\"' + v.replace(/\"/g, '\"\"') + '\"' : v;\n  };\n  return [cols.join(','), ...records.map(r => cols.map(c => esc(r[c])).join(','))].join('\\n');\n}\n\nfunction normalizeDomain(url) {\n  if (!url) return '';\n  let h = String(url).trim().toLowerCase();\n  h = h.replace(/^[a-z]+:\\/\\//, '').replace(/^www\\./, '').split(/[\\/?#]/)[0].split(':')[0];\n  return /^[a-z0-9.-]+\\.[a-z]{2,}$/.test(h) ? h : '';\n}\n\nfunction normalizeCnpj(v) {\n  const d = String(v || '').replace(/\\D/g, '');\n  return d.length === 14 ? d : '';\n}\n\nfunction validCnpj(v) {\n  const d = normalizeCnpj(v);\n  if (!d || /^(\\d)\\1+$/.test(d)) return false;\n  const calc = len => {\n    let sum = 0, pos = len - 7;\n    for (let i = len; i >= 1; i--) { sum += d[len - i] * pos--; if (pos < 2) pos = 9; }\n    const r = sum % 11;\n    return r < 2 ? 0 : 11 - r;\n  };\n  return calc(12) === +d[12] && calc(13) === +d[13];\n}\n\nfunction normalizeName(n) {\n  return String(n || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')\n    .replace(/\\b(ltda|me|epp|eireli|s\\/?a|sa|industria|comercio|e)\\b/g, ' ')\n    .replace(/[^a-z0-9]+/g, ' ').trim();\n}\n\n// Chaves fortes: CNPJ e domínio. Chave fraca (nome+UF) só sinaliza \"possível duplicado\".\nfunction keysFor(lead) {\n  return {\n    cnpj: validCnpj(lead.cnpj) ? normalizeCnpj(lead.cnpj) : '',\n    domain: normalizeDomain(lead.site),\n    weak: normalizeName(lead.nome) && lead.uf ? normalizeName(lead.nome) + '|' + String(lead.uf).toUpperCase() : '',\n  };\n}\n\nfunction findDuplicate(candidate, existing) {\n  const k = keysFor(candidate);\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.cnpj && k.cnpj === ek.cnpj) return { lead: e, match: 'cnpj', strong: true };\n    if (k.domain && k.domain === ek.domain) return { lead: e, match: 'dominio', strong: true };\n  }\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.weak && k.weak === ek.weak) return { lead: e, match: 'nome_uf', strong: false };\n  }\n  return null;\n}\n\n// Preenche apenas campos vazios; nunca sobrescreve dado existente.\nfunction mergeLead(existing, incoming) {\n  const out = { ...existing };\n  for (const [k, v] of Object.entries(incoming)) if (!out[k] && v) out[k] = v;\n  return out;\n}\n\nconst FACTORS = {\n  A: 'Compatibilidade com fabricação/montagem',\n  B: 'Complexidade aparente dos equipamentos',\n  C: 'Indícios de produção sob encomenda',\n  D: 'Número de etapas/tipos de produto',\n  E: 'Porte e público-alvo',\n  F: 'Canal comercial apropriado',\n  G: 'Operação produtiva própria',\n};\nconst DEFAULT_WEIGHTS = { A: 25, B: 15, C: 20, D: 10, E: 10, F: 10, G: 10 };\n\n// factors: { A: { value: 0..1 | null, level: 'fato'|'inferencia'|'hipotese', evidence: [urls] } }\n// Fator desconhecido (value null) NÃO penaliza: entra com valor neutro e fica listado em \"unknown\".\nfunction computeScore(factors, weights = DEFAULT_WEIGHTS, neutral = 0.5) {\n  const total = Object.values(weights).reduce((a, b) => a + b, 0) || 1;\n  let sum = 0;\n  const breakdown = {}, unknown = [];\n  for (const k of Object.keys(weights)) {\n    const f = factors[k] || {};\n    const known = typeof f.value === 'number' && !isNaN(f.value);\n    const v = known ? Math.min(1, Math.max(0, f.value)) : neutral;\n    if (!known) unknown.push(k);\n    const pts = (v * weights[k] * 100) / total;\n    breakdown[k] = { points: Math.round(pts * 10) / 10, weight: weights[k], known, level: f.level || (known ? 'inferencia' : 'desconhecido'), evidence: f.evidence || [] };\n    sum += pts;\n  }\n  const knownWeight = Object.keys(weights).filter(k => !unknown.includes(k)).reduce((a, k) => a + weights[k], 0);\n  return { score: Math.round(sum), breakdown, unknown, confidence: Math.round((knownWeight / total) * 100) / 100 };\n}\n\nfunction norm(v) { return String(v || '').trim().toLowerCase(); }\n\nfunction isSuppressed(lead, list) {\n  const emails = new Set(), domains = new Set(), ids = new Set();\n  for (const s of list || []) {\n    if (s.email) emails.add(norm(s.email));\n    if (s.dominio) domains.add(norm(s.dominio));\n    if (s.lead_id) ids.add(s.lead_id);\n  }\n  const d = normalizeDomain(lead.site);\n  const em = norm(lead.email);\n  if (ids.has(lead.id)) return true;\n  if (d && domains.has(d)) return true;\n  if (em && (emails.has(em) || domains.has(em.split('@')[1]))) return true;\n  return false;\n}\n\nconst DEFAULT_STAGES = [\n  'identificada', 'pesquisada', 'qualificado', 'aguardando_aprovacao', 'aprovada', 'contato_realizado',\n  'resposta_recebida', 'reuniao_agendada', 'diagnostico_realizado', 'demonstracao_apresentada',\n  'proposta_enviada', 'negociacao', 'cliente', 'perdido',\n];\nconst PROMO_STAGES = ['aguardando_aprovacao', 'aprovada'];\n\n// Transição: registra data/ator e aplica regras de interrupção.\nfunction transition(lead, to, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  if (!stages.includes(to)) throw new Error('Etapa inválida: ' + to);\n  if (lead.nao_contatar && PROMO_STAGES.concat('contato_realizado').includes(to)) {\n    throw new Error('Lead marcado como não contatar: ação promocional bloqueada');\n  }\n  const at = opts.at || new Date().toISOString();\n  const entry = { de: lead.status, para: to, em: at, por: opts.by || 'usuario', motivo: opts.reason || '' };\n  const next = { ...lead, status: to, atualizado_em: at, historico: [...(lead.historico || []), entry] };\n  if (to === 'perdido' && !opts.reason) throw new Error('Informe o motivo da perda');\n  if (to === 'resposta_recebida' || to === 'perdido') next.proxima_acao = next.proxima_acao || '';\n  return next;\n}\n\nfunction markDoNotContact(lead, opts = {}) {\n  const at = opts.at || new Date().toISOString();\n  return {\n    ...lead, nao_contatar: true, proxima_acao: '', atualizado_em: at,\n    historico: [...(lead.historico || []), { de: lead.status, para: lead.status, em: at, por: opts.by || 'usuario', motivo: 'nao_contatar: ' + (opts.reason || '') }],\n  };\n}\n\nfunction suggestNextAction(lead) {\n  if (lead.nao_contatar) return 'Nenhuma (não contatar)';\n  const m = {\n    identificada: 'Pesquisar a empresa em fontes oficiais',\n    pesquisada: 'Qualificar e revisar a pontuação',\n    qualificado: 'Gerar rascunho de abordagem',\n    aguardando_aprovacao: 'Revisar, editar e aprovar o rascunho',\n    aprovada: 'Enviar manualmente e marcar como enviado',\n    contato_realizado: 'Aguardar resposta; revisar manualmente após alguns dias úteis',\n    resposta_recebida: 'Responder e propor 20 min de conversa',\n    reuniao_agendada: 'Preparar roteiro de diagnóstico',\n    diagnostico_realizado: 'Avaliar demonstração',\n    demonstracao_apresentada: 'Avaliar proposta',\n    proposta_enviada: 'Fazer acompanhamento manual',\n    negociacao: 'Definir próximos passos com o decisor',\n  };\n  return m[lead.status] || '';\n}\n\nconst DEFAULT_RULES = {\n  maxWords: 180,\n  // Afirmações de dor que exigem evidência; o rascunho não pode afirmá-las.\n  bannedClaims: [/vocês? (usa|usam|trabalha|trabalham) com planilhas?/i, /sofre[mr]?\\b/i, /atrasos? (constantes|frequentes)/i, /desperd[ií]cio/i, /falta de estoque/i, /garantimos?/i, /aumente .* em \\d+%/i, /resultados? garantidos?/i],\n  placeholders: /\\[[^\\]]+\\]|\\{\\{[^}]+\\}\\}/,\n};\n\n// cfg: { allowedLinks:[urls configuradas], nonExistingFeatures:[termos], suppression:[...] }\nfunction validateDraft(draft, lead, cfg = {}) {\n  const errors = [], warnings = [];\n  const body = String(draft.corpo || ''), subject = String(draft.assunto || '');\n  const rules = { ...DEFAULT_RULES, ...(cfg.rules || {}) };\n  if (!subject.trim()) errors.push('Assunto vazio');\n  if (!body.trim()) errors.push('Corpo vazio');\n  if (rules.placeholders.test(subject + body)) errors.push('Placeholders não preenchidos');\n  if (body.split(/\\s+/).filter(Boolean).length > rules.maxWords) warnings.push('Mensagem longa');\n  for (const re of rules.bannedClaims) if (re.test(body)) errors.push('Afirmação sem evidência: ' + re);\n  for (const t of cfg.nonExistingFeatures || []) if (t && body.toLowerCase().includes(t.toLowerCase())) errors.push('Menciona funcionalidade inexistente: ' + t);\n  const allowed = new Set((cfg.allowedLinks || []).map(u => u.replace(/\\/$/, '')));\n  for (const u of body.match(/https?:\\/\\/[^\\s)>\"]+/g) || []) {\n    if (!allowed.has(u.replace(/[.,;]$/, '').replace(/\\/$/, ''))) errors.push('Link não configurado: ' + u);\n  }\n  if (!lead.fontes || !lead.fontes.length) errors.push('Lead sem fonte registrada');\n  if (lead.email && !lead.email_fonte) errors.push('E-mail sem URL de origem');\n  if (lead.nao_contatar || isSuppressed(lead, cfg.suppression)) errors.push('Lead em lista de supressão');\n  return { ok: errors.length === 0, errors, warnings };\n}\n\n// Conversão só é exibida quando o denominador atinge minSample; senão, \"amostra insuficiente\".\nfunction computeMetrics(leads, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  const minSample = opts.minSample || 20;\n  const reached = Object.fromEntries(stages.map(s => [s, 0]));\n  const idx = s => stages.indexOf(s);\n  for (const l of leads) {\n    const visited = new Set((l.historico || []).map(h => h.para).concat(l.status));\n    // etapa atingida = visitada ou posterior à maior visitada (exceto \"perdido\")\n    const max = Math.max(-1, ...[...visited].filter(s => s !== 'perdido').map(idx));\n    stages.forEach((s, i) => { if (s !== 'perdido' && (i <= max || visited.has(s))) reached[s]++; });\n    if (visited.has('perdido')) reached['perdido']++;\n  }\n  const conversions = [];\n  const chain = stages.filter(s => s !== 'perdido');\n  for (let i = 1; i < chain.length; i++) {\n    const from = reached[chain[i - 1]], to = reached[chain[i]];\n    conversions.push({ de: chain[i - 1], para: chain[i], base: from, atingiram: to,\n      taxa: from >= minSample ? Math.round((to / from) * 1000) / 10 : null,\n      nota: from >= minSample ? 'observado' : 'amostra insuficiente (<' + minSample + ')' });\n  }\n  const count = (key, f = x => x) => {\n    const o = {};\n    for (const l of leads) { const v = f(l[key]) || 'não informado'; o[v] = (o[v] || 0) + 1; }\n    return o;\n  };\n  const lost = {};\n  for (const l of leads) if (l.status === 'perdido') { const m = l.motivo_perda || 'não informado'; lost[m] = (lost[m] || 0) + 1; }\n  return {\n    total: leads.length, porEtapa: reached, conversoes: conversions,\n    porSegmento: count('segmento'), porFonte: count('fonte_aquisicao'), motivosPerda: lost,\n    proximasAcoes: leads.filter(l => l.proxima_acao && !l.nao_contatar).map(l => ({ id: l.id, nome: l.nome, acao: l.proxima_acao, data: l.proxima_acao_data || '' })),\n    tipo: 'observado',\n  };\n}\n\nconst STAGES = DEFAULT_STAGES;\nconst bool = v => ['true', 'sim', '1', 'x'].includes(String(v || '').toLowerCase());\nconst normLead = l => ({ ...l, nao_contatar: bool(l.nao_contatar) });\nconst cfgMap = rows => Object.fromEntries(rows.filter(r => r.json && r.json.chave).map(r => [r.json.chave, String(r.json.valor || '')]));\nconst list = s => String(s || '').split(';').map(x => x.trim()).filter(Boolean);\nconst esc = s => String(s == null ? '' : s).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\nconst now = () => new Date().toISOString();\nfunction requireToken(token) {\n  const t = $env.REVIEW_UI_TOKEN;\n  if (!t) throw new Error('REVIEW_UI_TOKEN não configurado: recusando requisição');\n  if (token !== t) throw new Error('Não autorizado');\n}\nfunction hashId(s) { let h = 5381; for (const c of s) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return 'L' + h.toString(36); }\n\nreturn $('Validar e preparar gravações').first().json.fonteRow.map(f => ({ json: f }));"
+      }
+    },
+    {
+      "id": "n29",
+      "name": "Gravar fonte",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        4560,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{$env.GOOGLE_SHEET_ID}}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Fontes"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": null,
+          "matchingColumns": []
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n30",
+      "name": "Resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4800,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// CSV mínimo (RFC 4180): aspas, vírgulas e quebras de linha dentro de campos.\nfunction parseCsv(text) {\n  const rows = [];\n  let row = [], field = '', inQ = false;\n  const s = String(text || '').replace(/^﻿/, '');\n  for (let i = 0; i < s.length; i++) {\n    const c = s[i];\n    if (inQ) {\n      if (c === '\"' && s[i + 1] === '\"') { field += '\"'; i++; }\n      else if (c === '\"') inQ = false;\n      else field += c;\n    } else if (c === '\"') inQ = true;\n    else if (c === ',' || c === ';') { row.push(field); field = ''; }\n    else if (c === '\\n' || c === '\\r') {\n      if (c === '\\r' && s[i + 1] === '\\n') i++;\n      row.push(field); field = '';\n      if (row.some(v => v !== '')) rows.push(row);\n      row = [];\n    } else field += c;\n  }\n  row.push(field);\n  if (row.some(v => v !== '')) rows.push(row);\n  if (!rows.length) return [];\n  const head = rows[0].map(h => h.trim());\n  return rows.slice(1).map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || '').trim()])));\n}\n\nfunction toCsv(records, columns) {\n  const cols = columns || [...new Set(records.flatMap(r => Object.keys(r)))];\n  const esc = v => {\n    v = v == null ? '' : String(v);\n    // evita injeção de fórmulas ao abrir no Excel/Sheets\n    if (/^[=+\\-@]/.test(v)) v = \"'\" + v;\n    return /[\",\\n\\r;]/.test(v) ? '\"' + v.replace(/\"/g, '\"\"') + '\"' : v;\n  };\n  return [cols.join(','), ...records.map(r => cols.map(c => esc(r[c])).join(','))].join('\\n');\n}\n\nfunction normalizeDomain(url) {\n  if (!url) return '';\n  let h = String(url).trim().toLowerCase();\n  h = h.replace(/^[a-z]+:\\/\\//, '').replace(/^www\\./, '').split(/[\\/?#]/)[0].split(':')[0];\n  return /^[a-z0-9.-]+\\.[a-z]{2,}$/.test(h) ? h : '';\n}\n\nfunction normalizeCnpj(v) {\n  const d = String(v || '').replace(/\\D/g, '');\n  return d.length === 14 ? d : '';\n}\n\nfunction validCnpj(v) {\n  const d = normalizeCnpj(v);\n  if (!d || /^(\\d)\\1+$/.test(d)) return false;\n  const calc = len => {\n    let sum = 0, pos = len - 7;\n    for (let i = len; i >= 1; i--) { sum += d[len - i] * pos--; if (pos < 2) pos = 9; }\n    const r = sum % 11;\n    return r < 2 ? 0 : 11 - r;\n  };\n  return calc(12) === +d[12] && calc(13) === +d[13];\n}\n\nfunction normalizeName(n) {\n  return String(n || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')\n    .replace(/\\b(ltda|me|epp|eireli|s\\/?a|sa|industria|comercio|e)\\b/g, ' ')\n    .replace(/[^a-z0-9]+/g, ' ').trim();\n}\n\n// Chaves fortes: CNPJ e domínio. Chave fraca (nome+UF) só sinaliza \"possível duplicado\".\nfunction keysFor(lead) {\n  return {\n    cnpj: validCnpj(lead.cnpj) ? normalizeCnpj(lead.cnpj) : '',\n    domain: normalizeDomain(lead.site),\n    weak: normalizeName(lead.nome) && lead.uf ? normalizeName(lead.nome) + '|' + String(lead.uf).toUpperCase() : '',\n  };\n}\n\nfunction findDuplicate(candidate, existing) {\n  const k = keysFor(candidate);\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.cnpj && k.cnpj === ek.cnpj) return { lead: e, match: 'cnpj', strong: true };\n    if (k.domain && k.domain === ek.domain) return { lead: e, match: 'dominio', strong: true };\n  }\n  for (const e of existing) {\n    const ek = keysFor(e);\n    if (k.weak && k.weak === ek.weak) return { lead: e, match: 'nome_uf', strong: false };\n  }\n  return null;\n}\n\n// Preenche apenas campos vazios; nunca sobrescreve dado existente.\nfunction mergeLead(existing, incoming) {\n  const out = { ...existing };\n  for (const [k, v] of Object.entries(incoming)) if (!out[k] && v) out[k] = v;\n  return out;\n}\n\nconst FACTORS = {\n  A: 'Compatibilidade com fabricação/montagem',\n  B: 'Complexidade aparente dos equipamentos',\n  C: 'Indícios de produção sob encomenda',\n  D: 'Número de etapas/tipos de produto',\n  E: 'Porte e público-alvo',\n  F: 'Canal comercial apropriado',\n  G: 'Operação produtiva própria',\n};\nconst DEFAULT_WEIGHTS = { A: 25, B: 15, C: 20, D: 10, E: 10, F: 10, G: 10 };\n\n// factors: { A: { value: 0..1 | null, level: 'fato'|'inferencia'|'hipotese', evidence: [urls] } }\n// Fator desconhecido (value null) NÃO penaliza: entra com valor neutro e fica listado em \"unknown\".\nfunction computeScore(factors, weights = DEFAULT_WEIGHTS, neutral = 0.5) {\n  const total = Object.values(weights).reduce((a, b) => a + b, 0) || 1;\n  let sum = 0;\n  const breakdown = {}, unknown = [];\n  for (const k of Object.keys(weights)) {\n    const f = factors[k] || {};\n    const known = typeof f.value === 'number' && !isNaN(f.value);\n    const v = known ? Math.min(1, Math.max(0, f.value)) : neutral;\n    if (!known) unknown.push(k);\n    const pts = (v * weights[k] * 100) / total;\n    breakdown[k] = { points: Math.round(pts * 10) / 10, weight: weights[k], known, level: f.level || (known ? 'inferencia' : 'desconhecido'), evidence: f.evidence || [] };\n    sum += pts;\n  }\n  const knownWeight = Object.keys(weights).filter(k => !unknown.includes(k)).reduce((a, k) => a + weights[k], 0);\n  return { score: Math.round(sum), breakdown, unknown, confidence: Math.round((knownWeight / total) * 100) / 100 };\n}\n\nfunction norm(v) { return String(v || '').trim().toLowerCase(); }\n\nfunction isSuppressed(lead, list) {\n  const emails = new Set(), domains = new Set(), ids = new Set();\n  for (const s of list || []) {\n    if (s.email) emails.add(norm(s.email));\n    if (s.dominio) domains.add(norm(s.dominio));\n    if (s.lead_id) ids.add(s.lead_id);\n  }\n  const d = normalizeDomain(lead.site);\n  const em = norm(lead.email);\n  if (ids.has(lead.id)) return true;\n  if (d && domains.has(d)) return true;\n  if (em && (emails.has(em) || domains.has(em.split('@')[1]))) return true;\n  return false;\n}\n\nconst DEFAULT_STAGES = [\n  'identificada', 'pesquisada', 'qualificado', 'aguardando_aprovacao', 'aprovada', 'contato_realizado',\n  'resposta_recebida', 'reuniao_agendada', 'diagnostico_realizado', 'demonstracao_apresentada',\n  'proposta_enviada', 'negociacao', 'cliente', 'perdido',\n];\nconst PROMO_STAGES = ['aguardando_aprovacao', 'aprovada'];\n\n// Transição: registra data/ator e aplica regras de interrupção.\nfunction transition(lead, to, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  if (!stages.includes(to)) throw new Error('Etapa inválida: ' + to);\n  if (lead.nao_contatar && PROMO_STAGES.concat('contato_realizado').includes(to)) {\n    throw new Error('Lead marcado como não contatar: ação promocional bloqueada');\n  }\n  const at = opts.at || new Date().toISOString();\n  const entry = { de: lead.status, para: to, em: at, por: opts.by || 'usuario', motivo: opts.reason || '' };\n  const next = { ...lead, status: to, atualizado_em: at, historico: [...(lead.historico || []), entry] };\n  if (to === 'perdido' && !opts.reason) throw new Error('Informe o motivo da perda');\n  if (to === 'resposta_recebida' || to === 'perdido') next.proxima_acao = next.proxima_acao || '';\n  return next;\n}\n\nfunction markDoNotContact(lead, opts = {}) {\n  const at = opts.at || new Date().toISOString();\n  return {\n    ...lead, nao_contatar: true, proxima_acao: '', atualizado_em: at,\n    historico: [...(lead.historico || []), { de: lead.status, para: lead.status, em: at, por: opts.by || 'usuario', motivo: 'nao_contatar: ' + (opts.reason || '') }],\n  };\n}\n\nfunction suggestNextAction(lead) {\n  if (lead.nao_contatar) return 'Nenhuma (não contatar)';\n  const m = {\n    identificada: 'Pesquisar a empresa em fontes oficiais',\n    pesquisada: 'Qualificar e revisar a pontuação',\n    qualificado: 'Gerar rascunho de abordagem',\n    aguardando_aprovacao: 'Revisar, editar e aprovar o rascunho',\n    aprovada: 'Enviar manualmente e marcar como enviado',\n    contato_realizado: 'Aguardar resposta; revisar manualmente após alguns dias úteis',\n    resposta_recebida: 'Responder e propor 20 min de conversa',\n    reuniao_agendada: 'Preparar roteiro de diagnóstico',\n    diagnostico_realizado: 'Avaliar demonstração',\n    demonstracao_apresentada: 'Avaliar proposta',\n    proposta_enviada: 'Fazer acompanhamento manual',\n    negociacao: 'Definir próximos passos com o decisor',\n  };\n  return m[lead.status] || '';\n}\n\nconst DEFAULT_RULES = {\n  maxWords: 180,\n  // Afirmações de dor que exigem evidência; o rascunho não pode afirmá-las.\n  bannedClaims: [/vocês? (usa|usam|trabalha|trabalham) com planilhas?/i, /sofre[mr]?\\b/i, /atrasos? (constantes|frequentes)/i, /desperd[ií]cio/i, /falta de estoque/i, /garantimos?/i, /aumente .* em \\d+%/i, /resultados? garantidos?/i],\n  placeholders: /\\[[^\\]]+\\]|\\{\\{[^}]+\\}\\}/,\n};\n\n// cfg: { allowedLinks:[urls configuradas], nonExistingFeatures:[termos], suppression:[...] }\nfunction validateDraft(draft, lead, cfg = {}) {\n  const errors = [], warnings = [];\n  const body = String(draft.corpo || ''), subject = String(draft.assunto || '');\n  const rules = { ...DEFAULT_RULES, ...(cfg.rules || {}) };\n  if (!subject.trim()) errors.push('Assunto vazio');\n  if (!body.trim()) errors.push('Corpo vazio');\n  if (rules.placeholders.test(subject + body)) errors.push('Placeholders não preenchidos');\n  if (body.split(/\\s+/).filter(Boolean).length > rules.maxWords) warnings.push('Mensagem longa');\n  for (const re of rules.bannedClaims) if (re.test(body)) errors.push('Afirmação sem evidência: ' + re);\n  for (const t of cfg.nonExistingFeatures || []) if (t && body.toLowerCase().includes(t.toLowerCase())) errors.push('Menciona funcionalidade inexistente: ' + t);\n  const allowed = new Set((cfg.allowedLinks || []).map(u => u.replace(/\\/$/, '')));\n  for (const u of body.match(/https?:\\/\\/[^\\s)>\"]+/g) || []) {\n    if (!allowed.has(u.replace(/[.,;]$/, '').replace(/\\/$/, ''))) errors.push('Link não configurado: ' + u);\n  }\n  if (!lead.fontes || !lead.fontes.length) errors.push('Lead sem fonte registrada');\n  if (lead.email && !lead.email_fonte) errors.push('E-mail sem URL de origem');\n  if (lead.nao_contatar || isSuppressed(lead, cfg.suppression)) errors.push('Lead em lista de supressão');\n  return { ok: errors.length === 0, errors, warnings };\n}\n\n// Conversão só é exibida quando o denominador atinge minSample; senão, \"amostra insuficiente\".\nfunction computeMetrics(leads, opts = {}) {\n  const stages = opts.stages || DEFAULT_STAGES;\n  const minSample = opts.minSample || 20;\n  const reached = Object.fromEntries(stages.map(s => [s, 0]));\n  const idx = s => stages.indexOf(s);\n  for (const l of leads) {\n    const visited = new Set((l.historico || []).map(h => h.para).concat(l.status));\n    // etapa atingida = visitada ou posterior à maior visitada (exceto \"perdido\")\n    const max = Math.max(-1, ...[...visited].filter(s => s !== 'perdido').map(idx));\n    stages.forEach((s, i) => { if (s !== 'perdido' && (i <= max || visited.has(s))) reached[s]++; });\n    if (visited.has('perdido')) reached['perdido']++;\n  }\n  const conversions = [];\n  const chain = stages.filter(s => s !== 'perdido');\n  for (let i = 1; i < chain.length; i++) {\n    const from = reached[chain[i - 1]], to = reached[chain[i]];\n    conversions.push({ de: chain[i - 1], para: chain[i], base: from, atingiram: to,\n      taxa: from >= minSample ? Math.round((to / from) * 1000) / 10 : null,\n      nota: from >= minSample ? 'observado' : 'amostra insuficiente (<' + minSample + ')' });\n  }\n  const count = (key, f = x => x) => {\n    const o = {};\n    for (const l of leads) { const v = f(l[key]) || 'não informado'; o[v] = (o[v] || 0) + 1; }\n    return o;\n  };\n  const lost = {};\n  for (const l of leads) if (l.status === 'perdido') { const m = l.motivo_perda || 'não informado'; lost[m] = (lost[m] || 0) + 1; }\n  return {\n    total: leads.length, porEtapa: reached, conversoes: conversions,\n    porSegmento: count('segmento'), porFonte: count('fonte_aquisicao'), motivosPerda: lost,\n    proximasAcoes: leads.filter(l => l.proxima_acao && !l.nao_contatar).map(l => ({ id: l.id, nome: l.nome, acao: l.proxima_acao, data: l.proxima_acao_data || '' })),\n    tipo: 'observado',\n  };\n}\n\nconst STAGES = DEFAULT_STAGES;\nconst bool = v => ['true', 'sim', '1', 'x'].includes(String(v || '').toLowerCase());\nconst normLead = l => ({ ...l, nao_contatar: bool(l.nao_contatar) });\nconst cfgMap = rows => Object.fromEntries(rows.filter(r => r.json && r.json.chave).map(r => [r.json.chave, String(r.json.valor || '')]));\nconst list = s => String(s || '').split(';').map(x => x.trim()).filter(Boolean);\nconst esc = s => String(s == null ? '' : s).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\nconst now = () => new Date().toISOString();\nfunction requireToken(token) {\n  const t = $env.REVIEW_UI_TOKEN;\n  if (!t) throw new Error('REVIEW_UI_TOKEN não configurado: recusando requisição');\n  if (token !== t) throw new Error('Não autorizado');\n}\nfunction hashId(s) { let h = 5381; for (const c of s) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return 'L' + h.toString(36); }\n\nconst v = $('Validar e preparar gravações').first().json; return [{ json: { body: JSON.stringify({ score: v.lead.score, rascunhos: v.fila.map(f => f.validacao) }) } }];"
+      }
+    },
+    {
+      "id": "n31",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        5040,
+        300
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{$json.body}}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leads": {
+      "main": [
+        [
+          {
+            "node": "Fontes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fontes": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Supressao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supressao": {
+      "main": [
+        [
+          {
+            "node": "Selecionar lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Selecionar lead": {
+      "main": [
+        [
+          {
+            "node": "Buscar site oficial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar site oficial": {
+      "main": [
+        [
+          {
+            "node": "Montar qualificação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar qualificação": {
+      "main": [
+        [
+          {
+            "node": "Claude: qualificar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: qualificar": {
+      "main": [
+        [
+          {
+            "node": "Pontuar e montar e-mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pontuar e montar e-mail": {
+      "main": [
+        [
+          {
+            "node": "Claude: rascunho",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: rascunho": {
+      "main": [
+        [
+          {
+            "node": "Validar e preparar gravações",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar e preparar gravações": {
+      "main": [
+        [
+          {
+            "node": "Item lead",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Itens fila",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Item histórico",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Itens fonte",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Item lead": {
+      "main": [
+        [
+          {
+            "node": "Atualizar lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Itens fila": {
+      "main": [
+        [
+          {
+            "node": "Gravar fila",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Item histórico": {
+      "main": [
+        [
+          {
+            "node": "Gravar histórico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Itens fonte": {
+      "main": [
+        [
+          {
+            "node": "Gravar fonte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resposta": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "nota": "Gerado por scripts/build-workflows.js. NÃO contém nó de envio de e-mail."
+  }
+}
