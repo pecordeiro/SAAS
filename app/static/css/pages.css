@@ -835,6 +835,8 @@
     .table-wrap--flat .table--cards td:has(.progress) { grid-column: 1 / -1; }
     .table-wrap--flat .table--cards td:first-child::before { content: none; }
     .table-wrap--flat .table--cards td { font-size: var(--font-size-md); font-variant-numeric: var(--font-numeric); }
+    .table-wrap--flat .table--cards td:has(.prazo-text) { grid-column: 1 / -1; }
+    .table--cards .prazo-text { white-space: normal; }
   }
 
   /* Controle segmentado (Tabela 1 · Tabela 2). */
