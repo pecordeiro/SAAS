@@ -24,6 +24,24 @@ Anotado nas conversas de 20 e 21/10:
 - Falta uma função de **restaurar** (voltar a um ponto anterior).
 - Nada mirabolante. Tem que ser útil e funcionar bem.
 
+## 1.1 Base atual do dono (recebida em 21/10)
+
+O dono enviou a pasta "Pré-montagem" com a versão do painel que está em uso. Ela é mais nova que a do
+GitHub (`pecordeiro/controle-de-atividades`) e passa a ser a referência. O arquivo não entrou no
+repositório porque a planilha tem dados reais de clientes.
+
+O que essa versão tem a mais:
+- **Vários projetos na mesma planilha.** O projeto principal usa as abas "Acompanhamento", "Equipe" e
+  "Como funciona"; os outros usam "<Nome> - Acompanhamento" etc. Um projeto existe quando as 3 abas existem.
+  Na planilha atual: SoBot (24 etapas), "Elevador + Imã" (11) e "Agro" (8).
+- **Projetos no topo do painel:** botões para trocar de projeto, ✎ renomear, ✕ apagar (com confirmação)
+  e "+" para criar (o projeto novo nasce com 5 etapas em branco, no mesmo formato).
+- **Preencher etapas:** "+ Nova etapa" no fim da lista, "Apagar etapa" com confirmação, arrastar para
+  reordenar etapas e subatividades.
+
+Consequências no plano: R3 e R5 ganham o seletor de projeto, o criar/renomear/apagar e o arrastar;
+R7 importa todos os projetos de uma planilha de uma vez (com escolha de quais).
+
 ## 2. Diagnóstico
 
 | | Base (Controle de Atividades) | SaaS hoje |
