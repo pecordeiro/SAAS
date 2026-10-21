@@ -1073,3 +1073,34 @@ critérios de pronto da anterior estiverem marcados.
   que exigem PostgreSQL), `scripts/build_assets.py --check` ok, contraste recalculado (claro e escuro).
 - Pendências: telas conferidas em 375/768/1280 px no navegador (sem navegador neste ambiente);
   regerar `docs/design/capturas/`; decidir o nome comercial.
+
+## Reestruturação R7 — servidor (planilha)
+
+- Entregue (só serviço + rotas mínimas; o visual definitivo fica com a reestruturação das telas):
+  - **Importar qualquer planilha** (`app/services/import_mapping.py`): a leitura virou uma grade em
+    memória (`importer.load_grid`, mesmas proteções: tamanho, zip bomb, DTD, senha; tetos de
+    5000 linhas × 60 colunas × 30 abas). `inspect` devolve abas, linha de cabeçalho detectada (ou
+    escolhida), colunas com amostras e a sugestão de mapeamento por nome (sem acento/caixa).
+    `parse_mapped` aplica etapa (obrigatória), subatividade, tempo, previstas, concluídas, % e prazo e
+    gera o mesmo `ImportResult` (erros por linha; etapa vazia herda a de cima; linhas “Total” ignoradas).
+    CSV/XLSX do site e a planilha de referência seguem reconhecidos sozinhos (`importer.auto_parse`).
+  - **Modo simples** (só etapa + %): `ImportResult.mode = "simples"`. TODO(R4): o modelo não tem o modo;
+    cada etapa vira UMA subatividade com o nome da etapa e peças = `calc.pecas_de_percentual(%, meta)`
+    (sem meta: 100 unidades, com aviso). Quando a R4 criar o campo, `importer.save` grava o modo e o %.
+  - **Exportar no layout da base** (`app/services/export_layout.py`): abas Acompanhamento (título, meta,
+    indicadores, blocos por etapa, RESUMO FINAL, Tabela 1, Tabela 2 com status colorido) e Equipe
+    (cenários 1–6 pessoas, início e prazo) com as MESMAS fórmulas da referência, entradas em amarelo
+    `#FFF9DB`, formatos %/número, validação de dados, painéis congelados. Textos do usuário neutralizados.
+    Só etapas/atividades ativas (arquivadas ficam na exportação em lista).
+  - Rotas: `POST /app/importar/colunas` (etapa de colunas; grade assinada com empresa+usuário, 1 h) e
+    `GET /app/projetos/<id>/exportar-planilha.xlsx`. `/app/importar` manda planilhas desconhecidas (ou com
+    “Quero escolher as colunas”) para a etapa de colunas. Tela mínima `dados/import_map.html`.
+- Testes: `tests/test_r7_planilha.py` (sugestão, inspeção, mapeamento detalhado/simples, erros por linha,
+  limites, formatos próprios, fórmulas iguais à referência, neutralização, **recalculo no LibreOffice
+  comparado com `calc.resumo_projeto`**, referência importada→exportada bate com a original, round-trip
+  exportar→importar, rotas); `test_isolation.py`: rota de exportação no A/B e grade de outra empresa recusada.
+- Verificação: `recalc.py` da skill xlsx na exportação da referência: 1444 fórmulas, 0 erros.
+- Pendências: tela definitiva da etapa de colunas e o link “Exportar planilha” no projeto (UI);
+  conferência no Excel real; telas 375/768/1280; PostgreSQL não rodado (só SQLite nesta fase).
+- Limites: grade assinada até ~400 kB (planilhas muito grandes pedem para deixar só a aba dos dados);
+  uma meta por projeto (meta diferente por linha é erro); vários prazos → usa o último.
