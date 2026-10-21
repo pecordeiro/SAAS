@@ -771,7 +771,7 @@
   }
 
   /* Área de desenho do ECharts. Altura das barras por etapa: o JS ajusta pelo nº de linhas. */
-  .chart-box { width: 100%; min-height: var(--chart-height); }
+  .chart-box { width: 100%; min-height: calc(2.5 * var(--space-12)); }
   .chart-box--status { width: calc(2 * var(--ring-size)); min-height: calc(2 * var(--ring-size)); height: calc(2 * var(--ring-size)); flex: none; }
   .no-js .chart-box { display: none; }
 
@@ -815,6 +815,7 @@
   .table-wrap--flat .table th:last-child, .table-wrap--flat .table td:last-child { padding-right: 0; }
   .table tfoot td { padding: var(--space-2) var(--space-3); border-top: var(--border-width) solid var(--color-border-strong); font-weight: var(--font-weight-semibold); font-variant-numeric: var(--font-numeric); }
   .table .col-progress { min-width: calc(4 * var(--space-8)); }
+  .table-wrap--flat .table td:first-child { min-width: calc(5 * var(--space-8)); }
   @media (max-width: 63.99em) {
     .table--cards tfoot, .table--cards tfoot tr, .table--cards tfoot td { display: block; }
     .table--cards tfoot tr { padding: var(--space-3) 0; border-top: var(--border-width) solid var(--color-border-strong); }
@@ -822,7 +823,18 @@
     .table--cards tfoot td + td { margin-top: var(--space-1); }
     .table--cards tfoot td[data-label]::before { content: attr(data-label) ": "; color: var(--color-text-muted); font-size: var(--font-size-sm); font-weight: var(--font-weight-regular); }
     .table--cards tfoot td:empty { display: none; }
-    .table-wrap--flat .table--cards tbody tr { padding-inline: 0; }
+    .table-wrap--flat .table--cards tbody tr,
+    .table-wrap--flat .table--cards tfoot tr {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-1) var(--space-4);
+      padding-inline: 0;
+    }
+    .table-wrap--flat .table--cards td + td { margin-top: 0; }
+    .table-wrap--flat .table--cards td:first-child,
+    .table-wrap--flat .table--cards td:has(.progress) { grid-column: 1 / -1; }
+    .table-wrap--flat .table--cards td:first-child::before { content: none; }
+    .table-wrap--flat .table--cards td { font-size: var(--font-size-md); font-variant-numeric: var(--font-numeric); }
   }
 
   /* Controle segmentado (Tabela 1 · Tabela 2). */

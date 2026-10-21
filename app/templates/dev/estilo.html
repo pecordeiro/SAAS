@@ -41,7 +41,7 @@
 
   <section id="tipografia" class="stack" aria-labelledby="h-tipo">
     <h2 id="h-tipo">Tipografia</h2>
-    <p class="muted text-sm">Uma família só, Geist: títulos em 700 com espaçamento fechado, texto em 400–600; números em algarismos tabulares (tnum).</p>
+    <p class="muted text-sm">Uma família só, IBM Plex Sans (400 e 600): títulos e números fortes em 600, texto em 400; números em algarismos tabulares (tnum). Nada acima de 32 px.</p>
     {%- for size, px in font_sizes %}
     <p class="fs-demo--{{ size }}"><code class="text-sm">--font-size-{{ size }} · {{ px }}</code><br><span class="{{ 'kpi__value' if size in ('2xl', '3xl') else '' }}">Lote 2026-014 · 1.234,5 h</span></p>
     {%- endfor %}

@@ -94,7 +94,8 @@ def test_selo_com_texto_e_icone_na_lista_detalhe_e_painel(client, app, tenants):
     listing = op.get("/app/projetos").get_data(as_text=True)
     assert "Aguardando peça" in listing and "#i-package" in listing
     panel = op.get(f"/app/projetos/{a.project_id}/painel").get_data(as_text=True)
-    assert "Aguardando peça · 1 etapa" in panel and "Aguardando peça · prev. 20/10" in panel
+    # R2: a frase-resumo do painel conta as etapas paradas; a Tabela 1 mantém o selo com a previsão.
+    assert "1 etapa aguardando peça" in panel and "Aguardando peça · prev. 20/10" in panel
     # Sem a marca, nenhum selo.
     _, b = tenants
     other = app.test_client()

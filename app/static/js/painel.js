@@ -74,6 +74,12 @@
     };
   }
 
+  // Números dos eixos no formato brasileiro (vírgula decimal): só apresentação.
+  var NUM = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
+  function axisNum(suffix) {
+    return function (v) { return NUM.format(v) + suffix; };
+  }
+
   function dot(kind) {
     return '<span class="chart-tip__dot chart-tip__dot--' + kind + '"></span>';
   }
@@ -96,6 +102,7 @@
         type: "value",
         axisLine: { show: false },
         axisTick: { show: false },
+        splitNumber: narrow() ? 3 : 5,
         splitLine: { lineStyle: { color: t.grid, width: 1 } },
         axisLabel: { color: t.subtle, fontSize: AXIS_FONT },
       },
@@ -104,7 +111,7 @@
   }
 
   function rowsHeight(n, perRow) {
-    return Math.max(160, n * perRow + 48);
+    return Math.max(120, n * perRow + 40);
   }
 
   function init(el) {
@@ -121,12 +128,12 @@
   /* ---------- 4. Tarefas × unidades (por etapa ou por projeto) ---------- */
   function drawTasks(el, t) {
     var rows = DATA.rows || [];
-    el.style.height = rowsHeight(rows.length, 34) + "px";
+    el.style.height = rowsHeight(rows.length, 44) + "px";
     var chart = init(el);
     var pct = function (p) { return p.value > 0 ? Math.round(p.value * 100) + "%" : ""; };
     chart.setOption(Object.assign(base(t), {
       grid: { left: 8, right: 40, top: 8, bottom: 8, containLabel: true },
-      xAxis: valueAxis(t, { min: 0, max: 1, interval: 0.25, axisLabel: { color: t.subtle, fontSize: AXIS_FONT, formatter: function (v) { return Math.round(v * 100) + "%"; } } }),
+      xAxis: valueAxis(t, { min: 0, max: 1, interval: narrow() ? 0.5 : 0.25, axisLabel: { color: t.subtle, fontSize: AXIS_FONT, formatter: function (v) { return Math.round(v * 100) + "%"; } } }),
       yAxis: categoryAxis(t, rows.map(function (r) { return r.label; })),
       tooltip: Object.assign(base(t).tooltip, {
         trigger: "axis",
@@ -138,10 +145,10 @@
         },
       }),
       series: [
-        { name: "Pelas tarefas", type: "bar", barWidth: 9, barGap: "30%", itemStyle: { color: t.tasks, borderRadius: [0, 3, 3, 0] },
+        { name: "Pelas tarefas", type: "bar", barWidth: 14, barGap: "15%", itemStyle: { color: t.tasks, borderRadius: [0, 3, 3, 0] },
           data: rows.map(function (r) { return r.tasks; }),
           label: { show: true, position: "right", color: t.text, fontSize: LABEL_FONT, formatter: pct } },
-        { name: "Unidades", type: "bar", barWidth: 9, itemStyle: { color: t.units, borderRadius: [0, 3, 3, 0] },
+        { name: "Unidades", type: "bar", barWidth: 14, itemStyle: { color: t.units, borderRadius: [0, 3, 3, 0] },
           data: rows.map(function (r) { return r.units; }),
           label: { show: true, position: "right", color: t.muted, fontSize: LABEL_FONT, formatter: pct } },
       ],
@@ -186,11 +193,11 @@
   /* ---------- 5. Horas (trabalhadas × faltam), nome no eixo ---------- */
   function drawHours(el, t) {
     var rows = DATA.rows || [];
-    el.style.height = rowsHeight(rows.length, 28) + "px";
+    el.style.height = rowsHeight(rows.length, 36) + "px";
     var chart = init(el);
     chart.setOption(Object.assign(base(t), {
       grid: { left: 8, right: 24, top: 8, bottom: 8, containLabel: true },
-      xAxis: valueAxis(t, { axisLabel: { color: t.subtle, fontSize: AXIS_FONT, formatter: function (v) { return v + " h"; } } }),
+      xAxis: valueAxis(t, { axisLabel: { color: t.subtle, fontSize: AXIS_FONT, formatter: axisNum(" h") } }),
       yAxis: categoryAxis(t, rows.map(function (r) { return r.label; })),
       tooltip: Object.assign(base(t).tooltip, {
         trigger: "axis",
@@ -202,9 +209,9 @@
         },
       }),
       series: [
-        { name: "Trabalhadas", type: "bar", stack: "h", barWidth: 14, itemStyle: { color: t.tasks, borderColor: t.surface, borderWidth: 1 },
+        { name: "Trabalhadas", type: "bar", stack: "h", barWidth: 20, itemStyle: { color: t.tasks, borderColor: t.surface, borderWidth: 1 },
           data: rows.map(function (r) { return r.worked; }) },
-        { name: "Faltam", type: "bar", stack: "h", barWidth: 14, itemStyle: { color: t.todo, borderColor: t.surface, borderWidth: 1, borderRadius: [0, 3, 3, 0] },
+        { name: "Faltam", type: "bar", stack: "h", barWidth: 20, itemStyle: { color: t.todo, borderColor: t.surface, borderWidth: 1, borderRadius: [0, 3, 3, 0] },
           data: rows.map(function (r) { return r.left; }) },
       ],
     }));
@@ -214,19 +221,23 @@
   /* ---------- 6. Equipe × prazo (um projeto) ---------- */
   function drawTeam(el, t) {
     var team = DATA.team || { rows: [] };
+    el.style.height = "240px";
     var rows = team.rows;
     var chart = init(el);
-    var markLine = team.due == null ? undefined : {
+    // A linha do prazo só entra quando cabe na escala sem achatar as colunas (até 1,5× a maior).
+    var maxDays = 0;
+    rows.forEach(function (r) { if (r.days != null && r.days > maxDays) maxDays = r.days; });
+    var markLine = team.due == null || team.due > maxDays * 1.5 ? undefined : {
       silent: true, symbol: "none",
       lineStyle: { color: t.text, type: "dashed", width: 1.5 },
-      label: { color: t.text, fontSize: LABEL_FONT, formatter: "prazo: " + team.due + " d", position: "insideEndTop" },
+      label: { color: t.text, fontSize: LABEL_FONT, formatter: "prazo: " + NUM.format(team.due) + " d", position: "insideEndTop" },
       data: [{ yAxis: team.due }],
     };
     chart.setOption(Object.assign(base(t), {
       grid: { left: 8, right: 16, top: 24, bottom: 8, containLabel: true },
       xAxis: { type: "category", data: rows.map(function (r) { return narrow() ? String(r.people) : r.label; }), axisTick: { show: false },
         axisLine: { lineStyle: { color: t.axis } }, axisLabel: { color: t.muted, fontSize: AXIS_FONT } },
-      yAxis: valueAxis(t, { axisLabel: { color: t.subtle, fontSize: AXIS_FONT, formatter: function (v) { return v + " d"; } } }),
+      yAxis: valueAxis(t, { axisLabel: { color: t.subtle, fontSize: AXIS_FONT, formatter: axisNum(" d") } }),
       tooltip: Object.assign(base(t).tooltip, {
         trigger: "item",
         formatter: function (p) {
@@ -235,7 +246,7 @@
         },
       }),
       series: [{
-        type: "bar", barMaxWidth: 28,
+        type: "bar", barMaxWidth: 40, barCategoryGap: "30%",
         data: rows.map(function (r) {
           return { value: r.days == null ? 0 : r.days, itemStyle: { color: r.current ? t.tasks : t.tasksSoft, borderRadius: [3, 3, 0, 0] } };
         }),
@@ -248,11 +259,11 @@
   /* ---------- 6. Prazo por projeto (painel da operação) ---------- */
   function drawDeadline(el, t) {
     var rows = (DATA.deadline && DATA.deadline.rows) || [];
-    el.style.height = rowsHeight(rows.length, 40) + "px";
+    el.style.height = rowsHeight(rows.length, 44) + "px";
     var chart = init(el);
     chart.setOption(Object.assign(base(t), {
       grid: { left: 8, right: 40, top: 8, bottom: 8, containLabel: true },
-      xAxis: valueAxis(t, { axisLabel: { color: t.subtle, fontSize: AXIS_FONT, formatter: function (v) { return v + " d"; } } }),
+      xAxis: valueAxis(t, { axisLabel: { color: t.subtle, fontSize: AXIS_FONT, formatter: axisNum(" d") } }),
       yAxis: categoryAxis(t, rows.map(function (r) { return r.label; })),
       tooltip: Object.assign(base(t).tooltip, {
         trigger: "axis",
@@ -264,10 +275,10 @@
         },
       }),
       series: [
-        { name: "Trabalho que falta", type: "bar", barWidth: 9, barGap: "30%", itemStyle: { color: t.tasks, borderRadius: [0, 3, 3, 0] },
+        { name: "Trabalho que falta", type: "bar", barWidth: 14, barGap: "15%", itemStyle: { color: t.tasks, borderRadius: [0, 3, 3, 0] },
           data: rows.map(function (r) { return r.need == null ? 0 : r.need; }),
           label: { show: true, position: "right", color: t.text, fontSize: LABEL_FONT, formatter: function (p) { return rows[p.dataIndex].needText; } } },
-        { name: "Até o prazo", type: "bar", barWidth: 9, itemStyle: { color: t.subtle, borderRadius: [0, 3, 3, 0] },
+        { name: "Até o prazo", type: "bar", barWidth: 14, itemStyle: { color: t.subtle, borderRadius: [0, 3, 3, 0] },
           data: rows.map(function (r) { return r.until == null ? 0 : r.until; }),
           label: { show: true, position: "right", color: t.muted, fontSize: LABEL_FONT, formatter: function (p) { return rows[p.dataIndex].untilText; } } },
       ],

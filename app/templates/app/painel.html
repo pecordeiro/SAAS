@@ -40,7 +40,7 @@
   ("Unidades prontas", s.unidades_concluidas, "/ " ~ s.previstas, "somando os projetos ativos", None),
   ("Etapas concluídas", s.etapas_concluidas, "/ " ~ s.etapas, "tarefas concluídas: " ~ s.tarefas_concluidas ~ " de " ~ s.tarefas, None),
   ("Horas que faltam", s.tempo_restante_h|num(1), "h", (s.projetos ~ (" projeto" if s.projetos == 1 else " projetos")), None),
-  ("Dias úteis até o prazo", prox.prazo.until if prox else None, (("dia útil" if prox.prazo.until == 1 else "dias úteis") if prox else None), (prox.project.name ~ ": " ~ prox.prazo.text) if prox else "nenhum projeto com prazo", prox.prazo.tone if prox else None),
+  ("Dias úteis até o prazo", prox.prazo.until if prox else None, (("dia útil" if prox.prazo.until == 1 else "dias úteis") if prox else None), (prox.project.name ~ " · " ~ prox.prazo.short) if prox else "nenhum projeto com prazo", prox.prazo.tone if prox else None, (prox.project.name ~ ": " ~ prox.prazo.text) if prox else None),
 ]) }}
 
 <section class="card painel-block" aria-labelledby="g-esteira">

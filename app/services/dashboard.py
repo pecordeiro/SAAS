@@ -49,30 +49,42 @@ def _dias(n: float | int | None) -> str:
     return _plural(int(n), "dia útil", "dias úteis") if float(n).is_integer() else f"{br_number(n, 1)} dias úteis"
 
 
+def _du(n) -> str:
+    """Forma curta para o rodapé do indicador: “16 d.u.” (dias úteis)."""
+    return f"{br_number(n, 0) if float(n).is_integer() else br_number(n, 1)} d.u."
+
+
 # ---------------------------------------------------------------- prazo e frase-resumo
 
 
 def situacao_prazo(deadline: dict, concluido: bool, prazo: date | None) -> dict:
     """Texto curto do prazo a partir de ``deadline`` (contas de calc via blueprint)."""
     if concluido:
-        return {"tone": "success", "text": "concluído", "until": None}
+        return {"tone": "success", "text": "concluído", "short": "concluído", "until": None}
     if prazo is None:
-        return {"tone": "neutral", "text": "sem prazo definido", "until": None}
+        return {"tone": "neutral", "text": "sem prazo definido", "short": "sem prazo definido", "until": None}
     if deadline.get("overdue"):
-        return {"tone": "danger", "text": f"o prazo ({br_date_short(prazo)}) passou há {_dias(deadline['overdue'])}", "until": 0}
+        return {
+            "tone": "danger",
+            "text": f"o prazo ({br_date_short(prazo)}) passou há {_dias(deadline['overdue'])}",
+            "short": f"vencido há {_du(deadline['overdue'])}",
+            "until": 0,
+        }
     if deadline.get("late"):
         return {
             "tone": "danger",
             "text": f"termina {br_date_short(deadline['forecast'])}, atraso de {_dias(deadline['delay'])}",
+            "short": f"atraso de {_du(deadline['delay'])}",
             "until": deadline.get("until_due"),
         }
     if deadline.get("on_time"):
         return {
             "tone": "success",
             "text": f"termina {br_date_short(deadline['forecast'])}, folga de {_dias(deadline['slack'])}",
+            "short": f"folga de {_du(deadline['slack'])}",
             "until": deadline.get("until_due"),
         }
-    return {"tone": "neutral", "text": f"prazo {br_date_short(prazo)}", "until": deadline.get("until_due")}
+    return {"tone": "neutral", "text": f"prazo {br_date_short(prazo)}", "short": f"prazo {br_date_short(prazo)}", "until": deadline.get("until_due")}
 
 
 def frase_projeto(nome: str, prazo_txt: dict, contagem: dict[str, int]) -> str:

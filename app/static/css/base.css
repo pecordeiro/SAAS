@@ -114,6 +114,13 @@
     cursor: pointer;
   }
 
+  a,
+  button,
+  summary,
+  label {
+    touch-action: manipulation;
+  }
+
   table {
     border-collapse: collapse;
     width: 100%;

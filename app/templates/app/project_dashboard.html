@@ -43,7 +43,7 @@
   ("Unidades prontas", r.unidades_concluidas, "/ " ~ project.quantity, "menor nº de unidades concluídas entre as etapas", None),
   ("Etapas concluídas", r.etapas_concluidas, "/ " ~ (d.etapas|length), "tarefas concluídas: " ~ r.tarefas_concluidas ~ " de " ~ r.tarefas, None),
   ("Horas que faltam", r.tempo_restante_h|num(1), "h", falta_sub, None),
-  ("Dias úteis até o prazo", d.prazo.until, ("dia útil" if d.prazo.until == 1 else "dias úteis") if d.prazo.until is not none else None, d.prazo.text, d.prazo.tone),
+  ("Dias úteis até o prazo", d.prazo.until, ("dia útil" if d.prazo.until == 1 else "dias úteis") if d.prazo.until is not none else None, d.prazo.short, d.prazo.tone, d.prazo.text),
 ]) }}
 
 <section class="card painel-block" aria-labelledby="g-esteira">
@@ -89,9 +89,9 @@
     </details>
   {% endcall %}
 
-  {% call p.chart_card("g-equipe", "Equipe × prazo", "team", "Dias úteis que faltam para equipes de 1 a 6 pessoas" ~ (", com o prazo em " ~ d.prazo.until ~ " dias úteis" if d.prazo.until is not none else "") ~ ". Valores na tabela de dados.", legend=[("current", "Equipe de hoje"), ("other", "Outros tamanhos")] + ([("due", "Dias úteis até o prazo")] if d.prazo.until is not none else []), class_="painel-grid__side") %}
+  {% call p.chart_card("g-equipe", "Equipe × prazo", "team", "Dias úteis que faltam para equipes de 1 a 6 pessoas" ~ (", com o prazo em " ~ d.prazo.until ~ " dias úteis" if d.prazo.until is not none else "") ~ ". Valores na tabela de dados.", legend=[("current", "Equipe de hoje"), ("other", "Outros tamanhos")], class_="painel-grid__side") %}
     {%- if d.equipe_atual and d.equipe_atual.days is not none %}
-    <p class="chart-card__note">Hoje: {{ d.equipe_atual.label }} · {{ d.equipe_atual.daysText }} dias úteis</p>
+    <p class="chart-card__note">Hoje: {{ d.equipe_atual.label }} · {{ d.equipe_atual.daysText }} dias úteis{% if d.prazo.until is not none %} · prazo em {{ d.prazo.until }} {{ "dia útil" if d.prazo.until == 1 else "dias úteis" }}{% endif %}</p>
     {%- endif %}
     <details class="chart__data">
       <summary>Ver dados em tabela</summary>

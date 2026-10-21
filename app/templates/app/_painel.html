@@ -35,11 +35,14 @@
       <span class="kpi__sub">{{ lead_sub }}</span>
     </div>
   </div>
-  {%- for label, value, unit, sub, tone in cells %}
-  <div class="kpi-strip__cell">
+  {%- for cell in cells %}
+  {%- set label, value, unit, sub, tone = cell[:5] %}
+  {%- set detail = cell[5] if cell|length > 5 else None %}
+  <div class="kpi-strip__cell"{% if detail %} title="{{ detail }}"{% endif %}>
     <span class="kpi__label">{{ label }}</span>
     <span class="kpi__value">{% if value is none %}<span class="kpi__empty">—</span>{% else %}{{ value }}{% if unit %}<span class="kpi__unit">{{ unit }}</span>{% endif %}{% endif %}</span>
     {%- if sub %}<span class="kpi__sub{% if tone in ('success', 'danger', 'warning') %} kpi__sub--{{ tone }}{% endif %}">{{ sub }}</span>{% endif %}
+    {%- if detail %}<span class="visually-hidden">{{ detail }}</span>{% endif %}
   </div>
   {%- endfor %}
 </section>
