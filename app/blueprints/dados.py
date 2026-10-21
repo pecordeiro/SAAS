@@ -52,12 +52,10 @@ def too_large(err):
 
     key = "PHOTO_MAX_BYTES" if request.endpoint == "qualidade.photo_upload" else "IMPORT_MAX_BYTES"
     limit = int(current_app.config.get(key, 2 * 1024 * 1024))
-    if request.endpoint == "dados.import_upload" and getattr(g, "company", None) is not None:
-        # R7: no passo 1 da importação, o aviso fica na própria tela.
-        return _page(ImportForm(formdata=None), 413, upload_error=(
-            f"Arquivo grande demais: o limite é {limit // (1024 * 1024)} MB. "
-            "Deixe só a aba com os dados e envie de novo."
-        ))
+    if request.endpoint == "dados.import_upload":
+        # R7: o corpo é recusado antes da rota (sem empresa carregada); a página de erro diz o
+        # limite e o que fazer (o passo 1 também avisa o limite antes do envio).
+        return render_template("errors/400.html", message=_too_large_message()), 413
     return render_template("errors/400.html", message=f"Arquivo grande demais (máximo {limit // (1024 * 1024)} MB)."), 413
 
 
@@ -108,6 +106,10 @@ def _limit_mb() -> int:
     return int(current_app.config.get("IMPORT_MAX_BYTES", 2 * 1024 * 1024)) // (1024 * 1024)
 
 
+def _too_large_message() -> str:
+    return f"Arquivo grande demais: o limite é {_limit_mb()} MB. Deixe só a aba com os dados e envie de novo."
+
+
 def _page(form, status=200, **ctx):
     """Passo 1 (enviar) ou, com ``result``, passo 3 (prévia ou erros por linha)."""
     ctx.setdefault("result", None)
@@ -134,7 +136,7 @@ def import_upload():
         return _page(form, 400)
     limit = int(current_app.config.get("IMPORT_MAX_BYTES", 2 * 1024 * 1024))
     if request.content_length and request.content_length > limit + 64 * 1024:
-        return _page(form, 413, upload_error=f"Arquivo grande demais: o limite é {limit // (1024 * 1024)} MB. Deixe só a aba com os dados e envie de novo.")
+        return _page(form, 413, upload_error=_too_large_message())
     upload = request.files.get("file")
     if upload is None or not upload.filename:
         return _page(form, 400, upload_error="Escolha um arquivo .xlsx ou .csv para enviar.")

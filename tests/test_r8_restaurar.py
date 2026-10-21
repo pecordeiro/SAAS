@@ -344,7 +344,7 @@ def test_fluxo_previa_aplicar_e_desfazer_pela_rota(client, app, routed):
     assert "Projeto restaurado" in history
     # mesma confirmação de novo: o estado mudou → 409 com a prévia nova
     again = post(client, app, f"/app/projetos/{a.project_id}/restaurar", {"ate": ate, "token": token, "confirm": "y"})
-    assert again.status_code == 409 and "mudou depois da prévia" in text_of(again)
+    assert again.status_code == 409 and "mudou desde a prévia" in text_of(again)
     undo_url = f"/app/projetos/{a.project_id}/restauracoes/{restore_id}/desfazer"
     assert post(client, app, undo_url, {}).status_code == 303  # sem confirmação
     with app.app_context():

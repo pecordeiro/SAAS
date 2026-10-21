@@ -992,7 +992,10 @@
     font-size: var(--font-size-sm);
   }
   @media (max-width: 47.99em) {
-    .page-header__actions .export-menu__list { right: auto; left: 0; }
+    /* Celular: o menu ocupa a largura da faixa de ações (sem rolagem lateral). */
+    .page-header__actions:has(.export-menu) { position: relative; }
+    .page-header__actions .export-menu { position: static; }
+    .page-header__actions .export-menu__list { left: 0; right: 0; width: auto; }
   }
 
   /* =================== R8 · Restaurar para uma data =================== */

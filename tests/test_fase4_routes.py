@@ -289,7 +289,7 @@ def test_importar_erros_pelas_telas(client, app, tenants, monkeypatch):
     response = _upload(client, app, "x.csv", bad)
     assert response.status_code == 400
     # R7 (tela): erros por linha numa tabela (Linha · Coluna · Problema)
-    assert re.search(r"Linha 7\s+tempo ideal\s+número inválido", text_of(response)) and "Nada foi gravado" in text_of(response)
+    assert re.search(r"Linha 7</td>[^<]*<td[^>]*>tempo ideal</td>[^<]*<td[^>]*>número inválido", text_of(response)) and "Nada foi gravado" in text_of(response)
     assert _upload(client, app, "x.txt", b"oi").status_code == 400
     assert post(client, app, "/app/importar", {}, content_type="multipart/form-data").status_code == 400
     big = _upload(client, app, "x.csv", b"x" * (3 * 1024 * 1024))
