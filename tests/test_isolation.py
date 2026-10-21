@@ -1074,3 +1074,40 @@ def test_etapa_g_unidades_ids_de_b_no_corpo_e_busca(client, app, tenants_units):
     after_a = _snapshot_units(app, a)  # A ganhou só o item de checklist do próprio teste
     assert (after_a["units"], after_a["unit_entries"]) == (before_a["units"], before_a["unit_entries"])
     assert _snapshot_units(app, b) == before_b
+
+
+# ---------------------------------------------------------------- Reestruturação R1–R2
+# Painel da operação (/app) e atalhos do menu (Preencher etapas, Meta e equipe, Como funciona).
+# Os atalhos aceitam ?projeto=<id>: o id é SEMPRE resolvido na empresa da sessão (outra → 404).
+ROUTES_R1_ATALHOS = ["/app/preencher", "/app/meta-e-equipe", "/app/como-funciona"]
+
+
+@pytest.mark.parametrize("url", ROUTES_R1_ATALHOS)
+def test_r1_atalho_com_projeto_de_outra_empresa_responde_404(client, app, tenants, url):
+    a, b = tenants
+    with app.app_context():
+        before = _snapshot(b.company_id)
+    login(client, app, a.owner_email)
+    assert client.get(f"{url}?projeto={b.project_id}").status_code == 404
+    assert client.get(f"{url}?projeto=nao-e-uuid").status_code == 404
+    with app.app_context():
+        assert _snapshot(b.company_id) == before
+
+
+@pytest.mark.parametrize("url", ROUTES_R1_ATALHOS)
+def test_r1_atalho_leva_so_ao_projeto_da_propria_empresa(client, app, tenants, url):
+    a, b = tenants
+    login(client, app, a.operator_email)
+    for suffix in ("", f"?projeto={a.project_id}"):
+        response = client.get(url + suffix)
+        assert response.status_code == 303
+        location = response.headers["Location"]
+        assert str(a.project_id) in location and str(b.project_id) not in location
+
+
+def test_r2_painel_da_operacao_mostra_so_a_propria_empresa(client, app, tenants):
+    a, b = tenants
+    login(client, app, a.owner_email)
+    html = client.get("/app/").get_data(as_text=True)
+    assert "Projeto A" in html
+    assert "Projeto B" not in html and str(b.project_id) not in html and str(b.stage_id) not in html

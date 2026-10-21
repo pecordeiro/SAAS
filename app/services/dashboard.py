@@ -1,141 +1,335 @@
-"""Monta os dados do painel do projeto (Etapa E) a partir do resultado de ``calc``.
+"""Monta os dados do Painel (reestruturação R2) a partir dos resultados de ``calc``.
 
-Sem Flask e sem banco: recebe nomes/ids das etapas e o ``ResultadoProjeto`` já calculado por
-``app/services/calc.py`` e devolve dicts prontos para o template — números do negócio vêm do
-calc, desenho (escalas, retângulos, arcos) vem de ``app/services/charts.py``. O template só
-imprime (ADR-0009).
+Sem Flask e sem banco: recebe objetos simples (etapas com ``id``/``name``, o ``ResultadoProjeto``
+já calculado por ``app/services/calc.py``, datas e funções que montam links) e devolve dicts
+prontos para o template e para o JSON dos gráficos (ECharts lê esse JSON e só desenha).
+Números do negócio vêm do calc; aqui só se organiza, rotula e formata (ADR-0009).
+
+Duas visões:
+- ``painel_projeto``: um projeto (cabeçalho, 5 indicadores, esteira, gráficos por etapa, tabelas);
+- ``painel_operacao``: todos os projetos ativos (as mesmas seções, com um projeto por linha).
 """
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+import re
+from datetime import date
+from typing import Any, Callable, Sequence
 
+from app.formatting import br_date_short, br_hours, br_number, br_pct
 from app.services import calc, charts
 
-# Treemap: área do viewBox e tamanhos de fonte (unidades do viewBox).
-TREEMAP_W, TREEMAP_H = 100.0, 64.0
-TREEMAP_FONT = 3.2
-TREEMAP_FAIXA = 1.3  # altura da faixa de progresso no pé de cada retângulo
-
-STATUS_CLASSE = {
-    calc.STATUS_CONCLUIDA: "done",
-    calc.STATUS_EM_ANDAMENTO: "doing",
-    calc.STATUS_NAO_INICIADA: "todo",
+NOMES_VISUAIS = {
+    calc.VISUAL_CONCLUIDA: "Concluída",
+    calc.VISUAL_EM_ANDAMENTO: "Em andamento",
+    calc.VISUAL_AGUARDANDO: "Aguardando peça",
+    calc.VISUAL_ATRASADA: "Atrasada",
+    calc.VISUAL_NAO_INICIADA: "Não iniciada",
 }
 
+ESTEIRA_LARGURA = 1000.0  # unidades do viewBox da esteira (a altura é fixa no CSS)
 
-def build(
-    stages: Sequence[Any],
-    result: calc.ResultadoProjeto,
-    *,
-    quantity: int,
-    people: int,
-    hours_per_day: float,
-) -> dict:
-    """``stages``: objetos com ``id`` e ``name``, na mesma ordem de ``result.etapas``."""
+_NUMERO_NO_INICIO = re.compile(r"^\s*\d+\s*[.)\-–—:]\s*")
+
+
+def rotulo_etapa(n: int, nome: str) -> str:
+    """“3. Montagem”. Se o nome já começa com número (“1. Preparação”), não repete: evita
+    “1. 1. Preparação” (nomes vindos da planilha de referência já trazem a numeração)."""
+    nome = (nome or "").strip()
+    return nome if _NUMERO_NO_INICIO.match(nome) else f"{n}. {nome}"
+
+
+def _plural(n: int, um: str, varios: str) -> str:
+    return f"{n} {um if n == 1 else varios}"
+
+
+def _dias(n: float | int | None) -> str:
+    if n is None:
+        return "—"
+    return _plural(int(n), "dia útil", "dias úteis") if float(n).is_integer() else f"{br_number(n, 1)} dias úteis"
+
+
+# ---------------------------------------------------------------- prazo e frase-resumo
+
+
+def situacao_prazo(deadline: dict, concluido: bool, prazo: date | None) -> dict:
+    """Texto curto do prazo a partir de ``deadline`` (contas de calc via blueprint)."""
+    if concluido:
+        return {"tone": "success", "text": "concluído", "until": None}
+    if prazo is None:
+        return {"tone": "neutral", "text": "sem prazo definido", "until": None}
+    if deadline.get("overdue"):
+        return {"tone": "danger", "text": f"o prazo ({br_date_short(prazo)}) passou há {_dias(deadline['overdue'])}", "until": 0}
+    if deadline.get("late"):
+        return {
+            "tone": "danger",
+            "text": f"termina {br_date_short(deadline['forecast'])}, atraso de {_dias(deadline['delay'])}",
+            "until": deadline.get("until_due"),
+        }
+    if deadline.get("on_time"):
+        return {
+            "tone": "success",
+            "text": f"termina {br_date_short(deadline['forecast'])}, folga de {_dias(deadline['slack'])}",
+            "until": deadline.get("until_due"),
+        }
+    return {"tone": "neutral", "text": f"prazo {br_date_short(prazo)}", "until": deadline.get("until_due")}
+
+
+def frase_projeto(nome: str, prazo_txt: dict, contagem: dict[str, int]) -> str:
+    """Ex.: “Lote 10: termina 14/11, folga de 17 dias úteis, 3 etapas atrasadas”."""
+    partes = [prazo_txt["text"]]
+    if contagem.get(calc.VISUAL_ATRASADA):
+        partes.append(_plural(contagem[calc.VISUAL_ATRASADA], "etapa atrasada", "etapas atrasadas"))
+    if contagem.get(calc.VISUAL_AGUARDANDO):
+        partes.append(_plural(contagem[calc.VISUAL_AGUARDANDO], "etapa aguardando peça", "etapas aguardando peça"))
+    return f"{nome}: " + ", ".join(partes)
+
+
+def frase_operacao(projetos: Sequence[dict], contagem: dict[str, int]) -> str:
+    """Ex.: “3 projetos ativos: 1 com atraso, 2 no prazo · 4 etapas atrasadas”."""
+    if not projetos:
+        return "Nenhum projeto ativo."
+    atraso = sum(1 for p in projetos if p["prazo"]["tone"] == "danger")
+    no_prazo = sum(1 for p in projetos if p["prazo"]["tone"] == "success")
+    partes = [_plural(len(projetos), "projeto ativo", "projetos ativos")]
+    detalhes = []
+    if atraso:
+        detalhes.append(f"{atraso} com atraso")
+    if no_prazo:
+        detalhes.append(f"{no_prazo} no prazo")
+    frase = partes[0] + (": " + ", ".join(detalhes) if detalhes else "")
+    extras = []
+    if contagem.get(calc.VISUAL_ATRASADA):
+        extras.append(_plural(contagem[calc.VISUAL_ATRASADA], "etapa atrasada", "etapas atrasadas"))
+    if contagem.get(calc.VISUAL_AGUARDANDO):
+        extras.append(_plural(contagem[calc.VISUAL_AGUARDANDO], "etapa aguardando peça", "etapas aguardando peça"))
+    return frase + ("; " + ", ".join(extras) if extras else "") + "."
+
+
+# ---------------------------------------------------------------- etapas de um projeto
+
+
+def etapas_do_painel(
+    stages: Sequence[Any], result: calc.ResultadoProjeto, fracao_decorrida: float | None
+) -> list[dict]:
+    """Uma linha por etapa: números do calc + situação visual + fatia da esteira."""
+    atrasos = calc.etapas_atrasadas(result.etapas, fracao_decorrida)
+    fatias = calc.fatias_da_esteira(result.etapas)
     etapas = []
-    for i, (stage, r) in enumerate(zip(stages, result.etapas), start=1):
+    for i, (stage, r, atrasada, (ini, larg)) in enumerate(zip(stages, result.etapas, atrasos, fatias), start=1):
+        aguardando = bool(getattr(stage, "waiting_part", False))
+        visual = calc.status_visual(r.status, aguardando, atrasada)
         etapas.append(
             {
                 "n": i,
                 "id": stage.id,
                 "name": stage.name,
-                # Etapa F: “aguardando peça” (só sinaliza); objetos sem o campo valem False.
-                "waiting_part": bool(getattr(stage, "waiting_part", False)),
-                "part_expected_on": getattr(stage, "part_expected_on", None),
+                "label": rotulo_etapa(i, stage.name),
                 "r": r,
+                "waiting_part": aguardando,
+                "part_expected_on": getattr(stage, "part_expected_on", None),
+                "atrasada": atrasada,
+                "visual": visual,
+                "visual_nome": NOMES_VISUAIS[visual],
+                "inicio": ini,
+                "largura": larg,
                 "pct_unidades": calc.razao(r.unidades, r.previstas),
-                "trabalhado_h": r.tempo_trabalhado_min / 60,
+                "trabalhado_h": (r.tempo_total_min - r.tempo_restante_min) / 60,
                 "falta_h": r.tempo_restante_min / 60,
                 "total_h": r.tempo_total_min / 60,
             }
         )
+    return etapas
 
-    contagem = calc.contagem_status(result.etapas)
-    status_rosca = charts.rosca(
-        [
-            ("done", calc.STATUS_CONCLUIDA, contagem[calc.STATUS_CONCLUIDA]),
-            ("doing", calc.STATUS_EM_ANDAMENTO, contagem[calc.STATUS_EM_ANDAMENTO]),
-            ("todo", calc.STATUS_NAO_INICIADA, contagem[calc.STATUS_NAO_INICIADA]),
-        ]
-    )
 
-    # Treemap: tamanho = peso da etapa no projeto; sem tempo definido não ocupa área.
-    rects = charts.treemap([e["r"].peso_no_projeto for e in etapas], TREEMAP_W, TREEMAP_H)
-    treemap = []
-    for e, rect in zip(etapas, rects):
-        if rect is None:
-            continue
-        mostra_nome = rect["w"] >= 15 and rect["h"] >= 9
-        mostra_pct = rect["w"] >= 7 and rect["h"] >= 6
-        nome = charts.cortar_texto(f"{e['n']}. {e['name']}", rect["w"] - 2, TREEMAP_FONT) if mostra_nome else ""
-        curto = charts.cortar_texto(str(e["n"]), rect["w"] - 2, TREEMAP_FONT)
-        treemap.append(
+def esteira(etapas: Sequence[dict], fracao_decorrida: float | None, href: Callable[[Any], str]) -> dict:
+    """Blocos da esteira (x e largura no viewBox de 1000) e a marca de “hoje”."""
+    blocos = []
+    for e in etapas:
+        detalhe = f"{e['visual_nome']}; tarefas {br_pct(e['r'].progresso, 0)}; faltam {br_hours(e['falta_h'])}"
+        if e["waiting_part"] and e["part_expected_on"]:
+            detalhe += f"; peça prevista {br_date_short(e['part_expected_on'])}"
+        blocos.append(
             {
-                **rect,
-                "etapa": e,
-                "classe": STATUS_CLASSE[e["r"].status],
-                "nome": nome,
-                "curto": curto if (mostra_pct and not mostra_nome) else "",
-                "mostra_pct": mostra_pct,
-                "faixa_w": round(rect["w"] * min(max(e["r"].progresso, 0), 1), 3),
-                "faixa_y": round(rect["y"] + rect["h"] - TREEMAP_FAIXA, 3),
+                "x": round(e["inicio"] * ESTEIRA_LARGURA, 3),
+                "w": round(e["largura"] * ESTEIRA_LARGURA, 3),
+                "visual": e["visual"],
+                "title": f"{e['label']} — {detalhe}",
+                "href": href(e["id"]),
             }
         )
+    hoje = None if fracao_decorrida is None else round(min(max(fracao_decorrida, 0), 1) * ESTEIRA_LARGURA, 3)
+    atual = next((e for e in etapas if e["visual"] != calc.VISUAL_CONCLUIDA), None)
+    return {"blocos": blocos, "hoje": hoje, "atual": atual}
 
-    horas = charts.colunas(
-        [
+
+def _rosca(contagem: dict[str, int]) -> list[dict]:
+    return [{"key": k, "name": NOMES_VISUAIS[k], "value": contagem[k]} for k in calc.VISUAIS]
+
+
+def _pendencias(etapas: Sequence[dict], projeto: str | None = None) -> list[dict]:
+    pend = []
+    for e in etapas:
+        if e["visual"] not in (calc.VISUAL_ATRASADA, calc.VISUAL_AGUARDANDO):
+            continue
+        extra = ""
+        if e["visual"] == calc.VISUAL_AGUARDANDO and e["part_expected_on"]:
+            extra = f"peça prevista {br_date_short(e['part_expected_on'])}"
+        pend.append({"etapa": e, "projeto": projeto, "extra": extra})
+    # atrasadas primeiro, depois aguardando peça (cada grupo na ordem das etapas)
+    pend.sort(key=lambda p: 0 if p["etapa"]["visual"] == calc.VISUAL_ATRASADA else 1)
+    return pend
+
+
+def _equipe(horas_restantes: float, hours_per_day: float, people: int) -> list[dict]:
+    linhas = []
+    for p, dias in calc.equipe_x_prazo(horas_restantes, hours_per_day):
+        linhas.append(
             {
-                "label": str(e["n"]),
-                "title": f"{e['n']}. {e['name']}",
-                "valores": {"trabalhadas": e["trabalhado_h"], "faltam": e["falta_h"]},
+                "people": p,
+                "label": _plural(p, "pessoa", "pessoas"),
+                "days": None if dias is None else round(dias, 2),
+                "daysText": "—" if dias is None else br_number(dias, 1),
+                "current": p == people,
+                "teamHours": br_number(p * hours_per_day, 0),
             }
-            for e in etapas
-        ],
-        ["trabalhadas", "faltam"],
-        passo=22,
-        largura_minima=300,
-    )
+        )
+    return linhas
 
-    tabela_equipe = calc.equipe_x_prazo(result.tempo_restante_h, hours_per_day)
-    equipe = charts.colunas(
-        [
-            {
-                "label": f"{p} pessoa" if p == 1 else f"{p} pessoas",
-                "title": f"{p} pessoa" if p == 1 else f"{p} pessoas",
-                "valores": {"dias": dias or 0},
-                "destaque": p == people,
-                "dias": dias,
-            }
-            for p, dias in tabela_equipe
-        ],
-        ["dias"],
-        passo=50,
-        largura_coluna=0.5,
-        largura_minima=0,
-        margem_base=30,
-    )
-    for col, (_, dias) in zip(equipe["cols"], tabela_equipe):
-        col["dias"] = dias
 
+def painel_projeto(
+    stages: Sequence[Any],
+    result: calc.ResultadoProjeto,
+    *,
+    nome: str,
+    quantity: int,
+    people: int,
+    hours_per_day: float,
+    prazo: date | None,
+    deadline: dict,
+    concluido: bool,
+    fracao_decorrida: float | None,
+    href_etapa: Callable[[Any], str],
+) -> dict:
+    """Tudo o que o painel de um projeto mostra, de cima para baixo (plano §4.2)."""
+    etapas = etapas_do_painel(stages, result, fracao_decorrida)
+    contagem = calc.contagem_visual(e["visual"] for e in etapas)
+    prazo_txt = situacao_prazo(deadline, concluido, prazo)
+    equipe = _equipe(result.tempo_restante_h, hours_per_day, people)
+    linhas = [
+        {
+            "label": e["label"],
+            "tasks": round(min(max(e["r"].progresso, 0), 1), 4),
+            "tasksText": br_pct(e["r"].progresso, 0),
+            "units": round(min(max(e["pct_unidades"], 0), 1), 4),
+            "unitsText": br_pct(e["pct_unidades"], 0),
+            "unitsFrac": f"{e['r'].unidades}/{e['r'].previstas}",
+            "worked": round(e["trabalhado_h"], 2),
+            "workedText": br_hours(e["trabalhado_h"]),
+            "left": round(e["falta_h"], 2),
+            "leftText": br_hours(e["falta_h"]),
+            "status": e["visual_nome"],
+            "href": href_etapa(e["id"]),
+        }
+        for e in etapas
+    ]
     return {
+        "kind": "projeto",
+        "frase": frase_projeto(nome, prazo_txt, contagem),
+        "prazo": prazo_txt,
         "etapas": etapas,
-        "aguardando_peca": sum(1 for e in etapas if e["waiting_part"]),
-        "quantity": quantity,
         "medidor": charts.medidor(result.progresso_geral),
         "unidades_pct": calc.razao(result.unidades_concluidas, quantity),
         "unidades_etapas_pct": calc.razao(result.unidades_etapas, result.unidades_etapas_previstas),
-        "tarefas_pct": calc.razao(result.tarefas_concluidas, result.tarefas),
+        "esteira": esteira(etapas, fracao_decorrida, href_etapa),
         "contagem": contagem,
-        "rosca": status_rosca,
-        "treemap": treemap,
-        "treemap_w": TREEMAP_W,
-        "treemap_h": TREEMAP_H,
-        "treemap_font": TREEMAP_FONT,
-        "sem_tempo": calc.etapas_sem_tempo(result.etapas),
-        "horas": horas,
+        "pendencias": [dict(x, href=href_etapa(x["etapa"]["id"])) for x in _pendencias(etapas)],
         "equipe": equipe,
-        "equipe_atual": next((c for c in equipe["cols"] if c["destaque"]), None),
-        "people": people,
-        "hours_per_day": hours_per_day,
+        "equipe_atual": next((x for x in equipe if x["current"]), None),
+        "sem_tempo": calc.etapas_sem_tempo(result.etapas),
+        "grafico": {
+            "kind": "etapas",
+            "rows": linhas,
+            "status": _rosca(contagem),
+            "team": {"rows": equipe, "due": prazo_txt["until"]},
+        },
+    }
+
+
+# ---------------------------------------------------------------- operação (todos os projetos)
+
+
+def painel_operacao(itens: Sequence[dict], href_etapa: Callable[[Any, Any], str], href_projeto: Callable[[Any], str]) -> dict:
+    """Painel geral. ``itens``: um dict por projeto ativo com ``project``, ``stages``, ``result``,
+    ``deadline``, ``concluido`` e ``fracao`` (calculados pelo blueprint via calc/svc)."""
+    projetos = []
+    todas = []
+    for it in itens:
+        p, r = it["project"], it["result"]
+        etapas = etapas_do_painel(it["stages"], r, it["fracao"])
+        todas.extend(etapas)
+        prazo_txt = situacao_prazo(it["deadline"], it["concluido"], p.due_date)
+        projetos.append(
+            {
+                "project": p,
+                "result": r,
+                "etapas": etapas,
+                "prazo": prazo_txt,
+                "deadline": it["deadline"],
+                "contagem": calc.contagem_visual(e["visual"] for e in etapas),
+                "esteira": esteira(etapas, it["fracao"], lambda sid, pid=p.id: href_etapa(pid, sid)),
+                "unidades_pct": calc.razao(r.unidades_concluidas, p.quantity),
+                "href": href_projeto(p.id),
+                "pendencias": [dict(x, projeto=p.name, href=href_etapa(p.id, x["etapa"]["id"])) for x in _pendencias(etapas)],
+            }
+        )
+    resumo = calc.resumo_operacao([it["result"] for it in itens])
+    contagem = calc.contagem_visual(e["visual"] for e in todas)
+    # Próximo prazo: o projeto em aberto com a data de prazo mais próxima (KPI "dias úteis até o prazo").
+    com_prazo = [p for p in projetos if p["project"].due_date and p["prazo"]["until"] is not None]
+    proximo = min(com_prazo, key=lambda p: p["project"].due_date) if com_prazo else None
+    linhas = [
+        {
+            "label": p["project"].name,
+            "tasks": round(min(max(p["result"].progresso_geral, 0), 1), 4),
+            "tasksText": br_pct(p["result"].progresso_geral, 0),
+            "units": round(min(max(p["unidades_pct"], 0), 1), 4),
+            "unitsText": br_pct(p["unidades_pct"], 0),
+            "unitsFrac": f"{p['result'].unidades_concluidas}/{p['project'].quantity}",
+            "worked": round(p["result"].tempo_trabalhado_h, 2),
+            "workedText": br_hours(p["result"].tempo_trabalhado_h),
+            "left": round(p["result"].tempo_restante_h, 2),
+            "leftText": br_hours(p["result"].tempo_restante_h),
+            "status": p["prazo"]["text"],
+            "href": p["href"],
+        }
+        for p in projetos
+    ]
+    prazo_linhas = [
+        {
+            "label": p["project"].name,
+            "need": None if p["result"].dias_uteis_restantes is None else round(p["result"].dias_uteis_restantes, 2),
+            "needText": "—" if p["result"].dias_uteis_restantes is None else br_number(p["result"].dias_uteis_restantes, 1),
+            "until": p["prazo"]["until"],
+            "untilText": "—" if p["prazo"]["until"] is None else str(p["prazo"]["until"]),
+            "href": p["href"],
+        }
+        for p in projetos
+    ]
+    return {
+        "kind": "operacao",
+        "frase": frase_operacao(projetos, contagem),
+        "projetos": projetos,
+        "resumo": resumo,
+        "medidor": charts.medidor(resumo.progresso_geral),
+        "unidades_pct": calc.razao(resumo.unidades_concluidas, resumo.previstas),
+        "contagem": contagem,
+        "pendencias": [x for p in projetos for x in p["pendencias"]],
+        "proximo": proximo,
+        "grafico": {
+            "kind": "projetos",
+            "rows": linhas,
+            "status": _rosca(contagem),
+            "deadline": {"rows": prazo_linhas},
+        },
     }

@@ -83,7 +83,8 @@ def test_nenhum_asset_externo_nos_templates():
 def test_sem_script_ou_estilo_inline_nos_templates():
     for path in _files(TEMPLATES, "*.html"):
         text = path.read_text(encoding="utf-8")
-        assert not re.search(r"<script(?![^>]*\bsrc=)[^>]*>", text, re.IGNORECASE), f"script inline em {path.name}"
+        # Bloco de dados JSON (não executa; a CSP não precisa liberar nada) é a única exceção.
+        assert not re.search(r'<script(?![^>]*\bsrc=)(?![^>]*type="application/json")[^>]*>', text, re.IGNORECASE), f"script inline em {path.name}"
         assert not re.search(r"<style\b", text, re.IGNORECASE), f"<style> em {path.name}"
         assert not re.search(r"\sstyle=", text, re.IGNORECASE), f"atributo style em {path.name}"
         assert not re.search(r"\son[a-z]+=", text), f"handler inline em {path.name}"
@@ -103,15 +104,16 @@ def test_csp_estrita_e_htmx_sem_eval(client):
 def test_assets_locais_existem():
     htmx = (STATIC / "js" / "htmx.min.js").read_text(encoding="utf-8")
     assert 'version:"2.0.4"' in htmx
-    for name in (
-        "geist-latin-400-normal.woff2",
-        "geist-latin-500-normal.woff2",
-        "geist-latin-600-normal.woff2",
-        "geist-latin-700-normal.woff2",
-    ):
+    # ADR-0015: IBM Plex Sans 400 e 600, servida pelo próprio site; a Geist saiu.
+    for name in ("ibm-plex-sans-latin-400-normal.woff2", "ibm-plex-sans-latin-600-normal.woff2"):
         assert (STATIC / "fonts" / name).read_bytes()[:4] == b"wOF2", name
-    for lic in ("OFL-Geist.txt",):
-        assert "SIL Open Font License" in (STATIC / "fonts" / lic).read_text(encoding="utf-8")
+    assert "SIL Open Font License" in (STATIC / "fonts" / "OFL-IBMPlexSans.txt").read_text(encoding="utf-8")
+    assert not list((STATIC / "fonts").glob("geist-*"))
+    # ECharts vendorizado (sem CDN, regra 8) com a licença Apache-2.0 e o NOTICE ao lado.
+    vendor = STATIC / "vendor" / "echarts-5.5.1"
+    assert 'version="5.5.1"' in (vendor / "echarts.min.js").read_text(encoding="utf-8")
+    assert "Apache License" in (vendor / "LICENSE").read_text(encoding="utf-8")
+    assert "Apache ECharts" in (vendor / "NOTICE").read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize("name,size", [("favicon-32.png", (32, 32)), ("apple-touch-icon.png", (180, 180)), ("og-image.png", (1200, 630))])

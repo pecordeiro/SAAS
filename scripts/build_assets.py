@@ -7,8 +7,11 @@ Saída em ``app/static/dist/``:
 - ``app.<hash>.js``    = ``static/js/app.js`` minificado
 - ``arrastar.<hash>.js`` = ``static/js/arrastar.js`` minificado (só na edição do projeto)
 - ``htmx.<hash>.js``   = ``static/js/htmx.min.js`` copiado (já vem minificado)
+- ``painel.<hash>.js``  = ``static/js/painel.js`` minificado (só nas páginas de painel)
 - ``manifest.json``    = {"site.css": "dist/site.<hash>.css", ...}
 
+O ECharts (``static/vendor/echarts-5.5.1/``) não passa por aqui: já vem minificado e a versão
+está no caminho, então é servido direto com cache longo (sem duplicar 1 MB no dist/).
 ``app/assets.py`` lê o manifesto e o ``url_for`` aponta para o arquivo com hash (cache longo,
 ``immutable``). Sem manifesto (checkout limpo), os templates caem nos arquivos-fonte.
 ``--check`` só confere se o manifesto bate com os fontes (usado nos testes/CI).
@@ -43,11 +46,13 @@ def build_outputs() -> dict[str, tuple[str, bytes]]:
     js_min = rjsmin.jsmin((STATIC / "js" / "app.js").read_text(encoding="utf-8")).encode("utf-8")
     drag_min = rjsmin.jsmin((STATIC / "js" / "arrastar.js").read_text(encoding="utf-8")).encode("utf-8")
     htmx = (STATIC / "js" / "htmx.min.js").read_bytes()
+    painel_min = rjsmin.jsmin((STATIC / "js" / "painel.js").read_text(encoding="utf-8")).encode("utf-8")
     return {
         "site.css": (f"site.{_digest(css_min)}.css", css_min),
         "app.js": (f"app.{_digest(js_min)}.js", js_min),
         "arrastar.js": (f"arrastar.{_digest(drag_min)}.js", drag_min),
         "htmx.js": (f"htmx.{_digest(htmx)}.js", htmx),
+        "painel.js": (f"painel.{_digest(painel_min)}.js", painel_min),
     }
 
 

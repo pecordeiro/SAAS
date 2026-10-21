@@ -93,7 +93,7 @@ def confirm_email(token: str):
             state = accounts.INVALID
         if state == accounts.VALID:
             flash("E-mail confirmado.", "sucesso")
-            target = url_for("app.projects") if current_user.is_authenticated else url_for("auth.login")
+            target = url_for("app.home") if current_user.is_authenticated else url_for("auth.login")
             return no_referrer(redirect(target, code=303))
     status_code = 200 if state == accounts.VALID and request.method == "GET" else 400
     return no_referrer(make_response(render_template("account/confirm.html", form=form, state=state, error=error), status_code))
@@ -385,4 +385,4 @@ def switch_company():
         abort(404)
     set_company(membership)
     flash(f"Agora você está em {membership.company.name}.", "sucesso")
-    return redirect(url_for("app.projects"), code=303)
+    return redirect(url_for("app.home"), code=303)

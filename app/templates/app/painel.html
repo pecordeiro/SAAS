@@ -1,0 +1,128 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/progress.html" import progress %}
+{% from "components/table.html" import data_table %}
+{% from "components/empty_state.html" import empty_state %}
+{% import "app/_painel.html" as p %}
+{% set nav_current = "dashboard" %}
+{% block title %}Painel · Controle de Produção{% endblock %}
+{% block head_extra %}
+  {%- if d.projetos %}
+  {%- for src in asset_urls("echarts.js") %}
+  <script src="{{ src }}" defer></script>
+  {%- endfor %}
+  {%- for src in asset_urls("painel.js") %}
+  <script src="{{ src }}" defer></script>
+  {%- endfor %}
+  {%- endif %}
+{% endblock %}
+{% block content %}
+{#
+  Painel da operação (R2, primeira tela): todos os projetos ativos, na vertical — cabeçalho
+  com frase-resumo, 5 indicadores somados (calc.resumo_operacao), uma esteira por projeto,
+  gráficos por projeto, situação das etapas e a tabela de projetos. Só exibe (ADR-0009).
+#}
+{%- set s = d.resumo -%}
+{{ p.header("Operação", d.frase, updated_at, url_for('app.fill') if d.projetos else None) }}
+
+{%- if not d.projetos %}
+<div class="card">
+  {%- if can_create %}
+  {{ empty_state("Nenhum projeto ativo", "Crie um projeto com as etapas da produção para ver o painel aqui.", action=("Novo projeto", url_for('app.project_new')), icon="chart") }}
+  {%- else %}
+  {{ empty_state("Nenhum projeto ativo", "Quando houver um projeto em andamento, o painel aparece aqui.", ghost_action=("Ver projetos", url_for('app.projects', status='todos')), icon="chart") }}
+  {%- endif %}
+</div>
+{%- else %}
+
+{%- set prox = d.proximo %}
+{{ p.kpi_strip(d.medidor, s.progresso_geral|pct(0), (s.tempo_trabalhado_h|num(1)) ~ " h trabalhadas de " ~ (s.tempo_total_h|num(1)) ~ " h", [
+  ("Unidades prontas", s.unidades_concluidas, "/ " ~ s.previstas, "somando os projetos ativos", None),
+  ("Etapas concluídas", s.etapas_concluidas, "/ " ~ s.etapas, "tarefas concluídas: " ~ s.tarefas_concluidas ~ " de " ~ s.tarefas, None),
+  ("Horas que faltam", s.tempo_restante_h|num(1), "h", (s.projetos ~ (" projeto" if s.projetos == 1 else " projetos")), None),
+  ("Dias úteis até o prazo", prox.prazo.until if prox else None, (("dia útil" if prox.prazo.until == 1 else "dias úteis") if prox else None), (prox.project.name ~ ": " ~ prox.prazo.text) if prox else "nenhum projeto com prazo", prox.prazo.tone if prox else None),
+]) }}
+
+<section class="card painel-block" aria-labelledby="g-esteira">
+  <div class="chart-card__head">
+    <h2 class="section-title" id="g-esteira">Esteira de etapas</h2>
+    {{ p.status_legend() }}
+  </div>
+  <div class="esteiras">
+    {%- for proj in d.projetos %}
+    {{ p.esteira(proj.esteira, proj.project.name, title_href=proj.href, prazo=proj.prazo) }}
+    {%- endfor %}
+  </div>
+  {%- if total_active > d.projetos|length %}
+  <p class="muted text-sm mt-2">Mostrando {{ d.projetos|length }} de {{ total_active }} projetos ativos. <a href="{{ url_for('app.projects') }}">Ver todos</a></p>
+  {%- endif %}
+</section>
+
+<div class="painel-grid">
+  {% call p.chart_card("g-tarefas", "Tarefas × unidades por projeto", "tasks", "Barras por projeto: progresso pelas tarefas e unidades prontas. Valores na tabela de dados.", legend=[("tasks", "Pelas tarefas"), ("units", "Unidades prontas")], class_="painel-grid__main") %}
+    <details class="chart__data">
+      <summary>Ver dados em tabela</summary>
+      <div class="table-wrap mt-2"><table class="table">
+        <thead><tr><th scope="col">Projeto</th><th scope="col" class="is-num">Pelas tarefas</th><th scope="col" class="is-num">Unidades prontas</th></tr></thead>
+        <tbody>{% for row in d.grafico.rows %}<tr><td>{{ row.label }}</td><td class="is-num">{{ row.tasksText }}</td><td class="is-num">{{ row.unitsFrac }} · {{ row.unitsText }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </details>
+  {% endcall %}
+
+  <section class="card chart-card painel-grid__side" aria-labelledby="g-status">
+    <div class="chart-card__head"><h2 class="section-title" id="g-status">Situação das etapas</h2></div>
+    <div class="status-split">
+      <div class="chart-box chart-box--status" data-chart="status" role="img" aria-label="Rosca: {% for x in d.grafico.status %}{{ x.name }} {{ x.value }}{{ ', ' if not loop.last }}{% endfor %}."></div>
+      {{ p.status_legend(d.contagem, with_today=False) }}
+    </div>
+    {{ p.pendencias(d.pendencias, show_project=True) }}
+  </section>
+</div>
+
+<div class="painel-grid">
+  {% call p.chart_card("g-horas", "Horas por projeto", "hours", "Barras empilhadas por projeto: horas trabalhadas e horas que faltam.", legend=[("worked", "Trabalhadas"), ("left", "Faltam")], class_="painel-grid__main") %}
+    <details class="chart__data">
+      <summary>Ver dados em tabela</summary>
+      <div class="table-wrap mt-2"><table class="table">
+        <thead><tr><th scope="col">Projeto</th><th scope="col" class="is-num">Trabalhadas</th><th scope="col" class="is-num">Faltam</th></tr></thead>
+        <tbody>{% for row in d.grafico.rows %}<tr><td>{{ row.label }}</td><td class="is-num">{{ row.workedText }}</td><td class="is-num">{{ row.leftText }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </details>
+  {% endcall %}
+
+  {% call p.chart_card("g-prazo", "Equipe × prazo", "deadline", "Por projeto: dias úteis de trabalho que faltam com a equipe de hoje e dias úteis até o prazo.", legend=[("need", "Trabalho que falta (equipe de hoje)"), ("until", "Até o prazo")], class_="painel-grid__side") %}
+    <details class="chart__data">
+      <summary>Ver dados em tabela</summary>
+      <div class="table-wrap mt-2"><table class="table">
+        <thead><tr><th scope="col">Projeto</th><th scope="col" class="is-num">Faltam (dias úteis)</th><th scope="col" class="is-num">Até o prazo</th></tr></thead>
+        <tbody>{% for row in d.grafico.deadline.rows %}<tr><td>{{ row.label }}</td><td class="is-num">{{ row.needText }}</td><td class="is-num">{{ row.untilText }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </details>
+  {% endcall %}
+</div>
+
+<section class="card painel-block" aria-labelledby="g-tabela" id="tabelas">
+  <div class="chart-card__head">
+    <h2 class="section-title" id="g-tabela">Projetos ativos</h2>
+    <a class="chart-card__link" href="{{ url_for('app.projects') }}">Lista completa</a>
+  </div>
+  <p class="chart-card__hint">Clique num projeto para abrir o painel dele.</p>
+  {% call data_table([("Projeto", ""), ("Progresso", "col-progress"), ("Unidades prontas", "is-num"), ("Etapas concluídas", "is-num"), ("Horas que faltam", "is-num"), ("Prazo", "")], caption="Projetos ativos", class_="table-wrap--flat") %}
+  <tbody>
+    {%- for proj in d.projetos %}
+    <tr>
+      <td data-label="Projeto"><a class="row-link" href="{{ proj.href }}">{{ proj.project.name }}</a></td>
+      <td data-label="Progresso">{{ progress(proj.result.progresso_geral, 1, label="Progresso de " ~ proj.project.name, size="sm", value_text=proj.result.progresso_geral|pct(0)) }}</td>
+      <td class="is-num" data-label="Unidades prontas">{{ proj.result.unidades_concluidas }} <span class="muted">/ {{ proj.project.quantity }}</span></td>
+      <td class="is-num" data-label="Etapas concluídas">{{ proj.result.etapas_concluidas }} <span class="muted">/ {{ proj.etapas|length }}</span></td>
+      <td class="is-num" data-label="Horas que faltam">{{ proj.result.tempo_restante_h|num(1) }} h</td>
+      <td data-label="Prazo"><span class="prazo-text prazo-text--{{ proj.prazo.tone }}">{{ proj.prazo.text }}</span></td>
+    </tr>
+    {%- endfor %}
+  </tbody>
+  {% endcall %}
+</section>
+
+<script type="application/json" id="painel-dados">{{ d.grafico|tojson }}</script>
+{%- endif %}
+{% endblock %}

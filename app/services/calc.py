@@ -305,6 +305,156 @@ def etapas_sem_tempo(etapas: Iterable[ResultadoEtapa]) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Painel (reestruturação R2): esteira de etapas, atraso por etapa e operação
+# ---------------------------------------------------------------------------
+
+# Situação visual da etapa (cor da esteira e da rosca). Ordem de prioridade:
+# concluída > aguardando peça > atrasada > em andamento > não iniciada.
+VISUAL_CONCLUIDA = "done"
+VISUAL_AGUARDANDO = "waiting"
+VISUAL_ATRASADA = "late"
+VISUAL_EM_ANDAMENTO = "doing"
+VISUAL_NAO_INICIADA = "todo"
+VISUAIS: tuple[str, ...] = (
+    VISUAL_CONCLUIDA,
+    VISUAL_EM_ANDAMENTO,
+    VISUAL_AGUARDANDO,
+    VISUAL_ATRASADA,
+    VISUAL_NAO_INICIADA,
+)
+
+
+def fracao_prazo_decorrida(
+    inicio: date | None,
+    prazo: date | None,
+    hoje: date,
+    feriados: Iterable[date] = (),
+    dias_semana: Iterable[int] = DIAS_SEMANA_PADRAO,
+) -> float | None:
+    """Quanto do prazo já passou, em dias úteis: (início, hoje] ÷ (início, prazo], entre 0 e 1.
+
+    None sem início ou sem prazo (não há linha de base). Prazo no próprio dia do início conta
+    como 1 dia útil, para não dividir por zero.
+    """
+    if inicio is None or prazo is None:
+        return None
+    if hoje <= inicio:
+        return 0.0
+    if hoje >= prazo:
+        return 1.0
+    feriados = tuple(feriados)
+    dias_semana = tuple(dias_semana)
+    total = max(1, dias_uteis_entre(inicio, prazo, feriados, dias_semana))
+    return min(1.0, dias_uteis_entre(inicio, hoje, feriados, dias_semana) / total)
+
+
+def fatias_da_esteira(etapas: Sequence[ResultadoEtapa]) -> tuple[tuple[float, float], ...]:
+    """(início, largura) de cada etapa na esteira, em fração de 0 a 1, na ordem das etapas.
+
+    Largura proporcional ao tempo total da etapa (tempo ideal × previstas). Sem nenhum tempo
+    definido, todas as etapas têm a mesma largura.
+    """
+    if not etapas:
+        return ()
+    tempos = [max(0.0, e.tempo_total_min or 0.0) for e in etapas]
+    total = sum(tempos)
+    if total <= 0:
+        tempos = [1.0] * len(etapas)
+        total = float(len(etapas))
+    fatias = []
+    inicio = 0.0
+    for t in tempos:
+        largura = t / total
+        fatias.append((inicio, largura))
+        inicio += largura
+    return tuple(fatias)
+
+
+def etapas_atrasadas(etapas: Sequence[ResultadoEtapa], fracao_decorrida: float | None) -> tuple[bool, ...]:
+    """Etapa atrasada = deveria ter terminado pela linha de base e não está concluída.
+
+    Linha de base: as etapas em ordem ocupam o prazo proporcionalmente ao tempo (a mesma
+    divisão da esteira). Se o fim da faixa da etapa já ficou para trás da fração do prazo
+    decorrida, ela devia estar pronta. Sem início/prazo (fração None), nenhuma é atrasada.
+    """
+    if fracao_decorrida is None:
+        return tuple(False for _ in etapas)
+    margem = 1e-9
+    return tuple(
+        (ini + larg) <= fracao_decorrida + margem and e.status != STATUS_CONCLUIDA and fracao_decorrida > 0
+        for e, (ini, larg) in zip(etapas, fatias_da_esteira(etapas))
+    )
+
+
+def status_visual(status: str, aguardando_peca: bool = False, atrasada: bool = False) -> str:
+    """Situação para a cor: concluída > aguardando peça > atrasada > em andamento > não iniciada."""
+    if status == STATUS_CONCLUIDA:
+        return VISUAL_CONCLUIDA
+    if aguardando_peca:
+        return VISUAL_AGUARDANDO
+    if atrasada:
+        return VISUAL_ATRASADA
+    if status == STATUS_EM_ANDAMENTO:
+        return VISUAL_EM_ANDAMENTO
+    return VISUAL_NAO_INICIADA
+
+
+def contagem_visual(situacoes: Iterable[str]) -> dict[str, int]:
+    """Quantas etapas em cada situação visual (rosca do painel), na ordem de ``VISUAIS``."""
+    contagem = {k: 0 for k in VISUAIS}
+    for s in situacoes:
+        contagem[s] += 1
+    return contagem
+
+
+@dataclass(frozen=True)
+class ResumoOperacao:
+    """Soma dos projetos ativos (painel geral): mesmas contas do resumo do projeto."""
+
+    projetos: int
+    unidades_concluidas: int
+    previstas: int
+    etapas: int
+    etapas_concluidas: int
+    tarefas: int
+    tarefas_concluidas: int
+    tempo_total_min: float
+    tempo_restante_min: float
+    progresso_geral: float
+
+    @property
+    def tempo_restante_h(self) -> float:
+        return self.tempo_restante_min / 60
+
+    @property
+    def tempo_total_h(self) -> float:
+        return self.tempo_total_min / 60
+
+    @property
+    def tempo_trabalhado_h(self) -> float:
+        return (self.tempo_total_min - self.tempo_restante_min) / 60
+
+
+def resumo_operacao(resultados: Sequence[ResultadoProjeto]) -> ResumoOperacao:
+    """Agrega vários projetos. Progresso geral = 1 − restante ÷ total (o mesmo E414), com os
+    tempos somados: um projeto grande pesa mais que um pequeno."""
+    total = sum(r.tempo_total_min for r in resultados)
+    restante = sum(r.tempo_restante_min for r in resultados)
+    return ResumoOperacao(
+        projetos=len(resultados),
+        unidades_concluidas=sum(r.unidades_concluidas for r in resultados),
+        previstas=sum(r.previstas for r in resultados),
+        etapas=sum(len(r.etapas) for r in resultados),
+        etapas_concluidas=sum(r.etapas_concluidas for r in resultados),
+        tarefas=sum(r.tarefas for r in resultados),
+        tarefas_concluidas=sum(r.tarefas_concluidas for r in resultados),
+        tempo_total_min=total,
+        tempo_restante_min=restante,
+        progresso_geral=progresso_geral(restante, total),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Resumos
 # ---------------------------------------------------------------------------
 

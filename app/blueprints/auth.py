@@ -84,7 +84,7 @@ def start_session(user: User) -> None:
 @limiter.limit(_limit("SIGNUP_RATE_LIMIT"), methods=["POST"])
 def signup():
     if current_user.is_authenticated:
-        return redirect(url_for("app.projects"))
+        return redirect(url_for("app.home"))
     form = SignupForm()
     if form.validate_on_submit():
         # Sem enumeração: e-mail novo ou já cadastrado → mesma resposta (o dono recebe aviso).
@@ -123,7 +123,7 @@ def signup_resend():
 @limiter.limit(_limit("LOGIN_RATE_LIMIT"), methods=["POST"])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for("app.projects"))
+        return redirect(url_for("app.home"))
     form = LoginForm()
     if request.method == "GET":
         form.next.data = safe_next(request.args.get("next")) or ""
@@ -160,7 +160,7 @@ def login():
                     return redirect(url_for("auth.login_mfa"), code=303)
                 lockout.register_success(email)
                 start_session(user)
-                return redirect(next_url or url_for("app.projects"))
+                return redirect(next_url or url_for("app.home"))
             after = lockout.register_failure(email, ip)
             if after.locked:
                 error, status_code = lock_message(after), 429
@@ -202,7 +202,7 @@ def login_mfa():
             lockout.register_success(user.email)
             next_url = safe_next(data.get("next"))
             start_session(user)
-            return redirect(next_url or url_for("app.projects"))
+            return redirect(next_url or url_for("app.home"))
         else:
             db.session.rollback()
             after = lockout.register_failure(user.email, ip)
@@ -217,7 +217,7 @@ def logout():
     dispositivos” no perfil, que incrementa session_version."""
     form = LogoutForm()
     if not form.validate_on_submit():  # CSRF já validado globalmente; mantido por clareza
-        return redirect(url_for("app.projects"))
+        return redirect(url_for("app.home"))
     logout_user()
     session.clear()
     flash("Você saiu.", "info")

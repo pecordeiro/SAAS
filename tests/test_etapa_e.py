@@ -6,7 +6,9 @@ o que o servidor calculou, é acessível (título/desc nos SVG, texto ao lado da
 
 from __future__ import annotations
 
+import json
 import re
+from datetime import date
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -51,6 +53,7 @@ def _painel(client, tenant, query=""):
 
 
 def test_painel_mostra_kpis_graficos_e_tabela(client, app, tenants):
+    """R2: cabeçalho com frase-resumo, faixa de 5 indicadores, esteira, gráficos e Tabelas 1/2."""
     a, _ = tenants
     _projeto_rico(app, a)
     login(client, app, a.operator_email)
@@ -58,52 +61,61 @@ def test_painel_mostra_kpis_graficos_e_tabela(client, app, tenants):
     assert response.status_code == 200
     page = text_of(response)
     for texto in (
-        "Painel do projeto",
+        "Atualizado às",
+        "Preencher etapas",
         "Progresso geral",
         "Unidades prontas",
-        "Unidades concluídas",
-        "Tarefas concluídas",
-        "Tempo que falta",
+        "Etapas concluídas",
+        "Horas que faltam",
         "Dias úteis até o prazo",
+        "Esteira de etapas",
         "Tarefas × unidades por etapa",
-        "Status das etapas",
-        "Quanto cada etapa representa",
+        "Situação das etapas",
+        "Atrasadas e aguardando peça",
         "Horas por etapa",
         "Equipe × prazo",
-        "Progresso por etapa pelas tarefas",
+        "Tabela 1 · Progresso por etapa pelas tarefas",
     ):
         assert texto in page, texto
-    # números do servidor: 1 de 5 etapas concluídas; etapa "Pintura" 4/10 em andamento
     with app.app_context():
         project = db.session.get(Project, a.project_id)
         r = svc.summary(project)
     html = response.get_data(as_text=True)
-    assert re.search(rf'{r.tarefas_concluidas}\s*<span class="kpi__unit">/ {r.tarefas}</span>', html)
-    assert "1/5" in page and "concluídas" in page  # centro da rosca
-    assert "Concluída" in page and "Em andamento" in page and "Não iniciada" in page
-    # etapa sem tempo definido não ocupa o treemap, mas é avisada
-    assert "1 etapa sem tempo definido" in page
-    # cor nunca sozinha: legenda em texto, “hoje” na equipe atual, tabela de dados
-    assert "hoje" in page and "Ver dados em tabela" in page
+    # números do servidor (calc): etapas concluídas sobre o total, unidade em cinza ao lado
+    assert re.search(rf'{r.etapas_concluidas}<span class="kpi__unit">/ 5</span>', html)
+    assert f"tarefas concluídas: {r.tarefas_concluidas} de {r.tarefas}" in page
+    # legenda em texto com a contagem por situação (cor nunca sozinha)
+    for nome in ("Concluída", "Em andamento", "Aguardando peça", "Atrasada", "Não iniciada"):
+        assert nome in page
+    assert "1 etapa ainda sem tempo ideal" in page
+    assert "Ver dados em tabela" in page
+    # dados dos gráficos: JSON gerado pelo servidor, lido pelo painel.js (ECharts local)
+    dados = json.loads(re.search(r'<script type="application/json" id="painel-dados">(.*?)</script>', html, re.S).group(1))
+    assert [row["label"] for row in dados["rows"]][:2] == ["1. Etapa 1", "2. Pintura"]
+    assert dados["rows"][0]["tasks"] == pytest.approx(r.etapas[0].progresso)
+    assert sum(s["value"] for s in dados["status"]) == 5
+    assert len(dados["team"]["rows"]) == 6
+    assert "/static/" in html and re.search(r"echarts(-5\.5\.1/echarts\.min|\.[0-9a-f]{10})\.js", html)
 
 
-def test_painel_svgs_acessiveis_sem_script_nem_estilo_inline(client, app, tenants):
+def test_painel_sem_estilo_inline_sem_cdn_e_esteira_acessivel(client, app, tenants):
     a, _ = tenants
     _projeto_rico(app, a)
     login(client, app, a.operator_email)
     html = _painel(client, a).get_data(as_text=True)
-    corpo = html.split('<h1>Painel do projeto</h1>')[1]
+    corpo = html.split('<main id="conteudo"')[1]
     assert not re.search(r"\sstyle\s*=", corpo), "estilo inline quebra a CSP"
-    assert not re.search(r"<script", corpo.split("</main>")[0], re.I)
+    # o único <script> no corpo é o bloco de dados JSON (não executa)
+    assert re.findall(r"<script\b[^>]*>", corpo.split("</main>")[0]) == ['<script type="application/json" id="painel-dados">']
     assert "http://" not in corpo and "https://cdn" not in corpo
-    # todo SVG com papel de imagem tem <title> e aria-labelledby; os decorativos ficam aria-hidden
-    svgs = re.findall(r"<svg\b[^>]*>", corpo)
-    assert len(svgs) >= 6
-    for tag in svgs:
-        assert 'aria-hidden="true"' in tag or ('role="img"' in tag and "aria-labelledby" in tag), tag
-    assert corpo.count("<title") >= 4
-    # sem cor solta nos SVG: só classes (tokens no CSS)
+    # esteira: um bloco (link com nome) por etapa, cor só por classe
+    blocos = re.findall(r'<a href="([^"]+)" aria-label="([^"]+)"><rect class="esteira__bloco esteira__bloco--(\w+)"', corpo)
+    assert len(blocos) == 5
+    assert all(" — " in label for _, label, _ in blocos)
     assert not re.search(r'(fill|stroke)="#', corpo) and "rgb(" not in corpo
+    # gráficos do ECharts têm nome acessível
+    for chart in ("tasks", "status", "hours", "team"):
+        assert re.search(rf'data-chart="{chart}" role="img" aria-label="[^"]+"', corpo), chart
 
 
 def test_painel_etapas_levam_ao_detalhe_com_a_etapa_aberta(client, app, tenants):
@@ -140,7 +152,7 @@ def test_painel_tabela_de_unidades_e_aba_invalida(client, app, tenants):
     _projeto_rico(app, a)
     login(client, app, a.operator_email)
     unidades = text_of(_painel(client, a, "?tabela=unidades"))
-    assert "Unidades concluídas por etapa" in unidades and "Feitas" in unidades
+    assert "Tabela 2 · Unidades concluídas por etapa" in unidades and "Feitas" in unidades
     padrao = text_of(_painel(client, a, "?tabela=qualquer-coisa"))
     assert "Progresso por etapa pelas tarefas" in padrao and "Tempo por unidade (min)" in padrao
 
@@ -164,7 +176,7 @@ def test_painel_exige_login_e_aparece_link_no_detalhe(client, app, tenants):
     assert f"/app/projetos/{a.project_id}/painel" in client.get(f"/app/projetos/{a.project_id}").get_data(as_text=True)
 
 
-# ---------------------------------------------------------------- dashboard.build (puro)
+# ---------------------------------------------------------------- dashboard.painel_* (puro)
 
 
 def _etapas_fake():
@@ -179,39 +191,94 @@ def _etapas_fake():
     return stages, calcs
 
 
-def test_build_usa_so_numeros_do_calc():
-    stages, calcs = _etapas_fake()
-    r = calc.resumo_projeto(calcs, 10, pessoas=2, horas_dia=8)
-    d = dashboard.build(stages, r, quantity=10, people=2, hours_per_day=8.0)
+def _painel_fake(pessoas=2, horas_dia=8.0, fracao=None, deadline=None, prazo=None, stages=None):
+    st, calcs = _etapas_fake()
+    stages = stages or st
+    r = calc.resumo_projeto(calcs, 10, pessoas=pessoas, horas_dia=horas_dia)
+    d = dashboard.painel_projeto(
+        stages, r, nome="Lote 10", quantity=10, people=pessoas, hours_per_day=horas_dia,
+        prazo=prazo, deadline=deadline or {}, concluido=False, fracao_decorrida=fracao,
+        href_etapa=lambda sid: f"/etapa/{sid}",
+    )
+    return r, d
+
+
+def test_painel_projeto_usa_so_numeros_do_calc():
+    r, d = _painel_fake()
     assert [e["n"] for e in d["etapas"]] == [1, 2, 3, 4, 5]
-    assert d["contagem"] == calc.contagem_status(r.etapas) == {"Concluída": 1, "Em andamento": 1, "Não iniciada": 3}
-    assert d["rosca"]["total"] == 5
-    assert d["sem_tempo"] == 1 and len(d["treemap"]) == 4
-    # área do treemap proporcional ao peso (calc.peso_etapa)
-    total = d["treemap_w"] * d["treemap_h"]
-    for c in d["treemap"]:
-        assert c["w"] * c["h"] == pytest.approx(c["etapa"]["r"].peso_no_projeto * total, rel=1e-2)
-    # horas empilhadas = trabalhadas + faltam de cada etapa
-    for col, e in zip(d["horas"]["cols"], d["etapas"]):
-        assert col["total"] == pytest.approx(e["total_h"])
+    assert d["contagem"] == {"done": 1, "doing": 1, "waiting": 0, "late": 0, "todo": 3}
+    assert sum(s["value"] for s in d["grafico"]["status"]) == 5
+    assert d["sem_tempo"] == 1
+    # esteira: largura ∝ tempo total da etapa (calc.fatias_da_esteira), blocos lado a lado
+    blocos = d["esteira"]["blocos"]
+    total = sum(e["r"].tempo_total_min for e in d["etapas"])
+    for b, e in zip(blocos, d["etapas"]):
+        assert b["w"] == pytest.approx(e["r"].tempo_total_min / total * 1000, abs=1e-2)
+        assert b["href"] == f"/etapa/{e['id']}"
+    assert blocos[-1]["w"] == 0 and sum(b["w"] for b in blocos) == pytest.approx(1000, abs=1e-2)
+    assert d["esteira"]["hoje"] is None  # sem prazo: sem marca de hoje
+    # horas = trabalhadas + faltam de cada etapa
+    for row, e in zip(d["grafico"]["rows"], d["etapas"]):
+        assert row["worked"] + row["left"] == pytest.approx(e["total_h"], abs=0.02)
+        assert row["tasks"] == pytest.approx(e["r"].progresso, abs=1e-4)
     # equipe × prazo: 6 linhas; a equipe atual (2) é a destacada e bate com o resumo
-    assert [c["destaque"] for c in d["equipe"]["cols"]] == [False, True, False, False, False, False]
-    assert d["equipe_atual"]["dias"] == pytest.approx(r.dias_uteis_restantes)
+    assert [x["current"] for x in d["equipe"]] == [False, True, False, False, False, False]
+    assert d["equipe_atual"]["days"] == pytest.approx(r.dias_uteis_restantes, abs=0.01)
     assert d["unidades_pct"] == pytest.approx(calc.razao(r.unidades_concluidas, 10))
+    assert d["frase"] == "Lote 10: sem prazo definido"
 
 
-def test_build_equipe_fora_de_1_a_6_nao_destaca_coluna():
-    stages, calcs = _etapas_fake()
-    r = calc.resumo_projeto(calcs, 10, pessoas=9, horas_dia=8)
-    d = dashboard.build(stages, r, quantity=10, people=9, hours_per_day=8.0)
+def test_painel_projeto_atraso_e_aguardando_peca():
+    st, _ = _etapas_fake()
+    st[2].waiting_part = True
+    # metade do prazo passou: as etapas cuja faixa terminou antes de 50% e não estão prontas atrasam
+    r, d = _painel_fake(fracao=0.5, stages=st, prazo=date(2026, 11, 14),
+                        deadline={"on_time": True, "forecast": date(2026, 11, 10), "slack": 3, "until_due": 17})
+    atrasos = calc.etapas_atrasadas(r.etapas, 0.5)
+    for e, atrasada in zip(d["etapas"], atrasos):
+        assert e["atrasada"] == atrasada
+    assert d["etapas"][0]["visual"] == "done"
+    assert d["etapas"][2]["visual"] == "waiting"  # aguardando peça vence "atrasada"
+    assert d["esteira"]["hoje"] == pytest.approx(500)
+    assert [p["etapa"]["visual"] for p in d["pendencias"]][-1] == "waiting"
+    assert d["frase"].startswith("Lote 10: termina 10/11, folga de 3 dias úteis")
+    assert "aguardando peça" in d["frase"]
+    assert d["grafico"]["team"]["due"] == 17
+
+
+def test_painel_projeto_equipe_fora_de_1_a_6_nao_destaca():
+    _, d = _painel_fake(pessoas=9)
     assert d["equipe_atual"] is None
 
 
-def test_build_horas_por_dia_zero_nao_quebra():
-    stages, calcs = _etapas_fake()
-    r = calc.resumo_projeto(calcs, 10, pessoas=1, horas_dia=0)
-    d = dashboard.build(stages, r, quantity=10, people=1, hours_per_day=0.0)
-    assert all(c["dias"] is None for c in d["equipe"]["cols"])
+def test_painel_projeto_horas_por_dia_zero_nao_quebra():
+    _, d = _painel_fake(pessoas=1, horas_dia=0.0)
+    assert all(x["days"] is None and x["daysText"] == "—" for x in d["equipe"])
+
+
+def test_rotulo_nao_repete_a_numeracao():
+    assert dashboard.rotulo_etapa(1, "1. Preparação da base") == "1. Preparação da base"
+    assert dashboard.rotulo_etapa(3, "3) Montagem") == "3) Montagem"
+    assert dashboard.rotulo_etapa(2, "Pintura") == "2. Pintura"
+    assert dashboard.rotulo_etapa(4, "4x4 Chassi") == "4. 4x4 Chassi"
+
+
+def test_painel_operacao_soma_os_projetos():
+    st, calcs = _etapas_fake()
+    itens = []
+    for i, pessoas in enumerate((1, 3)):
+        r = calc.resumo_projeto(calcs, 10, pessoas=pessoas, horas_dia=8)
+        proj = SimpleNamespace(id=f"p{i}", name=f"Lote {i}", quantity=10, due_date=None)
+        itens.append({"project": proj, "stages": st, "result": r, "deadline": {}, "concluido": False, "fracao": None})
+    d = dashboard.painel_operacao(itens, href_etapa=lambda p, s: f"/{p}/{s}", href_projeto=lambda p: f"/{p}")
+    resumo = d["resumo"]
+    assert resumo.projetos == 2 and resumo.etapas == 10
+    assert resumo.tempo_restante_min == pytest.approx(2 * itens[0]["result"].tempo_restante_min)
+    assert resumo.progresso_geral == pytest.approx(itens[0]["result"].progresso_geral)
+    assert [row["label"] for row in d["grafico"]["rows"]] == ["Lote 0", "Lote 1"]
+    assert d["proximo"] is None
+    assert d["frase"].startswith("2 projetos ativos")
+    assert d["projetos"][1]["esteira"]["blocos"][0]["href"] == "/p1/1"
 
 
 def test_dashboard_e_puro():

@@ -21,6 +21,8 @@ SOURCE_FALLBACK = {
     "app.js": ["js/app.js"],
     "arrastar.js": ["js/arrastar.js"],  # Etapa D: só na tela de edição do projeto
     "htmx.js": ["js/htmx.min.js"],
+    "painel.js": ["js/painel.js"],  # R2: gráficos do Painel (só nas páginas de painel)
+    "echarts.js": ["vendor/echarts-5.5.1/echarts.min.js"],  # Apache-2.0 (LICENSE e NOTICE na mesma pasta)
 }
 
 
@@ -42,9 +44,10 @@ def init_app(app: Flask) -> None:
 
     app.jinja_env.globals["asset_urls"] = asset_urls
 
-    # Arquivos com hash no nome (dist/) e fontes não mudam sem mudar de URL: cache longo.
+    # Arquivos com hash no nome (dist/), fontes e bibliotecas com a versão no caminho (vendor/)
+    # não mudam sem mudar de URL: cache longo.
     def get_send_file_max_age(filename: str | None):
-        if filename and (filename.startswith("dist/") or filename.startswith("fonts/")):
+        if filename and filename.startswith(("dist/", "fonts/", "vendor/")):
             return ONE_YEAR
         return app.config.get("SEND_FILE_MAX_AGE_DEFAULT")
 

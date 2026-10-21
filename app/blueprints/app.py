@@ -70,10 +70,123 @@ def _uuid_arg(name: str) -> uuid.UUID | None:
         return None
 
 
+OVERVIEW_MAX_PROJECTS = 20
+
+
+def _now_local() -> datetime:
+    try:
+        return datetime.now(ZoneInfo(g.company.timezone))
+    except Exception:  # noqa: BLE001 - fuso inválido cai no padrão
+        return datetime.now(ZoneInfo("America/Sao_Paulo"))
+
+
+def _deadline_fraction(project: Project) -> float | None:
+    """Quanto do prazo do projeto já passou (dias úteis da empresa) — conta em calc.py."""
+    return calc.fracao_prazo_decorrida(
+        project.start_date, project.due_date, _today(), holidays_for(g.company.id), g.company.workdays()
+    )
+
+
+def _stage_fill_href(project_id, stage_id) -> str:
+    """Clique numa etapa = abrir para preencher (hoje o detalhe com a etapa aberta; R3 troca)."""
+    return url_for("app.project_detail", project_id=project_id, etapa=stage_id, _anchor=f"etapa-{stage_id}")
+
+
 @bp.get("/")
 @tenant_required(ROLE_OPERATOR)
 def home():
-    return redirect(url_for("app.projects"))
+    """Primeira tela (R2): Painel da operação com todos os projetos ativos. Números do calc.py
+    (somados por calc.resumo_operacao); o template e o JS só exibem (ADR-0009)."""
+    projects = svc.list_projects("ativos")
+    total_active = len(projects)
+    projects = projects[:OVERVIEW_MAX_PROJECTS]
+    itens = []
+    for project in projects:
+        result = svc.summary(project)
+        status = _project_status(project, result)
+        itens.append(
+            {
+                "project": project,
+                "stages": svc.active_stages(project),
+                "result": result,
+                "deadline": _deadline(project, result, status),
+                "concluido": status == calc.STATUS_CONCLUIDA,
+                "fracao": _deadline_fraction(project),
+            }
+        )
+    data = dashboard.painel_operacao(
+        itens,
+        href_etapa=_stage_fill_href,
+        href_projeto=lambda pid: url_for("app.project_dashboard", project_id=pid),
+    )
+    return render_template(
+        "app/painel.html",
+        d=data,
+        total_active=total_active,
+        updated_at=_now_local(),
+        can_create=g.membership.has_role(ROLE_SUPERVISOR),
+        can_edit=g.membership.has_role(ROLE_SUPERVISOR),
+        table=_table_arg(),
+        table_tabs=DASHBOARD_TABLES,
+    )
+
+
+def _current_project() -> Project | None:
+    """Projeto “atual” dos atalhos do menu: o da URL (?projeto=, sempre da empresa da sessão —
+    de outra empresa → 404) ou, sem ele, o ativo mais recente."""
+    raw = request.args.get("projeto", "")
+    if raw:
+        try:
+            return get_or_404(Project, uuid.UUID(raw))
+        except ValueError:
+            abort(404)
+    active = svc.list_projects("ativos")
+    if active:
+        return active[0]
+    every = svc.list_projects("todos")
+    return every[0] if every else None
+
+
+def _no_project_redirect():
+    flash("Crie um projeto para começar." if g.membership.has_role(ROLE_SUPERVISOR) else "Ainda não há projetos.", "info")
+    target = "app.project_new" if g.membership.has_role(ROLE_SUPERVISOR) else "app.projects"
+    return redirect(url_for(target), 303)
+
+
+@bp.get("/preencher")
+@tenant_required(ROLE_OPERATOR)
+def fill():
+    """Menu “Preencher etapas”. TODO(R3): tela própria (lista de etapas + tabela editável);
+    por enquanto abre o detalhe do projeto atual, onde se lançam as peças."""
+    project = _current_project()
+    if project is None:
+        return _no_project_redirect()
+    return redirect(url_for("app.project_detail", project_id=project.id), 303)
+
+
+@bp.get("/meta-e-equipe")
+@tenant_required(ROLE_OPERATOR)
+def goal_team():
+    """Menu “Meta e equipe”. TODO(R5): tela própria (meta, pessoas, horas/dia, “e se mudar a
+    equipe?”). Por enquanto: supervisor+ edita os dados do projeto; os demais veem o gráfico
+    Equipe × prazo do painel."""
+    project = _current_project()
+    if project is None:
+        return _no_project_redirect()
+    if g.membership.has_role(ROLE_SUPERVISOR):
+        return redirect(url_for("edicao.project_edit", project_id=project.id), 303)
+    return redirect(url_for("app.project_dashboard", project_id=project.id, _anchor="g-equipe"), 303)
+
+
+@bp.get("/como-funciona")
+@tenant_required(ROLE_OPERATOR)
+def how_it_works():
+    """Menu “Como funciona”. TODO(R5): cada conta explicada com os números atuais. Por
+    enquanto abre as Tabelas 1 e 2 do painel do projeto, que mostram as contas por etapa."""
+    project = _current_project()
+    if project is None:
+        return _no_project_redirect()
+    return redirect(url_for("app.project_dashboard", project_id=project.id, _anchor="g-tabela"), 303)
 
 
 def _project_status(project: Project, result: calc.ResultadoProjeto) -> str:
@@ -377,16 +490,26 @@ DASHBOARD_TABLES = (("tarefas", "Tabela 1 · Tarefas"), ("unidades", "Tabela 2 �
 @bp.get("/projetos/<uuid:project_id>/painel")
 @tenant_required(ROLE_OPERATOR)
 def project_dashboard(project_id):
-    """Painel completo do projeto: KPIs, gráficos SVG e tabela de etapas. Só leitura; todos os
-    números vêm de calc.py (servidor) e a geometria dos gráficos de charts.py (ADR-0009)."""
+    """Painel de um projeto (R2): cabeçalho com frase-resumo, 5 indicadores, esteira de etapas,
+    gráficos (ECharts local, só desenha o JSON do servidor) e Tabelas 1/2. Só leitura; todos os
+    números vêm de calc.py (ADR-0009)."""
     project = get_or_404(Project, project_id)
     result = svc.summary(project)
     stages = svc.active_stages(project)
     status = _project_status(project, result)
-    table = request.args.get("tabela", "tarefas")
-    table = table if table in dict(DASHBOARD_TABLES) else "tarefas"
-    data = dashboard.build(
-        stages, result, quantity=project.quantity, people=project.people, hours_per_day=float(project.hours_per_day)
+    deadline = _deadline(project, result, status)
+    data = dashboard.painel_projeto(
+        stages,
+        result,
+        nome=project.name,
+        quantity=project.quantity,
+        people=project.people,
+        hours_per_day=float(project.hours_per_day),
+        prazo=project.due_date,
+        deadline=deadline,
+        concluido=status == calc.STATUS_CONCLUIDA,
+        fracao_decorrida=_deadline_fraction(project),
+        href_etapa=lambda sid: _stage_fill_href(project.id, sid),
     )
     return render_template(
         "app/project_dashboard.html",
@@ -394,11 +517,17 @@ def project_dashboard(project_id):
         result=result,
         d=data,
         project_status=status,
-        deadline=_deadline(project, result, status),
-        table=table,
+        deadline=deadline,
+        updated_at=_now_local(),
+        table=_table_arg(),
         table_tabs=DASHBOARD_TABLES,
         can_edit=g.membership.has_role(ROLE_SUPERVISOR),
     )
+
+
+def _table_arg() -> str:
+    table = request.args.get("tabela", "tarefas")
+    return table if table in dict(DASHBOARD_TABLES) else "tarefas"
 
 
 # ---------------------------------------------------------------- progresso por pessoa (Etapa D)
