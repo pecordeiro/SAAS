@@ -58,7 +58,8 @@ def test_login_e_logout(client, app, tenants):
     a, _ = tenants
     response = login(client, app, a.owner_email)
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/app/projetos")
+    assert response.headers["Location"].endswith("/app/")  # R2: o login abre o Painel
+    assert "Projeto A" in text_of(client.get("/app/"))
     assert "Projeto A" in text_of(client.get("/app/projetos"))
     response = post(client, app, "/sair")
     assert response.status_code == 302
@@ -84,7 +85,7 @@ def test_area_logada_exige_login(client):
 def test_login_next_so_aceita_caminho_interno(client, app, tenants):
     a, _ = tenants
     response = post(client, app, "/entrar", {"email": a.owner_email, "password": PASSWORD, "next": "https://evil.example/x"})
-    assert response.headers["Location"].endswith("/app/projetos")
+    assert response.headers["Location"].endswith("/app/")
     post(client, app, "/sair")
     response = post(client, app, "/entrar", {"email": a.owner_email, "password": PASSWORD, "next": f"/app/projetos/{a.project_id}"})
     assert response.headers["Location"].endswith(f"/app/projetos/{a.project_id}")

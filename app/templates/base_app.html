@@ -1,43 +1,55 @@
 {% extends "_base.html" %}
 {% from "components/icon.html" import icon %}
-{% from "components/nav.html" import sidebar_nav, bottom_nav, theme_switch %}
+{% from "components/nav.html" import sidebar_nav, bottom_nav, theme_switch, banner %}
 {% from "components/toast.html" import toast_region %}
 {% from "components/alert.html" import alert %}
 {#
-  Layout da área logada (telas.md, “Área logada”):
-  - < 768 px: barra superior (logo, empresa, iniciais → folha “Mais”), conteúdo e navegação
-    inferior fixa.
-  - ≥ 768 px: menu lateral (logo, empresa e papel, itens, usuário, tema, Sair).
-  Páginas definem `nav_current` (e `nav_project` para o atalho de Histórico do projeto).
-  Itens de Modelos, Usuários, Empresa e Assinatura entram quando as rotas existirem (Fases 4–6).
+  Layout da área logada (reestruturação R1, docs/plano/reestruturacao.md §4.1):
+  - Menu igual à base (Controle de Atividades): Painel, Preencher etapas, Meta e equipe,
+    Como funciona. Depois, Projetos e Histórico; no rodapé, "Configurações" agrupa Empresa,
+    Usuários, Assinatura, Privacidade, Modelos, API, Alertas e Unidades (conforme o papel).
+  - < 768 px: barra superior, conteúdo e navegação inferior (as 4 telas + "Mais").
+  - ≥ 768 px: menu lateral claro de 220 px.
+  Páginas definem `nav_current` (dashboard | fill | team | how | projects | history | …) e
+  `nav_project` (projeto aberto: os itens Preencher/Meta/Como passam a apontar para ele).
+  Mostrar ou esconder itens aqui é só conveniência: cada rota recusa por conta própria (ADR-0009).
 #}
 {%- set role_label = role_labels.get(current_membership.role, current_membership.role) if current_membership else "" -%}
+{%- set _proj = nav_project.id if nav_project is defined and nav_project else None -%}
 {%- set nav_items = [
+  {"key": "dashboard", "label": "Painel", "short": "Painel", "href": url_for("app.home"), "icon": "dashboard"},
+  {"key": "fill", "label": "Preencher etapas", "short": "Preencher", "href": url_for("app.fill", projeto=_proj), "icon": "edit"},
+  {"key": "team", "label": "Meta e equipe", "short": "Meta e equipe", "href": url_for("app.goal_team", projeto=_proj), "icon": "team"},
+  {"key": "how", "label": "Como funciona", "short": "Como funciona", "href": url_for("app.how_it_works", projeto=_proj), "icon": "help"},
+] -%}
+{%- set nav_records = [
   {"key": "projects", "label": "Projetos", "href": url_for("app.projects"), "icon": "projects"},
   {"key": "history", "label": "Histórico", "href": url_for("app.history"), "icon": "history"},
 ] -%}
-{%- if current_membership and current_membership.has_role("supervisor") -%}
-  {%- set _ = nav_items.append({"key": "alerts", "label": "Alertas", "href": url_for("app.alerts"), "icon": "alert"}) -%}
-  {%- set _ = nav_items.append({"key": "templates", "label": "Modelos", "href": url_for("modelos.index"), "icon": "folder"}) -%}
-  {%- set _ = nav_items.append({"key": "users", "label": "Usuários", "href": url_for("team.users"), "icon": "team"}) -%}
-{%- endif -%}
+{%- set nav_settings = [] -%}
 {%- if current_membership and current_membership.has_role("owner") -%}
-  {%- set _ = nav_items.append({"key": "company", "label": "Empresa", "href": url_for("empresa.settings"), "icon": "building"}) -%}
+  {%- set _ = nav_settings.append({"key": "company", "label": "Empresa", "href": url_for("empresa.settings")}) -%}
+{%- endif -%}
+{%- if current_membership and current_membership.has_role("supervisor") -%}
+  {%- set _ = nav_settings.append({"key": "users", "label": "Usuários", "href": url_for("team.users")}) -%}
 {%- endif -%}
 {%- if current_membership and current_membership.role == "owner" -%}
-  {%- set _ = nav_items.append({"key": "billing", "label": "Assinatura", "href": url_for("billing.overview"), "icon": "check"}) -%}
+  {%- set _ = nav_settings.append({"key": "billing", "label": "Assinatura", "href": url_for("billing.overview")}) -%}
+{%- endif -%}
+{%- if current_membership and current_membership.has_role("owner") -%}
+  {%- set _ = nav_settings.append({"key": "privacy", "label": "Privacidade", "href": url_for("lgpd.index")}) -%}
+{%- endif -%}
+{%- if current_membership and current_membership.has_role("supervisor") -%}
+  {%- set _ = nav_settings.append({"key": "templates", "label": "Modelos", "href": url_for("modelos.index")}) -%}
+  {%- set _ = nav_settings.append({"key": "alerts", "label": "Alertas", "href": url_for("app.alerts")}) -%}
 {%- endif -%}
 {%- if config.get("FEATURE_PUBLIC_API") and current_membership and current_membership.has_role("owner") -%}
-  {%- set _ = nav_items.append({"key": "api", "label": "API", "href": url_for("api_tokens_ui.tokens_index"), "icon": "chart"}) -%}
+  {%- set _ = nav_settings.append({"key": "api", "label": "API", "href": url_for("api_tokens_ui.tokens_index")}) -%}
 {%- endif -%}
-{#- Etapa G: busca por número de série (todos os papéis; depois dos itens da navegação inferior). -#}
 {%- if current_membership -%}
-  {%- set _ = nav_items.append({"key": "units", "label": "Unidades", "href": url_for("qualidade.units_search"), "icon": "package"}) -%}
+  {%- set _ = nav_settings.append({"key": "units", "label": "Unidades (nº de série)", "href": url_for("qualidade.units_search")}) -%}
 {%- endif -%}
-{#- Fase 7: Privacidade e dados (LGPD) — só proprietário. -#}
-{%- if current_membership and current_membership.has_role("owner") -%}
-  {%- set _ = nav_items.append({"key": "privacy", "label": "Privacidade", "href": url_for("lgpd.index"), "icon": "info"}) -%}
-{%- endif -%}
+{%- set settings_current = (nav_current | default("")) in (nav_settings | map(attribute="key") | list) -%}
 {%- set name_parts = (current_user.name or "?").split() -%}
 {%- set initials = (name_parts[0][0] ~ (name_parts[-1][0] if name_parts|length > 1 else ""))|upper -%}
 {%- set here = request.full_path.rstrip("?") -%}
@@ -48,36 +60,47 @@
 <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
 <div class="app-shell">
   <aside class="app-sidebar" aria-label="Menu lateral">
-    <a class="brand" href="{{ url_for('app.projects') }}">
-      <img class="brand__logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="" width="32" height="32">
+    <a class="brand" href="{{ url_for('app.home') }}">
+      <img class="brand__logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="" width="28" height="28">
       <span>Controle de Produção</span>
     </a>
     {%- if current_company %}
-    <p class="sidebar__company">{{ current_company.name }}<br><span class="muted text-sm">{{ role_label }}</span></p>
+    <p class="sidebar__company">{{ current_company.name }}<br><span class="sidebar__role">{{ role_label }}</span></p>
     {%- endif %}
-    {{ sidebar_nav(nav_items, nav_current | default("")) }}
-    <div class="sidebar__footer stack">
-      <p class="sidebar__user"><a href="{{ url_for('account.profile') }}"><span class="text-strong">{{ current_user.name }}</span></a><br><span class="muted text-sm">{{ current_user.email }}</span></p>
+    {{ sidebar_nav(nav_items, nav_current | default(""), "Telas") }}
+    {{ sidebar_nav(nav_records, nav_current | default(""), "Registros", secondary=True) }}
+    <div class="sidebar__footer">
+      {%- if nav_settings %}
+      <details class="sidebar__settings"{% if settings_current %} open{% endif %}>
+        <summary class="sidebar__item">{{ icon("settings") }}<span>Configurações</span>{{ icon("chevron-down", class_="sidebar__chevron") }}</summary>
+        <nav class="sidebar__subnav" aria-label="Configurações">
+          {%- for item in nav_settings %}
+          <a class="sidebar__subitem" href="{{ item.href }}"{% if item.key == nav_current | default("") %} aria-current="page"{% endif %}>{{ item.label }}</a>
+          {%- endfor %}
+        </nav>
+      </details>
+      {%- endif %}
+      <a class="sidebar__item" href="{{ url_for('account.profile') }}"{% if nav_current | default("") == "profile" %} aria-current="page"{% endif %}>{{ icon("user") }}<span class="sidebar__user-name">{{ current_user.name }}</span></a>
       {%- if company_count and company_count > 1 %}
-      <a class="sidebar__item" href="{{ url_for('account.companies') }}">{{ icon("projects") }}<span>Trocar empresa</span></a>
+      <a class="sidebar__item" href="{{ url_for('account.companies') }}">{{ icon("building") }}<span>Trocar empresa</span></a>
       {%- endif %}
       {{ theme_switch(theme, here, url_for("public.set_theme"), "tema-lateral") }}
       <form method="post" action="{{ url_for('auth.logout') }}">
         {{ logout_form.csrf_token }}
-        <button class="btn btn--ghost btn--block sidebar__logout" type="submit">{{ icon("logout") }}<span>Sair</span></button>
+        <button class="sidebar__item sidebar__logout" type="submit">{{ icon("logout") }}<span>Sair</span></button>
       </form>
     </div>
   </aside>
 
   <header class="app-topbar">
-    <a href="{{ url_for('app.projects') }}" class="app-topbar__logo"><img class="brand__logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="Controle de Produção — Projetos" width="32" height="32"></a>
+    <a href="{{ url_for('app.home') }}" class="app-topbar__logo"><img class="brand__logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="Controle de Produção — Painel" width="28" height="28"></a>
     <span class="app-topbar__company">{{ current_company.name if current_company else "Controle de Produção" }}</span>
     <a class="avatar" href="#mais" aria-haspopup="dialog" aria-controls="mais" title="{{ current_user.name }}"><span aria-hidden="true">{{ initials }}</span><span class="visually-hidden">Conta e opções de {{ current_user.name }}</span></a>
   </header>
 
   <main id="conteudo" class="app-main" tabindex="-1">
     {%- if email_unconfirmed and request.endpoint not in ("account.confirm_required",) %}
-    <div class="mb-4">{{ alert("info", "Confirme seu e-mail.", "Sem confirmar, o acesso dura 7 dias desde o cadastro.", action=("Reenviar", url_for("account.confirm_required"))) }}</div>
+    {{ banner("email", "info", "Confirme seu e-mail.", "Sem confirmar, o acesso dura 7 dias desde o cadastro.", ("Reenviar", url_for("account.confirm_required"))) }}
     {%- endif %}
     {%- if read_only | default(false) %}
     <div class="mb-4">{{ alert("warning", "Assinatura em modo leitura — registros pausados", "Dá para ver e exportar tudo. Para voltar a gravar, regularize a assinatura.") }}</div>
@@ -100,8 +123,8 @@
       </div>
       <a class="btn btn--ghost btn--icon sheet__close" href="#fechar" aria-label="Fechar" data-dialog-cancel>{{ icon("x") }}</a>
     </div>
-    <nav class="menu-list" aria-label="Conta">
-      {%- for item in nav_items[3:] %}
+    <nav class="menu-list" aria-label="Mais">
+      {%- for item in nav_records %}
       <a class="menu-list__item" href="{{ item.href }}"{% if item.key == nav_current | default("") %} aria-current="page"{% endif %}>{{ item.label }}</a>
       {%- endfor %}
       <a class="menu-list__item" href="{{ url_for('account.profile') }}">Perfil</a>
@@ -109,6 +132,14 @@
       <a class="menu-list__item" href="{{ url_for('account.companies') }}">Trocar empresa</a>
       {%- endif %}
     </nav>
+    {%- if nav_settings %}
+    <nav class="menu-list" aria-labelledby="mais-config">
+      <p class="menu-list__group" id="mais-config">Configurações</p>
+      {%- for item in nav_settings %}
+      <a class="menu-list__item" href="{{ item.href }}"{% if item.key == nav_current | default("") %} aria-current="page"{% endif %}>{{ item.label }}</a>
+      {%- endfor %}
+    </nav>
+    {%- endif %}
     {{ theme_switch(theme, here, url_for("public.set_theme"), "tema-mais") }}
     <form method="post" action="{{ url_for('auth.logout') }}">
       {{ logout_form.csrf_token }}

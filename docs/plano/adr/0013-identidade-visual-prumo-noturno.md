@@ -1,6 +1,6 @@
 # ADR-0013 — Identidade visual “Prumo Noturno”
 
-Status: aplicada a pedido do dono · Data: 2026-10-15
+Status: **substituída** pela ADR-0015 em 2026-10-21 (aplicada a pedido do dono em 2026-10-15)
 
 ## Contexto
 O dono pediu uma identidade nova, inspirada em um vídeo de dashboard claro e em uma referência de

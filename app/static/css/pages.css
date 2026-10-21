@@ -99,7 +99,7 @@
   .cta-band .btn--primary:hover { background: var(--color-primary-subtle); }
 
   @media (min-width: 48em) {
-    .hero__title { font-size: var(--font-size-3xl); }
+    .hero__title { font-size: var(--font-size-2xl); }
   }
   @media (min-width: 64em) {
     .hero__title { font-size: var(--font-size-4xl); }
@@ -151,8 +151,8 @@
 
   /* =================== Área logada: barra superior e menu =================== */
   .app-topbar__logo { display: inline-flex; align-items: center; min-height: var(--touch-min); flex: none; }
-  .sidebar__user { font-size: var(--font-size-sm); overflow-wrap: anywhere; }
-  .sidebar__logout { justify-content: flex-start; padding-inline: var(--space-3); }
+  .sidebar__user-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sidebar__logout { width: 100%; background: none; border: 0; text-align: left; font: inherit; }
 
   /* =================== Lista de projetos =================== */
   .projects-table .project-row__progress { min-width: calc(3 * var(--space-12)); }
@@ -654,4 +654,216 @@
   .checklist-answer { padding: var(--space-3) 0; border-bottom: var(--border-width) solid var(--color-border-subtle); }
   .checklist-answer:last-child { border-bottom: 0; }
   .stage-quality { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) var(--space-4) 0; }
+}
+
+/* =================== Painel (reestruturação R2, plano §4.2) =================== */
+@layer components {
+  .painel-header { align-items: flex-end; }
+  .painel-header__frase { margin-top: var(--space-1); color: var(--color-text-muted); font-size: var(--font-size-md); }
+  .painel-header__meta { margin-top: var(--space-1); color: var(--color-text-subtle); font-size: var(--font-size-sm); font-variant-numeric: var(--font-numeric); }
+
+  .painel-block { margin-top: var(--space-4); }
+
+  /* 2. Faixa de 5 indicadores: um card dividido por linhas finas (não 5 ladrilhos).
+     Celular/tablet: progresso em largura total + grade 2×2 (sem indicador órfão).
+     ≥ 1024 px: 5 colunas, a primeira (anel) um pouco mais larga. */
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0;
+    overflow: hidden;
+  }
+  .kpi-strip__lead {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border-bottom: var(--border-width) solid var(--color-border-subtle);
+    min-width: 0;
+  }
+  .kpi-strip__ring { flex: none; width: var(--ring-size); }
+  .kpi-strip__text { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+  .kpi-strip__cell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+    padding: var(--space-3) var(--space-4);
+  }
+  .kpi-strip__cell:nth-child(even) { border-right: var(--border-width) solid var(--color-border-subtle); }
+  .kpi-strip__cell:nth-child(-n + 3) { border-bottom: var(--border-width) solid var(--color-border-subtle); }
+  .kpi__value--lead { font-size: var(--font-size-3xl); }
+  .kpi__value .kpi__unit { margin-left: var(--space-1); }
+  .kpi__empty { color: var(--color-text-subtle); font-weight: var(--font-weight-regular); }
+  @media (min-width: 64em) {
+    .kpi-strip { grid-template-columns: minmax(0, 1.5fr) repeat(4, minmax(0, 1fr)); }
+    .kpi-strip__lead { grid-column: auto; border-bottom: 0; border-right: var(--border-width) solid var(--color-border-subtle); }
+    .kpi-strip__cell { padding: var(--space-4); justify-content: center; }
+    .kpi-strip__cell:nth-child(n) { border-bottom: 0; border-right: var(--border-width) solid var(--color-border-subtle); }
+    .kpi-strip__cell:last-child { border-right: 0; }
+  }
+
+  /* Anel de progresso (SVG do servidor): série "pelas tarefas". */
+  .gauge__fill { stroke: var(--color-series-tasks); }
+  .gauge__track { stroke: var(--color-track); }
+
+  /* Cabeçalho dos cards de gráfico: título à esquerda, legenda à direita. */
+  .chart-card { min-width: 0; }
+  .chart-card__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-4);
+    margin-bottom: var(--space-3);
+  }
+  .chart-card__head .section-title { margin: 0; }
+  .chart-card__head .legend { margin: 0; }
+  .chart-card__hint { margin: calc(-1 * var(--space-2)) 0 var(--space-3); color: var(--color-text-subtle); font-size: var(--font-size-sm); }
+  .chart-card__note { margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--font-size-sm); font-variant-numeric: var(--font-numeric); }
+  .chart-card__link { font-size: var(--font-size-md); }
+
+  /* Legenda: a amostra é a própria marca (cor do dado), o texto fica na cor de texto. */
+  .legend { gap: var(--space-1) var(--space-3); font-size: var(--font-size-sm); color: var(--color-text-muted); }
+  .legend__swatch { width: var(--space-2); height: var(--space-2); border-radius: calc(var(--radius-sm) / 2); }
+  .legend__swatch--done { background: var(--color-status-done); }
+  .legend__swatch--doing { background: var(--color-status-doing); }
+  .legend__swatch--waiting { background: var(--color-status-waiting); }
+  .legend__swatch--late { background: var(--color-status-late); }
+  .legend__swatch--todo { background: var(--color-status-todo); }
+  .legend__swatch--tasks, .legend__swatch--worked, .legend__swatch--current, .legend__swatch--need { background: var(--color-series-tasks); }
+  .legend__swatch--units { background: var(--color-series-units); }
+  .legend__swatch--left { background: var(--color-status-todo); }
+  .legend__swatch--other { background: var(--color-series-tasks-soft); }
+  .legend__swatch--until { background: var(--color-text-subtle); }
+  .legend__swatch--due { width: var(--space-3); height: 0; background: transparent; border-top: calc(2 * var(--border-width)) dashed var(--color-text); border-radius: 0; }
+  .legend__today { flex: none; width: calc(2 * var(--border-width)); height: var(--space-3); background: var(--color-text); }
+  .legend__count { margin-left: var(--space-1); color: var(--color-text); font-weight: var(--font-weight-semibold); font-variant-numeric: var(--font-numeric); }
+
+  /* 3. Esteira de etapas: SVG com um <rect> por etapa (largura ∝ tempo) e a marca de hoje. */
+  .esteiras { display: flex; flex-direction: column; gap: var(--space-4); }
+  .esteira { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+  .esteira__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-3); min-width: 0; }
+  .esteira__name { font-weight: var(--font-weight-semibold); color: var(--color-text); text-decoration: none; overflow-wrap: anywhere; }
+  a.esteira__name:hover { text-decoration: underline; }
+  .esteira__prazo { font-size: var(--font-size-sm); color: var(--color-text-muted); font-variant-numeric: var(--font-numeric); }
+  .esteira__prazo--danger { color: var(--color-danger); }
+  .esteira__prazo--success { color: var(--color-success); }
+  .esteira__bar { display: block; width: 100%; height: var(--space-7); border-radius: var(--radius-sm); overflow: visible; }
+  .esteira__bloco { stroke: var(--color-surface); stroke-width: calc(2 * var(--border-width)); vector-effect: non-scaling-stroke; cursor: pointer; }
+  .esteira__bloco--done { fill: var(--color-status-done); }
+  .esteira__bloco--doing { fill: var(--color-status-doing); }
+  .esteira__bloco--waiting { fill: var(--color-status-waiting); }
+  .esteira__bloco--late { fill: var(--color-status-late); }
+  .esteira__bloco--todo { fill: var(--color-status-todo); }
+  .esteira__bar a:hover .esteira__bloco { opacity: 0.8; }
+  .esteira__bar a:focus-visible { outline: none; }
+  .esteira__bar a:focus-visible .esteira__bloco { stroke: var(--color-focus); stroke-width: var(--focus-width); }
+  .esteira__hoje { stroke: var(--color-text); stroke-width: calc(2 * var(--border-width)); vector-effect: non-scaling-stroke; pointer-events: none; }
+  .esteira__foot { font-size: var(--font-size-sm); color: var(--color-text-muted); }
+
+  /* 4–6. Grade dos gráficos: principal (7/12) e lateral (5/12) no desktop largo. */
+  .painel-grid { display: grid; gap: var(--space-4); margin-top: var(--space-4); }
+  .painel-grid > * { min-width: 0; }
+  @media (min-width: 80em) {
+    .painel-grid { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); align-items: start; }
+  }
+
+  /* Área de desenho do ECharts. Altura das barras por etapa: o JS ajusta pelo nº de linhas. */
+  .chart-box { width: 100%; min-height: calc(2.5 * var(--space-12)); }
+  .chart-box--status { width: calc(2 * var(--ring-size)); min-height: calc(2 * var(--ring-size)); height: calc(2 * var(--ring-size)); flex: none; }
+  .no-js .chart-box { display: none; }
+
+  .status-split { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
+  .status-split .legend { flex-direction: column; flex-wrap: nowrap; gap: var(--space-2); }
+  .status-split .legend__item { display: flex; }
+
+  .pend { margin-top: var(--space-4); padding-top: var(--space-3); border-top: var(--border-width) solid var(--color-border-subtle); }
+  .pend__title { font-size: var(--font-size-md); font-weight: var(--font-weight-semibold); letter-spacing: 0; margin-bottom: var(--space-2); }
+  .pend__list { list-style: none; display: flex; flex-direction: column; }
+  .pend__item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: var(--space-2);
+    align-items: baseline;
+    padding: var(--space-2) 0;
+    border-top: var(--border-width) solid var(--color-border-subtle);
+  }
+  .pend__item:first-child { border-top: 0; }
+  .pend__dot { width: var(--space-2); height: var(--space-2); border-radius: var(--radius-pill); transform: translateY(calc(-1 * var(--border-width))); }
+  .pend__dot--late, .status-tag__dot--late { background: var(--color-status-late); }
+  .pend__dot--waiting, .status-tag__dot--waiting { background: var(--color-status-waiting); }
+  .pend__link { color: var(--color-text); font-weight: var(--font-weight-semibold); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pend__link:hover { text-decoration: underline; }
+  .pend__meta { grid-column: 2; color: var(--color-text-muted); font-size: var(--font-size-sm); }
+  .pend__empty, .pend__more { color: var(--color-text-muted); font-size: var(--font-size-sm); }
+
+  /* Situação em texto + ponto (Tabela 2). */
+  .status-tag { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
+  .status-tag__dot { flex: none; width: var(--space-2); height: var(--space-2); border-radius: var(--radius-pill); }
+  .status-tag__dot--done { background: var(--color-status-done); }
+  .status-tag__dot--doing { background: var(--color-status-doing); }
+  .status-tag__dot--todo { background: var(--color-status-todo); }
+  .prazo-text { white-space: nowrap; color: var(--color-text-muted); }
+  .prazo-text--danger { color: var(--color-danger); }
+  .prazo-text--success { color: var(--color-success); }
+
+  /* Tabela dentro de card: sem segunda moldura. */
+  .table-wrap--flat { border: 0; border-radius: 0; background: transparent; }
+  .table-wrap--flat .table th:first-child, .table-wrap--flat .table td:first-child { padding-left: 0; }
+  .table-wrap--flat .table th:last-child, .table-wrap--flat .table td:last-child { padding-right: 0; }
+  .table tfoot td { padding: var(--space-2) var(--space-3); border-top: var(--border-width) solid var(--color-border-strong); font-weight: var(--font-weight-semibold); font-variant-numeric: var(--font-numeric); }
+  .table .col-progress { min-width: calc(4 * var(--space-8)); }
+  .table-wrap--flat .table td:first-child { min-width: calc(5 * var(--space-8)); }
+  @media (max-width: 63.99em) {
+    .table--cards tfoot, .table--cards tfoot tr, .table--cards tfoot td { display: block; }
+    .table--cards tfoot tr { padding: var(--space-3) 0; border-top: var(--border-width) solid var(--color-border-strong); }
+    .table--cards tfoot td { padding: 0; border: 0; text-align: left; }
+    .table--cards tfoot td + td { margin-top: var(--space-1); }
+    .table--cards tfoot td[data-label]::before { content: attr(data-label) ": "; color: var(--color-text-muted); font-size: var(--font-size-sm); font-weight: var(--font-weight-regular); }
+    .table--cards tfoot td:empty { display: none; }
+    .table-wrap--flat .table--cards tbody tr,
+    .table-wrap--flat .table--cards tfoot tr {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-1) var(--space-4);
+      padding-inline: 0;
+    }
+    .table-wrap--flat .table--cards td + td { margin-top: 0; }
+    .table-wrap--flat .table--cards td:first-child,
+    .table-wrap--flat .table--cards td:has(.progress) { grid-column: 1 / -1; }
+    .table-wrap--flat .table--cards td:first-child::before { content: none; }
+    .table-wrap--flat .table--cards td { font-size: var(--font-size-md); font-variant-numeric: var(--font-numeric); }
+    .table-wrap--flat .table--cards td:has(.prazo-text) { grid-column: 1 / -1; }
+    .table--cards .prazo-text { white-space: normal; }
+  }
+
+  /* Controle segmentado (Tabela 1 · Tabela 2). */
+  .segmented { display: inline-flex; gap: calc(var(--space-1) / 2); padding: calc(var(--space-1) / 2); background: var(--color-surface-2); border: var(--border-width) solid var(--color-border-subtle); border-radius: var(--radius-md); }
+  .segmented__item {
+    display: inline-flex;
+    align-items: center;
+    min-height: calc(var(--touch-min) - var(--space-2));
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .segmented__item:hover { color: var(--color-text); }
+  .segmented__item[aria-current="page"] { background: var(--color-surface); color: var(--color-text); font-weight: var(--font-weight-semibold); box-shadow: 0 0 0 var(--border-width) var(--color-border-subtle); }
+
+  .chart__data { margin-top: var(--space-2); }
+  /* Tooltip do ECharts: HTML só com classes (a CSP bloqueia style= em HTML). */
+  .chart-tip__dot { display: inline-block; width: var(--space-2); height: var(--space-2); margin-right: var(--space-2); border-radius: var(--radius-pill); }
+  .chart-tip__dot--tasks, .chart-tip__dot--worked, .chart-tip__dot--need, .chart-tip__dot--doing { background: var(--color-series-tasks); }
+  .chart-tip__dot--units { background: var(--color-series-units); }
+  .chart-tip__dot--left, .chart-tip__dot--todo { background: var(--color-status-todo); }
+  .chart-tip__dot--until { background: var(--color-text-subtle); }
+  .chart-tip__dot--done { background: var(--color-status-done); }
+  .chart-tip__dot--waiting { background: var(--color-status-waiting); }
+  .chart-tip__dot--late { background: var(--color-status-late); }
+  .chart__data summary { font-size: var(--font-size-sm); color: var(--color-text-muted); font-weight: var(--font-weight-regular); }
 }

@@ -1,33 +1,20 @@
 /* Base: ordem das camadas, fontes e elementos HTML. Só tokens (nada de cor ou px literal). */
 @layer base, layout, components, utilities;
 
-/* Fonte servida pelo próprio site (Geist, OFL; licença em ../fonts/OFL-Geist.txt).
-   Geist tem algarismos tabulares pelo recurso OpenType "tnum" (var(--font-numeric)). */
+/* Fonte servida pelo próprio site (IBM Plex Sans, OFL; licença em ../fonts/OFL-IBMPlexSans.txt).
+   Só os pesos 400 e 600 (ADR-0015): 500 cai no 400 e 700 no 600, sem negrito sintético.
+   Plex tem algarismos tabulares pelo recurso OpenType "tnum" (var(--font-numeric)). */
 @font-face {
-  font-family: "Geist";
-  src: url("../fonts/geist-latin-400-normal.woff2") format("woff2");
+  font-family: "IBM Plex Sans";
+  src: url("../fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: "Geist";
-  src: url("../fonts/geist-latin-500-normal.woff2") format("woff2");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Geist";
-  src: url("../fonts/geist-latin-600-normal.woff2") format("woff2");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Geist";
-  src: url("../fonts/geist-latin-700-normal.woff2") format("woff2");
-  font-weight: 700;
+  font-family: "IBM Plex Sans";
+  src: url("../fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2");
+  font-weight: 600 700;
   font-style: normal;
   font-display: swap;
 }
@@ -71,9 +58,10 @@
     text-wrap: balance;
   }
 
-  h1 { font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); }
+  h1 { font-size: var(--font-size-xl); font-weight: var(--font-weight-semibold); }
   h2 { font-size: var(--font-size-lg); }
   h3 { font-size: var(--font-size-md); }
+  h1, h2, h3, h4 { overflow-wrap: break-word; }
 
   p,
   ul,
@@ -124,6 +112,13 @@
 
   button {
     cursor: pointer;
+  }
+
+  a,
+  button,
+  summary,
+  label {
+    touch-action: manipulation;
   }
 
   table {

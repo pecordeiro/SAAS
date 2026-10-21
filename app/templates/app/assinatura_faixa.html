@@ -1,8 +1,8 @@
-{% from "components/alert.html" import alert %}
-{#- Faixa de aviso de teste grátis / atraso / cancelamento no topo do /app (Fase 8).
-    `billing_banner` vem de billing.inject_billing_banner; só o owner vê o botão. -#}
+{% from "components/nav.html" import banner %}
+{#- Faixa fina de teste grátis / atraso / cancelamento no topo do /app (Fase 8; R1: uma linha,
+    pode ser fechada). `billing_banner` vem de billing.inject_billing_banner; só o owner vê o link. -#}
 {%- if billing_banner and not (read_only | default(false)) and request.endpoint not in ("billing.billing_info",) %}
 {%- set _b = billing_banner %}
 {%- set _owner = current_membership and current_membership.role == "owner" %}
-<div class="mb-4">{{ alert(_b.kind, _b.title, _b.body if _owner else _b.body ~ " Fale com o proprietário da conta.", action=((_b.action_label, url_for("billing.overview")) if _owner else None)) }}</div>
+{{ banner("assinatura-" ~ _b.kind, _b.kind, _b.title, _b.body if _owner else _b.body ~ " Fale com o proprietário da conta.", ((_b.action_label, url_for("billing.overview")) if _owner else None)) }}
 {%- endif %}

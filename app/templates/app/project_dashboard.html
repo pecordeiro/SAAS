@@ -1,34 +1,30 @@
 {% extends "base_app.html" %}
 {% from "components/icon.html" import icon %}
-{% from "components/button.html" import button %}
-{% from "components/kpi.html" import kpi %}
 {% from "components/progress.html" import progress %}
-{% from "components/badge.html" import status_badge, badge %}
+{% from "components/badge.html" import badge %}
 {% from "components/table.html" import data_table %}
 {% from "components/empty_state.html" import empty_state %}
-{% from "components/chart.html" import gauge, legend, grouped_bars, donut, treemap_chart, stacked_columns, team_columns %}
-{% set nav_current = "projects" %}
+{% import "app/_painel.html" as p %}
+{% set nav_current = "dashboard" %}
 {% set nav_project = project %}
 {% block title %}Painel · {{ project.name }} · Controle de Produção{% endblock %}
+{% block head_extra %}
+  {%- for src in asset_urls("echarts.js") %}
+  <script src="{{ src }}" defer></script>
+  {%- endfor %}
+  {%- for src in asset_urls("painel.js") %}
+  <script src="{{ src }}" defer></script>
+  {%- endfor %}
+{% endblock %}
 {% block content %}
 {#
-  Etapa E — painel completo do projeto (inspirado no painel antigo). Só leitura. Todos os
-  números vêm de calc.py e a geometria dos gráficos de charts.py, calculados no servidor
-  (ADR-0009); este template só imprime. Sem script, sem estilo inline, sem CDN (CSP).
-  Clicar numa etapa leva ao detalhe com ela aberta, pronta para lançar peças.
+  Painel de um projeto (R2, plano §4.2), de cima para baixo: cabeçalho com frase-resumo,
+  5 indicadores, esteira de etapas, tarefas × unidades + situação das etapas, horas por etapa,
+  equipe × prazo e Tabelas 1/2. Todos os números vêm de calc.py via dashboard.py (ADR-0009).
+  Clicar numa etapa abre a etapa para preencher.
 #}
 {%- set r = result -%}
-<header class="page-header">
-  <div class="page-header__titles">
-    <a class="back-link" href="{{ url_for('app.project_detail', project_id=project.id) }}">{{ icon("chevron-left") }}{{ project.name }}</a>
-    <h1>Painel do projeto</h1>
-    <p class="page-header__subtitle muted">{{ project.name }}{% if project.product %} · {{ project.product }}{% endif %} · meta de {{ project.quantity }} {{ "unidade" if project.quantity == 1 else "unidades" }}</p>
-    <p class="cluster page-header__meta">{{ status_badge(project_status) }}{% if d.aguardando_peca %}{{ badge("Aguardando peça · " ~ d.aguardando_peca ~ (" etapa" if d.aguardando_peca == 1 else " etapas"), "warning", "package") }}{% endif %}</p>
-  </div>
-  <div class="page-header__actions">
-    {{ button("Lançar peças", "secondary", icon="progress", href=url_for('app.project_detail', project_id=project.id)) }}
-  </div>
-</header>
+{{ p.header(project.name, d.frase, updated_at, url_for('app.fill', projeto=project.id), back=("Painel da operação", url_for('app.home'))) }}
 
 {%- if not d.etapas %}
 <div class="card">
@@ -36,127 +32,104 @@
 </div>
 {%- else %}
 
-<section class="dash-kpis" aria-label="Indicadores do projeto">
-  <div class="kpi kpi--gauge">
-    <div class="kpi__gauge">{{ gauge(d.medidor) }}</div>
-    <div class="kpi__gauge-text">
-      <span class="kpi__label">Progresso geral (pelas tarefas)</span>
-      <span class="kpi__value">{{ r.progresso_geral|pct(0) }}</span>
-      <span class="kpi__sub">{{ r.tempo_trabalhado_h|num(1) }} h trabalhadas de {{ r.tempo_total_h|num(1) }} h</span>
-    </div>
-  </div>
+{%- if r.tempo_restante_min == 0 %}
+  {%- set falta_sub = "nada pendente" %}
+{%- elif r.dias_uteis_restantes is none %}
+  {%- set falta_sub = "informe a equipe para ver os dias úteis" %}
+{%- else %}
+  {%- set falta_sub = "≈ " ~ (r.dias_uteis_restantes|num(1)) ~ " dias úteis · " ~ project.people ~ (" pessoa" if project.people == 1 else " pessoas") ~ " × " ~ (project.hours_per_day|num(0)) ~ " h" %}
+{%- endif %}
+{{ p.kpi_strip(d.medidor, r.progresso_geral|pct(0), (r.tempo_trabalhado_h|num(1)) ~ " h trabalhadas de " ~ (r.tempo_total_h|num(1)) ~ " h", [
+  ("Unidades prontas", r.unidades_concluidas, "/ " ~ project.quantity, "menor nº de unidades concluídas entre as etapas", None),
+  ("Etapas concluídas", r.etapas_concluidas, "/ " ~ (d.etapas|length), "tarefas concluídas: " ~ r.tarefas_concluidas ~ " de " ~ r.tarefas, None),
+  ("Horas que faltam", r.tempo_restante_h|num(1), "h", falta_sub, None),
+  ("Dias úteis até o prazo", d.prazo.until, ("dia útil" if d.prazo.until == 1 else "dias úteis") if d.prazo.until is not none else None, d.prazo.short, d.prazo.tone, d.prazo.text),
+]) }}
 
-  {% call kpi("Unidades prontas", r.unidades_concluidas, unit="/ " ~ project.quantity, sub="menor nº de unidades concluídas entre as etapas") %}
-    {{ progress(d.unidades_pct, 1, label="Unidades prontas", size="sm", show_text=False, value_text=d.unidades_pct|pct(0)) }}
+<section class="card painel-block" aria-labelledby="g-esteira">
+  <div class="chart-card__head">
+    <h2 class="section-title" id="g-esteira">Esteira de etapas</h2>
+    {{ p.status_legend(with_today=d.esteira.hoje is not none) }}
+  </div>
+  {{ p.esteira(d.esteira, project.name, prazo=None) }}
+  {%- if d.sem_tempo %}
+  <p class="muted text-sm mt-2">{{ d.sem_tempo }} {{ "etapa ainda sem tempo ideal" if d.sem_tempo == 1 else "etapas ainda sem tempo ideal" }}: {{ "ela não pesa" if d.sem_tempo == 1 else "elas não pesam" }} no progresso nem na esteira até ter tempo.</p>
+  {%- endif %}
+</section>
+
+<div class="painel-grid">
+  {% call p.chart_card("g-tarefas", "Tarefas × unidades por etapa", "tasks", "Barras por etapa: progresso pelas tarefas e unidades concluídas. Valores na tabela de dados.", legend=[("tasks", "Pelas tarefas"), ("units", "Unidades concluídas")], class_="painel-grid__main") %}
+    <details class="chart__data">
+      <summary>Ver dados em tabela</summary>
+      <div class="table-wrap mt-2"><table class="table">
+        <thead><tr><th scope="col">Etapa</th><th scope="col" class="is-num">Pelas tarefas</th><th scope="col" class="is-num">Unidades</th></tr></thead>
+        <tbody>{% for row in d.grafico.rows %}<tr><td>{{ row.label }}</td><td class="is-num">{{ row.tasksText }}</td><td class="is-num">{{ row.unitsFrac }} · {{ row.unitsText }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </details>
   {% endcall %}
 
-  {{ kpi("Unidades concluídas", r.unidades_etapas, unit="/ " ~ r.unidades_etapas_previstas ~ " · " ~ (d.unidades_etapas_pct|pct(0)), sub="feitas ÷ previstas nas etapas, sem contar parciais") }}
-
-  {{ kpi("Tarefas concluídas", r.tarefas_concluidas, unit="/ " ~ r.tarefas, sub="etapas concluídas: " ~ r.etapas_concluidas ~ " de " ~ (d.etapas|length)) }}
-
-  {%- if r.tempo_restante_min == 0 %}
-  {{ kpi("Tempo que falta", "0", unit="h", sub="nada pendente", tone="success") }}
-  {%- elif r.dias_uteis_restantes is none %}
-  {{ kpi("Tempo que falta", r.tempo_restante_h|num(1), unit="h", sub="informe a equipe para ver os dias úteis") }}
-  {%- else %}
-  {{ kpi("Tempo que falta", r.tempo_restante_h|num(1), unit="h", sub="≈ " ~ (r.dias_uteis_restantes|num(1)) ~ " dias úteis · " ~ project.people ~ (" pessoa" if project.people == 1 else " pessoas") ~ " × " ~ (project.hours_per_day|num(0)) ~ " h") }}
-  {%- endif %}
-
-  {%- if project_status == "Concluída" %}
-  {{ kpi("Dias úteis até o prazo", None, empty_sub="projeto concluído") }}
-  {%- elif not project.due_date %}
-  {{ kpi("Dias úteis até o prazo", None, empty_sub="sem prazo definido") }}
-  {%- elif deadline.overdue %}
-  {{ kpi("Dias úteis até o prazo", 0, unit="dias úteis", sub="o prazo (" ~ (project.due_date|data_curta) ~ ") passou há " ~ deadline.overdue ~ (" dia útil" if deadline.overdue == 1 else " dias úteis"), tone="danger") }}
-  {%- elif deadline.late %}
-  {{ kpi("Dias úteis até o prazo", deadline.until_due, unit="dias úteis", sub="prazo " ~ (project.due_date|data_curta) ~ " · término previsto " ~ (deadline.forecast|data_curta) ~ " · atraso de " ~ deadline.delay ~ (" dia útil" if deadline.delay == 1 else " dias úteis"), tone="danger") }}
-  {%- elif deadline.on_time %}
-  {{ kpi("Dias úteis até o prazo", deadline.until_due, unit="dias úteis", sub="prazo " ~ (project.due_date|data_curta) ~ " · término previsto " ~ (deadline.forecast|data_curta) ~ " · folga de " ~ deadline.slack ~ (" dia útil" if deadline.slack == 1 else " dias úteis"), tone="success") }}
-  {%- else %}
-  {{ kpi("Dias úteis até o prazo", deadline.until_due, unit="dias úteis", sub="prazo " ~ (project.due_date|data_curta)) }}
-  {%- endif %}
-</section>
-
-<div class="dash-grid">
-  <section class="card dash-grid__wide" aria-labelledby="g-tarefas">
-    <h2 class="section-title" id="g-tarefas"><span>Tarefas × unidades por etapa</span></h2>
-    <p class="muted text-sm mb-4">Azul: progresso pelas tarefas (conta as parciais). Amarelo: unidades 100% prontas ÷ previstas. Clique no nome da etapa para lançar peças.</p>
-    {{ grouped_bars(d.etapas, project.id) }}
+  <section class="card chart-card painel-grid__side" aria-labelledby="g-status">
+    <div class="chart-card__head"><h2 class="section-title" id="g-status">Situação das etapas</h2></div>
+    <div class="status-split">
+      <div class="chart-box chart-box--status" data-chart="status" role="img" aria-label="Rosca: {% for s in d.grafico.status %}{{ s.name }} {{ s.value }}{{ ', ' if not loop.last }}{% endfor %}."></div>
+      {{ p.status_legend(d.contagem, with_today=False) }}
+    </div>
+    {{ p.pendencias(d.pendencias) }}
   </section>
-
-  <div class="dash-grid__side stack">
-    <section class="card" aria-labelledby="g-status">
-      <h2 class="section-title" id="g-status"><span>Status das etapas</span></h2>
-      <p class="muted text-sm mb-4">Pela situação de cada etapa (unidades concluídas).</p>
-      {{ donut(d.rosca, d.contagem["Concluída"] ~ "/" ~ (d.etapas|length), "concluídas", "Status das etapas") }}
-    </section>
-
-    <section class="card" aria-labelledby="g-peso">
-      <h2 class="section-title" id="g-peso"><span>Quanto cada etapa representa</span></h2>
-      <p class="muted text-sm mb-4">Tamanho = tempo ideal de 1 unidade; fundo = situação; faixa no pé = progresso pelas tarefas.</p>
-      {{ legend([("done", "Concluída"), ("doing", "Em andamento"), ("todo", "Não iniciada")]) }}
-      {%- if d.treemap %}
-      {{ treemap_chart(d, "Quanto cada etapa representa no tempo de uma unidade") }}
-      {%- else %}
-      <p class="muted">Nenhuma etapa tem tempo ideal definido ainda.</p>
-      {%- endif %}
-      {%- if d.sem_tempo %}
-      <p class="muted text-sm mt-2">{{ d.sem_tempo }} {{ "etapa" if d.sem_tempo == 1 else "etapas" }} sem tempo definido {{ "não aparece" if d.sem_tempo == 1 else "não aparecem" }} aqui.</p>
-      {%- endif %}
-    </section>
-  </div>
 </div>
 
-<section class="card mt-6" aria-labelledby="g-horas">
-  <h2 class="section-title" id="g-horas"><span>Horas por etapa</span></h2>
-  <p class="muted text-sm mb-4">Tempo total da meta dividido em horas já trabalhadas e horas que faltam. O número embaixo é a posição da etapa; passe o dedo ou o mouse para ver o nome.</p>
-  {{ legend([("trabalhadas", "Trabalhadas"), ("faltam", "Faltam")]) }}
-  {{ stacked_columns(d.horas, "Horas trabalhadas e que faltam por etapa", "Colunas empilhadas por etapa, em horas. Total trabalhado " ~ (r.tempo_trabalhado_h|num(1)) ~ " h e faltam " ~ (r.tempo_restante_h|num(1)) ~ " h. Os valores de cada etapa estão na tabela abaixo.") }}
-</section>
+<div class="painel-grid">
+  {% call p.chart_card("g-horas", "Horas por etapa", "hours", "Barras empilhadas por etapa: horas trabalhadas e horas que faltam. Total trabalhado " ~ (r.tempo_trabalhado_h|num(1)) ~ " h; faltam " ~ (r.tempo_restante_h|num(1)) ~ " h.", legend=[("worked", "Trabalhadas"), ("left", "Faltam")], class_="painel-grid__main") %}
+    <details class="chart__data">
+      <summary>Ver dados em tabela</summary>
+      <div class="table-wrap mt-2"><table class="table">
+        <thead><tr><th scope="col">Etapa</th><th scope="col" class="is-num">Trabalhadas</th><th scope="col" class="is-num">Faltam</th></tr></thead>
+        <tbody>{% for row in d.grafico.rows %}<tr><td>{{ row.label }}</td><td class="is-num">{{ row.workedText }}</td><td class="is-num">{{ row.leftText }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </details>
+  {% endcall %}
 
-<section class="card mt-6" aria-labelledby="g-equipe">
-  <h2 class="section-title" id="g-equipe"><span>Equipe × prazo</span>
-    {%- if r.dias_uteis_restantes is not none %}<span class="badge badge--info">Hoje: {{ project.people }} {{ "pessoa" if project.people == 1 else "pessoas" }} · {{ r.dias_uteis_restantes|num(1) }} dias</span>{% endif %}</h2>
-  <p class="muted text-sm mb-4">Dias úteis restantes conforme o número de pessoas (horas que faltam ÷ pessoas × {{ project.hours_per_day|num(0) }} h por dia). A coluna da equipe atual leva a marca “hoje”.</p>
-  {{ team_columns(d.equipe, "Dias úteis restantes por número de pessoas", "Dias úteis restantes para equipes de 1 a 6 pessoas: " ~ (d.equipe.cols|map(attribute='title')|join(', ')) ~ ". Valores na tabela de dados abaixo.") }}
-  <details class="chart__data">
-    <summary>Ver dados em tabela</summary>
-    <div class="table-wrap mt-2">
-      <table class="table">
-        <thead><tr><th scope="col">Pessoas</th><th scope="col" class="is-num">Horas por dia (equipe)</th><th scope="col" class="is-num">Dias úteis restantes</th></tr></thead>
-        <tbody>
-          {%- for c in d.equipe.cols %}
-          <tr><td>{{ loop.index }}{% if c.destaque %} <span class="muted">(atual)</span>{% endif %}</td><td class="is-num">{{ (loop.index * project.hours_per_day)|num(0) }} h</td><td class="is-num">{{ c.dias|num(1) if c.dias is not none else "—" }}</td></tr>
-          {%- endfor %}
-        </tbody>
-      </table>
-    </div>
-  </details>
-</section>
+  {% call p.chart_card("g-equipe", "Equipe × prazo", "team", "Dias úteis que faltam para equipes de 1 a 6 pessoas" ~ (", com o prazo em " ~ d.prazo.until ~ " dias úteis" if d.prazo.until is not none else "") ~ ". Valores na tabela de dados.", legend=[("current", "Equipe de hoje"), ("other", "Outros tamanhos")], class_="painel-grid__side") %}
+    {%- if d.equipe_atual and d.equipe_atual.days is not none %}
+    <p class="chart-card__note">Hoje: {{ d.equipe_atual.label }} · {{ d.equipe_atual.daysText }} dias úteis{% if d.prazo.until is not none %} · prazo em {{ d.prazo.until }} {{ "dia útil" if d.prazo.until == 1 else "dias úteis" }}{% endif %}</p>
+    {%- endif %}
+    <details class="chart__data">
+      <summary>Ver dados em tabela</summary>
+      <div class="table-wrap mt-2"><table class="table">
+        <thead><tr><th scope="col">Pessoas</th><th scope="col" class="is-num">Horas por dia (equipe)</th><th scope="col" class="is-num">Dias úteis</th></tr></thead>
+        <tbody>{% for row in d.equipe %}<tr><td>{{ row.label }}{% if row.current %} <span class="muted">(hoje)</span>{% endif %}</td><td class="is-num">{{ row.teamHours }} h</td><td class="is-num">{{ row.daysText }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </details>
+  {% endcall %}
+</div>
 
-<section class="mt-6" aria-labelledby="g-tabela">
-  <h2 class="section-title" id="g-tabela"><span>{{ "Progresso por etapa pelas tarefas" if table == "tarefas" else "Unidades concluídas por etapa" }}</span></h2>
-  <p class="muted text-sm mb-4">{{ "Peças concluídas de cada atividade sobre as previstas." if table == "tarefas" else "Feitas ÷ previstas, sem contar parciais: uma unidade só está pronta depois de passar por todas as atividades." }} Clique numa linha para lançar peças.</p>
-  <nav class="tabs mb-4" aria-label="Tabela de etapas">
-    {%- for key, label in table_tabs %}
-    <a class="tabs__item" href="{{ url_for('app.project_dashboard', project_id=project.id, tabela=key, _anchor='g-tabela') }}"{% if key == table %} aria-current="page"{% endif %}>{{ label }}</a>
-    {%- endfor %}
-  </nav>
+<section class="card painel-block" aria-labelledby="g-tabela" id="tabelas">
+  <div class="chart-card__head">
+    <h2 class="section-title" id="g-tabela">{{ "Tabela 1 · Progresso por etapa pelas tarefas" if table == "tarefas" else "Tabela 2 · Unidades concluídas por etapa" }}</h2>
+    <nav class="segmented" aria-label="Tabela de etapas">
+      {%- for key, label in table_tabs %}
+      <a class="segmented__item" href="{{ url_for('app.project_dashboard', project_id=project.id, tabela=key, _anchor='g-tabela') }}"{% if key == table %} aria-current="page"{% endif %}>{{ label }}</a>
+      {%- endfor %}
+    </nav>
+  </div>
+  <p class="chart-card__hint">{{ "Peças concluídas de cada atividade sobre as previstas." if table == "tarefas" else "Feitas ÷ previstas, sem contar parciais." }} Clique numa linha para preencher a etapa.</p>
   {%- if table == "tarefas" %}
-  {% call data_table([("Etapa", ""), ("Tempo por unidade (min)", "is-num"), ("Peso", "is-num"), ("Previstas", "is-num"), ("Progresso", ""), ("Tempo total (h)", "is-num"), ("Tempo que falta (h)", "is-num")], caption="Progresso por etapa pelas tarefas") %}
+  {% call data_table([("Etapa", ""), ("Tempo por unidade (min)", "is-num"), ("Peso", "is-num"), ("Previstas", "is-num"), ("Progresso", "col-progress"), ("Tempo total (h)", "is-num"), ("Tempo que falta (h)", "is-num")], caption="Tabela 1: progresso por etapa pelas tarefas", class_="table-wrap--flat") %}
   <tbody>
     {%- for e in d.etapas %}
     <tr>
-      <td data-label="Etapa"><a class="row-link" href="{{ url_for('app.project_detail', project_id=project.id, etapa=e.id, _anchor='etapa-' ~ e.id) }}">{{ e.n }}. {{ e.name }}</a>{% if e.waiting_part %} {{ badge("Aguardando peça" ~ (" · prev. " ~ (e.part_expected_on|data_curta) if e.part_expected_on else ""), "warning", "package") }}{% endif %}</td>
+      <td data-label="Etapa"><a class="row-link" href="{{ d.esteira.blocos[loop.index0].href }}">{{ e.label }}</a>{% if e.waiting_part %} {{ badge("Aguardando peça" ~ (" · prev. " ~ (e.part_expected_on|data_curta) if e.part_expected_on else ""), "warning", "package") }}{% endif %}</td>
       <td class="is-num" data-label="Tempo por unidade (min)">{{ e.r.tempo_unidade_min|num(0) }}</td>
       <td class="is-num" data-label="Peso">{{ e.r.peso_no_projeto|pct(1) }}</td>
       <td class="is-num" data-label="Previstas">{{ e.r.previstas }}</td>
-      <td data-label="Progresso">{{ progress(e.r.progresso, 1, label="Progresso de " ~ e.name, size="sm", value_text=e.r.progresso|pct(0)) }}</td>
+      <td data-label="Progresso">{{ progress(e.r.progresso, 1, label="Progresso de " ~ e.label, size="sm", value_text=e.r.progresso|pct(0)) }}</td>
       <td class="is-num" data-label="Tempo total (h)">{{ e.total_h|num(2) }}</td>
       <td class="is-num" data-label="Tempo que falta (h)">{{ e.falta_h|num(2) }}</td>
     </tr>
     {%- endfor %}
-    <tr class="text-strong">
+  </tbody>
+  <tfoot>
+    <tr>
       <td data-label="Etapa">Total</td>
       <td class="is-num" data-label="Tempo por unidade (min)">{{ r.tempo_unidade_min|num(0) }}</td>
       <td class="is-num" data-label="Peso">{{ (1 if r.tempo_unidade_min else 0)|pct(0) }}</td>
@@ -165,30 +138,34 @@
       <td class="is-num" data-label="Tempo total (h)">{{ r.tempo_total_h|num(2) }}</td>
       <td class="is-num" data-label="Tempo que falta (h)">{{ r.tempo_restante_h|num(2) }}</td>
     </tr>
-  </tbody>
+  </tfoot>
   {% endcall %}
   {%- else %}
-  {% call data_table([("Etapa", ""), ("Feitas", "is-num"), ("Previstas", "is-num"), ("% concluída", ""), ("Situação", "")], caption="Unidades concluídas por etapa") %}
+  {% call data_table([("Etapa", ""), ("Feitas", "is-num"), ("Previstas", "is-num"), ("% concluída", "col-progress"), ("Situação", "")], caption="Tabela 2: unidades concluídas por etapa", class_="table-wrap--flat") %}
   <tbody>
     {%- for e in d.etapas %}
     <tr>
-      <td data-label="Etapa"><a class="row-link" href="{{ url_for('app.project_detail', project_id=project.id, etapa=e.id, _anchor='etapa-' ~ e.id) }}">{{ e.n }}. {{ e.name }}</a>{% if e.waiting_part %} {{ badge("Aguardando peça" ~ (" · prev. " ~ (e.part_expected_on|data_curta) if e.part_expected_on else ""), "warning", "package") }}{% endif %}</td>
+      <td data-label="Etapa"><a class="row-link" href="{{ d.esteira.blocos[loop.index0].href }}">{{ e.label }}</a></td>
       <td class="is-num" data-label="Feitas">{{ e.r.unidades }}</td>
       <td class="is-num" data-label="Previstas">{{ e.r.previstas }}</td>
-      <td data-label="% concluída">{{ progress(e.pct_unidades, 1, label="Unidades concluídas de " ~ e.name, size="sm", value_text=e.pct_unidades|pct(0)) }}</td>
-      <td data-label="Situação">{{ status_badge(e.r.status) }}</td>
+      <td data-label="% concluída">{{ progress(e.pct_unidades, 1, label="Unidades concluídas de " ~ e.label, size="sm", value_text=e.pct_unidades|pct(0)) }}</td>
+      <td data-label="Situação"><span class="status-tag"><span class="status-tag__dot status-tag__dot--{{ e.visual }}" aria-hidden="true"></span>{{ e.visual_nome }}</span></td>
     </tr>
     {%- endfor %}
-    <tr class="text-strong">
+  </tbody>
+  <tfoot>
+    <tr>
       <td data-label="Etapa">Total</td>
       <td class="is-num" data-label="Feitas">{{ r.unidades_etapas }}</td>
       <td class="is-num" data-label="Previstas">{{ r.unidades_etapas_previstas }}</td>
       <td data-label="% concluída">{{ d.unidades_etapas_pct|pct(0) }}</td>
       <td data-label="Situação"></td>
     </tr>
-  </tbody>
+  </tfoot>
   {% endcall %}
   {%- endif %}
 </section>
+
+<script type="application/json" id="painel-dados">{{ d.grafico|tojson }}</script>
 {%- endif %}
 {% endblock %}

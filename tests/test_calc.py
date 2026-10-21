@@ -474,3 +474,53 @@ def test_paridade_dashboard_com_planilha_de_referencia():
     for linha, (p, dias) in zip(range(13, 19), tabela):
         assert p == equipe.cell(linha, 1).value
         assert dias == pytest.approx(equipe.cell(linha, 3).value, abs=TOL)
+
+
+# ---------------------------------------------------------------- R2: painel (esteira, atraso, operação)
+
+
+def _etapa_r(tempo_total, status):
+    return calc.ResultadoEtapa(
+        tempo_unidade_min=0, peso_no_projeto=0, progresso=0, unidades=0, previstas=0, status=status,
+        tempo_total_min=tempo_total, tempo_restante_min=0, tarefas=0, tarefas_concluidas=0, atividades=(),
+    )
+
+
+def test_fracao_prazo_decorrida_em_dias_uteis():
+    seg, sex = date(2026, 10, 19), date(2026, 10, 23)  # 4 dias úteis depois do início
+    assert calc.fracao_prazo_decorrida(None, sex, seg) is None
+    assert calc.fracao_prazo_decorrida(seg, None, seg) is None
+    assert calc.fracao_prazo_decorrida(seg, sex, seg) == 0.0
+    assert calc.fracao_prazo_decorrida(seg, sex, date(2026, 10, 21)) == 0.5
+    assert calc.fracao_prazo_decorrida(seg, sex, date(2026, 10, 30)) == 1.0
+    # feriado na quarta: 3 dias úteis no prazo; até a quarta passou 1
+    assert calc.fracao_prazo_decorrida(seg, sex, date(2026, 10, 21), [date(2026, 10, 21)]) == pytest.approx(1 / 3)
+
+
+def test_fatias_e_atraso_por_etapa():
+    etapas = [_etapa_r(60, calc.STATUS_CONCLUIDA), _etapa_r(60, calc.STATUS_EM_ANDAMENTO), _etapa_r(120, calc.STATUS_NAO_INICIADA)]
+    assert calc.fatias_da_esteira(etapas) == ((0.0, 0.25), (0.25, 0.25), (0.5, 0.5))
+    assert calc.fatias_da_esteira([_etapa_r(0, calc.STATUS_NAO_INICIADA)] * 2) == ((0.0, 0.5), (0.5, 0.5))
+    assert calc.etapas_atrasadas(etapas, None) == (False, False, False)
+    assert calc.etapas_atrasadas(etapas, 0.4) == (False, False, False)
+    assert calc.etapas_atrasadas(etapas, 0.5) == (False, True, False)  # a 2ª devia ter acabado
+    assert calc.etapas_atrasadas(etapas, 1.0) == (False, True, True)
+
+
+def test_status_visual_prioridade():
+    assert calc.status_visual(calc.STATUS_CONCLUIDA, True, True) == "done"
+    assert calc.status_visual(calc.STATUS_EM_ANDAMENTO, True, True) == "waiting"
+    assert calc.status_visual(calc.STATUS_EM_ANDAMENTO, False, True) == "late"
+    assert calc.status_visual(calc.STATUS_EM_ANDAMENTO) == "doing"
+    assert calc.status_visual(calc.STATUS_NAO_INICIADA) == "todo"
+    assert calc.contagem_visual(["done", "late", "late"]) == {"done": 1, "doing": 0, "waiting": 0, "late": 2, "todo": 0}
+
+
+def test_resumo_operacao_soma_tempos():
+    a = calc.resumo_projeto([calc.Etapa([calc.Atividade(60, 10)], 10)], 10)
+    b = calc.resumo_projeto([calc.Etapa([calc.Atividade(30, 0)], 10)], 10)
+    r = calc.resumo_operacao([a, b])
+    assert r.projetos == 2 and r.previstas == 20 and r.unidades_concluidas == 10
+    assert r.tempo_total_min == 900 and r.tempo_restante_min == 300
+    assert r.progresso_geral == pytest.approx(1 - 300 / 900)
+    assert calc.resumo_operacao([]).progresso_geral == 0

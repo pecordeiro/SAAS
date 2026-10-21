@@ -1,5 +1,32 @@
 # Contraste — verificação WCAG 2.1
 
+## Revisão de 2026-10-21 — base “Controle de Atividades” (ADR-0015)
+
+Os valores abaixo valem a partir da R1; a análise da “Prumo Noturno” logo depois fica como histórico.
+
+| Tema | Par | Razão | Critério |
+|---|---|---|---|
+| Claro | `--color-text` sobre `--color-surface` | 19,68:1 | texto |
+| Claro | `--color-text-muted` sobre `--color-surface` | 7,94:1 | texto |
+| Claro | `--color-text-subtle` sobre `--color-bg` (pior caso) | 4,84:1 | texto |
+| Claro | `--color-primary` sobre `--color-primary-subtle` | 5,04:1 | texto |
+| Claro | `--color-success` sobre `--color-success-subtle` | 4,79:1 | texto |
+| Claro | `--color-danger` sobre `--color-danger-subtle` | 5,29:1 | texto |
+| Claro | `--color-warning` sobre `--color-warning-subtle` | 5,49:1 | texto |
+| Claro | `--color-editable-text` sobre `--color-editable` | 6,26:1 | texto |
+| Claro | `--color-border` sobre `--color-surface` | 3,50:1 | UI |
+| Claro | `--color-action-contrast` sobre `--color-action` | 17,42:1 | texto |
+| Escuro | `--color-text-muted` sobre `--color-surface` | 9,72:1 | texto |
+| Escuro | `--color-text-subtle` sobre `--color-surface-2` (pior caso) | 5,56:1 | texto |
+| Escuro | `--color-primary` sobre `--color-primary-subtle` | 4,53:1 | texto |
+| Escuro | `--color-border` sobre `--color-surface` | 3,99:1 | UI |
+| Escuro | `--color-action-contrast` sobre `--color-action` | 17,38:1 | texto |
+
+Cores de status e de série são **marcas de dado**, nunca texto. Azul/laranja das séries passam no
+validador de daltonismo da skill `dataviz` (ΔE CVD 24,7 claro / 24,3 escuro). Cinza “não iniciada” e
+amarelo “aguardando peça” ficam abaixo de 3:1 sobre o branco (são cores pedidas pelo plano): por isso
+a situação sempre aparece também em texto (legenda com contagem, lista, tabela de dados, título do bloco).
+
 Status: recalculado em 2026-10-15 para a identidade “Prumo Noturno” (claro e arejado, azul ação) ·
 Fonte dos valores: `tokens.css`
 

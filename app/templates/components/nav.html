@@ -3,21 +3,36 @@
   Navegação da área logada — design-system §11 (menu lateral, ≥ 768 px) e §12 (navegação
   inferior, < 768 px). items = lista de dicts {key, label, href, icon}.
 #}
-{% macro sidebar_nav(items, current) -%}
-<nav class="sidebar__nav" aria-label="Principal">
+{% macro sidebar_nav(items, current, label="Principal", secondary=False) -%}
+<nav class="sidebar__nav{% if secondary %} sidebar__nav--secondary{% endif %}" aria-label="{{ label }}">
   {%- for item in items %}
   <a class="sidebar__item" href="{{ item.href }}"{% if item.key == current %} aria-current="page"{% endif %}>{{ icon(item.icon) }}<span>{{ item.label }}</span></a>
   {%- endfor %}
 </nav>
 {%- endmacro %}
 
+{#- Celular: as 4 telas da base + "Mais" (Projetos, Histórico, Configurações, conta). -#}
 {% macro bottom_nav(items, current, more_href="#mais", more_label="Mais") -%}
 <nav class="bottom-nav" aria-label="Principal">
-  {%- for item in items[:3] %}
-  <a class="bottom-nav__item" href="{{ item.href }}"{% if item.key == current %} aria-current="page"{% endif %}>{{ icon(item.icon, "lg") }}<span>{{ item.label }}</span></a>
+  {%- for item in items[:4] %}
+  <a class="bottom-nav__item" href="{{ item.href }}"{% if item.key == current %} aria-current="page"{% endif %}>{{ icon(item.icon, "lg") }}<span>{{ item.short or item.label }}</span></a>
   {%- endfor %}
   <a class="bottom-nav__item" href="{{ more_href }}" aria-haspopup="dialog">{{ icon("more", "lg") }}<span>{{ more_label }}</span></a>
 </nav>
+{%- endmacro %}
+
+{#
+  Faixa fina de aviso (uma linha, ~36 px) que pode ser fechada. Sem JS ela só não fecha;
+  com JS o botão esconde e lembra na sessão do navegador (só apresentação, ADR-0009).
+  key = nome estável do aviso; kind = info | warning | danger; action = (rótulo, href).
+#}
+{% macro banner(key, kind, title, body=None, action=None) -%}
+<div class="banner banner--{{ kind }}" role="status" data-banner="{{ key }}">
+  {{ icon("info" if kind == "info" else "alert", "sm", class_="banner__icon") }}
+  <p class="banner__text"><strong>{{ title }}</strong>{% if body %} <span class="banner__body">{{ body }}</span>{% endif %}</p>
+  {%- if action %}<a class="banner__action" href="{{ action[1] }}">{{ action[0] }}</a>{% endif %}
+  <button class="banner__close js-only" type="button" data-banner-close aria-label="Fechar aviso">{{ icon("x", "sm") }}</button>
+</div>
 {%- endmacro %}
 
 {#

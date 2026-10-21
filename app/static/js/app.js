@@ -85,8 +85,26 @@
     if (closeToast) {
       var toast = closeToast.closest("[data-toast]");
       if (toast) toast.classList.add("is-dismissed");
+      return;
+    }
+    // Faixa fina de aviso: fecha e lembra nesta sessão do navegador (só apresentação).
+    var closeBanner = event.target.closest && event.target.closest("[data-banner-close]");
+    if (closeBanner) {
+      var banner = closeBanner.closest("[data-banner]");
+      if (!banner) return;
+      banner.classList.add("is-dismissed");
+      try { sessionStorage.setItem("aviso-fechado:" + banner.getAttribute("data-banner"), "1"); } catch (e) { /* sem storage */ }
     }
   });
+
+  function hideDismissedBanners(scope) {
+    var banners = scope.querySelectorAll("[data-banner]");
+    for (var i = 0; i < banners.length; i++) {
+      try {
+        if (sessionStorage.getItem("aviso-fechado:" + banners[i].getAttribute("data-banner"))) banners[i].classList.add("is-dismissed");
+      } catch (e) { return; }
+    }
+  }
 
   document.addEventListener("input", function (event) {
     var input = event.target;
@@ -260,6 +278,7 @@
   }
 
   function boot() {
+    hideDismissedBanners(document);
     init(document);
     startAutoRefresh();
   }

@@ -1159,3 +1159,38 @@ critérios de pronto da anterior estiverem marcados.
   conferência no Excel real; telas 375/768/1280; PostgreSQL não rodado (só SQLite nesta fase).
 - Limites: grade assinada até ~400 kB (planilhas muito grandes pedem para deixar só a aba dos dados);
   uma meta por projeto (meta diferente por linha é erro); vários prazos → usa o último.
+
+## Reestruturação R1–R2 (2026-10-21)
+
+Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) substitui a ADR-0013.
+
+- **R1 · Moldura** — entregue:
+  - [x] Tokens novos (claro/escuro) com os nomes antigos preservados + status, séries, campo editável,
+    `--color-action` (botão quase preto), `--color-text-subtle`; cópia idêntica em `docs/design/tokens.css`
+  - [x] IBM Plex Sans 400/600 local (OFL); Geist removida (arquivos, `@font-face`, preloads)
+  - [x] Escala 12/14/16/24/32 (nada acima de 32 px), cards de raio 8 sem sombra, tabela com separador e
+    cabeçalho sem faixa, controles 36 px no desktop e 44 px no celular
+  - [x] Menu de 4 telas + Projetos/Histórico + Configurações (rodapé); celular com 4 telas + “Mais”
+  - [x] Avisos de e-mail e de assinatura numa faixa fina que pode ser fechada
+  - [x] `/app` abre o Painel; login e troca de empresa levam ao Painel
+  - [ ] Telas próprias de Preencher etapas (R3), Meta e equipe e Como funciona (R5): por ora
+    `/app/preencher`, `/app/meta-e-equipe` e `/app/como-funciona` redirecionam (TODO no código)
+- **R2 · Painel** — entregue:
+  - [x] Painel da operação (`/app`) e do projeto (`/app/projetos/<id>/painel`): frase-resumo, 5 indicadores
+    (anel + 4; celular sem indicador órfão), esteira de etapas (largura ∝ tempo, cor da situação, clique
+    abre a etapa, marca de hoje), tarefas × unidades, rosca com lista “atrasadas / aguardando peça”, horas
+    por etapa (nome no eixo), equipe × prazo e Tabelas 1/2 clicáveis
+  - [x] Contas novas só em `calc.py` (puras, testadas): `fracao_prazo_decorrida`, `fatias_da_esteira`,
+    `etapas_atrasadas`, `status_visual`, `contagem_visual`, `resumo_operacao`
+  - [x] ECharts 5.5.1 vendorizado (Apache-2.0 + NOTICE + LICENSE-d3), só nas páginas de painel, canvas,
+    dados num bloco JSON, cores dos tokens, texto ≥ 11 px, tabela de dados em `<details>`
+  - [x] Numeração duplicada (“1. 1. Preparação”) corrigida (`dashboard.rotulo_etapa`)
+  - [x] Testes A/B: atalhos do menu com `?projeto=` de outra empresa → 404; painel da operação não mostra B
+- Verificação: suíte SQLite completa (ver resumo da entrega); `scripts/build_assets.py --check` ok;
+  capturas 375/768/1280 claro/escuro de `/app`, painel do projeto e lista de projetos (fora do repositório);
+  auditoria Web Interface Guidelines nos arquivos mexidos (números de eixo em pt-BR, `touch-action`).
+- Decisões a confirmar (ADR-0015): regra de “etapa atrasada” pela linha de base do prazo; prioridade das
+  cores; “faltam” em cinza; operação somando projetos.
+- Pendências: `charts.py` e macros SVG de `components/chart.html` sem uso no painel (remover na R9);
+  `<meta name="theme-color">` (exige cor no template; resolver com token/CSS na R9); capturas em
+  `docs/design/capturas/` desatualizadas; testes em PostgreSQL não rodados nesta fase (só SQLite, a pedido).
