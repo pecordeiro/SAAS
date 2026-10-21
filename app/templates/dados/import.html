@@ -40,8 +40,10 @@
 {%- if result and result.ok and confirm %}
 <section class="card stack mb-4" aria-labelledby="previa-titulo">
   <h2 class="section-title" id="previa-titulo">Pré-visualização</h2>
+  {%- for note in result.notes %}{{ alert("info", note) }}{% endfor %}
   <p class="cluster">
     {{ badge({"csv": "CSV", "xlsx": "XLSX", "planilha": "Planilha de referência"}.get(result.source, result.source), "info") }}
+    {%- if result.mode == "simples" %} {{ badge("Modo simples", "neutral") }}{% endif %}
     <span class="text-sm">{{ result.quantity }} unidades · {{ result.stages|length }} etapas · {{ result.activity_count }} atividades · {{ result.people }} pessoa(s) × {{ result.hours_per_day|num(1) }} h/dia</span>
   </p>
   {%- if usage.max_projects is not none and usage.projects >= usage.max_projects %}
@@ -78,9 +80,10 @@
 <form class="card stack" method="post" action="{{ url_for('dados.import_upload') }}" enctype="multipart/form-data">
   {{ form.csrf_token }}
   <h2 class="section-title">Enviar arquivo</h2>
-  <p class="muted text-sm">CSV no formato do modelo (separador ; ou ,), XLSX exportado por aqui, ou a planilha de acompanhamento (etapas lidas pelos títulos da coluna A). Até 2 MB.</p>
+  <p class="muted text-sm">Qualquer planilha .csv ou .xlsx: o formato do site e a planilha de acompanhamento são reconhecidos sozinhos; nas outras, você escolhe as colunas. Até 2 MB.</p>
   {{ field(form.file, attrs={"accept": ".csv,.xlsx", "required": true}) }}
   {{ field(form.name, optional=True, hint="Se vazio, usa o nome que vem no arquivo.") }}
+  {{ form.map_columns() }} {{ form.map_columns.label }}
   <div class="form-actions">{{ button("Ver pré-visualização", "primary") }}</div>
 </form>
 {% endblock %}

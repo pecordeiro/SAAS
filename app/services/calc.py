@@ -188,6 +188,15 @@ def unidades_etapa(atividades: Sequence[Atividade], previstas: int) -> int:
     return arredondar(menor * previstas)
 
 
+def pecas_de_percentual(pct: float, previstas: int) -> int:
+    """Peças equivalentes a um % concluído (importação no modo simples, R7):
+    ROUND(min(1, max(0, %)) × previstas, 0). Volta ao mesmo % por ``pct_atividade`` a menos
+    do arredondamento para peças inteiras."""
+    if previstas <= 0:
+        return 0
+    return arredondar(min(1.0, max(0.0, pct or 0.0)) * previstas)
+
+
 def unidades_projeto(unidades_por_etapa: Iterable[int]) -> int:
     """Equipamentos concluídos: menor número de unidades entre todas as etapas (0 se nenhuma)."""
     valores = list(unidades_por_etapa)

@@ -169,6 +169,7 @@ FASE4_ROUTES = [
     ("POST", "/app/projetos/{id}/modelo/aplicar", "tpl_project_id", {"confirm": "y"}),
     ("GET", "/app/projetos/{id}/exportar.csv", "project_id", None),
     ("GET", "/app/projetos/{id}/exportar.xlsx", "project_id", None),
+    ("GET", "/app/projetos/{id}/exportar-planilha.xlsx", "project_id", None),  # R7
     ("POST", "/app/etapas/{id}/renomear", "stage_id", {"name": "Invasora"}),
     ("POST", "/app/etapas/{id}/mover", "stage_id", {"direction": "down"}),
     ("POST", "/app/etapas/{id}/arquivar", "stage_id", {}),
@@ -313,6 +314,30 @@ def test_previa_de_importacao_assinada_para_outra_empresa_e_recusada(client, app
     assert response.status_code == 400
     with app.app_context():
         assert db.session.query(Project).count() == before
+
+
+def test_planilha_de_colunas_assinada_para_outra_empresa_e_recusada(client, app, tenants4):
+    """R7: a grade da etapa de colunas leva empresa e usuário; a de B não serve para A."""
+    from itsdangerous import URLSafeTimedSerializer
+
+    from app.blueprints.dados import GRID_SALT
+
+    a, b = tenants4
+    grid = {"k": "csv", "f": "x.csv", "s": [{"t": "CSV", "r": [["Etapa"], ["Invasora"]], "l": None}]}
+    token = URLSafeTimedSerializer(app.secret_key, salt=GRID_SALT).dumps({"c": str(b.company_id), "u": "x", "g": grid})
+    login(client, app, a.owner_email)
+    with app.app_context():
+        before_a, before_b = _snapshot(a.company_id), _snapshot(b.company_id)
+    form = {"grid": token, "current_sheet": "CSV", "sheet": "CSV", "header_row": 1, "etapa": "0"}
+    response = post(client, app, "/app/importar/colunas", form)
+    assert response.status_code == 400 and "Invasora" not in response.get_data(as_text=True)
+    # o mesmo pedido com a grade assinada para A funciona (vai para a prévia)
+    with app.app_context():
+        owner_id = str(db.session.query(User).filter_by(email=a.owner_email).one().id)
+    own = URLSafeTimedSerializer(app.secret_key, salt=GRID_SALT).dumps({"c": str(a.company_id), "u": owner_id, "g": grid})
+    assert post(client, app, "/app/importar/colunas", {**form, "grid": own}).status_code == 200
+    with app.app_context():
+        assert _snapshot(a.company_id) == before_a and _snapshot(b.company_id) == before_b
 
 
 def test_historico_e_exportacao_de_outra_empresa_nao_vazam_registros(client, app, tenants4):
