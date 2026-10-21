@@ -379,6 +379,33 @@ def stage_new(project_id):
     return redirect(_fill_url(project.id, stage.id, "nome-etapa"), 303)
 
 
+QUICK_PROJECT_STAGES = 5  # painel do dono: projeto novo nasce com 5 etapas
+QUICK_PROJECT_QUANTITY = 10  # meta inicial (ajustável em Meta e equipe)
+
+
+@bp.post("/preencher/projetos/novo")
+@tenant_required(ROLE_SUPERVISOR)
+def project_quick_new():
+    """“+ Novo projeto” do topo das telas (painel do dono): só o nome; nasce no modo simples
+    com 5 etapas (“Etapa 1” … “Etapa 5”) e meta 10. Limite do plano conferido em create_project."""
+    _csrf_ok()
+    name = " ".join((request.form.get("name") or "").split())
+    if not name or len(name) > 160:
+        flash("Digite um nome para o projeto (até 160 caracteres).", "erro")
+        return redirect(request.referrer or url_for("preencher.fill"), 303)
+    if any(p.name.casefold() == name.casefold() for p in svc.list_projects("todos")):
+        flash("Já existe um projeto com esse nome.", "erro")
+        return redirect(url_for("preencher.fill"), 303)
+    project = svc.create_project(
+        g.company, name=name, quantity=QUICK_PROJECT_QUANTITY, start_date=_today(), due_date=None, people=1,
+        hours_per_day=Decimal("8"), stages=[svc.NewStage(name=f"Etapa {i}") for i in range(1, QUICK_PROJECT_STAGES + 1)],
+        progress_mode=PROGRESS_SIMPLE, source="quick",
+    )
+    db.session.commit()
+    flash(f"Projeto “{name}” criado com {QUICK_PROJECT_STAGES} etapas. Dê nome a elas e ajuste a meta em Meta e equipe.", "sucesso")
+    return redirect(_fill_url(project.id, anchor="nome-etapa"), 303)
+
+
 @bp.post("/preencher/etapas/<uuid:stage_id>/desfazer-exclusao")
 @tenant_required(ROLE_SUPERVISOR)
 def stage_unarchive(stage_id):
@@ -450,6 +477,11 @@ def goal_team():
 
 def _parse_team_field(name: str, raw: str | None):
     raw = (raw or "").strip()
+    if name == "name":
+        raw = " ".join(raw.split())
+        if not raw or len(raw) > 160:
+            raise svc.EditError("Informe o nome do projeto (até 160 caracteres).")
+        return raw
     if name == "quantity":
         if not raw.isdigit() or not 1 <= int(raw) <= 100000:
             raise svc.EditError("A meta é um número inteiro de 1 a 100000.")
@@ -476,8 +508,8 @@ def _parse_team_field(name: str, raw: str | None):
     raise svc.EditError("Campo desconhecido.")
 
 
-TEAM_FIELDS = ("quantity", "people", "hours_per_day", "due_date")
-TEAM_LABELS = {"quantity": "meta", "people": "pessoas", "hours_per_day": "horas por dia", "due_date": "prazo"}
+TEAM_FIELDS = ("name", "quantity", "people", "hours_per_day", "due_date")
+TEAM_LABELS = {"name": "nome do projeto", "quantity": "meta", "people": "pessoas", "hours_per_day": "horas por dia", "due_date": "prazo"}
 
 
 @bp.post("/meta-e-equipe/<uuid:project_id>")
@@ -491,6 +523,7 @@ def goal_team_save(project_id):
         abort(400)
     fields = [field] if field else [f for f in TEAM_FIELDS if f in request.form]
     values = dict(
+        name=project.name,
         quantity=project.quantity, people=project.people, hours_per_day=project.hours_per_day,
         due_date=project.due_date,
     )
@@ -503,8 +536,7 @@ def goal_team_save(project_id):
                 changed.append(name)
         if changed:
             svc.update_project(
-                project, name=project.name, product=project.product, start_date=project.start_date,
-                user_id=current_user.id, **values,
+                project, product=project.product, start_date=project.start_date, user_id=current_user.id, **values,
             )
     except svc.EditError as exc:
         db.session.rollback()

@@ -28,6 +28,9 @@
     </div>
     {%- endif %}
     {{ parts.head_values(sel, quantity) }}
+    {%- if can_edit %}
+    <a class="btn btn--danger-ghost btn--sm edit-head__delete" href="#excluir-etapa-{{ st.id }}" aria-haspopup="dialog">Apagar etapa</a>
+    {%- endif %}
   </div>
 
   {%- if simple %}
@@ -90,7 +93,7 @@
       <tr class="sort-item" id="linha-{{ a.id }}" data-sort-id="{{ a.id }}" data-version="{{ a.version }}" data-move-url="{{ url_for('edicao.activity_position', activity_id=a.id) }}">
         <td class="etab__name">
           {%- if can_edit %}
-          <span class="etab__name-cell"><span class="drag-handle js-only" data-drag-handle title="Arrastar a subatividade" aria-hidden="true">⠿</span><input class="cell" name="name" form="f-{{ a.id }}" value="{{ a.name }}" maxlength="160" required autocomplete="off" aria-label="Nome da subatividade" aria-describedby="salvo-status"></span>
+          <span class="etab__name-cell"><span class="drag-handle js-only" data-drag-handle title="Arraste para reordenar" aria-hidden="true">⠿</span><input class="cell" name="name" form="f-{{ a.id }}" value="{{ a.name }}" maxlength="160" required autocomplete="off" aria-label="Nome da subatividade" aria-describedby="salvo-status"></span>
           {%- else %}<span class="etab__name-text">{{ a.name }}</span>{% endif %}
           {{ parts.last_entry(a, last, None) }}
         </td>
@@ -126,7 +129,7 @@
                 <button class="btn btn--secondary btn--sm" type="submit">Mover</button>
               </form>
               {%- endif %}
-              <a class="action-menu__item action-menu__item--danger" href="#excluir-atv-{{ a.id }}" aria-haspopup="dialog">Excluir subatividade</a>
+              <a class="action-menu__item action-menu__item--danger" href="#excluir-atv-{{ a.id }}" aria-haspopup="dialog">Apagar subatividade</a>
             </div>
           </details>
           {%- endif %}
@@ -163,13 +166,13 @@
   <p class="fill__hint">Digite quantas peças já estão concluídas em cada subatividade: o % sai sozinho (peças ÷ previstas) e as unidades concluídas são a menor contagem entre as subatividades. Os campos amarelos salvam ao sair do campo (Tab ou Enter); Esc desfaz.</p>
   {%- if can_edit and archived_activities %}
   <details class="fill__archived">
-    <summary>Subatividades excluídas ({{ archived_activities|length }})</summary>
+    <summary>Subatividades apagadas ({{ archived_activities|length }})</summary>
     <ul class="archived-list">
       {%- for a in archived_activities %}
       <li><span>{{ a.name }} <span class="muted">· {{ a.units_done }} peças</span></span>
         <form method="post" action="{{ url_for('preencher.activity_unarchive', activity_id=a.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button class="btn btn--secondary btn--sm" type="submit">Desfazer exclusão</button>
+          <button class="btn btn--secondary btn--sm" type="submit">Desfazer</button>
         </form>
       </li>
       {%- endfor %}

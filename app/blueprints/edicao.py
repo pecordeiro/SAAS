@@ -124,6 +124,9 @@ def project_archive(project_id):
         return redirect(url_for("edicao.project_edit", project_id=project.id), 303)
     svc.archive_project(project, current_user.id)
     db.session.commit()
+    if _to_fill():
+        flash(f"Projeto “{project.name}” apagado (arquivado). O histórico continua guardado.", "sucesso")
+        return redirect(url_for("preencher.fill"), 303)
     flash("Projeto arquivado. O histórico continua guardado.", "sucesso")
     return redirect(url_for("app.projects"), 303)
 
@@ -266,7 +269,7 @@ def stage_archive(stage_id):
     svc.archive_stage(stage, current_user.id)
     db.session.commit()
     if _to_fill():
-        flash(f"Etapa “{stage.name}” excluída. Para desfazer, use “Etapas excluídas” no fim da lista.", "sucesso")
+        flash(f"Etapa “{stage.name}” apagada. Para desfazer, use “Etapas apagadas” no fim da lista.", "sucesso")
         return _back(stage.project_id)
     flash("Etapa arquivada. Os registros dela continuam no histórico.", "sucesso")
     return _back(stage.project_id)
@@ -385,7 +388,7 @@ def activity_archive(activity_id):
     svc.archive_activity(activity, current_user.id)
     db.session.commit()
     if _to_fill():
-        flash(f"Subatividade “{activity.name}” excluída. Para desfazer, use “Subatividades excluídas” abaixo da tabela.", "sucesso")
+        flash(f"Subatividade “{activity.name}” apagada. Para desfazer, use “Subatividades apagadas” abaixo da tabela.", "sucesso")
         return _back(project_id, stage_id)
     flash("Atividade arquivada. Os registros dela continuam no histórico.", "sucesso")
     return _back(project_id)

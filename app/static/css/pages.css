@@ -866,4 +866,222 @@
   .chart-tip__dot--waiting { background: var(--color-status-waiting); }
   .chart-tip__dot--late { background: var(--color-status-late); }
   .chart__data summary { font-size: var(--font-size-sm); color: var(--color-text-muted); font-weight: var(--font-weight-regular); }
+
+  /* =================== Preencher etapas, Meta e equipe, Como funciona (R3–R5) =================== */
+  /* Topo: um botão por projeto (painel do dono), ✎ renomear, ✕ apagar e “+” novo projeto. */
+  .project-tabs { margin-bottom: var(--space-4); overflow-x: auto; }
+  .project-tabs__list { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; margin: 0; padding: 0; list-style: none; }
+  .project-tabs__item {
+    display: inline-flex;
+    align-items: center;
+    border: var(--border-width) solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+  }
+  .project-tabs__item.is-current { border-color: var(--color-text); }
+  .project-tabs__link {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--space-9);
+    padding: 0 var(--space-3);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-semibold);
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .project-tabs__item.is-current .project-tabs__link { color: var(--color-text); }
+  .project-tabs__link:hover { color: var(--color-text); }
+  .project-tabs__action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--space-8);
+    min-height: var(--space-9);
+    color: var(--color-text-subtle);
+    text-decoration: none;
+  }
+  .project-tabs__action:hover { color: var(--color-text); }
+  .project-tabs__action--danger:hover { color: var(--color-danger); }
+  .project-tabs__plus { list-style: none; color: var(--color-primary); font-size: var(--font-size-lg); }
+  .project-tabs__plus::-webkit-details-marker { display: none; }
+  .project-tabs__item--new { border-style: dashed; }
+  .project-new[open] .project-tabs__plus { color: var(--color-text); }
+  .project-new__form { display: flex; gap: var(--space-2); align-items: center; padding: 0 var(--space-2) var(--space-2); }
+  .project-new__form .field__input { width: 14rem; max-width: 60vw; }
+
+  .fill-header { margin-bottom: var(--space-3); }
+  .fill-header__project { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; color: var(--color-text-muted); }
+
+  /* “Salvo · quem, hora” discreto (ou o erro) logo acima do conteúdo. */
+  .save-status {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    min-height: var(--space-6);
+    margin: 0 0 var(--space-2);
+    font-size: var(--font-size-sm);
+    color: var(--color-success);
+  }
+  .save-status--error { color: var(--color-danger); font-weight: var(--font-weight-semibold); }
+
+  .fill { display: grid; gap: var(--space-4); align-items: start; }
+  @media (min-width: 64em) {
+    .fill { grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr); }
+    .fill__list { position: sticky; top: var(--space-4); }
+  }
+  .fill__list { padding: var(--space-2); }
+  .fill__panel { min-width: 0; }
+  .fill__hint { margin: var(--space-3) 0 0; font-size: var(--font-size-sm); color: var(--color-text-muted); max-width: 72ch; }
+  .fill__list-hint { margin: var(--space-2) var(--space-2) 0; font-size: var(--font-size-sm); color: var(--color-text-subtle); }
+
+  /* Lista de etapas (esquerda) */
+  .stage-list { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+  .stage-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    border: var(--border-width) solid transparent;
+    border-radius: var(--radius-md);
+  }
+  .stage-item:hover { background: var(--color-surface-2); }
+  .stage-item.is-current { background: var(--color-surface-2); border-color: var(--color-border-subtle); }
+  .stage-item .drag-handle { min-width: var(--space-6); }
+  .stage-item__link { flex: 1; min-width: 0; padding: var(--space-2); color: var(--color-text); text-decoration: none; }
+  .stage-item__info { display: grid; gap: var(--space-1); }
+  .stage-item__row { display: flex; justify-content: space-between; gap: var(--space-2); align-items: baseline; }
+  .stage-item__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--font-weight-semibold); }
+  .stage-item__pct { flex: none; font-weight: var(--font-weight-semibold); }
+  .stage-item__menu { flex: none; }
+
+  /* Mini barras (<progress>): azul = pelas tarefas, laranja = unidades, verde = 100%. */
+  .mini {
+    display: block;
+    width: 100%;
+    height: var(--space-1);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--color-track);
+    color: var(--color-series-tasks);
+    appearance: none;
+  }
+  .mini::-webkit-progress-bar { background: var(--color-track); border-radius: var(--radius-pill); }
+  .mini::-webkit-progress-value { background: var(--color-series-tasks); border-radius: var(--radius-pill); }
+  .mini::-moz-progress-bar { background: var(--color-series-tasks); border-radius: var(--radius-pill); }
+  .mini--units { color: var(--color-series-units); }
+  .mini--units::-webkit-progress-value { background: var(--color-series-units); }
+  .mini--units::-moz-progress-bar { background: var(--color-series-units); }
+  .mini--done { color: var(--color-status-done); }
+  .mini--done::-webkit-progress-value { background: var(--color-status-done); }
+  .mini--done::-moz-progress-bar { background: var(--color-status-done); }
+
+  .status-tag { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--font-size-sm); color: var(--color-text-muted); }
+  .status-tag::before { content: ""; flex: none; width: var(--space-2); height: var(--space-2); border-radius: var(--radius-pill); background: var(--color-status-todo); }
+  .status-tag--done::before { background: var(--color-status-done); }
+  .status-tag--doing::before { background: var(--color-status-doing); }
+  .status-tag--waiting::before { background: var(--color-status-waiting); }
+  .status-tag--late::before { background: var(--color-status-late); }
+
+  .new-stage { display: grid; gap: var(--space-1); margin-top: var(--space-3); padding: var(--space-2); border-top: var(--border-width) solid var(--color-border-subtle); }
+  .new-stage__row { display: flex; gap: var(--space-2); }
+  .new-stage__row .field__input { flex: 1; min-width: 0; }
+
+  .fill__archived { margin-top: var(--space-3); padding: var(--space-2); font-size: var(--font-size-sm); }
+  .fill__archived summary { cursor: pointer; color: var(--color-text-muted); }
+  .archived-list { display: grid; gap: var(--space-2); margin: var(--space-2) 0 0; padding: 0; list-style: none; }
+  .archived-list li { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); }
+
+  /* Cabeçalho da etapa (direita) */
+  .edit-head { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: flex-end; margin-bottom: var(--space-4); }
+  .edit-head__name { flex: 1 1 16rem; display: grid; gap: var(--space-1); min-width: 0; }
+  .edit-head__title { margin: 0; font-size: var(--font-size-lg); }
+  .edit-head__values { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+  .edit-head__delete { color: var(--color-danger); border-color: var(--color-border-subtle); background: var(--color-surface); }
+  .edit-head__delete:hover { background: var(--color-danger-subtle); color: var(--color-danger); }
+  .ro { display: grid; gap: var(--space-1); }
+  .ro__label { font-size: var(--font-size-sm); color: var(--color-text-muted); }
+  .ro__value { font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); }
+
+  /* Células amarelas: campo editável como na planilha. */
+  .cell {
+    width: 100%;
+    min-width: 0;
+    min-height: var(--control-height);
+    padding: 0 var(--space-2);
+    border: var(--border-width) solid var(--color-border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--color-editable);
+    color: var(--color-editable-text);
+    font: inherit;
+    font-size: var(--font-size-input);
+  }
+  .cell::placeholder { color: var(--color-text-subtle); }
+  .cell:hover { border-color: var(--color-border-strong); }
+  .cell:focus-visible { outline: var(--focus-width) solid var(--color-focus); outline-offset: 0; border-color: var(--color-focus); }
+  .cell--num { text-align: right; font-variant-numeric: var(--font-numeric); }
+  .cell--title { font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); }
+  .cell[aria-busy="true"] { opacity: 0.7; }
+  .cell.is-saved { border-color: var(--color-success); box-shadow: inset 0 0 0 var(--border-width) var(--color-success); }
+  .cell.is-invalid { border-color: var(--color-danger); box-shadow: inset 0 0 0 var(--border-width) var(--color-danger); }
+  .cell--new { background: var(--color-surface); border-style: dashed; }
+
+  /* Tabela da etapa (densa, separador de linha, números à direita) */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .etab { width: 100%; border-collapse: collapse; font-size: var(--font-size-md); font-variant-numeric: var(--font-numeric); }
+  .etab th, .etab td { padding: var(--space-1) var(--space-2); border-bottom: var(--border-width) solid var(--color-border-subtle); text-align: left; vertical-align: middle; }
+  .etab thead th { font-size: var(--font-size-sm); font-weight: var(--font-weight-regular); color: var(--color-text-muted); border-bottom-color: var(--color-border-strong); white-space: nowrap; }
+  .etab tbody th { font-weight: var(--font-weight-semibold); }
+  .etab .num { text-align: right; }
+  .etab td.num .cell { max-width: 7rem; margin-left: auto; display: block; }
+  .etab tfoot th, .etab tfoot td { font-weight: var(--font-weight-semibold); border-bottom: 0; border-top: var(--border-width) solid var(--color-border-strong); }
+  .etab__name { min-width: 14rem; }
+  .etab__name-cell { display: flex; align-items: center; gap: var(--space-1); }
+  .etab__name-cell .drag-handle { min-width: var(--space-6); }
+  .etab__actions { white-space: nowrap; text-align: right; }
+  .etab__actions form, .etab__actions details { display: inline-block; vertical-align: middle; }
+  .etab .action-menu__list { right: 0; left: auto; min-width: 16rem; text-align: left; }
+  .action-menu__form { display: grid; gap: var(--space-2); padding: var(--space-2); }
+  .action-menu__label { font-size: var(--font-size-sm); color: var(--color-text-muted); }
+  .row-author { display: block; margin-top: calc(var(--space-1) / 2); font-size: var(--font-size-sm); color: var(--color-text-subtle); }
+  .row-author:empty { display: none; }
+  .pct-cell { display: flex; align-items: center; gap: var(--space-2); min-width: 10rem; }
+  .pct-cell .mini { flex: 1; min-width: 3rem; }
+  .pct-cell .num { flex: none; white-space: nowrap; }
+  .etab__new td { border-bottom: 0; }
+
+  /* Duas caixas: pelas tarefas (azul) e unidades (laranja) */
+  .twobox { display: grid; gap: var(--space-3); margin-top: var(--space-4); }
+  @media (min-width: 40em) { .twobox { grid-template-columns: 1fr 1fr; } }
+  .box { padding: var(--space-3) var(--space-4); border: var(--border-width) solid var(--color-border-subtle); border-radius: var(--radius-lg); background: var(--color-surface-2); }
+  .box__label { margin: 0; font-size: var(--font-size-sm); color: var(--color-text-muted); }
+  .box__big { margin: var(--space-1) 0 0; font-size: var(--font-size-2xl); font-weight: var(--font-weight-semibold); line-height: var(--line-height-tight); letter-spacing: var(--letter-spacing-tight); }
+  .box__sub { margin: var(--space-1) 0 0; font-size: var(--font-size-sm); color: var(--color-text-muted); }
+  .box--tasks { border-left: var(--border-width-strong) solid var(--color-series-tasks); }
+  .box--units { border-left: var(--border-width-strong) solid var(--color-series-units); }
+
+  /* Meta e equipe */
+  .card-title { margin: 0; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); }
+  .team-grid { display: grid; gap: var(--space-4); align-items: start; }
+  @media (min-width: 64em) { .team-grid { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); } .team-mode { grid-column: 1 / -1; } }
+  .team-form { display: grid; gap: var(--space-3); }
+  .team-field { display: grid; gap: var(--space-1); }
+  .team-field .cell--num { max-width: 10rem; }
+  .team-field .cell[type="date"] { max-width: 12rem; }
+  .team-readonly { display: grid; gap: var(--space-2); margin: 0; }
+  .team-readonly div { display: flex; justify-content: space-between; gap: var(--space-3); border-bottom: var(--border-width) solid var(--color-border-subtle); padding-bottom: var(--space-2); }
+  .team-readonly dt { color: var(--color-text-muted); }
+  .team-readonly dd { margin: 0; font-weight: var(--font-weight-semibold); }
+  .team-table tbody tr.is-current { background: var(--color-primary-subtle); }
+  .team-table tbody tr.is-current th, .team-table tbody tr.is-current td { font-weight: var(--font-weight-semibold); }
+  .mode-options { display: grid; gap: var(--space-2); margin: 0; padding: 0; border: 0; }
+  @media (min-width: 40em) { .mode-options { grid-template-columns: 1fr 1fr; } }
+  .mode-option { display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-3); border: var(--border-width) solid var(--color-border-subtle); border-radius: var(--radius-lg); cursor: pointer; }
+  .mode-option:has(input:checked) { border: var(--border-width-strong) solid var(--color-primary); background: var(--color-primary-subtle); }
+  .mode-option input { flex: none; width: var(--space-5); height: var(--space-5); margin-top: calc(var(--space-1) / 2); accent-color: var(--color-primary); }
+  .mode-option__desc { display: block; font-size: var(--font-size-sm); color: var(--color-text-muted); }
+
+  /* Como funciona */
+  .how-table th[scope="row"] { min-width: 12rem; }
+  .how-table td { min-width: 14rem; }
+  .how-table__example { font-variant-numeric: var(--font-numeric); color: var(--color-text); }
 }

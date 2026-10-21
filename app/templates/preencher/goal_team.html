@@ -31,6 +31,8 @@
     {%- if can_edit %}
     <form id="f-equipe" class="team-form" method="post" action="{{ url_for('preencher.goal_team_save', project_id=project.id) }}" novalidate>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="team-field" for="meta-nome"><span class="field__label">Nome do projeto</span>
+        <input class="cell" id="meta-nome" name="name" value="{{ project.name }}" maxlength="160" autocomplete="off" aria-describedby="salvo-status"></label>
       <label class="team-field" for="meta-quantidade"><span class="field__label">Meta: quantas unidades vamos montar</span>
         <input class="cell cell--num" id="meta-quantidade" name="quantity" value="{{ project.quantity }}" inputmode="numeric" autocomplete="off" aria-describedby="salvo-status"></label>
       <label class="team-field" for="meta-pessoas"><span class="field__label">Pessoas montando</span>

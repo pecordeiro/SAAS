@@ -195,6 +195,14 @@
     .app-shell {
       display: grid;
       grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+      /* R3: o fundo e a borda do menu descem a página inteira (o menu em si é sticky com
+         a altura da janela; em páginas longas o fundo dele terminava no meio). */
+      background:
+        linear-gradient(to right,
+          var(--color-surface) calc(var(--sidebar-width) - var(--border-width)),
+          var(--color-border-subtle) calc(var(--sidebar-width) - var(--border-width)),
+          var(--color-border-subtle) var(--sidebar-width),
+          transparent var(--sidebar-width));
     }
     .app-topbar,
     .bottom-nav { display: none; }

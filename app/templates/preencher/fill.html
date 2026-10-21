@@ -23,18 +23,18 @@
   tarefas e laranja = unidades, situação; arrastar ou “Subir/Descer” para reordenar; menu
   Renomear / Mover / Excluir); à direita a tabela da etapa com células amarelas que salvam ao
   sair do campo. Operador só lança peças (ou o %, no modo simples). Excluir = arquivar: nada
-  se perde e dá para desfazer (“Etapas excluídas” e “Subatividades excluídas”).
+  se perde e dá para desfazer (“Etapas apagadas” e “Subatividades apagadas”).
 #}
 {%- macro archived_stage_list() %}
 {%- if archived_stages %}
     <details class="fill__archived">
-      <summary>Etapas excluídas ({{ archived_stages|length }})</summary>
+      <summary>Etapas apagadas ({{ archived_stages|length }})</summary>
       <ul class="archived-list">
         {%- for s in archived_stages %}
         <li><span>{{ s.name }}</span>
           <form method="post" action="{{ url_for('preencher.stage_unarchive', stage_id=s.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="btn btn--secondary btn--sm" type="submit">Desfazer exclusão</button>
+            <button class="btn btn--secondary btn--sm" type="submit">Desfazer</button>
           </form>
         </li>
         {%- endfor %}
@@ -77,7 +77,7 @@
       {%- for it in items %}
       {%- set current = it.stage.id == sel.stage.id %}
       <li class="stage-item sort-item{% if current %} is-current{% endif %}" data-sort-id="{{ it.stage.id }}">
-        {%- if can_edit %}<span class="drag-handle js-only" data-drag-handle title="Arrastar a etapa" aria-hidden="true">⠿</span>{% endif %}
+        {%- if can_edit %}<span class="drag-handle js-only" data-drag-handle title="Arraste para reordenar" aria-hidden="true">⠿</span>{% endif %}
         <a class="stage-item__link" href="{{ url_for('preencher.fill', projeto=project.id, etapa=it.stage.id) }}"{% if current %} aria-current="true"{% endif %}>{{ parts.stage_info(it) }}</a>
         {%- if can_edit %}
         <details class="action-menu stage-item__menu">
@@ -94,7 +94,7 @@
             </form>
             {%- endif %}
             {%- endfor %}
-            <a class="action-menu__item action-menu__item--danger" href="#excluir-etapa-{{ it.stage.id }}" aria-haspopup="dialog">Excluir etapa</a>
+            <a class="action-menu__item action-menu__item--danger" href="#excluir-etapa-{{ it.stage.id }}" aria-haspopup="dialog">Apagar etapa</a>
           </div>
         </details>
         {%- endif %}
@@ -105,7 +105,7 @@
     <p class="fill__list-hint js-only">Arraste pela alça ⠿ para mudar a ordem.</p>
     <form class="new-stage" method="post" action="{{ url_for('preencher.stage_new', project_id=project.id) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label class="field__label" for="nova-etapa">Nova etapa</label>
+      <label class="field__label" for="nova-etapa">+ Nova etapa</label>
       <span class="new-stage__row"><input class="field__input" id="nova-etapa" name="name" maxlength="160" required autocomplete="off" placeholder="Nome da etapa"><button class="btn btn--secondary" type="submit">{{ icon("plus", "sm") }}<span>Incluir</span></button></span>
     </form>
     {{ archived_stage_list() }}
@@ -117,13 +117,13 @@
 
 {%- if can_edit %}
 {%- for it in items %}
-{% call confirm_dialog("excluir-etapa-" ~ it.stage.id, "Excluir a etapa “" ~ it.stage.name ~ "”?", "Ela sai da tela e das contas. As peças lançadas continuam no histórico, e dá para desfazer em “Etapas excluídas”.", "Excluir etapa", url_for('edicao.stage_archive', stage_id=it.stage.id)) %}
+{% call confirm_dialog("excluir-etapa-" ~ it.stage.id, "Apagar “" ~ it.stage.name ~ "” e todas as suas subatividades?", "Ela sai da tela e das contas. As peças lançadas ficam no histórico, e dá para desfazer em “Etapas apagadas”, no fim da lista.", "Apagar etapa", url_for('edicao.stage_archive', stage_id=it.stage.id)) %}
 <input type="hidden" name="voltar" value="preencher">
 {% endcall %}
 {%- endfor %}
 {%- if not simple %}
 {%- for a, ar in rows %}
-{% call confirm_dialog("excluir-atv-" ~ a.id, "Excluir a subatividade “" ~ a.name ~ "”?", "Ela sai da etapa e das contas. As peças lançadas continuam no histórico, e dá para desfazer em “Subatividades excluídas”.", "Excluir subatividade", url_for('edicao.activity_archive', activity_id=a.id)) %}
+{% call confirm_dialog("excluir-atv-" ~ a.id, "Apagar a subatividade “" ~ a.name ~ "”?", "Ela sai da etapa e das contas. As peças lançadas ficam no histórico, e dá para desfazer em “Subatividades apagadas”, abaixo da tabela.", "Apagar subatividade", url_for('edicao.activity_archive', activity_id=a.id)) %}
 <input type="hidden" name="voltar" value="preencher">
 {% endcall %}
 {%- endfor %}

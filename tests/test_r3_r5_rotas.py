@@ -32,6 +32,7 @@ def _simple_project(company, name="Simples", quantity=20, stages=("Corte", "Sold
 def test_telas_abrem_para_cada_papel(client, app, tenants):
     a, _ = tenants
     for email in (a.owner_email, a.operator_email):
+        client = app.test_client()
         login(client, app, email)
         for url in ("/app/preencher", f"/app/preencher?projeto={a.project_id}&etapa={a.stage_id}",
                     "/app/meta-e-equipe", "/app/como-funciona", "/app/preencher?etapa=nao-e-uuid"):
@@ -85,7 +86,7 @@ def test_operador_nao_edita_estrutura_nem_diminui(client, app, tenants):
     assert post(client, app, f"/app/preencher/etapas/{a.stage_id}", {"campo": "name", "name": "X", "version": "1"}).status_code == 403
     assert post(client, app, f"/app/preencher/etapas/{a.stage_id}/atividades", {"name": "Nova"}).status_code == 403
     html = client.get("/app/preencher").get_data(as_text=True)
-    assert 'id="nome-etapa"' not in html and "Excluir etapa" not in html and 'name="units_done"' in html
+    assert 'id="nome-etapa"' not in html and "Apagar etapa" not in html and 'name="units_done"' in html
 
 
 def test_versao_velha_responde_409_com_valor_atual(client, app, tenants):
@@ -148,10 +149,10 @@ def test_excluir_e_desfazer_pela_tela(client, app, tenants):
     response = post(client, app, f"/app/atividades/{a.activity_id}/arquivar", {"voltar": "preencher"})
     assert response.status_code == 303 and "/app/preencher" in response.headers["Location"]
     html = client.get(f"/app/preencher?projeto={a.project_id}").get_data(as_text=True)
-    assert "Subatividades excluídas (1)" in html
+    assert "Subatividades apagadas (1)" in html
     assert post(client, app, f"/app/preencher/atividades/{a.activity_id}/desfazer-exclusao").status_code == 303
     assert post(client, app, f"/app/etapas/{a.stage_id}/arquivar", {"voltar": "preencher"}).status_code == 303
-    assert "Etapas excluídas (1)" in client.get(f"/app/preencher?projeto={a.project_id}").get_data(as_text=True)
+    assert "Etapas apagadas (1)" in client.get(f"/app/preencher?projeto={a.project_id}").get_data(as_text=True)
     assert post(client, app, f"/app/preencher/etapas/{a.stage_id}/desfazer-exclusao").status_code == 303
     with app.app_context():
         assert db.session.get(Stage, a.stage_id).archived_at is None
@@ -265,3 +266,39 @@ def test_como_funciona_mostra_numeros_atuais(client, app, tenants):
     assert "Como cada conta funciona" in html
     assert "Atividade 1: 4 ÷ 10 = 40%" in html
     assert "Atividade 1: 10 min ÷ 40 min = 25%" in html
+
+
+# ---------------------------------------------------------------- painel do dono: vários projetos
+
+
+def test_novo_projeto_rapido_nasce_simples_com_5_etapas(client, app, tenants):
+    a, b = tenants
+    login(client, app, a.supervisor_email)
+    html = client.get("/app/preencher").get_data(as_text=True)
+    assert "Novo projeto" in html and "Projeto A" in html and "Projeto B" not in html
+    response = post(client, app, "/app/preencher/projetos/novo", {"name": "Lote 11"})
+    assert response.status_code == 303
+    with app.app_context():
+        project = db.session.query(Project).filter_by(company_id=a.company_id, name="Lote 11").one()
+        assert project.progress_mode == "simples"
+        assert [s.name for s in project.stages] == [f"Etapa {i}" for i in range(1, 6)]
+        assert all(len(s.activities) == 1 for s in project.stages)
+        assert db.session.query(Project).filter_by(company_id=b.company_id).count() == 1
+    assert post(client, app, "/app/preencher/projetos/novo", {"name": "lote 11"}).status_code == 303
+    with app.app_context():
+        assert db.session.query(Project).filter(Project.name.ilike("lote 11")).count() == 1
+    other = app.test_client()
+    login(other, app, a.operator_email)
+    assert post(other, app, "/app/preencher/projetos/novo", {"name": "X"}).status_code == 403
+
+
+def test_renomear_e_apagar_projeto_pelo_topo(client, app, tenants):
+    a, _ = tenants
+    login(client, app, a.owner_email)
+    response = post(client, app, f"/app/meta-e-equipe/{a.project_id}", {"campo": "name", "name": "Lote A2"}, headers=HX)
+    assert response.status_code == 200
+    response = post(client, app, f"/app/projetos/{a.project_id}/arquivar", {"confirm": "y", "voltar": "preencher"})
+    assert response.status_code == 303 and "/app/preencher" in response.headers["Location"]
+    with app.app_context():
+        project = db.session.get(Project, a.project_id)
+        assert project.name == "Lote A2" and project.archived_at is not None
