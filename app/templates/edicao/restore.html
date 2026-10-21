@@ -37,7 +37,7 @@
   <div class="restore-when__row">
     <div class="field restore-when__field">
       <label class="field__label" for="ate">Data e hora</label>
-      <input class="field__input" type="datetime-local" id="ate" name="ate" value="{{ ate or '' }}" max="{{ now_local }}" required aria-describedby="ate-dica">
+      <input class="field__input" type="datetime-local" id="ate" name="ate" value="{{ ate or '' }}" max="{{ now_local }}" required autocomplete="off" aria-describedby="ate-dica">
     </div>
     {{ button("Ver o que muda", "secondary" if preview else "primary") }}
   </div>

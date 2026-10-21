@@ -31,7 +31,7 @@
     <h2 class="section-title" id="onde-titulo">Onde estão os dados</h2>
     <div class="import-where">
       {{ field(form.sheet, hint=(inspection.sheets|length ~ " abas no arquivo") if inspection.sheets|length > 1 else "Arquivo com uma aba") }}
-      {{ field(form.header_row, hint="A linha com os nomes das colunas.", attrs={"inputmode": "numeric", "min": 1}) }}
+      {{ field(form.header_row, hint="A linha com os nomes das colunas.", attrs={"inputmode": "numeric", "min": 1, "autocomplete": "off"}) }}
       <div class="import-where__action">{{ button("Reler a aba", "secondary", attrs={"name": "action", "value": "ver"}) }}</div>
     </div>
     <p class="muted text-sm num">
@@ -89,7 +89,7 @@
   <section class="card stack" aria-labelledby="projeto-titulo">
     <h2 class="section-title" id="projeto-titulo">Projeto</h2>
     <div class="import-where">
-      {{ field(form.quantity, optional=True, hint="Use se a planilha não tem a coluna de previstas.", attrs={"inputmode": "numeric", "min": 1}) }}
+      {{ field(form.quantity, optional=True, hint="Use se a planilha não tem a coluna de previstas.", attrs={"inputmode": "numeric", "min": 1, "autocomplete": "off"}) }}
       {{ field(form.name, optional=True, hint="Se ficar vazio, usamos o nome do arquivo.", attrs={"autocomplete": "off"}) }}
     </div>
   </section>

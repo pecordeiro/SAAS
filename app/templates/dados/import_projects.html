@@ -87,12 +87,13 @@
             <span>meta {{ r.quantity }}</span>
             <span>{{ r.people }} {{ "pessoa" if r.people == 1 else "pessoas" }} × {{ r.hours_per_day|num(1) }} h</span>
           </span>
+          <span class="import-projects__toggle">{{ icon("chevron-down", "sm") }}Ver as etapas</span>
         </summary>
-        <ol class="import-projects__stages">
+        <ul class="import-projects__stages">
           {%- for stage in r.stages %}
           <li><span>{{ stage.name }}</span> <span class="muted num">{{ stage.activities|length }} {{ "atividade" if stage.activities|length == 1 else "atividades" }}</span></li>
           {%- endfor %}
-        </ol>
+        </ul>
       </details>
     </li>
     {%- endfor %}

@@ -1039,6 +1039,12 @@
   .import-projects__check + .import-projects__meta { padding-left: calc(var(--icon-size) + var(--space-3)); }
   .import-projects__errors { margin: 0; padding-left: var(--space-5); color: var(--color-danger); }
   .import-projects__details > summary { display: grid; gap: var(--space-1); cursor: pointer; min-height: var(--touch-min); align-content: center; }
-  .import-projects__stages { margin: var(--space-2) 0 0; padding-left: var(--space-6); display: grid; gap: var(--space-1); font-size: var(--font-size-md); }
+  .import-projects__details > summary { list-style: none; }
+  .import-projects__details > summary::-webkit-details-marker { display: none; }
+  .import-projects__toggle { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--color-primary); font-size: var(--font-size-sm); }
+  .import-projects__details > summary:hover .import-projects__toggle { text-decoration: underline; }
+  .import-projects__details > summary:focus-visible { box-shadow: var(--focus-ring); border-radius: var(--radius-sm); outline: none; }
+  .import-projects__details[open] .import-projects__toggle .icon { transform: rotate(180deg); }
+  .import-projects__stages { margin: var(--space-2) 0 0; padding: 0; list-style: none; display: grid; gap: var(--space-1); font-size: var(--font-size-md); }
   .import-projects__confirm { display: contents; }
 }

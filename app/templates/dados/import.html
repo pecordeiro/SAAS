@@ -126,7 +126,7 @@
   {{ field(form.name, optional=True, hint="Se ficar vazio, usamos o nome do arquivo.", attrs={"autocomplete": "off"}) }}
   <label class="check"><input type="checkbox" name="{{ form.map_columns.name }}" id="{{ form.map_columns.id }}" value="y"{% if form.map_columns.data %} checked{% endif %}><span>Quero escolher as colunas mesmo assim</span></label>
   <div class="form-actions">
-    {{ button("Continuar", "primary") }}
+    {{ button("Ler a planilha", "primary") }}
     {{ button("Baixar modelo .csv", "ghost", icon="download", href=url_for('dados.import_template')) }}
   </div>
 </form>
