@@ -1,25 +1,29 @@
-"""Importação de projeto: CSV (modelo do site / exportação), XLSX exportado pelo site e a
-planilha de referência ``acompanhamento_montagem_v4.xlsx``.
+"""Importação de projeto: CSV (modelo do site / exportação), XLSX exportado pelo site (lista
+plana ou layout da base), a planilha de referência ``acompanhamento_montagem_v4.xlsx`` e — R7 —
+QUALQUER planilha .xlsx/.csv com mapeamento de colunas (``app/services/import_mapping.py``).
 
-Fluxo: ``parse_upload`` (arquivo em memória → ``ImportResult`` com dados e erros por linha)
-→ pré-visualização → ``save`` grava TUDO numa transação só (quem chama faz o commit). Com
-qualquer erro, nada é gravado.
+Fluxo: ``load_grid`` (arquivo em memória → ``Grid``: abas e linhas, com tetos) →
+``auto_parse`` (formatos reconhecidos sozinhos) ou ``import_mapping.parse_mapped`` (colunas
+escolhidas pela pessoa) → ``ImportResult`` com dados e erros por linha → pré-visualização →
+``save`` grava TUDO numa transação só (quem chama faz o commit). Com qualquer erro, nada é
+gravado. ``parse_upload`` = ``load_grid`` + ``auto_parse`` (comportamento da Fase 4).
 
 Planilha de referência: o layout é descoberto pelos títulos da coluna A (como o teste de
-paridade): “Meta…” (quantidade em B), blocos “N. Nome” → “Unidades previstas” →
+paridade): “Meta…” (quantidade em B), blocos “Nome da etapa” → “Unidades previstas” →
 “Subatividade” (cabeçalho) → atividades (A nome, B tempo ideal, D peças) → “Total da
-etapa…”. Na aba “Equipe”: “Pessoas montando” e “Horas de trabalho por dia”.
+etapa…”. Na aba “Equipe”: “Pessoas montando” e “Horas de trabalho por dia” (e, na
+exportação do site, “Início do projeto” e “Prazo de entrega”).
 
 Segurança: tamanho limitado (``IMPORT_MAX_BYTES``), tipo conferido pela extensão E pelo
-conteúdo (XLSX = zip; o tamanho descompactado é conferido antes de abrir, contra zip bomb),
-nada é gravado em disco, fórmulas não são avaliadas (só o valor em cache).
+conteúdo (XLSX = zip; o tamanho descompactado é conferido antes de abrir, contra zip bomb;
+DTD/entidades e senha recusados), nada é gravado em disco, fórmulas não são avaliadas (só o
+valor em cache).
 """
 
 from __future__ import annotations
 
 import csv
 import io
-import re
 import uuid
 import zipfile
 from dataclasses import asdict, dataclass, field
@@ -60,8 +64,10 @@ SOURCE_CSV = "csv"
 SOURCE_XLSX = "xlsx"
 SOURCE_REFERENCE = "planilha"
 
+MODE_DETAILED = "detalhado"
+MODE_SIMPLE = "simples"
+
 REQUIRED = (COL_STAGE, COL_ACTIVITY, COL_MINUTES)
-TITULO_ETAPA = re.compile(r"^\s*\d+\.\s")
 
 
 class ImportError_(Exception):
@@ -89,6 +95,13 @@ class ImportResult:
     hours_per_day: Decimal = Decimal("8")
     stages: list[NewStage] = field(default_factory=list)
     errors: list[RowError] = field(default_factory=list)
+    # R7: avisos que não impedem a gravação (ex.: “meta não informada, usamos 100”).
+    notes: list[str] = field(default_factory=list)
+    # R7: "detalhado" (subatividades) ou "simples" (só etapa + %). TODO(R4): o modelo ainda
+    # não tem o modo; um projeto "simples" é gravado com UMA subatividade por etapa, com o
+    # nome da etapa e as peças = % × meta. Quando a R4 criar ``Project.mode``, ``save`` deve
+    # gravar o modo e o % direto da etapa em vez da subatividade substituta.
+    mode: str = MODE_DETAILED
 
     @property
     def ok(self) -> bool:
@@ -302,8 +315,64 @@ def _read_activity(
     return NewActivity(name=name, ideal_minutes=minutes, units_done=units) if ok else None
 
 
-def parse_csv(data: bytes) -> ImportResult:
-    result = ImportResult(source=SOURCE_CSV)
+# ---------------------------------------------------------------- grade em memória (R7)
+#
+# Todo arquivo aceito vira uma ``Grid``: abas com as linhas de valores (texto, número, data),
+# já com tetos de linhas/colunas. A detecção automática (formato do site, planilha de
+# referência) e o mapeamento de colunas (``import_mapping``) leem a mesma grade, que também
+# pode ir assinada no formulário entre a etapa de colunas e a prévia (nada vai para o disco).
+
+MAX_GRID_ROWS = 5000
+MAX_GRID_COLS = 60
+MAX_GRID_SHEETS = 30
+
+
+@dataclass
+class Sheet:
+    title: str
+    rows: list[list]
+    # Número da linha no arquivo de cada item de ``rows`` (no CSV, um campo entre aspas pode
+    # ocupar várias linhas; no XLSX é sempre índice + 1).
+    lines: list[int] | None = None
+
+    @property
+    def max_row(self) -> int:
+        return len(self.rows)
+
+    def value(self, row: int, col: int):
+        """Valor da célula (1-based, como no Excel); fora da grade = None."""
+        if 1 <= row <= len(self.rows):
+            values = self.rows[row - 1]
+            if 1 <= col <= len(values):
+                return values[col - 1]
+        return None
+
+    def line(self, index: int) -> int:
+        """Linha no arquivo do item ``index`` (0-based) de ``rows``."""
+        if self.lines and index < len(self.lines):
+            return self.lines[index]
+        return index + 1
+
+
+@dataclass
+class Grid:
+    kind: str  # SOURCE_CSV | SOURCE_XLSX
+    filename: str
+    sheets: list[Sheet]
+
+    def sheet(self, title: str | None) -> Sheet | None:
+        if title is None:
+            return self.sheets[0] if self.sheets else None
+        return next((s for s in self.sheets if s.title == title), None)
+
+
+def _trim(values: list) -> list:
+    while values and (values[-1] is None or (isinstance(values[-1], str) and not values[-1].strip())):
+        values.pop()
+    return values
+
+
+def _csv_grid(data: bytes, filename: str = "") -> Grid:
     if b"\x00" in data:
         raise ImportError_("O arquivo não parece um CSV de texto.")
     try:
@@ -313,19 +382,108 @@ def parse_csv(data: bytes) -> ImportResult:
     first_line = text.split("\n", 1)[0]
     delimiter = max((";", ",", "\t"), key=first_line.count)
     reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter)
+    rows: list[list] = []
+    lines: list[int] = []
     try:
-        header = next(reader)
-    except StopIteration:
-        result.error(1, "arquivo", "vazio")
-        return result
-    rows = ((reader.line_num, row) for row in reader)
-    try:
-        return _parse_flat(result, header, rows)
+        for row in reader:
+            if len(rows) >= MAX_GRID_ROWS:
+                break
+            rows.append(list(row[:MAX_GRID_COLS]))
+            lines.append(reader.line_num)
     except csv.Error as exc:  # pragma: no cover - CSV malformado raro
         raise ImportError_(f"CSV inválido: {exc}") from None
+    return Grid(SOURCE_CSV, filename, [Sheet("CSV", rows, lines)])
 
 
-# ---------------------------------------------------------------- XLSX
+def _cell_value(value):
+    """Valores do openpyxl para a grade: só tipos simples (vão em JSON no formulário)."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, datetime):
+        return value.date() if value.time() == datetime.min.time() else value
+    if isinstance(value, date):
+        return value
+    return str(value)
+
+
+def _xlsx_grid(data: bytes, filename: str = "") -> Grid:
+    wb = _open_workbook(data)
+    sheets = []
+    for ws in wb.worksheets[:MAX_GRID_SHEETS]:
+        rows = [
+            _trim([_cell_value(v) for v in values])
+            for values in ws.iter_rows(
+                min_row=1,
+                max_row=min(ws.max_row or 1, MAX_GRID_ROWS),
+                max_col=min(ws.max_column or 1, MAX_GRID_COLS),
+                values_only=True,
+            )
+        ]
+        while rows and not rows[-1]:
+            rows.pop()
+        sheets.append(Sheet(str(ws.title), rows))
+    return Grid(SOURCE_XLSX, filename, sheets)
+
+
+def load_grid(filename: str, data: bytes, max_bytes: int) -> Grid:
+    """Confere tamanho e tipo (extensão + conteúdo) e lê o arquivo em memória numa grade."""
+    if not data:
+        raise ImportError_("Escolha um arquivo .csv ou .xlsx.")
+    if len(data) > max_bytes:
+        raise ImportError_(f"Arquivo maior que {max_bytes // (1024 * 1024)} MB.")
+    ext = (filename or "").rsplit(".", 1)[-1].lower() if "." in (filename or "") else ""
+    is_zip = data[:4] == b"PK\x03\x04"
+    if ext == "xlsx" and is_zip:
+        return _xlsx_grid(data, filename)
+    if ext == "csv" and not is_zip:
+        return _csv_grid(data, filename)
+    raise ImportError_("Envie um arquivo .csv ou .xlsx (o conteúdo precisa bater com a extensão).")
+
+
+# ---------------------------------------------------------------- formatos reconhecidos sozinhos
+
+SITE_HEADER = frozenset(_norm_header(c) for c in (COL_STAGE, COL_ACTIVITY, COL_MINUTES))
+SITE_HEADER_FULL = SITE_HEADER | {_norm_header(COL_PROJECT), _norm_header(COL_QUANTITY)}
+
+
+def _flat_rows(sheet: Sheet):
+    return ((sheet.line(i), list(values)) for i, values in enumerate(sheet.rows) if i > 0)
+
+
+def auto_parse(grid: Grid, strict: bool = True) -> ImportResult | None:
+    """Formatos que o sistema reconhece sem mapeamento: CSV/XLSX do próprio site (cabeçalho na
+    linha 1) e a planilha de referência (blocos de etapa). ``None`` = precisa mapear colunas.
+
+    ``strict=False`` mantém o comportamento antigo de ``parse_upload``: sem formato
+    reconhecido, devolve os erros do formato mais provável (CSV do site ou referência)."""
+    header_set = SITE_HEADER_FULL if strict else SITE_HEADER
+    for sheet in grid.sheets:
+        header = sheet.rows[0] if sheet.rows else []
+        if {_norm_header(h) for h in header} >= header_set:
+            return _parse_flat(ImportResult(source=grid.kind), header, _flat_rows(sheet))
+    if grid.kind == SOURCE_XLSX:
+        if not strict or any(_find_blocks(s) for s in grid.sheets):
+            return parse_reference(grid)
+        return None
+    if strict:
+        return None
+    result = ImportResult(source=SOURCE_CSV)
+    sheet = grid.sheets[0]
+    if not sheet.rows:
+        result.error(1, "arquivo", "vazio")
+        return result
+    return _parse_flat(result, sheet.rows[0], _flat_rows(sheet))
+
+
+def parse_csv(data: bytes) -> ImportResult:
+    return auto_parse(_csv_grid(data), strict=False)
+
+
+def parse_xlsx(data: bytes) -> ImportResult:
+    return auto_parse(_xlsx_grid(data), strict=False)
+
+
+# ---------------------------------------------------------------- XLSX (proteções)
 
 
 _DTD_MARKERS = tuple(
@@ -382,25 +540,19 @@ def _open_workbook(data: bytes):
         raise ImportError_("Não foi possível ler a planilha .xlsx.") from None
 
 
-def parse_xlsx(data: bytes) -> ImportResult:
-    wb = _open_workbook(data)
-    # 1) XLSX exportado pelo site: primeira linha com os cabeçalhos conhecidos.
-    for ws in wb.worksheets:
-        header = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1), [])]
-        if {_norm_header(h) for h in header} >= {_norm_header(c) for c in (COL_STAGE, COL_ACTIVITY, COL_MINUTES)}:
-            rows = ((r_idx, list(values)) for r_idx, values in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2))
-            return _parse_flat(ImportResult(source=SOURCE_XLSX), header, rows)
-    # 2) Planilha de referência (layout pelos títulos da coluna A).
-    return parse_reference(wb)
+# ---------------------------------------------------------------- planilha de referência
 
 
-def _a(ws, row: int) -> str:
-    return _clean(ws.cell(row, 1).value)
+def _a(ws: Sheet, row: int) -> str:
+    return _clean(ws.value(row, 1))
 
 
-def parse_reference(wb) -> ImportResult:
+def parse_reference(grid: Grid) -> ImportResult:
+    """Layout da planilha de referência (e da exportação “layout da base”, que é o mesmo):
+    título em A1, “Meta…” com a quantidade em B, blocos de etapa; na aba Equipe, pessoas,
+    horas por dia e (só na exportação do site) início e prazo."""
     result = ImportResult(source=SOURCE_REFERENCE)
-    ws = next((w for w in wb.worksheets if _find_blocks(w)), None)
+    ws = next((s for s in grid.sheets if _find_blocks(s)), None)
     if ws is None:
         result.error(1, "A", "nenhum bloco de etapa encontrado (título “N. Nome” seguido de “Unidades previstas”)")
         return result
@@ -410,23 +562,27 @@ def parse_reference(wb) -> ImportResult:
         result.error(1, "A", "linha “Meta…” (quantidade prevista) não encontrada")
     else:
         try:
-            result.quantity = _int(ws.cell(meta_row, 2).value)
+            result.quantity = _int(ws.value(meta_row, 2))
             if not 1 <= result.quantity <= MAX_QUANTITY:
                 raise ValueError
         except ValueError:
             result.error(meta_row, "B (meta)", f"número inteiro entre 1 e {MAX_QUANTITY}")
-    team = next((w for w in wb.worksheets if w.title.casefold() == "equipe"), None)
+    team = next((s for s in grid.sheets if s.title.casefold() == "equipe"), None)
     if team is not None:
         for r in range(1, min(team.max_row, 60) + 1):
             title = _a(team, r).casefold()
-            value = team.cell(r, 2).value
+            value = team.value(r, 2)
             try:
                 if title.startswith("pessoas montando"):
                     result.people = _int(value)
                 elif title.startswith("horas de trabalho por dia"):
                     result.hours_per_day = _decimal(value).quantize(Decimal("0.01"))
-            except ValueError:
-                result.error(r, f"Equipe!B ({_a(team, r)})", "número inválido")
+                elif title.startswith("início do projeto"):
+                    result.start_date = _date(value)
+                elif title.startswith("prazo de entrega"):
+                    result.due_date = _date(value)
+            except (ValueError, InvalidOperation):
+                result.error(r, f"Equipe!B ({_a(team, r)})", "valor inválido")
     for title_row, first, total in _find_blocks(ws):
         stage = NewStage(name=_a(ws, title_row)[:160], activities=[])
         for r in range(first, total):
@@ -434,10 +590,12 @@ def parse_reference(wb) -> ImportResult:
             if not name:
                 continue
             activity = _read_activity(
-                result, r, name[:160], ws.cell(r, 2).value, ws.cell(r, 4).value, blank_is_zero=True
+                result, r, name[:160], ws.value(r, 2), ws.value(r, 4), blank_is_zero=True
             )
             if activity is not None:
                 stage.activities.append(activity)
+        if len(stage.activities) > MAX_ACTIVITIES_PER_STAGE:
+            result.error(title_row, "A", f"mais de {MAX_ACTIVITIES_PER_STAGE} atividades na etapa")
         result.stages.append(stage)
         if len(result.stages) > MAX_STAGES:
             result.error(title_row, "A", f"mais de {MAX_STAGES} etapas")
@@ -445,23 +603,24 @@ def parse_reference(wb) -> ImportResult:
     return result
 
 
-def _find_blocks(ws) -> list[tuple[int, int, int]]:
-    """(linha do título, primeira linha de atividade, linha “Total da etapa”) de cada bloco."""
+def _find_blocks(ws: Sheet) -> list[tuple[int, int, int]]:
+    """(linha do título, primeira linha de atividade, linha “Total da etapa”) de cada bloco.
+
+    Título: qualquer texto na coluna A (a referência usa “N. Nome”; a exportação do site
+    escreve o nome da etapa como está) seguido de “Unidades previstas” e “Subatividade”."""
     blocks = []
     r = 1
-    max_row = min(ws.max_row, 5000)
+    max_row = min(ws.max_row, MAX_GRID_ROWS)
     while r <= max_row:
-        title = ws.cell(r, 1).value
         if (
-            isinstance(title, str)
-            and TITULO_ETAPA.match(title)
+            _a(ws, r)
             and _a(ws, r + 1).startswith("Unidades previstas")
             and _a(ws, r + 2).startswith("Subatividade")
         ):
             total = r + 3
             while total <= max_row and not _a(ws, total).startswith("Total da etapa"):
                 total += 1
-            if total > max_row or total - r > MAX_ACTIVITIES_PER_STAGE:
+            if total > max_row or total - r > MAX_ACTIVITIES_PER_STAGE + 20:
                 break
             blocks.append((r, r + 3, total))
             r = total + 1
@@ -474,18 +633,9 @@ def _find_blocks(ws) -> list[tuple[int, int, int]]:
 
 
 def parse_upload(filename: str, data: bytes, max_bytes: int) -> ImportResult:
-    """Confere tamanho e tipo (extensão + conteúdo) e lê o arquivo em memória."""
-    if not data:
-        raise ImportError_("Escolha um arquivo .csv ou .xlsx.")
-    if len(data) > max_bytes:
-        raise ImportError_(f"Arquivo maior que {max_bytes // (1024 * 1024)} MB.")
-    ext = (filename or "").rsplit(".", 1)[-1].lower() if "." in (filename or "") else ""
-    is_zip = data[:4] == b"PK\x03\x04"
-    if ext == "xlsx" and is_zip:
-        return parse_xlsx(data)
-    if ext == "csv" and not is_zip:
-        return parse_csv(data)
-    raise ImportError_("Envie um arquivo .csv ou .xlsx (o conteúdo precisa bater com a extensão).")
+    """Confere tamanho e tipo (extensão + conteúdo) e lê o arquivo em memória (só os formatos
+    reconhecidos sozinhos; para mapear colunas, ``load_grid`` + ``import_mapping``)."""
+    return auto_parse(load_grid(filename, data, max_bytes), strict=False)
 
 
 # ---------------------------------------------------------------- pré-visualização ↔ gravação
@@ -495,6 +645,7 @@ def to_payload(result: ImportResult) -> dict:
     """Dados já validados, em JSON (vão assinados no formulário de confirmação)."""
     data = asdict(result)
     data.pop("errors")
+    data.pop("notes")
     data["start_date"] = result.start_date.isoformat() if result.start_date else None
     data["due_date"] = result.due_date.isoformat() if result.due_date else None
     data["hours_per_day"] = str(result.hours_per_day)
@@ -508,6 +659,7 @@ def from_payload(data: dict) -> ImportResult:
     """Reconstrói o resultado e REVALIDA (não confia só na assinatura)."""
     result = ImportResult(source=str(data.get("source", SOURCE_CSV)))
     result.name = str(data.get("name", ""))[:160]
+    result.mode = MODE_SIMPLE if data.get("mode") == MODE_SIMPLE else MODE_DETAILED
     try:
         result.quantity = int(data.get("quantity", 0))
         result.start_date = date.fromisoformat(data["start_date"]) if data.get("start_date") else None
@@ -577,7 +729,7 @@ def save(company: Company, result: ImportResult, user_id: uuid.UUID | None, name
         actor_user_id=user_id,
         object_type="project",
         object_id=project.id,
-        details={"source": result.source, "stages": len(result.stages), "activities": result.activity_count},
+        details={"source": result.source, "mode": result.mode, "stages": len(result.stages), "activities": result.activity_count},
     )
     db.session.flush()
     return project

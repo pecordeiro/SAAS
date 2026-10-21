@@ -137,6 +137,34 @@ class TemplateForm(BaseForm):
 class ImportForm(BaseForm):
     file = FileField("Arquivo (.csv ou .xlsx)")
     name = StringField("Nome do projeto", filters=[_strip], validators=[Optional(), Length(max=160)])
+    # R7: mesmo num formato reconhecido sozinho, a pessoa pode preferir escolher as colunas.
+    map_columns = BooleanField("Quero escolher as colunas")
+
+
+def _column_choice(label: str) -> SelectField:
+    return SelectField(label, choices=[], validate_choice=False, default="")
+
+
+class ImportMapForm(BaseForm):
+    """R7 — etapa 2 da importação com mapeamento. ``grid`` é a planilha lida na etapa 1,
+    ASSINADA (empresa + usuário + validade); os campos de coluna levam o índice (0-based) ou
+    vazio (“não usar”). Os nomes dos campos são as chaves de ``import_mapping.FIELDS``."""
+
+    grid = HiddenField(validators=[DataRequired()])
+    current_sheet = HiddenField()
+    sheet = SelectField("Aba", choices=[], validate_choice=False)
+    header_row = IntegerField("Linha do cabeçalho", validators=[Optional(), NumberRange(min=1, max=5000)])
+    etapa = _column_choice("Etapa")
+    subatividade = _column_choice("Subatividade")
+    tempo = _column_choice("Tempo ideal (min)")
+    previstas = _column_choice("Previstas (meta)")
+    concluidas = _column_choice("Concluídas (peças)")
+    percentual = _column_choice("% concluído")
+    prazo = _column_choice("Prazo (data)")
+    quantity = IntegerField("Meta (unidades previstas)", validators=[Optional(), NumberRange(min=1, max=100000)])
+    name = StringField("Nome do projeto", filters=[_strip], validators=[Optional(), Length(max=160)])
+    # Botões ``name="action"``: “ver” relê a aba/cabeçalho; “previa” (padrão) gera a prévia.
+    action = StringField(validators=[Optional(), AnyOf(["previa", "ver"])])
 
 
 class ImportConfirmForm(BaseForm):
