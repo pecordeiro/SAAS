@@ -42,6 +42,7 @@
 {%- if current_membership and current_membership.has_role("supervisor") -%}
   {%- set _ = nav_settings.append({"key": "templates", "label": "Modelos", "href": url_for("modelos.index")}) -%}
   {%- set _ = nav_settings.append({"key": "alerts", "label": "Alertas", "href": url_for("app.alerts")}) -%}
+  {%- set _ = nav_settings.append({"key": "spreadsheet", "label": "Planilha", "href": url_for("dados.import_upload")}) -%}
 {%- endif -%}
 {%- if config.get("FEATURE_PUBLIC_API") and current_membership and current_membership.has_role("owner") -%}
   {%- set _ = nav_settings.append({"key": "api", "label": "API", "href": url_for("api_tokens_ui.tokens_index")}) -%}

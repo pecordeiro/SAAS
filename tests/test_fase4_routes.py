@@ -3,6 +3,8 @@ novo projeto a partir de modelo, edição, desfazer, importar e exportar."""
 
 from __future__ import annotations
 
+import re
+
 import io
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -286,7 +288,8 @@ def test_importar_erros_pelas_telas(client, app, tenants, monkeypatch):
         ["L;2;E;B;1"] * 4) + "\r\nL;2;E;C;dez\r\n").encode()
     response = _upload(client, app, "x.csv", bad)
     assert response.status_code == 400
-    assert "Linha 7, tempo ideal: número inválido" in text_of(response) and "Nada foi gravado" in text_of(response)
+    # R7 (tela): erros por linha numa tabela (Linha · Coluna · Problema)
+    assert re.search(r"Linha 7\s+tempo ideal\s+número inválido", text_of(response)) and "Nada foi gravado" in text_of(response)
     assert _upload(client, app, "x.txt", b"oi").status_code == 400
     assert post(client, app, "/app/importar", {}, content_type="multipart/form-data").status_code == 400
     big = _upload(client, app, "x.csv", b"x" * (3 * 1024 * 1024))
@@ -304,7 +307,7 @@ def test_importar_planilha_de_referencia_pela_tela(client, app, tenants):
     response = _upload(client, app, "acompanhamento_montagem_v4.xlsx", XLSX.read_bytes(), {"name": "SoBot"})
     page = text_of(response)
     assert response.status_code == 200
-    assert "Planilha de referência" in page and "24 etapas" in page and "Montagem do Suporte de Manutenção" in page
+    assert "planilha de acompanhamento reconhecido" in page and "24 etapas" in page and "Montagem do Suporte de Manutenção" in page
     assert _count(app, Project, company_id=a.company_id) == 1  # nada gravado antes de confirmar
 
 

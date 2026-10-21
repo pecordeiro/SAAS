@@ -6,6 +6,7 @@
 {% from "components/empty_state.html" import empty_state %}
 {% from "components/badge.html" import badge %}
 {% from "components/pagination.html" import pagination %}
+{% from "components/export_menu.html" import export_menu %}
 {% set general = general | default(false) %}
 {% set nav_current = "history" %}
 {% if project %}{% set nav_project = project %}{% endif %}
@@ -24,8 +25,10 @@
   </div>
   {%- if project and can_undo %}
   <div class="page-header__actions">
-    {{ button("Exportar CSV", "secondary", icon="download", href=url_for('dados.export_csv', project_id=project.id), class_="only-desktop") }}
-    {{ button("Exportar XLSX", "secondary", icon="download", href=url_for('dados.export_xlsx', project_id=project.id), class_="only-desktop") }}
+    {{ export_menu(project) }}
+    {%- if not project.archived_at %}
+    {{ button("Restaurar para uma data", "secondary", icon="history", href=url_for('edicao.project_restore', project_id=project.id)) }}
+    {%- endif %}
   </div>
   {%- endif %}
 </header>
@@ -83,7 +86,8 @@
       <td class="history-row__qty is-num is-plain">{% if e.id in undone %}<s>{{ "%+d"|format(e.delta) }}</s>{% else %}{{ "%+d"|format(e.delta) }}{% endif %}</td>
       <td class="history-row__range is-num is-plain muted">{% if tot %}{{ tot[0] }} → {{ tot[1] }} de {{ e.activity.stage.project.quantity }}{% endif %}</td>
       <td class="is-plain">
-        {%- if e.reverts_entry_id %}{{ badge("desfazer", "neutral") }}
+        {%- if e.restore_id %}{{ badge("desfaz restauração" if e.restore_undoes_id else "restauração", "info", icon_name="history") }}
+        {%- elif e.reverts_entry_id %}{{ badge("desfazer", "neutral") }}
         {%- elif e.id in undone %}{{ badge("desfeito", "neutral") }}{% set rev = undone_by.get(e.id) %}{% if rev %} <span class="muted text-sm history-row__undone-by">por {{ rev.user.name if rev.user else "—" }}</span>{% endif %}
         {%- elif can_undo and e.delta > 0 and not e.restore_id and not e.activity.archived_at and not e.activity.stage.archived_at and not e.activity.stage.project.archived_at %}<a class="btn btn--ghost" href="{{ url_for('edicao.entry_undo', entry_id=e.id) }}">Desfazer</a>
         {%- endif %}

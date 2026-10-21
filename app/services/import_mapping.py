@@ -159,6 +159,45 @@ def suggest(headers: list) -> dict[str, int | None]:
     return mapping
 
 
+# Rótulos do select “Isto é…” da tela (uma escolha por COLUNA; R7 — tela). A ordem é a da tela.
+COLUMN_CHOICES: tuple[tuple[str, str], ...] = (
+    (F_STAGE, "Etapa"),
+    (F_ACTIVITY, "Subatividade (opcional)"),
+    (F_MINUTES, "Tempo ideal em min (opcional)"),
+    (F_PLANNED, "Previstas / meta (opcional)"),
+    (F_DONE, "Concluídas (opcional)"),
+    (F_PCT, "% da etapa (opcional)"),
+    (F_DUE, "Prazo (opcional)"),
+)
+COLUMN_PREFIX = "col_"
+
+
+def mapping_from_columns(values: dict[int, str]) -> tuple[dict[str, int | None], list[str]]:
+    """Inverte a escolha da tela (coluna ↦ campo) para o mapeamento (campo ↦ coluna).
+
+    ``values``: índice da coluna (0-based) ↦ chave do campo (vazio = não usar). Um campo em
+    duas colunas é erro (a pessoa escolhe uma); chave desconhecida é ignorada."""
+    mapping: dict[str, int | None] = {k: None for k in FIELD_KEYS}
+    errors: list[str] = []
+    for idx in sorted(values):
+        key = values[idx]
+        if key not in FIELD_LABELS:
+            continue
+        if mapping[key] is not None:
+            first = get_column_letter(mapping[key] + 1)
+            errors.append(
+                f"{FIELD_LABELS[key]} está em duas colunas ({first} e {get_column_letter(idx + 1)}). Escolha uma."
+            )
+            continue
+        mapping[key] = idx
+    return mapping, errors
+
+
+def mode_of(mapping: dict[str, int | None]) -> str:
+    """Modo que o mapeamento produz: com subatividade, detalhado; sem, simples."""
+    return MODE_DETAILED if mapping.get(F_ACTIVITY) is not None else MODE_SIMPLE
+
+
 # ---------------------------------------------------------------- etapa 1: inspeção
 
 

@@ -16,9 +16,12 @@
     <p class="painel-header__frase">{{ frase }}</p>
     <p class="painel-header__meta">Atualizado às <time datetime="{{ updated_at.isoformat(timespec='minutes') }}">{{ updated_at.strftime("%H:%M") }}</time></p>
   </div>
-  {%- if fill_href %}
+  {%- if fill_href or caller is defined %}
   <div class="page-header__actions">
+    {%- if caller is defined %}{{ caller() }}{% endif %}
+    {%- if fill_href %}
     <a class="btn btn--primary" href="{{ fill_href }}">{{ icon("edit", class_="btn__icon") }}<span class="btn__label">Preencher etapas</span></a>
+    {%- endif %}
   </div>
   {%- endif %}
 </header>

@@ -52,6 +52,12 @@ def too_large(err):
 
     key = "PHOTO_MAX_BYTES" if request.endpoint == "qualidade.photo_upload" else "IMPORT_MAX_BYTES"
     limit = int(current_app.config.get(key, 2 * 1024 * 1024))
+    if request.endpoint == "dados.import_upload" and getattr(g, "company", None) is not None:
+        # R7: no passo 1 da importação, o aviso fica na própria tela.
+        return _page(ImportForm(formdata=None), 413, upload_error=(
+            f"Arquivo grande demais: o limite é {limit // (1024 * 1024)} MB. "
+            "Deixe só a aba com os dados e envie de novo."
+        ))
     return render_template("errors/400.html", message=f"Arquivo grande demais (máximo {limit // (1024 * 1024)} MB)."), 413
 
 
@@ -98,11 +104,19 @@ def import_template():
     return _download(exporter.template_csv(), "text/csv; charset=utf-8", "modelo-importacao.csv")
 
 
+def _limit_mb() -> int:
+    return int(current_app.config.get("IMPORT_MAX_BYTES", 2 * 1024 * 1024)) // (1024 * 1024)
+
+
 def _page(form, status=200, **ctx):
+    """Passo 1 (enviar) ou, com ``result``, passo 3 (prévia ou erros por linha)."""
     ctx.setdefault("result", None)
     ctx.setdefault("payload", None)
     ctx.setdefault("upload_error", None)
-    return render_template("dados/import.html", form=form, **ctx), status
+    ctx.setdefault("back", None)
+    ctx.setdefault("confirm", None)
+    ctx.setdefault("usage", None)
+    return render_template("dados/import.html", form=form, limit_mb=_limit_mb(), **ctx), status
 
 
 def _import_limit():
@@ -120,10 +134,10 @@ def import_upload():
         return _page(form, 400)
     limit = int(current_app.config.get("IMPORT_MAX_BYTES", 2 * 1024 * 1024))
     if request.content_length and request.content_length > limit + 64 * 1024:
-        return _page(form, 413, upload_error=f"Arquivo maior que {limit // (1024 * 1024)} MB.")
+        return _page(form, 413, upload_error=f"Arquivo grande demais: o limite é {limit // (1024 * 1024)} MB. Deixe só a aba com os dados e envie de novo.")
     upload = request.files.get("file")
     if upload is None or not upload.filename:
-        return _page(form, 400, upload_error="Escolha um arquivo .csv ou .xlsx.")
+        return _page(form, 400, upload_error="Escolha um arquivo .xlsx ou .csv para enviar.")
     data = upload.stream.read(limit + 1)
     try:
         grid = importer.load_grid(upload.filename, data, limit)
@@ -135,23 +149,24 @@ def import_upload():
     return _preview(form, result, form.name.data)
 
 
-def _preview(form, result, name, status_error=400):
-    """Prévia (ou erros) de um ``ImportResult``: o mesmo caminho para os dois fluxos."""
+def _preview(form, result, name, status_error=400, back=None):
+    """Prévia (ou erros) de um ``ImportResult``: o mesmo caminho para os dois fluxos.
+    ``back`` (fluxo de colunas): dados para o botão “Voltar às colunas” sem reenviar o arquivo."""
     if not result.ok:
-        return _page(form, status_error, result=result)
+        return _page(form, status_error, result=result, back=back)
     payload = _serializer().dumps(
         {"c": str(g.company.id), "u": str(current_user.id), "d": importer.to_payload(result)}
     )
     confirm = ImportConfirmForm(formdata=None, data={"payload": payload, "name": name or result.name})
     usage = entitlements.usage(g.company)
-    return _page(form, result=result, confirm=confirm, usage=usage)
+    return _page(form, result=result, confirm=confirm, usage=usage, back=back)
 
 
 # ---------------------------------------------------------------- R7: mapeamento de colunas
 
 
 def _mapping_page(grid, *, name=None, sheet=None, header_row=None, chosen=None, token=None, quantity=None,
-                  result=None, status=200):
+                  result=None, status=200, map_errors=None):
     inspection = mapping_svc.inspect(grid, sheet, header_row)
     if token is None:
         token = _grid_serializer().dumps(
@@ -174,9 +189,42 @@ def _mapping_page(grid, *, name=None, sheet=None, header_row=None, chosen=None, 
     choices = [("", "— não usar —")] + [(str(c.index), c.label) for c in inspection.columns]
     for key in mapping_svc.FIELD_KEYS:
         getattr(form, key).choices = choices
+    # Na tela a escolha é por COLUNA (“Isto é…”): coluna ↦ campo.
+    column_field = {idx: key for key, idx in selected.items() if isinstance(idx, int) and idx >= 0}
     return render_template(
-        "dados/import_map.html", form=form, inspection=inspection, fields=mapping_svc.FIELDS, result=result,
+        "dados/import_map.html", form=form, inspection=inspection, result=result,
+        column_field=column_field, column_choices=mapping_svc.COLUMN_CHOICES,
+        mode=mapping_svc.mode_of(selected), has_stage=selected.get(mapping_svc.F_STAGE) is not None,
+        map_errors=map_errors or [], limit_mb=_limit_mb(),
     ), status
+
+
+def _columns_from_form(values) -> dict[int, str] | None:
+    """``col_<índice>`` = chave do campo (a escolha da tela). ``None`` se o formulário não traz
+    nenhuma (formato antigo: um select por campo, ``etapa=<índice>``)."""
+    out: dict[int, str] = {}
+    for key, value in values.items():
+        if not key.startswith(mapping_svc.COLUMN_PREFIX):
+            continue
+        try:
+            idx = int(key[len(mapping_svc.COLUMN_PREFIX):])
+        except ValueError:
+            continue
+        if 0 <= idx < importer.MAX_GRID_COLS:
+            out[idx] = (value or "").strip()
+    return out or None
+
+
+@bp.get("/importar/colunas/modo")
+@tenant_required(ROLE_SUPERVISOR)
+def import_columns_mode():
+    """Aviso do modo (simples × detalhado) para a escolha atual das colunas — o servidor decide,
+    a tela só troca o trecho (HTMX). Não lê nem grava dados da empresa."""
+    mapping, errors = mapping_svc.mapping_from_columns(_columns_from_form(request.args) or {})
+    return render_template(
+        "dados/_import_mode.html", mode=mapping_svc.mode_of(mapping),
+        has_stage=mapping.get(mapping_svc.F_STAGE) is not None, map_errors=errors,
+    )
 
 
 def _int_or_none(value):
@@ -204,19 +252,33 @@ def import_columns():
         sheet = form.sheet.data or None
         same_sheet = sheet == (form.current_sheet.data or None)
         header_row = form.header_row.data if same_sheet else None
-        chosen = {k: _int_or_none(getattr(form, k).data) for k in mapping_svc.FIELD_KEYS}
+        by_column = _columns_from_form(request.form)
+        if by_column is None:
+            chosen, map_errors = {k: _int_or_none(getattr(form, k).data) for k in mapping_svc.FIELD_KEYS}, []
+        else:
+            chosen, map_errors = mapping_svc.mapping_from_columns(by_column)
         common = {"name": form.name.data, "sheet": sheet, "token": form.grid.data, "quantity": form.quantity.data}
         if form.action.data == "ver" or not same_sheet:
             return _mapping_page(grid, header_row=header_row, chosen=chosen if same_sheet else None, **common)
         inspection = mapping_svc.inspect(grid, sheet, header_row)
+        if map_errors:
+            return _mapping_page(grid, header_row=inspection.header_row, chosen=chosen, map_errors=map_errors,
+                                 status=400, **common)
         result = mapping_svc.parse_mapped(
             grid, inspection.sheet, inspection.header_row, chosen, quantity=form.quantity.data, name=form.name.data
         )
-        if not result.ok:
-            return _mapping_page(grid, header_row=inspection.header_row, chosen=chosen, result=result, status=400, **common)
+        if not result.ok and all(e.column in ("colunas", "aba") for e in result.errors):
+            # Erro de mapeamento (coluna repetida, sem etapa): fica no passo 2.
+            return _mapping_page(grid, header_row=inspection.header_row, chosen=chosen,
+                                 map_errors=[e.message for e in result.errors], status=400, **common)
     except importer.ImportError_ as exc:
         return _page(ImportForm(formdata=None), 400, upload_error=str(exc))
-    return _preview(ImportForm(formdata=None), result, form.name.data)
+    back = {
+        "grid": form.grid.data, "sheet": inspection.sheet, "header_row": inspection.header_row,
+        "columns": {idx: key for key, idx in chosen.items() if isinstance(idx, int) and idx >= 0},
+        "quantity": form.quantity.data, "name": form.name.data,
+    }
+    return _preview(ImportForm(formdata=None), result, form.name.data, back=back)
 
 
 @bp.post("/importar/confirmar")

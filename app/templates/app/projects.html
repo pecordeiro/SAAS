@@ -16,7 +16,7 @@
   {%- if can_create %}
   <div class="page-header__actions">
     {{ button("Exportar", "secondary", icon="download", href=url_for('app.projects_export', status=filters.status, prazo=filters.prazo or None, q=filters.q or None), class_="only-desktop") }}
-    {{ button("Importar", "secondary", href=url_for('dados.import_upload'), class_="only-desktop") }}
+    {{ button("Importar planilha", "secondary", icon="arrow-up", href=url_for('dados.import_upload'), class_="only-desktop") }}
     {{ button("Novo projeto", "primary", icon="plus", href=url_for('app.project_new'), class_="only-desktop") }}
     {{ button("Novo", "primary", icon="plus", href=url_for('app.project_new'), class_="only-mobile") }}
   </div>

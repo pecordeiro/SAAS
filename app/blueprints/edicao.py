@@ -10,9 +10,11 @@ arquivado = 404). Também registra, para o app inteiro, a resposta 402 de
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 from flask_login import current_user
+from sqlalchemy import select
 
 from app.extensions import db
 from app.formatting import br_number
@@ -27,7 +29,7 @@ from app.forms_production import (
     RenameForm,
     RestoreForm,
 )
-from app.models import ROLE_SUPERVISOR, Activity, Project, ProgressEntry, Stage
+from app.models import ROLE_SUPERVISOR, Activity, Project, ProgressEntry, Stage, User
 from app.services import entitlements
 from app.services import projects as svc
 from app.services import restore as rsvc
@@ -403,6 +405,14 @@ def entry_undo(entry_id):
 # ---------------------------------------------------------------- restaurar (R8)
 
 
+def _local_label(raw: str | None) -> str:
+    """``AAAA-MM-DDTHH:MM`` → ``21/10/2026 às 10:30`` (só formatação)."""
+    try:
+        return datetime.strptime(raw or "", rsvc.INPUT_FORMAT).strftime("%d/%m/%Y às %H:%M")
+    except ValueError:
+        return (raw or "").replace("T", " ")
+
+
 def _restore_page(project: Project, *, ate: str | None, status: int = 200, conflict: bool = False,
                   error: str | None = None):
     tz_name = g.company.timezone or rsvc.DEFAULT_TZ
@@ -410,18 +420,27 @@ def _restore_page(project: Project, *, ate: str | None, status: int = 200, confl
     if ate and error is None:
         at = rsvc.parse_local(ate, tz_name)
         if at is None:
-            error, status = "Data e hora inválidas. Use o formato AAAA-MM-DDTHH:MM.", 400
+            error, status = "Data e hora inválidas. Escolha o dia e a hora no campo.", 400
         else:
             preview = rsvc.restore_preview(project, at)
+    records = rsvc.restorations(project)
+    actor_ids = {r.log.actor_user_id for r in records if r.log.actor_user_id}
+    actors = (
+        {u.id: u.name for u in db.session.execute(select(User).where(User.id.in_(actor_ids))).scalars()}
+        if actor_ids else {}
+    )
     return (
         render_template(
             "edicao/restore.html",
             project=project,
             ate=ate if preview else None,
-            ate_label=(ate or "").replace("T", " "),
+            ate_label=_local_label(ate),
+            now_local=rsvc.format_local(datetime.now(timezone.utc), tz_name),
             tz_label=tz_name,
             preview=preview,
-            records=rsvc.restorations(project),
+            records=records,
+            record_labels={r.restore_id: _local_label(r.target) for r in records},
+            actors=actors,
             form=RestoreForm(formdata=None),
             confirm_form=ConfirmForm(formdata=None),
             conflict=conflict,
@@ -465,7 +484,7 @@ def project_restore_apply(project_id):
         return redirect(url_for("edicao.project_restore", project_id=project.id, ate=ate), 303)
     db.session.commit()
     flash(
-        f"Projeto restaurado para {ate.replace('T', ' ')}: {len(result.entries)} "
+        f"Projeto restaurado para {_local_label(ate)}: {len(result.entries)} "
         f"{'lançamento' if len(result.entries) == 1 else 'lançamentos'} no histórico.",
         "sucesso",
     )

@@ -4,90 +4,137 @@
 {% from "components/badge.html" import badge %}
 {% from "components/alert.html" import alert %}
 {% from "components/field.html" import checkbox %}
+{% from "components/modal.html" import confirm_dialog %}
+{% from "components/empty_state.html" import empty_state %}
 {% set nav_current = "history" %}
 {% set nav_project = project %}
-{% block title %}Restaurar · {{ project.name }}{% endblock %}
+{% block title %}Restaurar para uma data · {{ project.name }} · Controle de Produção{% endblock %}
 {% block content %}
-{# R8 (supervisor+), tela mínima: a tela definitiva vem com o visual novo. Todos os números
-   (peças no instante, resumo antes/depois) vêm do servidor (services/restore.py + calc.py). #}
+{#
+  R8 (supervisor+): voltar as peças do projeto para como estavam numa data e hora (fuso da
+  empresa). Prévia antes → depois por etapa e atividade + resumo do projeto; confirmar grava
+  lançamentos de restauração (o histórico não perde nada) e a restauração pode ser desfeita.
+  Todos os números (peças no instante, resumos) vêm do servidor (services/restore.py + calc.py).
+#}
 {%- set history_url = url_for('app.project_history', project_id=project.id) %}
 <header class="page-header">
   <div class="page-header__titles">
     <a class="back-link" href="{{ history_url }}">{{ icon("chevron-left") }}Histórico</a>
-    <h1>Restaurar o projeto</h1>
-    <p class="page-header__subtitle">{{ project.name }} · volta as peças das atividades para como estavam numa data e hora</p>
+    <h1>Restaurar para uma data</h1>
+    <p class="page-header__subtitle">{{ project.name }}</p>
   </div>
 </header>
 
 {%- if conflict %}
-{{ alert("warning", "O projeto mudou depois da prévia", "Confira a prévia atualizada abaixo e confirme de novo.", role="alert") }}
+<div class="mb-4">{{ alert("warning", "Algo mudou desde a prévia", "Alguém lançou peças depois que você abriu a prévia, então nada foi restaurado. Veja a prévia nova abaixo e confirme de novo.", role="alert") }}</div>
 {%- endif %}
 {%- if error %}
-{{ alert("danger", error, role="alert") }}
+<div class="mb-4">{{ alert("danger", error, role="alert") }}</div>
 {%- endif %}
 
-<form class="card stack" method="get" action="{{ url_for('edicao.project_restore', project_id=project.id) }}">
-  <div class="field">
-    <label class="field__label" for="ate">Data e hora ({{ tz_label }})</label>
-    <input class="field__input" type="datetime-local" id="ate" name="ate" value="{{ ate or '' }}" required>
-    <p class="field__hint">Só as peças concluídas voltam. Nomes, tempos, quantidade e etapas não mudam. Nada é apagado do histórico.</p>
+<form class="card stack restore-when" method="get" action="{{ url_for('edicao.project_restore', project_id=project.id) }}">
+  <h2 class="section-title">Para quando voltar</h2>
+  <div class="restore-when__row">
+    <div class="field restore-when__field">
+      <label class="field__label" for="ate">Data e hora</label>
+      <input class="field__input" type="datetime-local" id="ate" name="ate" value="{{ ate or '' }}" max="{{ now_local }}" required aria-describedby="ate-dica">
+    </div>
+    {{ button("Ver o que muda", "secondary" if preview else "primary") }}
   </div>
-  <div class="form-actions">{{ button("Ver o que muda", "secondary") }}</div>
+  <p class="field__hint" id="ate-dica">Hora de {{ tz_label|replace("_", " ") }}. Voltam só as peças concluídas de cada atividade; nomes, tempos, meta e etapas ficam como estão. O histórico não perde nada e dá para desfazer depois.</p>
 </form>
 
 {%- if preview %}
-<section class="card stack" aria-labelledby="previa-titulo">
-  <h2 class="section-title" id="previa-titulo">O que muda</h2>
-  <p>Progresso geral: {{ preview.before.progresso_geral|pct }} → <span class="text-strong">{{ preview.after.progresso_geral|pct }}</span>
-    · Unidades prontas: {{ preview.before.unidades_concluidas }} → <span class="text-strong">{{ preview.after.unidades_concluidas }}</span> de {{ project.quantity }}</p>
+<section class="card stack mt-6 restore-preview" aria-labelledby="previa-titulo">
+  <div class="import-head">
+    <h2 class="section-title" id="previa-titulo">O que muda</h2>
+    <p class="muted text-sm">Como o projeto ficaria se voltasse para {{ ate_label }}.</p>
+  </div>
+
+  <dl class="restore-summary">
+    {%- set b, a = preview.before, preview.after %}
+    {%- for label, before, after in [
+      ("Progresso geral", b.progresso_geral|pct, a.progresso_geral|pct),
+      ("Unidades prontas", b.unidades_concluidas ~ " de " ~ project.quantity, a.unidades_concluidas ~ " de " ~ project.quantity),
+      ("Tarefas concluídas", b.tarefas_concluidas ~ " de " ~ b.tarefas, a.tarefas_concluidas ~ " de " ~ a.tarefas),
+      ("Tempo que falta", b.tempo_restante_h|horas, a.tempo_restante_h|horas),
+    ] %}
+    <div class="restore-summary__item{% if before != after %} is-changed{% endif %}">
+      <dt>{{ label }}</dt>
+      <dd class="num"><span class="restore-summary__before">{{ before }}</span><span class="restore-summary__arrow" aria-label="vai para"> → </span><span class="restore-summary__after">{{ after }}</span></dd>
+    </div>
+    {%- endfor %}
+  </dl>
+
   {%- if not preview.changed %}
-  {{ alert("info", "Nada a restaurar", "Nesse momento o projeto já estava como está agora.") }}
+  {{ alert("info", "Nada a restaurar", "Em " ~ ate_label ~ " o projeto estava igual a agora. Escolha outra data e hora.") }}
   {%- else %}
+  {%- set changed_count = preview.changes|length %}
   <div class="table-wrap">
-    <table class="table">
-      <thead><tr><th scope="col">Etapa › atividade</th><th scope="col" class="is-num">Agora</th><th scope="col" class="is-num">Depois</th></tr></thead>
+    <table class="table table--cards restore-table">
+      <caption class="visually-hidden">Peças concluídas agora e depois de restaurar, por etapa e atividade</caption>
+      <thead><tr><th scope="col">Etapa › atividade</th><th scope="col" class="is-num">Agora</th><th scope="col" class="is-num">Depois</th><th scope="col" class="is-num">Diferença</th></tr></thead>
+      {%- for s in preview.stages if s.changed %}
       <tbody>
-        {%- for s in preview.stages if s.changed %}
-        <tr><th scope="row" colspan="3">{{ s.stage.name }} · {{ s.before.progresso|pct }} → {{ s.after.progresso|pct }}</th></tr>
-        {%- for a in s.activities if a.changed %}
-        <tr><td>{{ a.activity.name }}</td><td class="is-num">{{ a.current }}</td><td class="is-num text-strong">{{ a.target }} ({{ "%+d"|format(a.delta) }})</td></tr>
-        {%- endfor %}
+        <tr class="table__group"><th scope="rowgroup" colspan="4">{{ s.stage.name }} <span class="restore-table__stage num">{{ s.before.progresso|pct }} → {{ s.after.progresso|pct }}</span></th></tr>
+        {%- for d in s.activities if d.changed %}
+        <tr>
+          <td class="is-plain">{{ d.activity.name }}</td>
+          <td class="is-num" data-label="Agora">{{ d.current }}</td>
+          <td class="is-num restore-table__after" data-label="Depois">{{ d.target }}</td>
+          <td class="is-num" data-label="Diferença">{{ "%+d"|format(d.delta) }}</td>
+        </tr>
         {%- endfor %}
       </tbody>
+      {%- endfor %}
     </table>
   </div>
-  <form class="stack" method="post" action="{{ url_for('edicao.project_restore_apply', project_id=project.id) }}">
+  <p class="muted text-sm num">{{ changed_count }} {{ "atividade muda" if changed_count == 1 else "atividades mudam" }}; as outras ficam como estão.</p>
+  <form class="stack restore-confirm" method="post" action="{{ url_for('edicao.project_restore_apply', project_id=project.id) }}">
     {{ form.csrf_token }}
     <input type="hidden" name="ate" value="{{ ate }}">
     <input type="hidden" name="token" value="{{ preview.token }}">
-    {{ checkbox("confirm", "Confirmo: voltar o projeto para " ~ ate_label, value="y") }}
+    {{ checkbox("confirm", "Entendi: as peças voltam para " ~ ate_label ~ ", com um lançamento de restauração por atividade no histórico.", value="y") }}
     <div class="form-actions">
-      {{ button("Restaurar", "danger", size="lg") }}
-      {{ button("Cancelar", "secondary", size="lg", href=history_url) }}
+      {{ button("Restaurar o projeto", "primary") }}
+      {{ button("Cancelar", "ghost", href=history_url) }}
     </div>
   </form>
   {%- endif %}
 </section>
 {%- endif %}
 
-{%- if records %}
-<section class="card stack" aria-labelledby="rest-titulo">
-  <h2 class="section-title" id="rest-titulo">Restaurações deste projeto</h2>
-  <ul class="stack--sm">
-    {%- for r in records %}
-    <li class="cluster">
-      <span>{{ r.log.at|datahora }} · para {{ r.target|replace("T", " ") }} · {{ r.entries }} {{ "lançamento" if r.entries == 1 else "lançamentos" }}</span>
-      {%- if r.undone %}{{ badge("desfeita", "neutral") }}
-      {%- else %}
-      <form method="post" action="{{ url_for('edicao.project_restore_undo', project_id=project.id, restore_id=r.restore_id) }}" class="cluster">
-        {{ confirm_form.csrf_token }}
-        {{ checkbox("confirm", "Confirmo", value="y") }}
-        {{ button("Desfazer restauração", "secondary") }}
-      </form>
-      {%- endif %}
-    </li>
-    {%- endfor %}
-  </ul>
+<section class="card stack mt-6" aria-labelledby="rest-titulo">
+  <h2 class="section-title" id="rest-titulo">Restaurações deste projeto{% if records %} <span class="num muted">{{ records|length }}</span>{% endif %}</h2>
+  {%- if records %}
+  <div class="table-wrap">
+    <table class="table table--cards restore-list">
+      <caption class="visually-hidden">Restaurações feitas neste projeto, mais recentes primeiro</caption>
+      <thead><tr><th scope="col">Voltou para</th><th scope="col">Feita em</th><th scope="col">Por</th><th scope="col" class="is-num">Lançamentos</th><th scope="col"><span class="visually-hidden">Ação</span></th></tr></thead>
+      <tbody>
+        {%- for r in records %}
+        <tr>
+          <td class="is-plain num restore-list__target">{{ record_labels[r.restore_id] }}</td>
+          <td class="num" data-label="Feita em">{{ r.log.at|datahora }}</td>
+          <td data-label="Por">{{ actors.get(r.log.actor_user_id, "—") }}</td>
+          <td class="is-num" data-label="Lançamentos">{{ r.entries }}</td>
+          <td class="is-plain restore-list__action">
+            {%- if r.undone %}{{ badge("desfeita", "neutral") }}
+            {%- else %}<a class="btn btn--ghost" href="#desfazer-{{ r.restore_id }}" aria-haspopup="dialog">Desfazer restauração</a>{% endif %}
+          </td>
+        </tr>
+        {%- endfor %}
+      </tbody>
+    </table>
+  </div>
+  {%- else %}
+  {{ empty_state("Nenhuma restauração ainda", "Quando você restaurar o projeto para uma data, ela aparece aqui e pode ser desfeita.", icon="history") }}
+  {%- endif %}
 </section>
-{%- endif %}
+
+{%- for r in records if not r.undone %}
+{% call confirm_dialog("desfazer-" ~ r.restore_id, "Desfazer a restauração para " ~ record_labels[r.restore_id] ~ "?", "As peças que ela mudou voltam para como estavam antes dela. O que foi lançado depois continua. Tudo fica no histórico.", "Desfazer restauração", url_for('edicao.project_restore_undo', project_id=project.id, restore_id=r.restore_id), variant="primary") %}
+<input type="hidden" name="confirm" value="y">
+{% endcall %}
+{%- endfor %}
 {% endblock %}

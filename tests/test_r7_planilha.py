@@ -443,7 +443,9 @@ def test_importar_qualquer_planilha_pelas_telas(client, app, tenants):
     # troca de aba: relê e sugere as colunas da aba nova
     page = post(client, app, "/app/importar/colunas", {"grid": grid, "current_sheet": "Capa", "sheet": "Linha", "action": "ver"})
     assert page.status_code == 200 and "Serrar" in text_of(page)
-    assert re.search(r'<option selected value="0">|<option value="0" selected>', page.get_data(as_text=True))
+    # tela: um select “Isto é…” por coluna, com a sugestão já marcada (coluna A = Etapa)
+    assert re.search(r'<select[^>]*name="col_0"[^>]*>\s*<option value="">Não usar</option>\s*<option value="etapa" selected>',
+                     page.get_data(as_text=True))
     form = {"grid": grid, "current_sheet": "Linha", "sheet": "Linha", "header_row": 1, "etapa": "0",
             "subatividade": "1", "tempo": "2", "concluidas": "3", "previstas": "4", "name": "Linha 3"}
     preview = post(client, app, "/app/importar/colunas", form)

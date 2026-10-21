@@ -324,7 +324,7 @@ def test_fluxo_previa_aplicar_e_desfazer_pela_rota(client, app, routed):
     page = client.get(f"/app/projetos/{a.project_id}/restaurar?ate={ate}")
     assert page.status_code == 200
     html = text_of(page)
-    assert "Atividade 1" in html and "(-2)" in html
+    assert "Atividade 1" in html and 'data-label="Diferença">-2<' in html
     with app.app_context():
         token = rsvc.restore_preview(db.session.get(Project, a.project_id), rsvc.parse_local(ate, TZ)).token
     assert f'value="{token}"' in page.get_data(as_text=True)

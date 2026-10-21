@@ -340,6 +340,33 @@ def test_planilha_de_colunas_assinada_para_outra_empresa_e_recusada(client, app,
         assert _snapshot(a.company_id) == before_a and _snapshot(b.company_id) == before_b
 
 
+def test_aviso_do_modo_da_importacao_nao_le_dados_de_empresa(client, app, tenants4):
+    """R7 (tela): GET /app/importar/colunas/modo só traduz a escolha das colunas em aviso.
+    Não aceita empresa nem id na URL, não mostra nada de A nem de B e não grava nada;
+    operador recebe 403 (como o resto da importação)."""
+    a, b = tenants4
+    with app.app_context():
+        before_a, before_b = _snapshot(a.company_id), _snapshot(b.company_id)
+        names_b = [s.name for s in db.session.query(Stage).filter_by(company_id=b.company_id)]
+    login(client, app, a.owner_email)
+    url = "/app/importar/colunas/modo"
+    page = client.get(f"{url}?col_0=etapa&col_1=subatividade&company_id={b.company_id}")
+    body = page.get_data(as_text=True)
+    assert page.status_code == 200 and "modo detalhado" in body
+    assert all(name not in body for name in names_b)
+    assert "modo simples" in client.get(f"{url}?col_0=etapa&col_1=percentual").get_data(as_text=True)
+    assert "duas colunas" in client.get(f"{url}?col_0=etapa&col_2=etapa").get_data(as_text=True)
+    assert "Falta a coluna da Etapa" in client.get(f"{url}?col_0=").get_data(as_text=True)
+    with app.app_context():
+        assert _snapshot(a.company_id) == before_a and _snapshot(b.company_id) == before_b
+
+
+def test_aviso_do_modo_da_importacao_recusa_operador(client, app, tenants):
+    a, _ = tenants
+    login(client, app, a.operator_email)
+    assert client.get("/app/importar/colunas/modo?col_0=etapa").status_code == 403
+
+
 def test_historico_e_exportacao_de_outra_empresa_nao_vazam_registros(client, app, tenants4):
     a, b = tenants4
     login(client, app, a.owner_email)
