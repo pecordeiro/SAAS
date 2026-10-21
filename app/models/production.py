@@ -30,6 +30,13 @@ PROJECT_ACTIVE = "active"
 PROJECT_DONE = "done"
 PROJECT_STATUSES = (PROJECT_ACTIVE, PROJECT_DONE)
 
+# R4 — modo de lançar progresso (plano §4.4, decisão D1). "simples": a pessoa lança o % da etapa
+# (a etapa tem UMA atividade interna com o nome dela; o % vira peças por calc.pecas_de_percentual).
+# "detalhado": subatividades com tempo ideal e peças, igual à planilha.
+PROGRESS_SIMPLE = "simples"
+PROGRESS_DETAILED = "detalhado"
+PROGRESS_MODES = (PROGRESS_SIMPLE, PROGRESS_DETAILED)
+
 
 class Project(UUIDPk, Timestamps, TenantMixin, db.Model):
     __tablename__ = "projects"
@@ -40,6 +47,7 @@ class Project(UUIDPk, Timestamps, TenantMixin, db.Model):
         CheckConstraint("people >= 1", name="people_positive"),
         CheckConstraint("hours_per_day > 0", name="hours_per_day_positive"),
         CheckConstraint("status IN ('active', 'done')", name="status_valid"),
+        CheckConstraint("progress_mode IN ('simples', 'detalhado')", name="progress_mode_valid"),
     )
 
     # Modelo de origem (snapshot): as etapas foram COPIADAS desta versão na criação.
@@ -56,6 +64,11 @@ class Project(UUIDPk, Timestamps, TenantMixin, db.Model):
         Numeric(4, 2), nullable=False, default=Decimal("8"), server_default="8"
     )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default=PROJECT_ACTIVE)
+    # R4: projetos que já existiam (e os importados da planilha de referência) ficam "detalhado";
+    # o formulário de novo projeto sem modelo começa em "simples".
+    progress_mode: Mapped[str] = mapped_column(
+        String(12), nullable=False, default=PROGRESS_DETAILED, server_default=PROGRESS_DETAILED
+    )
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     stages: Mapped[list["Stage"]] = relationship(

@@ -5,12 +5,23 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from sqlalchemy import func, or_, select, update
 
 from app.extensions import db
-from app.models import PROJECT_ACTIVE, PROJECT_DONE, Activity, Company, Project, ProgressEntry, Stage
+from app.models import (
+    PROGRESS_DETAILED,
+    PROGRESS_MODES,
+    PROGRESS_SIMPLE,
+    PROJECT_ACTIVE,
+    PROJECT_DONE,
+    Activity,
+    Company,
+    Project,
+    ProgressEntry,
+    Stage,
+)
 from app.services import audit, calc, entitlements, events
 from app.services.holidays import holidays_for
 from app.tenancy import current_company_id, scoped
@@ -57,6 +68,15 @@ class NewStage:
     checklist_required: bool = False
 
 
+# R4 — modo simples: a etapa tem UMA atividade interna (nome = nome da etapa). O tempo dela pesa a
+# etapa no projeto e dá as horas que faltam; sem tempo informado, vale este padrão.
+SIMPLE_DEFAULT_MINUTES = Decimal("60")
+
+
+def is_simple(project: Project) -> bool:
+    return project.progress_mode == PROGRESS_SIMPLE
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -83,12 +103,20 @@ def create_project(
     source: str = "manual",
     check_limits: bool = True,
     product: str | None = None,
+    progress_mode: str = PROGRESS_DETAILED,
 ) -> Project:
     """Cria o projeto com as etapas dadas. Vindas de um modelo (``template_version_id``),
     as etapas já são a cópia (snapshot) da versão: ver ``services.templates``.
 
     Confere o limite de projetos do plano (``PlanLimitError`` → 402) e grava
-    ``project.created`` na mesma transação."""
+    ``project.created`` na mesma transação.
+
+    R4: ``progress_mode`` ``"simples"`` exige no máximo uma atividade por etapa; etapa sem
+    atividade ganha a atividade interna (nome da etapa, ``SIMPLE_DEFAULT_MINUTES``)."""
+    if progress_mode not in PROGRESS_MODES:
+        raise ValueError(f"modo de progresso inválido: {progress_mode!r}")
+    if progress_mode == PROGRESS_SIMPLE and any(len(s.activities) > 1 for s in stages):
+        raise EditError("No modo simples cada etapa tem só o %: no máximo uma atividade por etapa.")
     if check_limits:
         entitlements.check_can_create_project(company)
     project = Project(
@@ -101,6 +129,7 @@ def create_project(
         due_date=due_date,
         people=people,
         hours_per_day=hours_per_day,
+        progress_mode=progress_mode,
     )
     db.session.add(project)
     db.session.flush()
@@ -132,6 +161,8 @@ def add_stage(
 ) -> Stage:
     if position is None:
         position = max((s.position for s in project.stages), default=-1) + 1
+    if is_simple(project) and not activities:
+        activities = [NewActivity(name=name, ideal_minutes=SIMPLE_DEFAULT_MINUTES)]
     stage = Stage(
         company_id=project.company_id, project_id=project.id, name=name, position=position,
         checklist_required=bool(checklist_required),
@@ -527,6 +558,11 @@ def rename_stage(stage: Stage, name: str, expected_version: int | None = None, u
     name = _clean_name(name, "etapa")
     before = stage.name
     _guarded_update(Stage, stage, expected_version, {"name": name}, _stage_state, STAGE_CONFLICT)
+    if is_simple(stage.project):
+        # Modo simples: a atividade interna acompanha o nome da etapa (exportação e histórico).
+        for activity in active_activities(stage):
+            activity.name = name
+        db.session.flush()
     if before != name:
         audit.record(
             audit.STAGE_RENAMED, company_id=stage.company_id, actor_user_id=user_id,
@@ -758,6 +794,209 @@ def archive_activity(activity: Activity, user_id: uuid.UUID | None) -> None:
     )
 
 
+# ---------------------------------------------------------------- R3: desfazer exclusão
+
+
+def unarchive_stage(stage: Stage, user_id: uuid.UUID | None) -> None:
+    """Desfaz a exclusão (arquivamento) da etapa: ela volta, no fim da lista, com as atividades
+    que tinha quando foi excluída. Audita ``stage.unarchived``."""
+    if stage.archived_at is None:
+        raise EditError("Esta etapa não está excluída.")
+    project = stage.project
+    stage.archived_at = None
+    stage.position = max((s.position for s in project.stages if s.id != stage.id), default=-1) + 1
+    db.session.flush()
+    db.session.expire(project, ["stages"])
+    _sync_status(project)
+    audit.record(
+        audit.STAGE_UNARCHIVED, company_id=stage.company_id, actor_user_id=user_id,
+        object_type="project", object_id=project.id, details={"stage": stage.name},
+    )
+
+
+def unarchive_activity(activity: Activity, user_id: uuid.UUID | None) -> None:
+    """Desfaz a exclusão da atividade (volta no fim da etapa, com as peças que tinha).
+    Etapa excluída → traga a etapa antes; projeto no modo simples já com atividade → recusa."""
+    if activity.archived_at is None:
+        raise EditError("Esta atividade não está excluída.")
+    stage = activity.stage
+    if stage.archived_at is not None:
+        raise EditError("A etapa desta atividade também foi excluída: desfaça a exclusão da etapa primeiro.")
+    if is_simple(stage.project) and active_activities(stage):
+        raise EditError("No modo simples a etapa tem só o %: não dá para trazer uma segunda atividade.")
+    activity.archived_at = None
+    activity.position = max((a.position for a in stage.activities if a.id != activity.id), default=-1) + 1
+    db.session.flush()
+    db.session.expire(stage, ["activities"])
+    _sync_status(stage.project)
+    audit.record(
+        audit.ACTIVITY_UNARCHIVED, company_id=activity.company_id, actor_user_id=user_id,
+        object_type="project", object_id=stage.project_id,
+        details={"stage": stage.name, "activity": activity.name},
+    )
+
+
+def archived_stages(project: Project) -> list[Stage]:
+    return [s for s in _sorted(project.stages) if s.archived_at is not None]
+
+
+def archived_activities(stage: Stage) -> list[Activity]:
+    return [a for a in _sorted(stage.activities) if a.archived_at is not None]
+
+
+# ---------------------------------------------------------------- R3: células de Preencher etapas
+
+
+def parse_pieces(raw: str | None, quantity: int) -> int:
+    """Peças concluídas digitadas na célula: só número inteiro de 0 até as previstas."""
+    text = (raw or "").strip().replace(" ", "")
+    if not text.isdigit():
+        raise ProgressError(f"Use um número inteiro de peças, de 0 a {quantity}.")
+    value = int(text)
+    if value > quantity:
+        raise ProgressError(f"As peças concluídas não podem passar das previstas ({quantity}).")
+    return value
+
+
+def _decimal(raw: str | None) -> Decimal | None:
+    text = (raw or "").strip().replace(" ", "")
+    if "," in text:
+        text = text.replace(".", "").replace(",", ".")
+    try:
+        value = Decimal(text)
+    except InvalidOperation:
+        return None
+    return value if value.is_finite() else None
+
+
+def parse_minutes(raw: str | None) -> Decimal:
+    """Tempo ideal (min por unidade): 0 a 100000, até 2 casas (vírgula ou ponto)."""
+    value = _decimal(raw)
+    if value is None or value < 0 or value > Decimal("100000") or value != value.quantize(Decimal("0.01")):
+        raise EditError("Tempo ideal inválido: use minutos de 0 a 100000, com até 2 casas (ex.: 7,5).")
+    return value.quantize(Decimal("0.01"))
+
+
+def parse_percent(raw: str | None) -> Decimal:
+    """% da etapa no modo simples: 0 a 100, inteiro ou 1 casa (aceita “45”, “45,5”, “45%”)."""
+    value = _decimal((raw or "").replace("%", ""))
+    if value is None or value < 0 or value > 100 or value != value.quantize(Decimal("0.1")):
+        raise ProgressError("Use um % de 0 a 100, inteiro ou com 1 casa (ex.: 45 ou 45,5).")
+    return value.quantize(Decimal("0.1"))
+
+
+def set_units_done(
+    activity: Activity,
+    target: int,
+    expected_version: int | None,
+    user_id: uuid.UUID,
+    *,
+    can_decrease: bool,
+) -> ProgressEntry | None:
+    """Peças concluídas em valor ABSOLUTO (a célula da planilha). Para cima, é um registro como
+    outro qualquer (``register_progress``: máximo, versão, eventos). Para baixo, é uma CORREÇÃO:
+    lançamento negativo no histórico (append-only), só para quem ``can_decrease`` (supervisor+
+    na rota), com auditoria ``progress.corrected``. Igual ao atual → nada muda (``None``)."""
+    project = activity.stage.project
+    if not 0 <= target <= project.quantity:
+        raise ProgressError(f"As peças concluídas vão de 0 a {project.quantity}.")
+    if expected_version is not None and expected_version != activity.version:
+        raise ConflictError("Esta atividade foi atualizada por outra pessoa. Confira os números e tente de novo.")
+    delta = target - activity.units_done
+    if delta == 0:
+        return None
+    if delta > 0:
+        return register_progress(activity, delta, expected_version, user_id)
+    if not can_decrease:
+        raise ProgressError("Para diminuir as peças, peça a um supervisor ou desfaça o lançamento no histórico.")
+    result = db.session.execute(
+        update(Activity)
+        .where(
+            Activity.id == activity.id,
+            Activity.company_id == activity.company_id,
+            Activity.version == activity.version,
+            Activity.units_done + delta >= 0,
+        )
+        .values(units_done=Activity.units_done + delta, version=Activity.version + 1)
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:  # pragma: no cover - corrida rara entre duas abas
+        db.session.rollback()
+        raise ConflictError("Esta atividade foi atualizada por outra pessoa. Confira os números e tente de novo.")
+    before = activity.units_done
+    entry = ProgressEntry(company_id=activity.company_id, activity_id=activity.id, user_id=user_id, delta=delta)
+    db.session.add(entry)
+    db.session.flush()
+    db.session.refresh(activity)
+    # Diminuir nunca conclui etapa nem projeto (como o desfazer).
+    _after_progress(activity, entry, stage_before=True, project_before=True)
+    audit.record(
+        audit.PROGRESS_CORRECTED, company_id=activity.company_id, actor_user_id=user_id,
+        object_type="project", object_id=project.id,
+        details={"activity": activity.name, "antes": before, "depois": activity.units_done},
+    )
+    return entry
+
+
+def simple_activity(stage: Stage) -> Activity:
+    """Atividade interna da etapa no modo simples (cria se a etapa ficou sem nenhuma)."""
+    live = active_activities(stage)
+    if live:
+        return live[0]
+    activity = add_activity(stage, NewActivity(name=stage.name, ideal_minutes=SIMPLE_DEFAULT_MINUTES))
+    db.session.expire(stage, ["activities"])
+    return activity
+
+
+def set_stage_percent(
+    stage: Stage, pct: Decimal, expected_version: int | None, user_id: uuid.UUID, *, can_decrease: bool
+) -> ProgressEntry | None:
+    """Modo simples: o % da etapa vira peças da atividade interna (``calc.pecas_de_percentual``).
+    Mesmas regras de ``set_units_done`` (versão, máximo, diminuir só supervisor+)."""
+    project = stage.project
+    if not is_simple(project):
+        raise ProgressError("Este projeto está no modo detalhado: lance as peças de cada subatividade.")
+    activity = simple_activity(stage)
+    pieces = calc.pecas_de_percentual(float(pct) / 100, project.quantity)
+    return set_units_done(activity, pieces, expected_version, user_id, can_decrease=can_decrease)
+
+
+# ---------------------------------------------------------------- R4: modo de progresso
+
+
+def set_progress_mode(project: Project, mode: str, user_id: uuid.UUID | None) -> bool:
+    """Troca o modo do projeto. Simples → detalhado mantém a atividade de cada etapa (vira a
+    primeira subatividade). Detalhado → simples só se cada etapa tiver no máximo UMA atividade
+    (``EditError`` com as etapas que impedem); etapa sem atividade ganha a interna."""
+    if mode not in PROGRESS_MODES:
+        raise EditError("Modo de progresso inválido.")
+    if project.progress_mode == mode:
+        return False
+    stages = active_stages(project)
+    if mode == PROGRESS_SIMPLE:
+        blocking = [s.name for s in stages if len(active_activities(s)) > 1]
+        if blocking:
+            names = ", ".join(f"“{n}”" for n in blocking[:5]) + ("…" if len(blocking) > 5 else "")
+            raise EditError(
+                "Para usar o modo simples, cada etapa pode ter no máximo uma subatividade. "
+                f"Têm mais de uma: {names}. Exclua ou junte as subatividades e tente de novo."
+            )
+    before = project.progress_mode
+    project.progress_mode = mode
+    db.session.flush()
+    if mode == PROGRESS_SIMPLE:
+        for stage in stages:
+            simple_activity(stage)
+        db.session.flush()
+        db.session.expire(project, ["stages"])
+        _sync_status(project)
+    audit.record(
+        audit.PROJECT_MODE_CHANGED, company_id=project.company_id, actor_user_id=user_id,
+        object_type="project", object_id=project.id, details={"antes": before, "depois": mode},
+    )
+    return True
+
+
 def archive_project(project: Project, user_id: uuid.UUID | None) -> None:
     project.archived_at = _now()
     db.session.flush()
@@ -793,6 +1032,7 @@ def duplicate_project(project: Project, user_id: uuid.UUID | None, name: str | N
         stages=stages,
         template_version_id=project.template_version_id,
         source="duplicate",
+        progress_mode=project.progress_mode,
     )
     audit.record(
         audit.PROJECT_DUPLICATED, company_id=project.company_id, actor_user_id=user_id,

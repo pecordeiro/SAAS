@@ -800,3 +800,200 @@ def alertas_projeto(
                 )
             )
     return tuple(saida)
+
+
+# ---------------------------------------------------------------------------
+# Meta e equipe e Como funciona (reestruturação R5)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class LinhaEquipe:
+    """Uma linha de “E se mudar o tamanho da equipe?” (aba Equipe, A13:C18)."""
+
+    pessoas: int
+    horas_equipe: float  # horas por dia da equipe inteira (pessoas × horas por dia)
+    dias: float | None  # dias úteis restantes com essa equipe (None se a equipe não trabalha)
+    atual: bool  # é o tamanho de equipe do projeto
+
+
+@dataclass(frozen=True)
+class ResumoEquipe:
+    horas_restantes: float
+    horas_meta: float
+    dias_restantes: float | None  # Equipe!B8
+    dias_meta: float | None  # Equipe!B9 (a meta inteira, do zero)
+    linhas: tuple[LinhaEquipe, ...]
+
+
+def resumo_equipe(
+    resultado: ResultadoProjeto, pessoas: int, horas_dia: float, ate: int = EQUIPE_MAXIMA_GRAFICO
+) -> ResumoEquipe:
+    """Aba Equipe: dias úteis restantes e para a meta inteira, e a tabela de 1 a ``ate`` pessoas.
+    Se a equipe atual passa de ``ate``, a linha dela entra no fim (para aparecer destacada)."""
+    horas = resultado.tempo_restante_h
+    tamanhos = list(range(1, max(ate, 1) + 1))
+    if pessoas and pessoas not in tamanhos:
+        tamanhos.append(pessoas)
+    linhas = tuple(
+        LinhaEquipe(p, p * (horas_dia or 0), dias_uteis_restantes(horas, p, horas_dia), p == pessoas) for p in tamanhos
+    )
+    return ResumoEquipe(
+        horas_restantes=horas,
+        horas_meta=resultado.tempo_total_h,
+        dias_restantes=dias_uteis_restantes(horas, pessoas, horas_dia),
+        dias_meta=dias_uteis_restantes(resultado.tempo_total_h, pessoas, horas_dia),
+        linhas=linhas,
+    )
+
+
+@dataclass(frozen=True)
+class LinhaComoFunciona:
+    conta: str
+    como: str
+    exemplo: str
+
+
+SEM_EXEMPLO = "(preencha a primeira etapa)"
+
+
+def _br(valor: float, casas: int = 1) -> str:
+    """Número em pt-BR com ``casas`` decimais fixas (1.234,5)."""
+    texto = f"{float(valor):,.{casas}f}"
+    return texto.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+
+
+def _br_min(valor: float) -> str:
+    """Minutos como a pessoa digitou: inteiro sem casas, senão até 2 casas (7,5)."""
+    v = float(valor or 0)
+    if abs(v - round(v)) < 1e-9:
+        return _br(round(v), 0)
+    return _br(v, 2).rstrip("0").rstrip(",")
+
+
+def _plural(n: int, um: str, varios: str) -> str:
+    return f"{n} {um if n == 1 else varios}"
+
+
+def _br_pct(fracao: float, casas: int = 0) -> str:
+    return _br(fracao * 100, casas) + "%"
+
+
+def como_funciona(
+    etapas: Sequence[Etapa],
+    nomes_etapas: Sequence[str],
+    nomes_atividades: Sequence[Sequence[str]],
+    quantidade: int,
+    pessoas: int,
+    horas_dia: float,
+    simples: bool = False,
+) -> tuple[LinhaComoFunciona, ...]:
+    """Tela “Como funciona” (aba de mesmo nome da planilha): cada conta, como é feita e um
+    exemplo com os números ATUAIS do projeto. O exemplo usa a primeira etapa que tem
+    subatividade (a planilha usa a primeira etapa). ``simples``: modo simples (R4), em que a
+    pessoa lança o % da etapa e as contas de subatividade não aparecem."""
+    r = resumo_projeto(etapas, quantidade, pessoas, horas_dia)
+    i = next((k for k, e in enumerate(etapas) if e.atividades), None)
+    linhas: list[LinhaComoFunciona] = []
+
+    def add(conta: str, como: str, exemplo) -> None:
+        linhas.append(LinhaComoFunciona(conta, como, exemplo() if i is not None else SEM_EXEMPLO))
+
+    if i is not None:
+        e, re_, nome = etapas[i], r.etapas[i], nomes_etapas[i]
+        a, ra, nome_a = e.atividades[0], re_.atividades[0], nomes_atividades[i][0]
+    if simples:
+        add(
+            "% concluído da etapa",
+            "Você digita o % da etapa. O sistema guarda como unidades: % × meta, arredondado.",
+            lambda: f"{nome}: {_br_pct(ra.pct)} × {quantidade} = {_plural(a.pecas, 'unidade', 'unidades')}",
+        )
+    else:
+        add(
+            "Peso da subatividade na etapa",
+            "Tempo ideal da subatividade ÷ soma dos tempos da etapa.",
+            lambda: f"{nome_a}: {_br_min(a.ideal_min)} min ÷ {_br_min(re_.tempo_unidade_min)} min = {_br_pct(ra.peso)}",
+        )
+    add(
+        "Peso da etapa no projeto",
+        "Tempo da etapa ÷ tempo de 1 unidade (soma de todas as etapas)."
+        + (" Etapa sem tempo informado vale 60 min." if simples else ""),
+        lambda: f"{nome}: {_br_min(re_.tempo_unidade_min)} min ÷ {_br_min(r.tempo_unidade_min)} min = {_br_pct(re_.peso_no_projeto)}",
+    )
+    if not simples:
+        add(
+            "% concluído da subatividade",
+            "Peças concluídas ÷ unidades previstas. Você só digita as peças.",
+            lambda: f"{nome_a}: {a.pecas} ÷ {quantidade} = {_br_pct(ra.pct)}",
+        )
+        add(
+            "Progresso da etapa pelas tarefas (Tabela 1)",
+            "Soma de (peso × % concluído) das subatividades. Conta as parciais.",
+            lambda: f"{nome}: {_br_pct(re_.progresso, 1)}",
+        )
+        add(
+            "Unidades concluídas da etapa (Tabela 2)",
+            "Menor número de peças concluídas entre as subatividades: uma unidade só está pronta quando passou por todas.",
+            lambda: (
+                f"{nome}: menor nº de peças = {re_.unidades} → {re_.unidades} ÷ {quantidade} = "
+                f"{_br_pct(razao(re_.unidades, quantidade))}, mesmo com as tarefas em {_br_pct(re_.progresso)}"
+            ),
+        )
+        add(
+            "Tempo total da subatividade",
+            "Tempo ideal × unidades previstas.",
+            lambda: f"{nome_a}: {_br_min(a.ideal_min)} min × {quantidade} = {_br_min(ra.tempo_total_min)} min",
+        )
+        add(
+            "Tempo que falta",
+            "Tempo ideal × (previstas − peças concluídas).",
+            lambda: (
+                f"{nome_a}: {_br_min(a.ideal_min)} min × ({quantidade} − {min(a.pecas, quantidade)}) = "
+                f"{_br_min(ra.tempo_restante_min)} min"
+            ),
+        )
+    else:
+        add(
+            "Tempo que falta da etapa",
+            "Tempo da etapa × (previstas − unidades concluídas).",
+            lambda: (
+                f"{nome}: {_br_min(re_.tempo_unidade_min)} min × ({quantidade} − {min(a.pecas, quantidade)}) = "
+                f"{_br_min(re_.tempo_restante_min)} min"
+            ),
+        )
+    add(
+        "Unidades concluídas do projeto",
+        "Menor número de unidades concluídas entre todas as etapas: uma unidade só está pronta quando passou por todas.",
+        lambda: f"Menor valor entre as etapas = {r.unidades_concluidas} de {quantidade}",
+    )
+    add(
+        "Progresso geral",
+        "1 − tempo que falta ÷ tempo total, somando todas as etapas.",
+        lambda: (
+            f"1 − {_br(r.tempo_restante_h)} h ÷ {_br(r.tempo_total_h)} h = {_br_pct(r.progresso_geral, 1)}"
+            if r.tempo_total_min
+            else "(informe o tempo das etapas)"
+        ),
+    )
+    capacidade = (pessoas or 0) * (horas_dia or 0)
+    add(
+        "Dias úteis restantes (Meta e equipe)",
+        "Tempo que falta ÷ (pessoas × horas por dia).",
+        lambda: (
+            f"{_br(r.tempo_restante_h)} h ÷ ({_plural(pessoas, 'pessoa', 'pessoas')} × {_br_min(horas_dia)} h) = "
+            f"{_br(r.dias_uteis_restantes or 0)} dias úteis"
+            if capacidade > 0
+            else "(informe pessoas e horas por dia)"
+        ),
+    )
+    add(
+        "Dias úteis para a meta inteira",
+        "Tempo total ÷ (pessoas × horas por dia), como se começasse do zero.",
+        lambda: (
+            f"{_br(r.tempo_total_h)} h ÷ ({_plural(pessoas, 'pessoa', 'pessoas')} × {_br_min(horas_dia)} h) = "
+            f"{_br(dias_uteis_restantes(r.tempo_total_h, pessoas, horas_dia) or 0)} dias úteis"
+            if capacidade > 0
+            else "(informe pessoas e horas por dia)"
+        ),
+    )
+    return tuple(linhas)
