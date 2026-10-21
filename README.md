@@ -139,6 +139,20 @@ migrations no PostgreSQL só rodam com `TEST_DATABASE_URL`; no SQLite aparecem c
 - `tests/test_rls.py`: RLS ligado com um papel comum (não superusuário) criado no teste.
 - `tests/test_migrations.py`: upgrade → downgrade base → upgrade sem drift (SQLite e PG).
 
+### Painel e moldura (reestruturação R1–R2)
+
+- Visual da base “Controle de Atividades” (ADR-0015): IBM Plex Sans 400/600 local, paleta do painel
+  antigo, cores de status e de série em `tokens.css`, nada acima de 32 px, cards sem sombra.
+- Menu: Painel, Preencher etapas, Meta e equipe, Como funciona; depois Projetos e Histórico;
+  Configurações no rodapé. Celular: as 4 telas + “Mais”.
+- `/app` abre o **Painel da operação** (todos os projetos ativos); `/app/projetos/<id>/painel` é o
+  painel de um projeto. Frase-resumo, 5 indicadores, esteira de etapas, gráficos e Tabelas 1/2.
+- Gráficos com ECharts 5.5.1 vendorizado (`app/static/vendor/echarts-5.5.1/`, Apache-2.0), desenhados
+  por `app/static/js/painel.js` a partir do JSON que o servidor gera (`app/services/dashboard.py` →
+  `calc.py`). Nenhuma conta no navegador.
+- `/app/preencher`, `/app/meta-e-equipe` e `/app/como-funciona` ainda redirecionam para as telas
+  existentes mais próximas (telas próprias na R3/R5).
+
 ### Interface (Fase 2)
 
 - Tokens: `app/static/css/tokens.css` é cópia de `docs/design/tokens.css` (o handoff do
@@ -149,7 +163,8 @@ migrations no PostgreSQL só rodam com `TEST_DATABASE_URL`; no SQLite aparecem c
 - Componentes: macros em `app/templates/components/` (`{% from "components/button.html"
   import button %}` etc.). Páginas estendem `base_publica.html` ou `base_app.html`.
 - Vitrine: `http://127.0.0.1:5000/estilo` (só com `APP_ENV=development`; 404 nos demais).
-- Sem CDN e sem script/estilo inline (CSP `default-src 'self'`): fontes woff2 (OFL) em
+- Sem CDN e sem script/estilo inline (CSP `default-src 'self'`; o único `<script>` sem `src` é o bloco
+  de dados `application/json` do painel): fontes woff2 (OFL) em
   `app/static/fonts`, HTMX 2.0.4 em `app/static/js/htmx.min.js` (`allowEval:false`),
   melhorias em `app/static/js/app.js`. Tudo funciona sem JS.
 - Tema: Sistema/Claro/Escuro no menu (cookie `tema`).
