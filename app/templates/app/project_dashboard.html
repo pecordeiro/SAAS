@@ -24,7 +24,7 @@
   Clicar numa etapa abre a etapa para preencher.
 #}
 {%- set r = result -%}
-{{ p.header(project.name, d.frase, updated_at, url_for('app.fill', projeto=project.id), back=("Painel da operação", url_for('app.home'))) }}
+{{ p.header(project.name, d.frase, updated_at, url_for('preencher.fill', projeto=project.id), back=("Painel da operação", url_for('app.home'))) }}
 
 {%- if not d.etapas %}
 <div class="card">

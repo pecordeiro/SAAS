@@ -14,6 +14,7 @@ from wtforms import (
     FormField,
     HiddenField,
     IntegerField,
+    RadioField,
     SelectField,
     StringField,
     TextAreaField,
@@ -21,20 +22,56 @@ from wtforms import (
 from wtforms.validators import AnyOf, DataRequired, InputRequired, Length, NumberRange, Optional, ValidationError
 
 from app.forms import BaseForm, ProjectForm, StageSlotForm, _strip
-from app.services.projects import NewStage
+from app.models import PROGRESS_DETAILED, PROGRESS_SIMPLE
+from app.services.projects import SIMPLE_DEFAULT_MINUTES, NewActivity, NewStage
 
 MAX_TEMPLATE_STAGES = 60
 
 
 class ProjectFromTemplateForm(ProjectForm):
-    """Novo projeto: com modelo (cópia da versão atual) ou digitando as etapas."""
+    """Novo projeto: com modelo (cópia da versão atual) ou digitando as etapas.
+
+    R4: sem modelo, o projeto começa no modo SIMPLES (padrão; a etapa recebe o % direto e as
+    atividades ficam opcionais: uma linha só, que dá o tempo da etapa). Com modelo, o projeto
+    é detalhado (o modelo traz as subatividades)."""
 
     template_id = SelectField("Modelo de etapas", choices=[], validate_choice=False, default="")
+    progress_mode = RadioField(
+        "Como lançar o progresso",
+        choices=[(PROGRESS_SIMPLE, "Simples"), (PROGRESS_DETAILED, "Detalhado")],
+        validate_choice=False,  # a tela marca “Simples”; POST sem o campo (API/testes antigos) = detalhado
+    )
+
+    @property
+    def chosen_mode(self) -> str:
+        if self.template_id.data:
+            return PROGRESS_DETAILED
+        return PROGRESS_SIMPLE if self.progress_mode.data == PROGRESS_SIMPLE else PROGRESS_DETAILED
+
+    def validate(self, extra_validators=None):
+        simple = self.chosen_mode == PROGRESS_SIMPLE
+        for slot in self.stages:
+            slot.form.allow_without_activities = simple
+        return super().validate(extra_validators)
 
     def validate_stages(self, field):
         if self.template_id.data:
             return  # etapas vêm do modelo
         super().validate_stages(field)
+
+    def new_stages(self) -> list[NewStage]:
+        stages = super().new_stages()
+        if self.chosen_mode != PROGRESS_SIMPLE:
+            return stages
+        return [
+            NewStage(
+                name=s.name,
+                activities=[NewActivity(name=s.name, ideal_minutes=s.activities[0].ideal_minutes if s.activities else SIMPLE_DEFAULT_MINUTES)],
+                checklist=s.checklist,
+                checklist_required=s.checklist_required,
+            )
+            for s in stages
+        ]
 
 
 class ProjectEditForm(BaseForm):

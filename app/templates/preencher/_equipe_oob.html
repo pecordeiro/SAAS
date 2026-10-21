@@ -1,0 +1,6 @@
+{% import "preencher/_equipe.html" as eq %}
+{% import "preencher/_partes.html" as parts %}
+{# Resposta HTMX de “Meta e equipe”: caixas, tabela e “Salvo · quem, hora” (fora de banda). #}
+{{ eq.team_boxes(team, forecast, project, oob=True) }}
+{{ eq.team_table(team, oob=True) }}
+{{ parts.save_status(message, error, oob=True) }}

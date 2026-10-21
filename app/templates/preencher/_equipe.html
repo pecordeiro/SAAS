@@ -1,0 +1,36 @@
+{#
+  Pedaços de “Meta e equipe” que mudam ao salvar (fora de banda com `oob`): as duas caixas de
+  dias úteis e a tabela “E se mudar o tamanho da equipe?”. Números de calc.resumo_equipe.
+#}
+{% macro team_boxes(team, forecast, project, oob=False) -%}
+<div class="twobox" id="equipe-caixas"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <div class="box">
+    <p class="box__label">Dias úteis restantes</p>
+    <p class="box__big num">{% if team.dias_restantes is none %}—{% else %}{{ team.dias_restantes|num(1) }}{% endif %}</p>
+    <p class="box__sub">{{ team.horas_restantes|num(1) }} h de trabalho que faltam{% if forecast %} · termina em {{ forecast|data }}{% endif %}</p>
+  </div>
+  <div class="box">
+    <p class="box__label">Dias úteis para a meta inteira</p>
+    <p class="box__big num">{% if team.dias_meta is none %}—{% else %}{{ team.dias_meta|num(1) }}{% endif %}</p>
+    <p class="box__sub">{{ team.horas_meta|num(1) }} h para {{ project.quantity }} unidade{{ "" if project.quantity == 1 else "s" }}{% if project.due_date %} · prazo {{ project.due_date|data }}{% endif %}</p>
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro team_table(team, oob=False) -%}
+<div class="table-scroll" id="equipe-tabela"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <table class="etab team-table">
+    <caption class="visually-hidden">Dias úteis restantes conforme o tamanho da equipe</caption>
+    <thead><tr><th scope="col">Pessoas</th><th scope="col" class="num">Horas por dia (equipe)</th><th scope="col" class="num">Dias úteis restantes</th></tr></thead>
+    <tbody>
+      {%- for l in team.linhas %}
+      <tr{% if l.atual %} class="is-current"{% endif %}>
+        <th scope="row">{{ l.pessoas }} {{ "pessoa" if l.pessoas == 1 else "pessoas" }}{% if l.atual %} <span class="badge badge--info">equipe atual</span>{% endif %}</th>
+        <td class="num">{{ l.horas_equipe|minutos }}</td>
+        <td class="num">{% if l.dias is none %}—{% else %}{{ l.dias|num(1) }}{% endif %}</td>
+      </tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+</div>
+{%- endmacro %}

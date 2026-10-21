@@ -162,13 +162,29 @@ def project_apply_template(project_id):
 # ---------------------------------------------------------------- etapas
 
 
-def _back(project_id):
+def _to_fill() -> bool:
+    """R3: a ação veio de “Preencher etapas” (campo ``voltar=preencher``) e volta para lá."""
+    return request.form.get("voltar") == "preencher"
+
+
+def _back(project_id, stage_id=None):
+    if _to_fill():
+        return redirect(url_for("preencher.fill", projeto=project_id, etapa=stage_id), 303)
     return redirect(url_for("edicao.project_edit", project_id=project_id), 303)
+
+
+def _fill_error(project_id, message: str, stage_id=None):
+    """Erro/409 vindo de Preencher etapas: nada foi gravado; volta à tela com o aviso."""
+    db.session.rollback()
+    flash(message, "erro")
+    return _back(project_id, stage_id)
 
 
 def _conflict_page(project_id, obj_id, exc: svc.EditConflict, mine: dict, current_text: str):
     """409: nada foi gravado. A tela mostra o valor ATUAL e devolve o que a pessoa digitou,
     já com a versão atual — salvar de novo é a confirmação consciente de sobrescrever."""
+    if _to_fill():
+        return _fill_error(project_id, f"{exc} Agora: {current_text}. Confira e tente de novo.")
     db.session.rollback()
     project = get_or_404(Project, project_id)
     message = f"{exc} Agora: {current_text}. Confira e salve de novo para confirmar a sua versão."
@@ -196,7 +212,7 @@ def stage_rename(stage_id):
         return _back(stage.project_id)
     db.session.commit()
     flash("Etapa renomeada.", "sucesso")
-    return _back(stage.project_id)
+    return _back(stage.project_id, stage.id)
 
 
 @bp.post("/etapas/<uuid:stage_id>/mover")
@@ -208,7 +224,7 @@ def stage_move(stage_id):
         abort(400)
     svc.move_stage(stage, -1 if form.direction.data == "up" else 1)
     db.session.commit()
-    return _back(stage.project_id)
+    return _back(stage.project_id, stage.id)
 
 
 @bp.post("/projetos/<uuid:project_id>/etapas/ordem")
@@ -232,6 +248,8 @@ def stages_reorder(project_id):
     try:
         changed = svc.reorder_stages(project, ordered, current_user.id)
     except svc.OrderConflict as exc:
+        if _to_fill():
+            return _fill_error(project_id, str(exc))
         db.session.rollback()
         project = get_or_404(Project, project_id)
         return _edit_page(project, ProjectEditForm(obj=project), 409, error=str(exc))
@@ -247,6 +265,9 @@ def stage_archive(stage_id):
     stage = get_or_404(Stage, stage_id)
     svc.archive_stage(stage, current_user.id)
     db.session.commit()
+    if _to_fill():
+        flash(f"Etapa “{stage.name}” excluída. Para desfazer, use “Etapas excluídas” no fim da lista.", "sucesso")
+        return _back(stage.project_id)
     flash("Etapa arquivada. Os registros dela continuam no histórico.", "sucesso")
     return _back(stage.project_id)
 
@@ -324,6 +345,8 @@ def activity_position(activity_id):
     try:
         svc.move_activity_to(activity, target, form.position.data, form.version.data, current_user.id)
     except svc.EditConflict as exc:
+        if _to_fill():
+            return _fill_error(project_id, f"{exc} Confira onde ela está agora e mova de novo.", form.stage_id.data)
         db.session.rollback()
         project = get_or_404(Project, project_id)
         current = get_or_404(Activity, activity_id)
@@ -336,8 +359,8 @@ def activity_position(activity_id):
         db.session.rollback()
         abort(404)
     db.session.commit()
-    flash("Atividade movida.", "sucesso")
-    return _back(project_id)
+    flash("Subatividade movida." if _to_fill() else "Atividade movida.", "sucesso")
+    return _back(project_id, target.id)
 
 
 @bp.post("/atividades/<uuid:activity_id>/mover")
@@ -350,7 +373,7 @@ def activity_move(activity_id):
     project_id = activity.stage.project_id
     svc.move_activity(activity, -1 if form.direction.data == "up" else 1)
     db.session.commit()
-    return _back(project_id)
+    return _back(project_id, activity.stage_id)
 
 
 @bp.post("/atividades/<uuid:activity_id>/arquivar")
@@ -358,8 +381,12 @@ def activity_move(activity_id):
 def activity_archive(activity_id):
     activity = get_or_404(Activity, activity_id)
     project_id = activity.stage.project_id
+    stage_id = activity.stage_id
     svc.archive_activity(activity, current_user.id)
     db.session.commit()
+    if _to_fill():
+        flash(f"Subatividade “{activity.name}” excluída. Para desfazer, use “Subatividades excluídas” abaixo da tabela.", "sucesso")
+        return _back(project_id, stage_id)
     flash("Atividade arquivada. Os registros dela continuam no histórico.", "sucesso")
     return _back(project_id)
 

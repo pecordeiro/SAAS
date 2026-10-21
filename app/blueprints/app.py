@@ -88,8 +88,8 @@ def _deadline_fraction(project: Project) -> float | None:
 
 
 def _stage_fill_href(project_id, stage_id) -> str:
-    """Clique numa etapa = abrir para preencher (hoje o detalhe com a etapa aberta; R3 troca)."""
-    return url_for("app.project_detail", project_id=project_id, etapa=stage_id, _anchor=f"etapa-{stage_id}")
+    """Clique numa etapa = abrir a etapa em Preencher etapas (R3)."""
+    return url_for("preencher.fill", projeto=project_id, etapa=stage_id)
 
 
 @bp.get("/")
@@ -129,64 +129,6 @@ def home():
         table=_table_arg(),
         table_tabs=DASHBOARD_TABLES,
     )
-
-
-def _current_project() -> Project | None:
-    """Projeto “atual” dos atalhos do menu: o da URL (?projeto=, sempre da empresa da sessão —
-    de outra empresa → 404) ou, sem ele, o ativo mais recente."""
-    raw = request.args.get("projeto", "")
-    if raw:
-        try:
-            return get_or_404(Project, uuid.UUID(raw))
-        except ValueError:
-            abort(404)
-    active = svc.list_projects("ativos")
-    if active:
-        return active[0]
-    every = svc.list_projects("todos")
-    return every[0] if every else None
-
-
-def _no_project_redirect():
-    flash("Crie um projeto para começar." if g.membership.has_role(ROLE_SUPERVISOR) else "Ainda não há projetos.", "info")
-    target = "app.project_new" if g.membership.has_role(ROLE_SUPERVISOR) else "app.projects"
-    return redirect(url_for(target), 303)
-
-
-@bp.get("/preencher")
-@tenant_required(ROLE_OPERATOR)
-def fill():
-    """Menu “Preencher etapas”. TODO(R3): tela própria (lista de etapas + tabela editável);
-    por enquanto abre o detalhe do projeto atual, onde se lançam as peças."""
-    project = _current_project()
-    if project is None:
-        return _no_project_redirect()
-    return redirect(url_for("app.project_detail", project_id=project.id), 303)
-
-
-@bp.get("/meta-e-equipe")
-@tenant_required(ROLE_OPERATOR)
-def goal_team():
-    """Menu “Meta e equipe”. TODO(R5): tela própria (meta, pessoas, horas/dia, “e se mudar a
-    equipe?”). Por enquanto: supervisor+ edita os dados do projeto; os demais veem o gráfico
-    Equipe × prazo do painel."""
-    project = _current_project()
-    if project is None:
-        return _no_project_redirect()
-    if g.membership.has_role(ROLE_SUPERVISOR):
-        return redirect(url_for("edicao.project_edit", project_id=project.id), 303)
-    return redirect(url_for("app.project_dashboard", project_id=project.id, _anchor="g-equipe"), 303)
-
-
-@bp.get("/como-funciona")
-@tenant_required(ROLE_OPERATOR)
-def how_it_works():
-    """Menu “Como funciona”. TODO(R5): cada conta explicada com os números atuais. Por
-    enquanto abre as Tabelas 1 e 2 do painel do projeto, que mostram as contas por etapa."""
-    project = _current_project()
-    if project is None:
-        return _no_project_redirect()
-    return redirect(url_for("app.project_dashboard", project_id=project.id, _anchor="g-tabela"), 303)
 
 
 def _project_status(project: Project, result: calc.ResultadoProjeto) -> str:
@@ -323,7 +265,9 @@ def project_new():
             template = get_or_404(Template, form.template_id.data)
             project = tsvc.create_project_from_template(g.company, template, **fields)
         else:
-            project = svc.create_project(g.company, stages=form.new_stages(), **fields)
+            project = svc.create_project(
+                g.company, stages=form.new_stages(), progress_mode=form.chosen_mode, **fields
+            )
         db.session.commit()
         flash("Projeto criado.", "sucesso")
         return redirect(url_for("app.project_detail", project_id=project.id), 303)

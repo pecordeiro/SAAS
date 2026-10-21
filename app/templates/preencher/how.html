@@ -1,0 +1,32 @@
+{% extends "base_app.html" %}
+{% set nav_current = "how" %}
+{% set nav_project = project %}
+{% block title %}Como funciona · {{ project.name }} · Controle de Produção{% endblock %}
+{% block head_extra %}
+  {%- for src in asset_urls("preencher.js") %}
+  <script src="{{ src }}" defer></script>
+  {%- endfor %}
+{% endblock %}
+{% block content %}
+{#
+  Como funciona (R5, aba “Como funciona” da planilha): cada conta, como é feita e um exemplo
+  com os números de agora do projeto. O texto vem pronto de calc.como_funciona (ADR-0009).
+#}
+{%- set page_title, page_endpoint = "Como funciona", "preencher.how" %}
+{% include "preencher/_cabecalho.html" %}
+
+<section class="card stack" aria-labelledby="contas-titulo">
+  <h2 class="card-title" id="contas-titulo">Como cada conta funciona</h2>
+  <p class="fill__hint">A coluna “Exemplo” usa os números que estão agora no projeto e muda junto com eles.</p>
+  <div class="table-scroll">
+    <table class="etab how-table">
+      <thead><tr><th scope="col">Conta</th><th scope="col">Como é calculada</th><th scope="col">Exemplo com os números atuais</th></tr></thead>
+      <tbody>
+        {%- for row in rows %}
+        <tr><th scope="row">{{ row.conta }}</th><td>{{ row.como }}</td><td class="how-table__example">{{ row.exemplo }}</td></tr>
+        {%- endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

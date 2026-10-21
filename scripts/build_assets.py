@@ -8,6 +8,7 @@ Saída em ``app/static/dist/``:
 - ``arrastar.<hash>.js`` = ``static/js/arrastar.js`` minificado (só na edição do projeto)
 - ``htmx.<hash>.js``   = ``static/js/htmx.min.js`` copiado (já vem minificado)
 - ``painel.<hash>.js``  = ``static/js/painel.js`` minificado (só nas páginas de painel)
+- ``preencher.<hash>.js`` = ``static/js/preencher.js`` minificado (Preencher etapas e Meta e equipe)
 - ``manifest.json``    = {"site.css": "dist/site.<hash>.css", ...}
 
 O ECharts (``static/vendor/echarts-5.5.1/``) não passa por aqui: já vem minificado e a versão
@@ -47,12 +48,14 @@ def build_outputs() -> dict[str, tuple[str, bytes]]:
     drag_min = rjsmin.jsmin((STATIC / "js" / "arrastar.js").read_text(encoding="utf-8")).encode("utf-8")
     htmx = (STATIC / "js" / "htmx.min.js").read_bytes()
     painel_min = rjsmin.jsmin((STATIC / "js" / "painel.js").read_text(encoding="utf-8")).encode("utf-8")
+    fill_min = rjsmin.jsmin((STATIC / "js" / "preencher.js").read_text(encoding="utf-8")).encode("utf-8")
     return {
         "site.css": (f"site.{_digest(css_min)}.css", css_min),
         "app.js": (f"app.{_digest(js_min)}.js", js_min),
         "arrastar.js": (f"arrastar.{_digest(drag_min)}.js", drag_min),
         "htmx.js": (f"htmx.{_digest(htmx)}.js", htmx),
         "painel.js": (f"painel.{_digest(painel_min)}.js", painel_min),
+        "preencher.js": (f"preencher.{_digest(fill_min)}.js", fill_min),
     }
 
 

@@ -1,0 +1,133 @@
+{% extends "base_app.html" %}
+{% import "preencher/_partes.html" as parts %}
+{% from "components/icon.html" import icon %}
+{% from "components/alert.html" import alert %}
+{% from "components/modal.html" import confirm_dialog %}
+{% from "components/empty_state.html" import empty_state %}
+{% set nav_current = "fill" %}
+{% set nav_project = project %}
+{% block title %}Preencher etapas · {{ project.name }} · Controle de Produção{% endblock %}
+{% block head_extra %}
+  {%- for src in asset_urls("preencher.js") %}
+  <script src="{{ src }}" defer></script>
+  {%- endfor %}
+  {%- if can_edit %}
+  {%- for src in asset_urls("arrastar.js") %}
+  <script src="{{ src }}" defer></script>
+  {%- endfor %}
+  {%- endif %}
+{% endblock %}
+{% block content %}
+{#
+  Preencher etapas (R3, plano §4.3): à esquerda as etapas (nome, %, mini barras azul = pelas
+  tarefas e laranja = unidades, situação; arrastar ou “Subir/Descer” para reordenar; menu
+  Renomear / Mover / Excluir); à direita a tabela da etapa com células amarelas que salvam ao
+  sair do campo. Operador só lança peças (ou o %, no modo simples). Excluir = arquivar: nada
+  se perde e dá para desfazer (“Etapas excluídas” e “Subatividades excluídas”).
+#}
+{%- macro archived_stage_list() %}
+{%- if archived_stages %}
+    <details class="fill__archived">
+      <summary>Etapas excluídas ({{ archived_stages|length }})</summary>
+      <ul class="archived-list">
+        {%- for s in archived_stages %}
+        <li><span>{{ s.name }}</span>
+          <form method="post" action="{{ url_for('preencher.stage_unarchive', stage_id=s.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn--secondary btn--sm" type="submit">Desfazer exclusão</button>
+          </form>
+        </li>
+        {%- endfor %}
+      </ul>
+    </details>
+    {%- endif %}
+{%- endmacro %}
+{%- set page_title, page_endpoint = "Preencher etapas", "preencher.fill" %}
+{% include "preencher/_cabecalho.html" %}
+
+{%- with errors = get_flashed_messages(category_filter=["erro"]) %}
+{%- if errors %}<div class="mb-4">{{ alert("danger", errors[-1], role="alert") }}</div>{% endif %}
+{%- endwith %}
+
+{%- if not items %}
+<div class="card">
+  {{ empty_state("Nenhuma etapa ainda", "Inclua a primeira etapa para começar a lançar o progresso." if can_edit else "Peça a um supervisor para incluir as etapas do projeto.", icon="edit") }}
+  {%- if can_edit %}
+  <form class="new-stage" method="post" action="{{ url_for('preencher.stage_new', project_id=project.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="field__label" for="nova-etapa-vazia">Nome da etapa</label>
+    <span class="new-stage__row"><input class="field__input" id="nova-etapa-vazia" name="name" maxlength="160" required autocomplete="off"><button class="btn btn--primary" type="submit">Incluir etapa</button></span>
+  </form>
+  {{ archived_stage_list() }}
+  {%- endif %}
+</div>
+{%- else %}
+
+{{ parts.save_status(None) }}
+
+<div class="fill">
+  <nav class="card fill__list" aria-label="Etapas do projeto">
+    {%- if can_edit %}
+    <form id="ordem-etapas" method="post" action="{{ url_for('edicao.stages_reorder', project_id=project.id) }}" hidden>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="voltar" value="preencher">
+    </form>
+    {%- endif %}
+    <ol class="stage-list sort-list" data-sort-list="stages" data-sort-form="ordem-etapas">
+      {%- for it in items %}
+      {%- set current = it.stage.id == sel.stage.id %}
+      <li class="stage-item sort-item{% if current %} is-current{% endif %}" data-sort-id="{{ it.stage.id }}">
+        {%- if can_edit %}<span class="drag-handle js-only" data-drag-handle title="Arrastar a etapa" aria-hidden="true">⠿</span>{% endif %}
+        <a class="stage-item__link" href="{{ url_for('preencher.fill', projeto=project.id, etapa=it.stage.id) }}"{% if current %} aria-current="true"{% endif %}>{{ parts.stage_info(it) }}</a>
+        {%- if can_edit %}
+        <details class="action-menu stage-item__menu">
+          <summary class="btn btn--ghost btn--sm btn--icon" aria-label="Ações da etapa {{ it.stage.name }}">{{ icon("more") }}</summary>
+          <div class="action-menu__list">
+            <a class="action-menu__item" href="{{ url_for('preencher.fill', projeto=project.id, etapa=it.stage.id, _anchor='nome-etapa') }}">Renomear</a>
+            {%- for direction, label in (("up", "Mover para cima"), ("down", "Mover para baixo")) %}
+            {%- if (direction == "up" and it.n > 1) or (direction == "down" and it.n < items|length) %}
+            <form method="post" action="{{ url_for('edicao.stage_move', stage_id=it.stage.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="voltar" value="preencher">
+              <input type="hidden" name="direction" value="{{ direction }}">
+              <button class="action-menu__item" type="submit">{{ label }}</button>
+            </form>
+            {%- endif %}
+            {%- endfor %}
+            <a class="action-menu__item action-menu__item--danger" href="#excluir-etapa-{{ it.stage.id }}" aria-haspopup="dialog">Excluir etapa</a>
+          </div>
+        </details>
+        {%- endif %}
+      </li>
+      {%- endfor %}
+    </ol>
+    {%- if can_edit %}
+    <p class="fill__list-hint js-only">Arraste pela alça ⠿ para mudar a ordem.</p>
+    <form class="new-stage" method="post" action="{{ url_for('preencher.stage_new', project_id=project.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="field__label" for="nova-etapa">Nova etapa</label>
+      <span class="new-stage__row"><input class="field__input" id="nova-etapa" name="name" maxlength="160" required autocomplete="off" placeholder="Nome da etapa"><button class="btn btn--secondary" type="submit">{{ icon("plus", "sm") }}<span>Incluir</span></button></span>
+    </form>
+    {{ archived_stage_list() }}
+    {%- endif %}
+  </nav>
+
+  {% include "preencher/_painel.html" %}
+</div>
+
+{%- if can_edit %}
+{%- for it in items %}
+{% call confirm_dialog("excluir-etapa-" ~ it.stage.id, "Excluir a etapa “" ~ it.stage.name ~ "”?", "Ela sai da tela e das contas. As peças lançadas continuam no histórico, e dá para desfazer em “Etapas excluídas”.", "Excluir etapa", url_for('edicao.stage_archive', stage_id=it.stage.id)) %}
+<input type="hidden" name="voltar" value="preencher">
+{% endcall %}
+{%- endfor %}
+{%- if not simple %}
+{%- for a, ar in rows %}
+{% call confirm_dialog("excluir-atv-" ~ a.id, "Excluir a subatividade “" ~ a.name ~ "”?", "Ela sai da etapa e das contas. As peças lançadas continuam no histórico, e dá para desfazer em “Subatividades excluídas”.", "Excluir subatividade", url_for('edicao.activity_archive', activity_id=a.id)) %}
+<input type="hidden" name="voltar" value="preencher">
+{% endcall %}
+{%- endfor %}
+{%- endif %}
+{%- endif %}
+{%- endif %}
+{% endblock %}

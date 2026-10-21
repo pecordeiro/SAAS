@@ -23,7 +23,7 @@
   gráficos por projeto, situação das etapas e a tabela de projetos. Só exibe (ADR-0009).
 #}
 {%- set s = d.resumo -%}
-{{ p.header("Operação", d.frase, updated_at, url_for('app.fill') if d.projetos else None) }}
+{{ p.header("Operação", d.frase, updated_at, url_for('preencher.fill') if d.projetos else None) }}
 
 {%- if not d.projetos %}
 <div class="card">

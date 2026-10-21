@@ -1,0 +1,37 @@
+{% import "preencher/_partes.html" as parts %}
+{#
+  Resposta HTMX de “Preencher etapas” (o gatilho usa swap “none”): tudo aqui é fora de banda
+  e troca o elemento de mesmo id. Depois de salvar uma célula, só os NÚMEROS mudam (os campos
+  ficam como estão, para não roubar o foco de quem já está no próximo campo). Depois de incluir
+  uma subatividade, o painel inteiro volta (full_panel).
+#}
+{%- if sel %}
+{%- if full_panel %}
+{% include "preencher/_painel.html" %}
+{%- else %}
+{{ parts.head_values(sel, quantity, oob=True) }}
+{{ parts.version_input("v-etapa", "version", "f-etapa", sel.stage.version, oob=True) }}
+{%- if simple and simple_activity %}
+{%- set a, ar = simple_activity, simple_result %}
+{{ parts.version_input("va-etapa", "activity_version", "f-etapa", a.version, oob=True) }}
+<span class="pct-cell" id="pct-{{ a.id }}" hx-swap-oob="true"><progress class="mini mini--units" value="{{ [ar.pct, 1]|min }}" max="1" aria-label="Unidades concluídas">{{ ar.pct|pct(0) }}</progress><span class="num">{{ a.units_done }}/{{ quantity }}</span></span>
+<span class="num" id="tt-{{ a.id }}" hx-swap-oob="true">{{ ar.tempo_total_min|num(0) }}</span>
+<span class="num" id="tf-{{ a.id }}" hx-swap-oob="true">{{ ar.tempo_restante_min|num(0) }}</span>
+{%- else %}
+{%- for a, ar in rows %}
+<span class="num" id="peso-{{ a.id }}" hx-swap-oob="true">{{ ar.peso|pct(0) }}</span>
+<span class="pct-cell" id="pct-{{ a.id }}" hx-swap-oob="true"><progress class="mini{% if ar.pct >= 1 %} mini--done{% else %} mini--tasks{% endif %}" value="{{ [ar.pct, 1]|min }}" max="1" aria-label="{{ a.name }}: {{ ar.pct|pct(0) }}">{{ ar.pct|pct(0) }}</progress><span class="num">{{ a.units_done }}/{{ quantity }} · {{ ar.pct|pct(0) }}</span></span>
+<span class="num" id="tt-{{ a.id }}" hx-swap-oob="true">{{ ar.tempo_total_min|num(0) }}</span>
+<span class="num" id="tf-{{ a.id }}" hx-swap-oob="true">{{ ar.tempo_restante_min|num(0) }}</span>
+{{ parts.last_entry(a, last, None, oob=True) }}
+<input type="hidden" id="v-{{ a.id }}" name="version" value="{{ a.version }}" hx-swap-oob="true">
+{%- endfor %}
+<span class="num" id="total-tempo" hx-swap-oob="true">{{ sel.r.tempo_unidade_min|minutos }}</span>
+<span class="num" id="total-tt" hx-swap-oob="true">{{ sel.r.tempo_total_min|num(0) }}</span>
+<span class="num" id="total-tf" hx-swap-oob="true">{{ sel.r.tempo_restante_min|num(0) }}</span>
+{%- endif %}
+{{ parts.boxes(sel, simple, oob=True) }}
+{%- endif %}
+{{ parts.stage_info(sel, oob=True) }}
+{%- endif %}
+{{ parts.save_status(message, error, oob=True) }}

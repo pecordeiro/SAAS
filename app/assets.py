@@ -19,7 +19,8 @@ ONE_YEAR = 60 * 60 * 24 * 365
 SOURCE_FALLBACK = {
     "site.css": [f"css/{n}.css" for n in ("tokens", "base", "layout", "components", "pages", "utilities")],
     "app.js": ["js/app.js"],
-    "arrastar.js": ["js/arrastar.js"],  # Etapa D: só na tela de edição do projeto
+    "arrastar.js": ["js/arrastar.js"],  # Etapa D: edição do projeto e Preencher etapas
+    "preencher.js": ["js/preencher.js"],  # R3–R5: células que salvam ao sair do campo
     "htmx.js": ["js/htmx.min.js"],
     "painel.js": ["js/painel.js"],  # R2: gráficos do Painel (só nas páginas de painel)
     "echarts.js": ["vendor/echarts-5.5.1/echarts.min.js"],  # Apache-2.0 (LICENSE e NOTICE na mesma pasta)

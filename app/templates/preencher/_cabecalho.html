@@ -1,0 +1,25 @@
+{% from "components/icon.html" import icon %}
+{% from "components/badge.html" import badge %}
+{#
+  Cabeçalho comum de Preencher etapas, Meta e equipe e Como funciona: volta ao painel do
+  projeto, título da tela (page_title, definido pela página), projeto + modo e o seletor de
+  projeto (GET; com JS aplica ao escolher, sem JS botão “Abrir”). page_endpoint = rota da tela.
+#}
+<header class="page-header fill-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('app.project_dashboard', project_id=project.id) }}">{{ icon("chevron-left", "sm") }}Painel do projeto</a>
+    <h1>{{ page_title }}</h1>
+    <p class="fill-header__project"><span>{{ project.name }}</span>{{ badge("Modo simples" if simple else "Modo detalhado", "neutral") }}</p>
+  </div>
+  {%- if project_choices|length > 1 %}
+  <form class="project-picker" method="get" action="{{ url_for(page_endpoint) }}" data-autosubmit>
+    <label class="field__label" for="projeto-escolha">Projeto</label>
+    <span class="project-picker__row">
+      <select class="field__input" id="projeto-escolha" name="projeto">
+        {%- for pid, pname in project_choices %}<option value="{{ pid }}"{% if pid == project.id %} selected{% endif %}>{{ pname }}</option>{% endfor %}
+      </select>
+      <button class="btn btn--secondary no-js-only" type="submit">Abrir</button>
+    </span>
+  </form>
+  {%- endif %}
+</header>
