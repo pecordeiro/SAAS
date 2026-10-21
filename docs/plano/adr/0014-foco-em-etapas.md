@@ -1,6 +1,6 @@
 # ADR-0014 — Foco do produto em etapas; o resto é opcional
 
-- Status: **proposto** (aguarda aprovação do dono) · Data: 2026-10-21
+- Status: **aceito** em 2026-10-21, com a decisão D1 = os dois modos (simples como padrão). Ver `docs/plano/reestruturacao.md`.
 
 ## Contexto
 O dono definiu que a função central do SaaS é acompanhar a produção por **etapas**: progresso,

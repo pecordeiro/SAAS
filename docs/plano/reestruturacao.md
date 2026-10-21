@@ -1,6 +1,6 @@
 # Plano de reestruturação — de volta à base do Controle de Atividades
 
-Status: **proposta, aguarda aprovação do dono** · Data: 2026-10-21
+Status: **aprovado** em 2026-10-21 ("agora faça isso"), com as sugestões da seção 9 como decisões · Data: 2026-10-21
 
 Referências usadas: código do painel antigo (`pecordeiro/controle-de-atividades`, `sistema/server.py` e
 `sistema/index.html`), capturas em `docs/referencia/painel-antigo/`, ADR-0014 (foco em etapas), uma
@@ -223,6 +223,8 @@ Depois da R10 seguem os passos de lançamento que já estão em `docs/plano/lanc
 | **codebase-memory-mcp** | Bloqueado pela permissão do ambiente; o Graphify cobre a mesma necessidade | — |
 
 ## 9. Decisões do dono
+
+Aplicadas as sugestões abaixo (o dono aprovou o plano sem mudar nenhuma). Podem ser trocadas depois.
 
 | # | Pergunta | Sugestão |
 |---|---|---|
