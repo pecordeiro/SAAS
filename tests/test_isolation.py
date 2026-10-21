@@ -103,7 +103,7 @@ def test_toda_rota_com_uuid_tem_caso_de_isolamento(app_factory, flags):
     """Varre o url_map (com e sem as flags que registram blueprints) e falha se alguma rota
     com <uuid:> não tiver caso A/B. Rota com dois <uuid:> também precisa estar listada."""
     app = app_factory(flags)
-    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI + ROUTES_ETAPA_D + ROUTES_ETAPA_E + ROUTES_ETAPA_F + ROUTES_ETAPA_G + ROUTES_ETAPA_G_CHECKLIST + ROUTES_ETAPA_G_UNIDADES
+    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI + ROUTES_ETAPA_D + ROUTES_ETAPA_E + ROUTES_ETAPA_F + ROUTES_ETAPA_G + ROUTES_ETAPA_G_CHECKLIST + ROUTES_ETAPA_G_UNIDADES + ROUTES_R8
     cobertas = {template.replace("{id}", "") for _, template, _, _ in todas}
     # Etapa C: /interno é da plataforma (sem empresa na URL); acesso cruzado = não ser equipe → 404,
     # coberto por tests/test_etapa_c_interno.py::test_interno_e_404_para_quem_nao_e_equipe.
@@ -1074,3 +1074,107 @@ def test_etapa_g_unidades_ids_de_b_no_corpo_e_busca(client, app, tenants_units):
     after_a = _snapshot_units(app, a)  # A ganhou só o item de checklist do próprio teste
     assert (after_a["units"], after_a["unit_entries"]) == (before_a["units"], before_a["unit_entries"])
     assert _snapshot_units(app, b) == before_b
+
+
+# --------------------------------------------------------------------------- R8 (restaurar)
+# Prévia, aplicar e desfazer restauração. Cada empresa tem um projeto com 2 registros (um há
+# 3 h, outro há 1 h) e uma restauração já aplicada (para ter o id do desfazer). Owner de A
+# pedindo projeto/restauração de B → 404 e nada muda em B (nem com o token VÁLIDO de B).
+
+from datetime import datetime as _dt  # noqa: E402
+from datetime import timedelta as _td  # noqa: E402
+from datetime import timezone as _tz  # noqa: E402
+
+from app.services import restore as rsvc  # noqa: E402
+
+# Para a varredura do url_map (os casos A/B de verdade estão nos testes test_r8_* abaixo).
+ROUTES_R8 = [
+    ("GET", "/app/projetos/{id}/restaurar", "project_id", None),
+    ("POST", "/app/projetos/{id}/restaurar", "project_id", None),
+    ("POST", "/app/projetos/{id}/restauracoes/{id}/desfazer", "project_id", None),
+]
+
+
+@dataclass
+class TenantR8:
+    company_id: object
+    owner_email: str
+    project_id: object
+    restore_id: object
+    ate: str  # instante (local) com algo a restaurar
+    token: str  # token válido da prévia desse instante
+
+
+def _make_tenant_r8(label: str) -> TenantR8:
+    base = make_tenant(label)
+    now = _dt.now(_tz.utc).replace(second=0, microsecond=0)
+    table = ProgressEntry.__table__
+    for delta, hours in ((3, 3), (2, 1)):
+        entry = svc.register_progress(db.session.get(Activity, base.activity_id), delta, None, base.owner_id)
+        db.session.commit()
+        db.session.execute(table.update().where(table.c.id == entry.id).values(at=now - _td(hours=hours)))
+        db.session.commit()
+    db.session.expire_all()
+    project = db.session.get(Project, base.project_id)
+    at_full = now - _td(days=1)
+    restored = rsvc.restore_apply(project, at_full, base.owner_id, rsvc.restore_preview(project, at_full).token)
+    db.session.commit()
+    # Depois da restauração (tudo a 0), a prévia para há 2 h tem o que mudar (0 → 3).
+    at = now - _td(hours=2)
+    project = db.session.get(Project, base.project_id)
+    return TenantR8(
+        company_id=base.company_id, owner_email=base.owner_email, project_id=base.project_id,
+        restore_id=restored.restore_id, ate=rsvc.format_local(at, "America/Sao_Paulo"),
+        token=rsvc.restore_preview(project, at).token,
+    )
+
+
+@pytest.fixture()
+def tenants_r8(app):
+    with app.app_context():
+        return _make_tenant_r8("A"), _make_tenant_r8("B")
+
+
+def _r8_calls(t: TenantR8, project_of: TenantR8, restore_of: TenantR8):
+    base = f"/app/projetos/{project_of.project_id}"
+    return [
+        ("GET", f"{base}/restaurar", None),
+        ("GET", f"{base}/restaurar?ate={t.ate}", None),
+        ("POST", f"{base}/restaurar", {"ate": t.ate, "token": t.token, "confirm": "y"}),
+        ("POST", f"{base}/restauracoes/{restore_of.restore_id}/desfazer", {"confirm": "y"}),
+    ]
+
+
+def test_r8_recurso_de_outra_empresa_responde_404(client, app, tenants_r8):
+    a, b = tenants_r8
+    with app.app_context():
+        before = _snapshot(b.company_id)
+    login(client, app, a.owner_email)
+    # projeto de B (com o token válido de B) e restauração de B dentro do projeto de A
+    calls = _r8_calls(b, b, b) + [_r8_calls(a, a, b)[3]]
+    for method, url, data in calls:
+        assert _call(client, app, method, url, data).status_code == 404, url
+    with app.app_context():
+        assert _snapshot(b.company_id) == before
+
+
+def test_r8_mesma_rota_funciona_na_propria_empresa(client, app, tenants_r8):
+    a, b = tenants_r8
+    with app.app_context():
+        before_b = _snapshot(b.company_id)
+    login(client, app, a.owner_email)
+    for method, url, data in _r8_calls(a, a, a):
+        assert _call(client, app, method, url, data).status_code in (200, 302, 303), url
+    with app.app_context():
+        assert _snapshot(b.company_id) == before_b
+        # 0 → 3 (restaurar para há 2 h) → 8 (desfazer a 1ª restauração devolve as 5 que ela tirou)
+        assert db.session.query(Activity).filter_by(company_id=a.company_id, name="Atividade 1").one().units_done == 8
+        assert rsvc.is_restore_undone(db.session.get(Project, a.project_id), a.restore_id)
+
+
+def test_r8_previa_de_a_nao_mostra_dados_de_b(client, app, tenants_r8):
+    a, b = tenants_r8
+    login(client, app, a.owner_email)
+    page = client.get(f"/app/projetos/{a.project_id}/restaurar?ate={a.ate}").get_data(as_text=True)
+    assert "Projeto A" in page and "Projeto B" not in page
+    assert str(b.restore_id) not in page and b.token not in page

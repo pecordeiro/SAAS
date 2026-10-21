@@ -1,0 +1,93 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/badge.html" import badge %}
+{% from "components/alert.html" import alert %}
+{% from "components/field.html" import checkbox %}
+{% set nav_current = "history" %}
+{% set nav_project = project %}
+{% block title %}Restaurar · {{ project.name }}{% endblock %}
+{% block content %}
+{# R8 (supervisor+), tela mínima: a tela definitiva vem com o visual novo. Todos os números
+   (peças no instante, resumo antes/depois) vêm do servidor (services/restore.py + calc.py). #}
+{%- set history_url = url_for('app.project_history', project_id=project.id) %}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ history_url }}">{{ icon("chevron-left") }}Histórico</a>
+    <h1>Restaurar o projeto</h1>
+    <p class="page-header__subtitle">{{ project.name }} · volta as peças das atividades para como estavam numa data e hora</p>
+  </div>
+</header>
+
+{%- if conflict %}
+{{ alert("warning", "O projeto mudou depois da prévia", "Confira a prévia atualizada abaixo e confirme de novo.", role="alert") }}
+{%- endif %}
+{%- if error %}
+{{ alert("danger", error, role="alert") }}
+{%- endif %}
+
+<form class="card stack" method="get" action="{{ url_for('edicao.project_restore', project_id=project.id) }}">
+  <div class="field">
+    <label class="field__label" for="ate">Data e hora ({{ tz_label }})</label>
+    <input class="field__input" type="datetime-local" id="ate" name="ate" value="{{ ate or '' }}" required>
+    <p class="field__hint">Só as peças concluídas voltam. Nomes, tempos, quantidade e etapas não mudam. Nada é apagado do histórico.</p>
+  </div>
+  <div class="form-actions">{{ button("Ver o que muda", "secondary") }}</div>
+</form>
+
+{%- if preview %}
+<section class="card stack" aria-labelledby="previa-titulo">
+  <h2 class="section-title" id="previa-titulo">O que muda</h2>
+  <p>Progresso geral: {{ preview.before.progresso_geral|pct }} → <span class="text-strong">{{ preview.after.progresso_geral|pct }}</span>
+    · Unidades prontas: {{ preview.before.unidades_concluidas }} → <span class="text-strong">{{ preview.after.unidades_concluidas }}</span> de {{ project.quantity }}</p>
+  {%- if not preview.changed %}
+  {{ alert("info", "Nada a restaurar", "Nesse momento o projeto já estava como está agora.") }}
+  {%- else %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th scope="col">Etapa › atividade</th><th scope="col" class="is-num">Agora</th><th scope="col" class="is-num">Depois</th></tr></thead>
+      <tbody>
+        {%- for s in preview.stages if s.changed %}
+        <tr><th scope="row" colspan="3">{{ s.stage.name }} · {{ s.before.progresso|pct }} → {{ s.after.progresso|pct }}</th></tr>
+        {%- for a in s.activities if a.changed %}
+        <tr><td>{{ a.activity.name }}</td><td class="is-num">{{ a.current }}</td><td class="is-num text-strong">{{ a.target }} ({{ "%+d"|format(a.delta) }})</td></tr>
+        {%- endfor %}
+        {%- endfor %}
+      </tbody>
+    </table>
+  </div>
+  <form class="stack" method="post" action="{{ url_for('edicao.project_restore_apply', project_id=project.id) }}">
+    {{ form.csrf_token }}
+    <input type="hidden" name="ate" value="{{ ate }}">
+    <input type="hidden" name="token" value="{{ preview.token }}">
+    {{ checkbox("confirm", "Confirmo: voltar o projeto para " ~ ate_label, value="y") }}
+    <div class="form-actions">
+      {{ button("Restaurar", "danger", size="lg") }}
+      {{ button("Cancelar", "secondary", size="lg", href=history_url) }}
+    </div>
+  </form>
+  {%- endif %}
+</section>
+{%- endif %}
+
+{%- if records %}
+<section class="card stack" aria-labelledby="rest-titulo">
+  <h2 class="section-title" id="rest-titulo">Restaurações deste projeto</h2>
+  <ul class="stack--sm">
+    {%- for r in records %}
+    <li class="cluster">
+      <span>{{ r.log.at|datahora }} · para {{ r.target|replace("T", " ") }} · {{ r.entries }} {{ "lançamento" if r.entries == 1 else "lançamentos" }}</span>
+      {%- if r.undone %}{{ badge("desfeita", "neutral") }}
+      {%- else %}
+      <form method="post" action="{{ url_for('edicao.project_restore_undo', project_id=project.id, restore_id=r.restore_id) }}" class="cluster">
+        {{ confirm_form.csrf_token }}
+        {{ checkbox("confirm", "Confirmo", value="y") }}
+        {{ button("Desfazer restauração", "secondary") }}
+      </form>
+      {%- endif %}
+    </li>
+    {%- endfor %}
+  </ul>
+</section>
+{%- endif %}
+{% endblock %}

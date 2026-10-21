@@ -275,6 +275,9 @@ def undo_progress(entry: ProgressEntry, user_id: uuid.UUID) -> ProgressEntry:
     Não desfaz um desfazer nem o mesmo registro duas vezes (UNIQUE no banco também)."""
     if entry.reverts_entry_id is not None or entry.delta < 0:
         raise ProgressError("Este lançamento já é um desfazer.")
+    if entry.restore_id is not None:
+        # R8: lançamento de restauração só sai junto com a restauração inteira.
+        raise ProgressError("Este lançamento é de uma restauração: desfaça a restauração inteira.")
     if is_undone(entry):
         raise ProgressError("Este registro já foi desfeito.")
     activity = entry.activity

@@ -103,6 +103,15 @@ class ConfirmForm(BaseForm):
     version_id = HiddenField()
 
 
+class RestoreForm(BaseForm):
+    """R8 — confirmar a restauração: o instante digitado (fuso da empresa) e o token da prévia
+    (assinatura do estado mostrado; diferente do atual → 409)."""
+
+    ate = StringField("Data e hora", filters=[_strip], validators=[DataRequired(), Length(max=16)])
+    token = HiddenField(validators=[DataRequired(), Length(max=64)])
+    confirm = BooleanField("Confirmo", validators=[DataRequired(message="Marque a confirmação.")])
+
+
 class TemplateForm(BaseForm):
     name = StringField("Nome do modelo", filters=[_strip], validators=[DataRequired(), Length(max=160)])
     description = TextAreaField("Descrição", filters=[_strip], validators=[Optional(), Length(max=2000)])

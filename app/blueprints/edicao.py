@@ -1,5 +1,6 @@
 """Edição de projeto (Fase 4): dados, renomear/reordenar/arquivar etapas e atividades,
-duplicar, arquivar, comparar/aplicar versão do modelo e desfazer registro (D13).
+duplicar, arquivar, comparar/aplicar versão do modelo, desfazer registro (D13) e restaurar o
+projeto para uma data (R8).
 
 Tudo supervisor+, POST com CSRF, recursos resolvidos por ``get_or_404`` (empresa da sessão;
 arquivado = 404). Também registra, para o app inteiro, a resposta 402 de
@@ -24,10 +25,12 @@ from app.forms_production import (
     PositionForm,
     ProjectEditForm,
     RenameForm,
+    RestoreForm,
 )
 from app.models import ROLE_SUPERVISOR, Activity, Project, ProgressEntry, Stage
 from app.services import entitlements
 from app.services import projects as svc
+from app.services import restore as rsvc
 from app.services import templates as tsvc
 from app.tenancy import get_or_404, tenant_required
 
@@ -395,3 +398,101 @@ def entry_undo(entry_id):
         undone=svc.is_undone(entry),
         form=ConfirmForm(formdata=None),
     )
+
+
+# ---------------------------------------------------------------- restaurar (R8)
+
+
+def _restore_page(project: Project, *, ate: str | None, status: int = 200, conflict: bool = False,
+                  error: str | None = None):
+    tz_name = g.company.timezone or rsvc.DEFAULT_TZ
+    preview = None
+    if ate and error is None:
+        at = rsvc.parse_local(ate, tz_name)
+        if at is None:
+            error, status = "Data e hora inválidas. Use o formato AAAA-MM-DDTHH:MM.", 400
+        else:
+            preview = rsvc.restore_preview(project, at)
+    return (
+        render_template(
+            "edicao/restore.html",
+            project=project,
+            ate=ate if preview else None,
+            ate_label=(ate or "").replace("T", " "),
+            tz_label=tz_name,
+            preview=preview,
+            records=rsvc.restorations(project),
+            form=RestoreForm(formdata=None),
+            confirm_form=ConfirmForm(formdata=None),
+            conflict=conflict,
+            error=error,
+        ),
+        status,
+    )
+
+
+@bp.get("/projetos/<uuid:project_id>/restaurar")
+@tenant_required(ROLE_SUPERVISOR)
+def project_restore(project_id):
+    """Prévia: ``?ate=AAAA-MM-DDTHH:MM`` (fuso da empresa). Só leitura."""
+    project = get_or_404(Project, project_id)
+    return _restore_page(project, ate=(request.args.get("ate") or "").strip()[:16] or None)
+
+
+@bp.post("/projetos/<uuid:project_id>/restaurar")
+@tenant_required(ROLE_SUPERVISOR)
+def project_restore_apply(project_id):
+    """Aplica a restauração mostrada na prévia (token): mudou no meio → 409 com a prévia nova."""
+    project = get_or_404(Project, project_id)
+    form = RestoreForm()
+    ate = (form.ate.data or "").strip()[:16]
+    tz_name = g.company.timezone or rsvc.DEFAULT_TZ
+    at = rsvc.parse_local(ate, tz_name)
+    if not form.validate() or at is None:
+        if at is None:
+            return _restore_page(project, ate=None, status=400, error="Data e hora inválidas.")
+        flash("Marque a confirmação para restaurar.", "erro")
+        return redirect(url_for("edicao.project_restore", project_id=project.id, ate=ate), 303)
+    try:
+        result = rsvc.restore_apply(project, at, current_user.id, form.token.data, tz_name=tz_name)
+    except rsvc.RestoreConflict:
+        db.session.rollback()
+        project = get_or_404(Project, project_id)
+        return _restore_page(project, ate=ate, status=409, conflict=True)
+    except rsvc.RestoreError as exc:
+        db.session.rollback()
+        flash(str(exc), "erro")
+        return redirect(url_for("edicao.project_restore", project_id=project.id, ate=ate), 303)
+    db.session.commit()
+    flash(
+        f"Projeto restaurado para {ate.replace('T', ' ')}: {len(result.entries)} "
+        f"{'lançamento' if len(result.entries) == 1 else 'lançamentos'} no histórico.",
+        "sucesso",
+    )
+    return redirect(url_for("edicao.project_restore", project_id=project.id), 303)
+
+
+@bp.post("/projetos/<uuid:project_id>/restauracoes/<uuid:restore_id>/desfazer")
+@tenant_required(ROLE_SUPERVISOR)
+def project_restore_undo(project_id, restore_id):
+    """Desfaz uma restauração inteira (lançamentos que invertem os dela). Outra empresa → 404."""
+    project = get_or_404(Project, project_id)
+    back = url_for("edicao.project_restore", project_id=project.id)
+    form = ConfirmForm()
+    try:
+        if not form.validate():
+            if not rsvc.restore_exists(project, restore_id):
+                abort(404)
+            flash("Marque a confirmação para desfazer a restauração.", "erro")
+            return redirect(back, 303)
+        rsvc.restore_undo(project, restore_id, current_user.id)
+    except rsvc.RestoreNotFound:
+        db.session.rollback()
+        abort(404)
+    except rsvc.RestoreError as exc:
+        db.session.rollback()
+        flash(str(exc), "erro")
+        return redirect(back, 303)
+    db.session.commit()
+    flash("Restauração desfeita. Os lançamentos dela continuam no histórico.", "sucesso")
+    return redirect(back, 303)

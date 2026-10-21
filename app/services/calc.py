@@ -373,6 +373,22 @@ def resumo_projeto(
 
 
 # ---------------------------------------------------------------------------
+# Restaurar (R8)
+# ---------------------------------------------------------------------------
+
+
+def pecas_no_instante(pecas_agora: int, deltas_posteriores: Iterable[int], previstas: int) -> int:
+    """Peças da atividade num instante passado: as de agora menos tudo o que foi lançado
+    DEPOIS do instante (registros, desfazeres e restaurações, cada um com o seu sinal).
+
+    Contar para trás a partir de agora (e não somar o histórico desde o zero) mantém a conta
+    certa mesmo se o histórico não começa em zero. O resultado fica entre 0 e as previstas
+    de AGORA (a quantidade do projeto pode ter mudado depois do instante)."""
+    valor = pecas_agora - sum(deltas_posteriores)
+    return max(0, min(valor, max(0, previstas)))
+
+
+# ---------------------------------------------------------------------------
 # Progresso por pessoa (Etapa D)
 # ---------------------------------------------------------------------------
 

@@ -64,6 +64,9 @@ UNIT_STATUS_CHANGED = "unit.status_changed"
 TEMPLATE_VERSION_APPLIED = "template.version_applied"
 TEMPLATE_ARCHIVED = "template.archived"
 PROGRESS_UNDONE = "progress.undone"
+# R8 — restaurar o projeto para uma data (lançamentos compensatórios) e desfazer a restauração.
+PROJECT_RESTORED = "project.restored"
+PROJECT_RESTORE_UNDONE = "project.restore_undone"
 COMPANY_UPDATED = "company.updated"
 HOLIDAY_ADDED = "holiday.added"
 HOLIDAY_REMOVED = "holiday.removed"
@@ -111,6 +114,8 @@ ACTION_LABELS = {
     TEMPLATE_VERSION_APPLIED: "Versão do modelo aplicada",
     TEMPLATE_ARCHIVED: "Modelo arquivado",
     PROGRESS_UNDONE: "Registro desfeito",
+    PROJECT_RESTORED: "Projeto restaurado",
+    PROJECT_RESTORE_UNDONE: "Restauração desfeita",
     COMPANY_UPDATED: "Dados da empresa alterados",
     HOLIDAY_ADDED: "Feriado incluído",
     HOLIDAY_REMOVED: "Feriado removido",

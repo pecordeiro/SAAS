@@ -1073,3 +1073,58 @@ critérios de pronto da anterior estiverem marcados.
   que exigem PostgreSQL), `scripts/build_assets.py --check` ok, contraste recalculado (claro e escuro).
 - Pendências: telas conferidas em 375/768/1280 px no navegador (sem navegador neste ambiente);
   regerar `docs/design/capturas/`; decidir o nome comercial.
+
+## Reestruturação R8 — servidor (restaurar o projeto para uma data)
+
+- Status: parte de servidor concluída; tela definitiva pendente (vem com o visual novo).
+- Datas: início 2026-10-21 · fim 2026-10-21
+- Entregas:
+  - `app/services/restore.py`: `restore_preview(project, at)` (peças de cada atividade ativa no
+    instante, diferença agora → depois por etapa/atividade, resumo do projeto antes/depois via
+    `calc.resumo_projeto` e um `token` = assinatura do estado lido: versão e peças de cada atividade,
+    quantidade e instante); `restore_apply(project, at, actor_id, expected_token)` (token diferente
+    → `RestoreConflict`/409; grava UM lançamento compensatório por atividade que muda, com UPDATE
+    condicional na versão, eventos de progresso/conclusão, status do projeto e auditoria
+    `project.restored` com quem, para quando, quantos lançamentos); `restore_undo(project,
+    restore_id, actor_id)` (inverte os lançamentos da restauração, uma vez só, recusa desfazer um
+    desfazer e recusa se a inversão sairia de 0..previstas; auditoria `project.restore_undone`);
+    `restorations(project)` para a lista.
+  - `calc.pecas_no_instante`: peças de agora menos tudo o que foi lançado depois do instante
+    (registros, desfazeres e restaurações), limitado a 0..previstas de agora. Conta para trás, então
+    funciona mesmo se o histórico não começa em zero.
+  - Migration `e8c4a7b2d1f9` (revisa `d9a3b6e2f8c5`): `progress_entries.restore_id` e
+    `restore_undoes_id` (Uuid, NULL nas linhas antigas, sem FK: a operação vive em `audit_logs`),
+    índices por empresa e CHECK `restore_undoes_id IS NULL OR restore_id IS NOT NULL`. O histórico
+    continua append-only; RLS sem mudança.
+  - Rotas (supervisor+; operador 403; projeto de outra empresa ou arquivado 404):
+    `GET /app/projetos/<id>/restaurar[?ate=AAAA-MM-DDTHH:MM]` (prévia; data inválida 400),
+    `POST /app/projetos/<id>/restaurar` (`ate`, `token`, `confirm`; 409 com a prévia nova se mudou),
+    `POST /app/projetos/<id>/restauracoes/<restore_id>/desfazer` (`confirm`; restauração de outro
+    projeto/empresa 404). Template mínimo `edicao/restore.html` com componentes existentes.
+  - Desfazer registro (`undo_progress`) recusa lançamento de restauração (só sai a restauração
+    inteira); o histórico não mostra “Desfazer” nesses lançamentos.
+- Regras:
+  - A data digitada é local, no fuso da empresa (padrão America/Sao_Paulo), e vale o início do
+    minuto: “10:30” = 10:30:00; lançamento às 10:30:20 fica depois e é desfeito.
+  - Escopo: só as peças concluídas das atividades ATIVAS (o que o histórico registra). Fora do
+    escopo, porque o histórico não guarda esses estados: nomes, tempos ideais, quantidade, pessoas,
+    horas por dia, estrutura de etapas e atividades (criar, mover, arquivar), “aguardando peça”,
+    checklist, fotos, comentários e unidades (número de série). Atividade/etapa arquivada não muda.
+  - Se a quantidade do projeto diminuiu depois do instante, o valor restaurado é limitado às
+    previstas de agora.
+  - Desfazer a restauração é relativo (como desfazer registro): o que foi lançado depois dela fica.
+- Critérios de pronto: [x] restaura e desfaz sem perder histórico · [x] prévia antes de aplicar ·
+  [x] 409 se mudou entre prévia e confirmação · [x] A/B para cada rota nova · [ ] tela definitiva no
+  visual novo, capturas 375/768/1280 claro/escuro.
+- Testes: `tests/test_r8_restaurar.py` (18: calc, fuso, restaurar antes de N lançamentos, futuro
+  não muda nada, concorrência por token e por versão no banco, desfazer, limites, isolamento entre
+  empresas, projeto arquivado, atividade arquivada, eventos de conclusão, rotas e 403 do operador) e
+  bloco R8 em `tests/test_isolation.py` (404 com token válido de B, rota funciona em A, varredura do
+  url_map). Suíte completa em SQLite verde; migrations ida e volta em SQLite.
+- /security-review: não rodado neste ambiente (sem achado conhecido; empresa sempre via
+  `get_or_404` + `company_id` do projeto em todas as consultas).
+- Telas conferidas: n/a (tela mínima provisória).
+- Pendências para a tela: botão “Restaurar” na tela de histórico (link para
+  `edicao.project_restore`), campo data/hora no visual novo, tabela antes → depois com o resumo
+  (`preview.before`/`preview.after`), lista de restaurações com “Desfazer restauração”, mensagem de
+  409 e de “nada a restaurar”, selo “restauração” nas linhas do histórico (`entry.restore_id`).

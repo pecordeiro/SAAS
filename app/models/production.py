@@ -139,6 +139,9 @@ class ProgressEntry(UUIDPk, TenantMixin, db.Model):
         Index("ix_progress_entries_company_unit", "company_id", "unit_id"),
         CheckConstraint("delta <> 0", name="delta_nonzero"),
         CheckConstraint("reverts_entry_id IS NULL OR delta < 0", name="reversal_negative"),
+        Index("ix_progress_entries_company_restore", "company_id", "restore_id"),
+        Index("ix_progress_entries_company_restore_undoes", "company_id", "restore_undoes_id"),
+        CheckConstraint("restore_undoes_id IS NULL OR restore_id IS NOT NULL", name="restore_undo_grouped"),
     )
 
     activity_id: Mapped[uuid.UUID] = mapped_column(
@@ -153,6 +156,12 @@ class ProgressEntry(UUIDPk, TenantMixin, db.Model):
     # Etapa G: unidade (número de série) do lançamento — rastreabilidade opcional; não muda o
     # cálculo (o progresso continua em activities.units_done).
     unit_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("units.id", ondelete="RESTRICT"))
+    # R8 — restaurar: lançamentos gravados por uma restauração levam o id da operação
+    # (agrupa os lançamentos dela; não é FK, a operação não tem tabela própria — o registro dela
+    # fica em audit_logs). O desfazer de uma restauração também é uma operação: os lançamentos
+    # dele levam o próprio ``restore_id`` e, em ``restore_undoes_id``, a restauração desfeita.
+    restore_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    restore_undoes_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
 
     activity: Mapped[Activity] = relationship()
     user = relationship("User")
