@@ -22,7 +22,7 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 
 from app.extensions import db, limiter
 from app.security import signing_keys
-from app.forms_production import ImportConfirmForm, ImportForm, ImportMapForm
+from app.forms_production import ImportConfirmForm, ImportForm, ImportManyForm, ImportMapForm
 from app.models import ROLE_SUPERVISOR, Project
 from app.services import entitlements, export_layout, exporter, importer
 from app.services import import_mapping as mapping_svc
@@ -143,6 +143,10 @@ def import_upload():
     data = upload.stream.read(limit + 1)
     try:
         grid = importer.load_grid(upload.filename, data, limit)
+        if not form.map_columns.data:
+            found = importer.parse_reference_many(grid)
+            if len(found) >= 2:
+                return _projects_page(found)
         result = None if form.map_columns.data else importer.auto_parse(grid)
         if result is None:
             return _mapping_page(grid, name=form.name.data)
@@ -281,6 +285,129 @@ def import_columns():
         "quantity": form.quantity.data, "name": form.name.data,
     }
     return _preview(ImportForm(formdata=None), result, form.name.data, back=back)
+
+
+# ---------------------------------------------------------------- R7: vários projetos no arquivo
+
+MANY_SALT = "importacao-varios"
+
+
+def _many_serializer() -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(signing_keys(), salt=MANY_SALT)
+
+
+def _sign_many(results) -> str:
+    return _many_serializer().dumps(
+        {"c": str(g.company.id), "u": str(current_user.id), "d": [importer.to_payload(r) for r in results]}
+    )
+
+
+def _load_many(token: str) -> list | None:
+    """Lista de ``ImportResult`` revalidados, ou ``None`` se a assinatura/sessão não confere."""
+    try:
+        data = _many_serializer().loads(token, max_age=PAYLOAD_MAX_AGE)
+    except BadSignature:
+        return None
+    if data.get("c") != str(g.company.id) or data.get("u") != str(current_user.id):
+        return None
+    items = data.get("d")
+    if not isinstance(items, list) or not 1 <= len(items) <= importer.MAX_GRID_SHEETS:
+        return None
+    return [importer.from_payload(item if isinstance(item, dict) else {}) for item in items]
+
+
+def _limit_message(usage, chosen: int) -> str | None:
+    """Mensagem clara quando os projetos escolhidos passam do limite do plano (a recusa de
+    verdade é o ``check_can_create_project`` na confirmação)."""
+    if usage["max_projects"] is None or usage["projects"] + chosen <= usage["max_projects"]:
+        return None
+    free = max(usage["max_projects"] - usage["projects"], 0)
+    return (
+        f"Seu plano {usage['plan'].name} permite {usage['max_projects']} projetos ativos e já há "
+        f"{usage['projects']}. Dá para importar {free} agora: desmarque {chosen - free} "
+        f"ou arquive projetos antes."
+    )
+
+
+def _projects_page(found, *, status=200, error=None, picked=None):
+    """Passo 2 do arquivo com vários projetos: lista para escolher (todos marcados)."""
+    ok = [result for _, result in found if result.ok]
+    rows, i = [], 0
+    for project, result in found:
+        rows.append((project, result, i if result.ok else None))
+        i += 1 if result.ok else 0
+    usage = entitlements.usage(g.company)
+    picked = set(range(len(ok))) if picked is None else picked
+    form = ImportManyForm(formdata=None, data={"payload": _sign_many(ok)}) if ok else None
+    return render_template(
+        "dados/import_projects.html", step=2, rows=rows, ok_count=len(ok), form=form, usage=usage,
+        picked=picked, error=error, limit_message=_limit_message(usage, len(picked)), limit_mb=_limit_mb(),
+    ), status
+
+
+def _picks(total: int) -> list[int]:
+    out = []
+    for raw in request.form.getlist("pick"):
+        try:
+            idx = int(raw)
+        except ValueError:
+            continue
+        if 0 <= idx < total and idx not in out:
+            out.append(idx)
+    return sorted(out)
+
+
+@bp.post("/importar/projetos")
+@limiter.limit(_import_limit)
+@tenant_required(ROLE_SUPERVISOR)
+def import_projects():
+    """Passo 2 → 3: os projetos escolhidos viram a prévia (nova lista assinada, só com eles)."""
+    form = ImportManyForm()
+    results = _load_many(form.payload.data or "") if form.validate() else None
+    if results is None:
+        return _page(ImportForm(formdata=None), 400, upload_error="Prévia expirada ou de outra sessão. Envie o arquivo de novo.")
+    picks = _picks(len(results))
+    if request.form.get("action") == "voltar":
+        return _projects_page([(None, r) for r in results], picked=set(picks))
+    if not picks:
+        found = [(None, r) for r in results]
+        return _projects_page(found, status=400, picked=set(), error="Marque ao menos um projeto para importar.")
+    chosen = [results[i] for i in picks]
+    usage = entitlements.usage(g.company)
+    confirm = ImportManyForm(formdata=None, data={"payload": _sign_many(chosen)})
+    return render_template(
+        "dados/import_projects.html", step=3, chosen=chosen, form=confirm, usage=usage,
+        limit_message=_limit_message(usage, len(chosen)), back_payload=form.payload.data, picks=picks,
+        limit_mb=_limit_mb(),
+    )
+
+
+@bp.post("/importar/confirmar-varios")
+@limiter.limit(_import_limit)
+@tenant_required(ROLE_SUPERVISOR)
+def import_confirm_many():
+    """Cria um projeto por item escolhido, numa transação só. Limite do plano conferido no
+    servidor ANTES de gravar (e de novo em cada ``create_project``)."""
+    form = ImportManyForm()
+    results = _load_many(form.payload.data or "") if form.validate() else None
+    if results is None or any(not r.ok for r in results):
+        return _page(ImportForm(formdata=None), 400, upload_error="Prévia expirada ou inválida. Envie o arquivo de novo.")
+    usage = entitlements.usage(g.company)
+    message = _limit_message(usage, len(results))
+    if message:
+        return render_template(
+            "dados/import_projects.html", step=3, chosen=results, form=form, usage=usage,
+            limit_message=message, back_payload=None, picks=[], limit_mb=_limit_mb(), blocked=True,
+        ), 402
+    entitlements.check_can_create_project(g.company, adding=len(results))
+    projects = [importer.save(g.company, r, current_user.id) for r in results]
+    db.session.commit()
+    flash(
+        f"{len(projects)} {'projeto importado' if len(projects) == 1 else 'projetos importados'}: "
+        + ", ".join(p.name for p in projects) + ".",
+        "sucesso",
+    )
+    return redirect(url_for("app.projects"), 303)
 
 
 @bp.post("/importar/confirmar")

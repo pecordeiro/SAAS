@@ -361,6 +361,41 @@ def test_aviso_do_modo_da_importacao_nao_le_dados_de_empresa(client, app, tenant
         assert _snapshot(a.company_id) == before_a and _snapshot(b.company_id) == before_b
 
 
+def test_varios_projetos_assinados_para_outra_empresa_sao_recusados(client, app, tenants4):
+    """R7: a lista de projetos (arquivo com vários) leva empresa e usuário; a de B não serve
+    para A, nem na escolha nem na confirmação, e nada é gravado em nenhuma das duas."""
+    from itsdangerous import URLSafeTimedSerializer
+
+    from app.blueprints.dados import MANY_SALT
+    from app.models import User
+    from app.services import importer
+    from app.services.projects import NewActivity, NewStage
+
+    a, b = tenants4
+    result = importer.ImportResult(source="planilha", name="Invasora", quantity=2)
+    result.stages = [NewStage(name="Corte", activities=[NewActivity(name="Serrar", ideal_minutes=1, units_done=0)])]
+    item = importer.to_payload(result)
+    with app.app_context():
+        b_user = str(db.session.query(User).filter_by(email=b.owner_email).one().id)
+        a_user = str(db.session.query(User).filter_by(email=a.owner_email).one().id)
+        before_a, before_b = _snapshot(a.company_id), _snapshot(b.company_id)
+    signer = URLSafeTimedSerializer(app.secret_key, salt=MANY_SALT)
+    of_b = signer.dumps({"c": str(b.company_id), "u": b_user, "d": [item]})
+    login(client, app, a.owner_email)
+    for url, data in (("/app/importar/projetos", {"payload": of_b, "pick": "0"}),
+                      ("/app/importar/confirmar-varios", {"payload": of_b})):
+        response = post(client, app, url, data)
+        assert response.status_code == 400 and "Invasora" not in response.get_data(as_text=True)
+    # usuário de A com empresa de B na assinatura também não serve
+    mixed = signer.dumps({"c": str(b.company_id), "u": a_user, "d": [item]})
+    assert post(client, app, "/app/importar/confirmar-varios", {"payload": mixed}).status_code == 400
+    with app.app_context():
+        assert _snapshot(a.company_id) == before_a and _snapshot(b.company_id) == before_b
+    # a mesma lista assinada para A funciona
+    own = signer.dumps({"c": str(a.company_id), "u": a_user, "d": [item]})
+    assert post(client, app, "/app/importar/projetos", {"payload": own, "pick": "0"}).status_code == 200
+
+
 def test_aviso_do_modo_da_importacao_recusa_operador(client, app, tenants):
     a, _ = tenants
     login(client, app, a.operator_email)
