@@ -991,11 +991,14 @@
     color: var(--color-text-subtle);
     font-size: var(--font-size-sm);
   }
+  /* Primeiro botão da faixa (painel, histórico): o menu abre para a direita, dentro do conteúdo. */
+  .page-header__actions > .export-menu:first-child .export-menu__list { right: auto; left: 0; }
   @media (max-width: 47.99em) {
     /* Celular: o menu ocupa a largura da faixa de ações (sem rolagem lateral). */
     .page-header__actions:has(.export-menu) { position: relative; }
     .page-header__actions .export-menu { position: static; }
-    .page-header__actions .export-menu__list { left: 0; right: 0; width: auto; }
+    .page-header__actions > .export-menu .export-menu__list,
+    .page-header__actions > .export-menu:first-child .export-menu__list { left: 0; right: 0; width: auto; }
   }
 
   /* =================== R8 · Restaurar para uma data =================== */
