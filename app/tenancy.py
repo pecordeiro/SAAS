@@ -90,6 +90,7 @@ def tenant_required(
 
     Sem login → tela de login. Sem empresa válida na sessão → primeiro vínculo ativo do
     usuário (ou 403 se não houver).
+    Rota de módulo opcional desligado na empresa → 404 (R6, ``services/modules.py``).
     Papel insuficiente → 403.
     Escrita (método que não é GET/HEAD/OPTIONS) com a empresa em modo leitura → 402
     (``entitlements.ReadOnlyError``). ``allow_read_only=True`` libera a rota (ex.: pagar a
@@ -109,6 +110,11 @@ def tenant_required(
                 if membership is None:
                     abort(403)
                 set_company(membership)
+            # R6 (ADR-0017): rota de módulo opcional desligado → 404 para todos os papéis, antes
+            # do papel (não revela que a rota existe). O mapa rota → módulo está em services/modules.
+            from app.services import modules
+
+            modules.guard_endpoint(g.company)
             if not g.membership.has_role(min_role):
                 abort(403)
             if not allow_read_only and request.method not in SAFE_METHODS:

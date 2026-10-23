@@ -1,0 +1,8 @@
+{#
+  Selo “Opcional” (R6, ADR-0017): marca tudo o que é de um módulo opcional — o que só aparece
+  porque o proprietário ligou o módulo em Configurações › Módulos. Só apresentação: quem recusa
+  a rota de um módulo desligado é o servidor (services/modules.py, ADR-0009).
+#}
+{% macro optional_badge(class_="") -%}
+<span class="badge badge--optional optional-tag{% if class_ %} {{ class_ }}{% endif %}" title="Módulo opcional: o proprietário liga ou desliga em Configurações › Módulos">Opcional</span>
+{%- endmacro %}

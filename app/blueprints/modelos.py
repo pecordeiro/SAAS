@@ -10,6 +10,7 @@ from flask_login import current_user
 from app.extensions import db
 from app.forms_production import MAX_TEMPLATE_STAGES, ConfirmForm, TemplateForm
 from app.models import ROLE_SUPERVISOR, Template
+from app.services import modules
 from app.services import templates as tsvc
 from app.services.exporter import br_decimal
 from app.tenancy import get_or_404, tenant_required
@@ -32,6 +33,24 @@ def _slot_data(template: Template | None) -> list[dict]:
     return slots + [{"name": "", "activities": "", "checklist": "", "checklist_required": False}] * 2
 
 
+def _stages_from(form: TemplateForm, template: Template | None) -> list:
+    """Etapas do formulário. R6: com o módulo “checklist” desligado o campo nem aparece, então o
+    que vier no POST é ignorado e cada etapa mantém o checklist que já tinha no modelo (pelo
+    nome); etapa nova fica sem checklist. Quem decide é o servidor (ADR-0009)."""
+    stages = form.new_stages()
+    if modules.is_enabled(g.company, modules.CHECKLIST):
+        return stages
+    before = {}
+    if template is not None and template.current_version is not None:
+        before = {
+            s.name.strip().casefold(): ([i.text for i in s.checklist_items], bool(s.checklist_required))
+            for s in template.current_version.stages
+        }
+    for stage in stages:
+        stage.checklist, stage.checklist_required = before.get(stage.name.strip().casefold(), ([], False))
+    return stages
+
+
 @bp.get("")
 @tenant_required(ROLE_SUPERVISOR)
 def index():
@@ -51,7 +70,7 @@ def new():
     if form.validate_on_submit():
         try:
             template = tsvc.create_template(
-                g.company, form.name.data, form.new_stages(), created_by_user_id=current_user.id,
+                g.company, form.name.data, _stages_from(form, None), created_by_user_id=current_user.id,
                 description=form.description.data,
             )
         except tsvc.TemplateError as exc:
@@ -76,7 +95,7 @@ def edit(template_id):
     if form.validate_on_submit():
         try:
             version = tsvc.update_template(
-                template, name=form.name.data, description=form.description.data, stages=form.new_stages(),
+                template, name=form.name.data, description=form.description.data, stages=_stages_from(form, template),
                 user_id=current_user.id,
             )
         except tsvc.TemplateError as exc:

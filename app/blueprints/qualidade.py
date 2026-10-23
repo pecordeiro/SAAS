@@ -1,5 +1,9 @@
 """Etapa G — qualidade: evidências por atividade (comentários e fotos).
 
+R6 (ADR-0017): três módulos OPCIONAIS moram aqui — ``fotos`` (evidências), ``checklist``
+(checklist e inspeções) e ``unidades`` (número de série). Com o módulo desligado na empresa, a rota
+responde 404 (``tenancy.tenant_required`` → ``modules.guard_endpoint``; mapa em services/modules.py).
+
 Regras (CLAUDE.md): empresa SÓ da sessão (``tenant_required`` + ``get_or_404``; recurso de outra
 empresa → 404), papéis na rota (esconder botão não substitui a recusa), POST com CSRF, foto
 nunca em pasta pública — só por ``/app/fotos/<uuid>`` com Content-Type fixo, ``nosniff``,
@@ -22,7 +26,7 @@ from app.models.quality import (
     StageChecklistItem,
     StageInspection,
 )
-from app.services import audit
+from app.services import audit, modules
 from app.services import checklists as checklists_svc
 from app.services import comments as comments_svc
 from app.services import projects as projects_svc
@@ -178,7 +182,10 @@ def photo_delete(photo_id):
 
 
 def _units_for_select(stage: Stage) -> list:
-    """Unidades do projeto para escolher na inspeção (opcional)."""
+    """Unidades do projeto para escolher na inspeção (opcional). R6: só com o módulo
+    “número de série” ligado."""
+    if not modules.is_enabled(g.company, modules.UNIDADES):
+        return []
     return units_svc.list_units(stage.project)
 
 
@@ -248,6 +255,8 @@ def inspection_start(stage_id):
     stage = get_or_404(Stage, stage_id)
     unit = None
     raw_unit = (request.form.get("unit_id") or "").strip()
+    if raw_unit and not modules.is_enabled(g.company, modules.UNIDADES):
+        raw_unit = ""  # R6: sem o módulo de número de série, a inspeção vale para a etapa inteira
     if raw_unit:
         unit = get_or_404(Unit, raw_unit)  # de outra empresa → 404
         if unit.project_id != stage.project_id:

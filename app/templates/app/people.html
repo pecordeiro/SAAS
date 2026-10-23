@@ -1,4 +1,5 @@
 {% extends "base_app.html" %}
+{% from "components/optional.html" import optional_badge %}
 {% from "components/icon.html" import icon %}
 {% from "components/table.html" import data_table %}
 {% from "components/chart.html" import bar_chart %}
@@ -15,7 +16,7 @@
 <header class="page-header">
   <div class="page-header__titles">
     <a class="back-link" href="{{ url_for('app.project_detail', project_id=project.id) }}">{{ icon("chevron-left") }}{{ project.name }}</a>
-    <h1>Progresso por pessoa</h1>
+    <h1>Progresso por pessoa{{ optional_badge() }}</h1>
     <p class="page-header__subtitle">Peças lançadas no período (desfazeres descontados) e atividades sob responsabilidade de cada pessoa.</p>
   </div>
 </header>

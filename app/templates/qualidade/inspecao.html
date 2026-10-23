@@ -1,4 +1,5 @@
 {% extends "base_app.html" %}
+{% from "components/optional.html" import optional_badge %}
 {% from "components/icon.html" import icon %}
 {% from "components/button.html" import button %}
 {% from "components/alert.html" import alert %}
@@ -17,7 +18,7 @@
 <header class="page-header">
   <div class="page-header__titles">
     <a class="back-link" href="{{ url_for('qualidade.checklist', stage_id=stage.id) }}">{{ icon("chevron-left") }}Checklist · {{ stage.name }}</a>
-    <h1>Inspeção{% if inspection.unit %} · {{ inspection.unit.serial }}{% endif %}</h1>
+    <h1>Inspeção{% if inspection.unit and "unidades" in modules %} · {{ inspection.unit.serial }}{% endif %}{{ optional_badge() }}</h1>
     <p class="page-header__subtitle">
       {%- if signed %}{{ badge("Assinada", "success", "check") }} <span class="muted">por {{ inspection.signed_by.name if inspection.signed_by else "Pessoa removida" }} em <span class="num">{{ inspection.signed_at|datahora }}</span></span>
       {%- else %}{{ badge("Rascunho", "neutral", "circle") }} <span class="muted">aberta em <span class="num">{{ inspection.created_at|datahora }}</span></span>{% endif %}

@@ -6,6 +6,7 @@
 {% from "components/modal.html" import confirm_dialog %}
 {% from "components/field.html" import checkbox %}
 {% from "components/export_menu.html" import export_menu %}
+{% from "components/optional.html" import optional_badge %}
 {% set nav_current = "fill" %}
 {% set nav_project = project %}
 {% block title %}{{ project.name }} · Controle de Produção{% endblock %}
@@ -28,7 +29,9 @@
   <div class="page-header__actions">
     {{ button("Painel", "secondary", icon="chart", href=url_for('app.project_dashboard', project_id=project.id)) }}
     {{ button("Histórico", "secondary", icon="history", href=url_for('app.project_history', project_id=project.id)) }}
-    {{ button("Unidades", "secondary", icon="package", href=url_for('qualidade.units', project_id=project.id)) }}
+    {%- if "unidades" in modules %}
+    <a class="btn btn--secondary" href="{{ url_for('qualidade.units', project_id=project.id) }}">{{ icon("package") }}<span>Unidades</span>{{ optional_badge() }}</a>
+    {%- endif %}
     {%- if can_edit %}
     {{ export_menu(project) }}
     <details class="action-menu">
@@ -62,12 +65,13 @@
         {% include "app/detail/_stage_summary.html" %}
         <div class="stage__body">
           {%- if errors.get(stage.id) %}{{ alert("danger", errors.get(stage.id), role="alert") }}{% endif %}
-          {%- if stage.waiting_part %}
+          {%- set waiting_on = "aguardando_peca" in modules %}
+          {%- if waiting_on and stage.waiting_part %}
           {{ alert("warning", "Aguardando peça" ~ (" · previsão " ~ (stage.part_expected_on|data) if stage.part_expected_on else ""), stage.part_note or "O registro de peças continua liberado; a marca só avisa a equipe.") }}
           {%- endif %}
-          {%- if can_edit %}
+          {%- if can_edit and waiting_on %}
           <details class="part-toggle">
-            <summary class="btn btn--ghost">{{ icon("package") }}<span>{{ "Atualizar aguardando peça" if stage.waiting_part else "Marcar aguardando peça" }}</span></summary>
+            <summary class="btn btn--ghost">{{ icon("package") }}<span>{{ "Atualizar aguardando peça" if stage.waiting_part else "Marcar aguardando peça" }}</span>{{ optional_badge() }}</summary>
             <form class="inline-form mt-2" method="post" action="{{ url_for('app.stage_waiting_part', stage_id=stage.id) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="version" value="{{ stage.version }}">
@@ -84,9 +88,9 @@
             </form>
           </details>
           {%- endif %}
-          {%- if activities %}
+          {%- if activities and "fotos" in modules %}
           <details class="part-toggle evidence-toggle">
-            <summary class="btn btn--ghost">{{ icon("folder") }}<span>Fotos e comentários</span></summary>
+            <summary class="btn btn--ghost">{{ icon("folder") }}<span>Fotos e comentários</span>{{ optional_badge() }}</summary>
             <ul class="evidence-links" role="list">
               {%- for activity, ar in activities %}
               <li><a class="btn btn--secondary" href="{{ url_for('qualidade.evidence', activity_id=activity.id) }}">{{ activity.name }}<span class="muted num">&nbsp;({{ evidence_counts.get(activity.id, 0) }})</span></a></li>
@@ -94,10 +98,12 @@
             </ul>
           </details>
           {%- endif %}
+          {%- if "checklist" in modules %}
           {%- set cs = checklist_signals.get(stage.id) %}
           <div class="stage-quality">
-            <a class="btn btn--ghost" href="{{ url_for('qualidade.checklist', stage_id=stage.id) }}">{{ icon("check") }}<span>Checklist de inspeção{% if cs and cs.items %} ({{ cs.items }} itens){% endif %}</span></a>
+            <a class="btn btn--ghost" href="{{ url_for('qualidade.checklist', stage_id=stage.id) }}">{{ icon("check") }}<span>Checklist de inspeção{% if cs and cs.items %} ({{ cs.items }} itens){% endif %}</span>{{ optional_badge() }}</a>
           </div>
+          {%- endif %}
           <ul class="activities" role="list">
             {%- for activity, ar in activities %}
             {% include "app/detail/_activity.html" %}

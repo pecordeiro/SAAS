@@ -1,4 +1,5 @@
 {% extends "base_app.html" %}
+{% from "components/optional.html" import optional_badge %}
 {% from "components/button.html" import button %}
 {% from "components/field.html" import field, checkbox %}
 {% from "components/table.html" import data_table %}
@@ -11,7 +12,7 @@
 {# Fase 9: tokens da API pública (só proprietário; atrás de FEATURE_PUBLIC_API). O token puro aparece uma única vez. #}
 <header class="page-header">
   <div class="page-header__titles">
-    <h1>API</h1>
+    <h1>API{{ optional_badge() }}</h1>
     <p class="page-header__subtitle">Tokens para integrar outros sistemas. Contrato em docs/api/openapi.yaml.</p>
   </div>
 </header>

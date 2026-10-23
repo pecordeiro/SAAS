@@ -122,14 +122,15 @@ def frase_operacao(projetos: Sequence[dict], contagem: dict[str, int]) -> str:
 
 
 def etapas_do_painel(
-    stages: Sequence[Any], result: calc.ResultadoProjeto, fracao_decorrida: float | None
+    stages: Sequence[Any], result: calc.ResultadoProjeto, fracao_decorrida: float | None, aguardando_ativo: bool = True
 ) -> list[dict]:
-    """Uma linha por etapa: números do calc + situação visual + fatia da esteira."""
+    """Uma linha por etapa: números do calc + situação visual + fatia da esteira.
+    ``aguardando_ativo=False`` (R6: módulo “aguardando peça” desligado) ignora a marca."""
     atrasos = calc.etapas_atrasadas(result.etapas, fracao_decorrida)
     fatias = calc.fatias_da_esteira(result.etapas)
     etapas = []
     for i, (stage, r, atrasada, (ini, larg)) in enumerate(zip(stages, result.etapas, atrasos, fatias), start=1):
-        aguardando = bool(getattr(stage, "waiting_part", False))
+        aguardando = aguardando_ativo and bool(getattr(stage, "waiting_part", False))
         visual = calc.status_visual(r.status, aguardando, atrasada)
         etapas.append(
             {
@@ -175,8 +176,12 @@ def esteira(etapas: Sequence[dict], fracao_decorrida: float | None, href: Callab
     return {"blocos": blocos, "hoje": hoje, "atual": atual}
 
 
-def _rosca(contagem: dict[str, int]) -> list[dict]:
-    return [{"key": k, "name": NOMES_VISUAIS[k], "value": contagem[k]} for k in calc.VISUAIS]
+def _rosca(contagem: dict[str, int], aguardando_ativo: bool = True) -> list[dict]:
+    return [
+        {"key": k, "name": NOMES_VISUAIS[k], "value": contagem[k]}
+        for k in calc.VISUAIS
+        if aguardando_ativo or k != calc.VISUAL_AGUARDANDO
+    ]
 
 
 def _pendencias(etapas: Sequence[dict], projeto: str | None = None) -> list[dict]:
@@ -222,9 +227,10 @@ def painel_projeto(
     concluido: bool,
     fracao_decorrida: float | None,
     href_etapa: Callable[[Any], str],
+    aguardando_ativo: bool = True,
 ) -> dict:
     """Tudo o que o painel de um projeto mostra, de cima para baixo (plano §4.2)."""
-    etapas = etapas_do_painel(stages, result, fracao_decorrida)
+    etapas = etapas_do_painel(stages, result, fracao_decorrida, aguardando_ativo)
     contagem = calc.contagem_visual(e["visual"] for e in etapas)
     prazo_txt = situacao_prazo(deadline, concluido, prazo)
     equipe = _equipe(result.tempo_restante_h, hours_per_day, people)
@@ -247,6 +253,7 @@ def painel_projeto(
     ]
     return {
         "kind": "projeto",
+        "aguardando_ativo": aguardando_ativo,
         "frase": frase_projeto(nome, prazo_txt, contagem),
         "prazo": prazo_txt,
         "etapas": etapas,
@@ -262,7 +269,7 @@ def painel_projeto(
         "grafico": {
             "kind": "etapas",
             "rows": linhas,
-            "status": _rosca(contagem),
+            "status": _rosca(contagem, aguardando_ativo),
             "team": {"rows": equipe, "due": prazo_txt["until"]},
         },
     }
@@ -271,14 +278,15 @@ def painel_projeto(
 # ---------------------------------------------------------------- operação (todos os projetos)
 
 
-def painel_operacao(itens: Sequence[dict], href_etapa: Callable[[Any, Any], str], href_projeto: Callable[[Any], str]) -> dict:
+def painel_operacao(itens: Sequence[dict], href_etapa: Callable[[Any, Any], str], href_projeto: Callable[[Any], str],
+                    aguardando_ativo: bool = True) -> dict:
     """Painel geral. ``itens``: um dict por projeto ativo com ``project``, ``stages``, ``result``,
     ``deadline``, ``concluido`` e ``fracao`` (calculados pelo blueprint via calc/svc)."""
     projetos = []
     todas = []
     for it in itens:
         p, r = it["project"], it["result"]
-        etapas = etapas_do_painel(it["stages"], r, it["fracao"])
+        etapas = etapas_do_painel(it["stages"], r, it["fracao"], aguardando_ativo)
         todas.extend(etapas)
         prazo_txt = situacao_prazo(it["deadline"], it["concluido"], p.due_date)
         projetos.append(
@@ -330,6 +338,7 @@ def painel_operacao(itens: Sequence[dict], href_etapa: Callable[[Any, Any], str]
     ]
     return {
         "kind": "operacao",
+        "aguardando_ativo": aguardando_ativo,
         "frase": frase_operacao(projetos, contagem),
         "projetos": projetos,
         "resumo": resumo,
@@ -341,7 +350,7 @@ def painel_operacao(itens: Sequence[dict], href_etapa: Callable[[Any, Any], str]
         "grafico": {
             "kind": "projetos",
             "rows": linhas,
-            "status": _rosca(contagem),
+            "status": _rosca(contagem, aguardando_ativo),
             "deadline": {"rows": prazo_linhas},
         },
     }

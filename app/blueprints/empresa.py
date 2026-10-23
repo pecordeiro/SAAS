@@ -2,17 +2,22 @@
 
 Dados (nome, CNPJ), calendário (jornada, dias de trabalho) e feriados da empresa. A empresa
 é SEMPRE a da sessão; o id do feriado é resolvido nela (de outra empresa, ou nacional → 404).
+
+R6 (ADR-0017): Configurações › Módulos (``/app/empresa/modulos``) liga e desliga os módulos
+opcionais da empresa da sessão. Só o proprietário; cada mudança vai para ``audit_logs``.
 """
 
 from __future__ import annotations
 
-from flask import Blueprint, flash, g, redirect, render_template, url_for
+from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 from flask_login import current_user
 
 from app.extensions import db
+from app.forms import BaseForm
 from app.forms_company import CompanyForm, HolidayForm
 from app.models import ROLE_OWNER, Holiday
 from app.services import company as svc
+from app.services import entitlements, modules
 from app.tenancy import get_or_404, tenant_required
 
 bp = Blueprint("empresa", __name__, url_prefix="/app/empresa")
@@ -63,7 +68,8 @@ def settings():
                 daily_hours=form.daily_hours.data,
                 workdays=form.workdays.data or [],
                 user_id=current_user.id,
-                stalled_days=form.stalled_days.data,
+                # R6: “etapa parada” é do módulo de alertas; desligado, o campo some e o valor fica.
+                stalled_days=form.stalled_days.data if modules.is_enabled(company, modules.ALERTAS) else None,
             )
         except svc.CompanyError as exc:
             db.session.rollback()
@@ -109,3 +115,57 @@ def _company_data() -> dict:
         "workdays": list(company.workdays()),
         "stalled_days": company.stalled_days,
     }
+
+
+# ---------------------------------------------------------------- módulos opcionais (R6)
+
+
+class ModulesForm(BaseForm):
+    """Só o CSRF: as chaves vêm como caixas ``modulo`` (valor = chave do módulo)."""
+
+
+def _modules_page(*, status: int = 200, error: str | None = None):
+    company = g.company
+    on = modules.enabled_keys(company)
+    plan = entitlements.effective_plan(company)
+    items = [
+        {
+            "module": m,
+            "enabled": m.key in on,
+            # Recurso do plano (ex.: API): ligar o módulo não libera o que o plano não tem.
+            "plan_missing": bool(m.plan_feature) and not entitlements.has_feature(company, m.plan_feature),
+        }
+        for m in modules.available()
+    ]
+    return (
+        render_template("empresa/modulos.html", items=items, plan=plan, form=ModulesForm(formdata=None), error=error),
+        status,
+    )
+
+
+@bp.route("/modulos", methods=["GET", "POST"], endpoint="modules")
+@tenant_required(ROLE_OWNER)
+def modules_settings():
+    """Liga/desliga os módulos opcionais. O estado enviado é o estado inteiro: caixa marcada =
+    ligado, desmarcada = desligado. Chave desconhecida ou indisponível → 400."""
+    if request.method == "GET":
+        return _modules_page()
+    form = ModulesForm()
+    if not form.validate_on_submit():
+        abort(400)
+    chosen = set(request.form.getlist("modulo"))
+    available = [m.key for m in modules.available()]
+    if chosen - set(available):
+        return _modules_page(status=400, error="Módulo desconhecido. Recarregue a página e tente de novo.")
+    try:
+        changed = modules.set_modules(g.company, {k: k in chosen for k in available}, current_user.id)
+    except modules.ModuleError:
+        db.session.rollback()
+        return _modules_page(status=400, error="Módulo desconhecido. Recarregue a página e tente de novo.")
+    db.session.commit()
+    if not changed:
+        flash("Nada mudou nos módulos.", "info")
+    else:
+        names = ", ".join(f"{modules.BY_KEY[k].name} ({'ligado' if on else 'desligado'})" for k, on in changed)
+        flash(f"Módulos salvos: {names}.", "sucesso")
+    return redirect(url_for("empresa.modules"), 303)

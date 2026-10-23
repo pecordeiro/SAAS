@@ -52,9 +52,10 @@
 {%- endmacro %}
 
 {# ---------- Legenda das situações (o quadrado é a própria marca da esteira/rosca) ---------- #}
-{% macro status_legend(contagem=None, with_today=True) -%}
+{#- waiting=False: módulo opcional “aguardando peça” desligado (R6) — a situação some da legenda. -#}
+{% macro status_legend(contagem=None, with_today=True, waiting=True) -%}
 <ul class="legend" role="list">
-  {%- for key, label in [("done", "Concluída"), ("doing", "Em andamento"), ("waiting", "Aguardando peça"), ("late", "Atrasada"), ("todo", "Não iniciada")] %}
+  {%- for key, label in [("done", "Concluída"), ("doing", "Em andamento"), ("waiting", "Aguardando peça"), ("late", "Atrasada"), ("todo", "Não iniciada")] if waiting or key != "waiting" %}
   <li class="legend__item"><span class="legend__swatch legend__swatch--{{ key }}" aria-hidden="true"></span>{{ label }}{% if contagem is not none %} <span class="legend__count">{{ contagem[key] }}</span>{% endif %}</li>
   {%- endfor %}
   {%- if with_today %}
@@ -107,9 +108,9 @@
 {%- endmacro %}
 
 {# ---------- Lista "atrasadas / aguardando peça" ---------- #}
-{% macro pendencias(items, show_project=False) -%}
+{% macro pendencias(items, show_project=False, waiting=True) -%}
 <div class="pend">
-  <h3 class="pend__title">Atrasadas e aguardando peça</h3>
+  <h3 class="pend__title">{{ "Atrasadas e aguardando peça" if waiting else "Etapas atrasadas" }}</h3>
   {%- if items %}
   <ul class="pend__list" role="list">
     {%- for p in items[:8] %}
@@ -122,7 +123,7 @@
   </ul>
   {%- if items|length > 8 %}<p class="pend__more">e mais {{ items|length - 8 }}</p>{% endif %}
   {%- else %}
-  <p class="pend__empty">Nenhuma etapa atrasada ou aguardando peça.</p>
+  <p class="pend__empty">{{ "Nenhuma etapa atrasada ou aguardando peça." if waiting else "Nenhuma etapa atrasada." }}</p>
   {%- endif %}
 </div>
 {%- endmacro %}

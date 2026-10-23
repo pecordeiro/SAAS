@@ -73,6 +73,9 @@ ACTIVITY_UNARCHIVED = "activity.unarchived"
 PROGRESS_CORRECTED = "progress.corrected"
 PROJECT_MODE_CHANGED = "project.progress_mode"
 COMPANY_UPDATED = "company.updated"
+# R6 — módulos opcionais (Configurações › Módulos, só o proprietário).
+MODULE_ENABLED = "module.enabled"
+MODULE_DISABLED = "module.disabled"
 HOLIDAY_ADDED = "holiday.added"
 HOLIDAY_REMOVED = "holiday.removed"
 # Fase 7 — LGPD e suporte (constantes usadas por app/services/lgpd.py e support.py).
@@ -126,6 +129,8 @@ ACTION_LABELS = {
     PROGRESS_CORRECTED: "Peças corrigidas para menos",
     PROJECT_MODE_CHANGED: "Modo de progresso alterado",
     COMPANY_UPDATED: "Dados da empresa alterados",
+    MODULE_ENABLED: "Módulo opcional ligado",
+    MODULE_DISABLED: "Módulo opcional desligado",
     HOLIDAY_ADDED: "Feriado incluído",
     HOLIDAY_REMOVED: "Feriado removido",
     COMPANY_DELETION_CANCELLED: "Exclusão da empresa cancelada",

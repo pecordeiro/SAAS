@@ -1368,3 +1368,65 @@ def test_r2_painel_da_operacao_mostra_so_a_propria_empresa(client, app, tenants)
     html = client.get("/app/").get_data(as_text=True)
     assert "Projeto A" in html
     assert "Projeto B" not in html and str(b.project_id) not in html and str(b.stage_id) not in html
+
+
+# --------------------------------------------------------------------------- R6 (módulos opcionais)
+# Configurações › Módulos (/app/empresa/modulos) não tem <uuid:> na URL: a empresa vem SÓ da
+# sessão. Owner de A (papel máximo) liga e desliga módulos; B não muda, nem com o id de B no
+# formulário, nem com o company_id de B forjado na sessão. Módulo ligado em A não abre recurso
+# de B. Mais casos em tests/test_r6_modulos.py.
+
+from app.models import CompanyModule  # noqa: E402
+from app.services import modules as _modules  # noqa: E402
+from tests.conftest import set_tenant_modules  # noqa: E402
+
+
+def _module_state(company_id):
+    return sorted(
+        (r.module, r.enabled) for r in db.session.query(CompanyModule).filter_by(company_id=company_id).all()
+    )
+
+
+def test_r6_modulos_de_a_nao_alteram_b(client, app, tenants):
+    a, b = tenants
+    with app.app_context():
+        set_tenant_modules(a.company_id, ())
+        set_tenant_modules(b.company_id, [_modules.ALERTAS])
+        db.session.commit()
+        before_b = _module_state(b.company_id)
+    login(client, app, a.owner_email)
+    assert client.get("/app/empresa/modulos").status_code == 200
+    # Liga fotos mandando o id de B junto: só A muda.
+    response = post(client, app, "/app/empresa/modulos",
+                    {"modulo": [_modules.FOTOS], "company_id": str(b.company_id), "empresa": str(b.company_id)})
+    assert response.status_code == 303
+    with app.app_context():
+        assert _modules.enabled_keys(a.company_id) == {_modules.FOTOS}
+        assert _module_state(b.company_id) == before_b
+        assert db.session.query(AuditLog).filter(
+            AuditLog.company_id == b.company_id, AuditLog.action.like("module.%")
+        ).count() == 0
+    # Empresa forjada na sessão (sem vínculo) volta para A: a tela mostra e grava o estado de A.
+    with client.session_transaction() as sess:
+        sess["company_id"] = str(b.company_id)
+    html = client.get("/app/empresa/modulos").get_data(as_text=True)
+    assert 'value="fotos" id="modulo-fotos" checked' in html
+    assert 'value="alertas" id="modulo-alertas" checked' not in html
+    post(client, app, "/app/empresa/modulos", {"modulo": [_modules.FOTOS, _modules.UNIDADES]})
+    with app.app_context():
+        assert _module_state(b.company_id) == before_b
+        assert _modules.enabled_keys(a.company_id) == {_modules.FOTOS, _modules.UNIDADES}
+    # Módulo ligado em A não abre o recurso de B (404 pela empresa).
+    assert client.get(f"/app/projetos/{b.project_id}/unidades").status_code == 404
+    assert client.get(f"/app/atividades/{b.activity_id}/evidencias").status_code == 404
+
+
+def test_r6_modulos_so_proprietario(client, app, tenants):
+    a, _ = tenants
+    for email_ in (a.supervisor_email, a.operator_email):
+        login(client, app, email_)
+        assert client.get("/app/empresa/modulos").status_code == 403
+        assert post(client, app, "/app/empresa/modulos", {"modulo": []}).status_code == 403
+        post(client, app, "/sair")
+    with app.app_context():
+        assert _modules.enabled_keys(a.company_id) == frozenset(_modules.KEYS)

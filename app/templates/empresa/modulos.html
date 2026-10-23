@@ -1,0 +1,60 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/badge.html" import badge %}
+{% from "components/optional.html" import optional_badge %}
+{% set nav_current = "modules" %}
+{% block title %}Módulos · Controle de Produção{% endblock %}
+{% block content %}
+{#
+  R6 (ADR-0017) — Configurações › Módulos, só o proprietário. O núcleo (etapas) não desliga;
+  os módulos opcionais começam desligados. A caixa só mostra o estado que o servidor gravou: quem
+  libera ou recusa as rotas de cada módulo é o servidor (services/modules.py, ADR-0009).
+#}
+<header class="page-header">
+  <div class="page-header__titles">
+    <h1>Módulos</h1>
+    <p class="page-header__subtitle muted">O essencial é acompanhar as etapas. O resto é opcional: ligue só o que a sua equipe usa.</p>
+  </div>
+</header>
+
+<div class="stack--lg modules-page">
+  <section class="card stack--sm" aria-labelledby="nucleo-titulo">
+    <h2 class="section-title" id="nucleo-titulo">Sempre ligado</h2>
+    <p>Painel, Preencher etapas, Meta e equipe, Como funciona, Projetos, Histórico e Planilha.</p>
+  </section>
+
+  <form class="card stack" method="post" action="{{ url_for('empresa.modules') }}" novalidate>
+    {{ form.csrf_token }}
+    {%- if error %}<div class="alert-focus" tabindex="-1" data-autofocus>{{ alert("danger", error, role="alert") }}</div>{% endif %}
+    <fieldset class="modules-list">
+      <legend class="section-title modules-list__legend">Módulos opcionais</legend>
+      <p class="muted text-sm modules-list__note">Desligar esconde o módulo para todos na empresa, mas não apaga nada. Ao ligar de novo, tudo volta como estava.</p>
+      <ul class="modules-list__items" role="list">
+        {%- for it in items %}
+        {%- set m = it.module %}
+        <li class="module-row">
+          <label class="check module-row__check">
+            <input type="checkbox" name="modulo" value="{{ m.key }}" id="modulo-{{ m.key }}"{% if it.enabled %} checked{% endif %} aria-describedby="modulo-{{ m.key }}-desc">
+            <span class="module-row__name">{{ m.name }}</span>
+          </label>
+          <div class="module-row__tags">
+            {{ optional_badge() }}
+            {{ badge("Ligado", "success", "check") if it.enabled else badge("Desligado", "neutral", "circle") }}
+          </div>
+          <div class="module-row__desc" id="modulo-{{ m.key }}-desc">
+            <p>{{ m.description }}</p>
+            <p class="muted text-sm">Onde aparece: {{ m.where }}</p>
+            {%- if it.plan_missing %}
+            <p class="text-sm module-row__plan">{{ icon("info", "sm") }}<span>O plano {{ plan.name }} não inclui a API. Ligado, o módulo só passa a funcionar num plano com API.</span></p>
+            {%- endif %}
+          </div>
+        </li>
+        {%- endfor %}
+      </ul>
+    </fieldset>
+    <div class="form-actions">{{ button("Salvar módulos", "primary") }}</div>
+  </form>
+</div>
+{% endblock %}

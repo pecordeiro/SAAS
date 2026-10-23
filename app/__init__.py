@@ -109,6 +109,9 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
 
     security.init_app(app)  # Fase 7: CSP com nonce, HSTS, cookies, uploads em memória
     _register_template_helpers(app)
+    from app.services import modules
+
+    modules.init_app(app)  # R6: variável ``modules`` (módulos opcionais ligados) nos templates
     from app import assets
 
     assets.init_app(app)

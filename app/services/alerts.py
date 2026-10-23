@@ -1,5 +1,7 @@
 """Alertas automáticos por empresa (Etapa F).
 
+Módulo opcional ``alertas`` (R6, ADR-0017): empresa com o módulo desligado é pulada.
+
 A REGRA mora em ``calc.alertas_projeto`` (pura). Aqui só: montar as entradas a partir do
 banco (no contexto RLS da empresa), gravar o que saiu com dedupe ``(company_id, dedupe_key,
 day)`` e mandar UM e-mail-resumo por pessoa (supervisor/proprietário com ``notify_alerts``).
@@ -35,7 +37,7 @@ from app.models import (
     Project,
     ProgressEntry,
 )
-from app.services import calc, notifications
+from app.services import calc, modules, notifications
 from app.services import projects as svc
 from app.services.email import EmailError
 from app.services.holidays import holidays_for
@@ -132,6 +134,9 @@ def compute_company(company: Company, today: date) -> list[tuple[Project, calc.A
     days = company.workdays()
     last = _last_entry_days(company)
     stalled = company.stalled_days if calc.dias_parada_valido(company.stalled_days) else calc.DIAS_PARADA_PADRAO
+    # R6: sem o módulo “aguardando peça”, a marca não vale (nem “peça atrasada”, nem a exceção
+    # de etapa parada) — o dado fica guardado e volta a valer se o módulo for religado.
+    waiting_on = modules.is_enabled(company, modules.AGUARDANDO_PECA)
     out = []
     for project in projects:
         result = svc.summary(project)
@@ -142,7 +147,7 @@ def compute_company(company: Company, today: date) -> list[tuple[Project, calc.A
                 id=stage.id,
                 status=sr.status,
                 ultimo_registro=last.get(stage.id),
-                aguardando_peca=bool(stage.waiting_part),
+                aguardando_peca=waiting_on and bool(stage.waiting_part),
                 peca_prevista=stage.part_expected_on,
                 peca_atualizada=local_dt(stage.part_updated_at, company.timezone).date() if stage.part_updated_at else None,
             )
@@ -283,6 +288,8 @@ def run_all(now: datetime) -> dict[str, int]:
             company = db.session.get(Company, company_id)
             if company is None or company.deletion_requested_at is not None:
                 continue
+            if not modules.is_enabled(company, modules.ALERTAS):
+                continue  # R6: módulo desligado = nenhum alerta gravado nem e-mail
             created, sent = run_company(company, now)
             total["companies"] += 1
             total["created"] += created

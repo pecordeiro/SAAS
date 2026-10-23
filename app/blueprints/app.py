@@ -16,9 +16,9 @@ from app.extensions import db
 from app.formatting import br_hours, local_dt
 from app.forms import ActivityForm, ProgressForm, StageForm
 from app.forms_production import ProjectFromTemplateForm, WaitingPartForm
-from app.models import ROLE_OPERATOR, ROLE_SUPERVISOR, Activity, Project, Stage, Template
+from app.models import ALERT_PART_OVERDUE, ROLE_OPERATOR, ROLE_SUPERVISOR, Activity, Project, Stage, Template
 from app.services import alerts as alerts_svc
-from app.services import audit, calc, dashboard, exporter
+from app.services import audit, calc, dashboard, exporter, modules
 from app.services import checklists as checklists_svc
 from app.services import comments as comments_svc
 from app.services import photos as photos_svc
@@ -118,6 +118,7 @@ def home():
         itens,
         href_etapa=_stage_fill_href,
         href_projeto=lambda pid: url_for("app.project_dashboard", project_id=pid),
+        aguardando_ativo=modules.is_enabled(g.company, modules.AGUARDANDO_PECA),
     )
     return render_template(
         "app/painel.html",
@@ -172,7 +173,12 @@ def _filtered_projects() -> tuple[list[dict], dict]:
     deadline = deadline if deadline in dict(DEADLINE_FILTERS) else ""
     q = (request.args.get("q") or "").strip()[:80]
     projects = svc.list_projects(status, q)
-    waiting = svc.waiting_part_counts(p.id for p in projects)
+    # R6: contagem de “aguardando peça” só com o módulo ligado.
+    waiting = (
+        svc.waiting_part_counts(p.id for p in projects)
+        if modules.is_enabled(g.company, modules.AGUARDANDO_PECA)
+        else {}
+    )
     items = [dict(_list_item(p), waiting_part=waiting.get(p.id, 0)) for p in projects]
     if deadline == "atraso":
         items = [i for i in items if i["deadline"]["late"]]
@@ -345,15 +351,17 @@ def _detail_ctx(project: Project, *, errors=None, conflicts=None, deltas=None, o
     # Vindo do painel (?etapa=): abre a etapa pedida, só se for deste projeto (id solto é ignorado).
     if open_stage is not None and any(s.id == open_stage for s, _, _ in rows):
         current_stage = open_stage
+    on = modules.enabled_keys(g.company)  # R6: só o que o módulo ligado mostra
     # Etapa G: fotos + comentários por atividade (duas consultas agrupadas, só contagem).
     activity_ids = [a.id for _, _, acts in rows for a, _ in acts]
     evidence_counts: dict = {}
-    for counts in (
-        photos_svc.counts_by_activity(project.company_id, activity_ids),
-        comments_svc.counts_by_activity(project.company_id, activity_ids),
-    ):
-        for aid, n in counts.items():
-            evidence_counts[aid] = evidence_counts.get(aid, 0) + n
+    if modules.FOTOS in on:
+        for counts in (
+            photos_svc.counts_by_activity(project.company_id, activity_ids),
+            comments_svc.counts_by_activity(project.company_id, activity_ids),
+        ):
+            for aid, n in counts.items():
+                evidence_counts[aid] = evidence_counts.get(aid, 0) + n
     progress_series = [
         {"label": s.name, "value": sr.progresso, "max": 1, "text": f"{sr.progresso * 100:.0f}%", "done": sr.progresso >= 1}
         for s, sr, _ in rows
@@ -373,11 +381,11 @@ def _detail_ctx(project: Project, *, errors=None, conflicts=None, deltas=None, o
         last_entries=svc.last_entries(project),
         evidence_counts=evidence_counts,
         # Etapa G: sinal do checklist por etapa (exige? assinado?) — só sinaliza, não bloqueia.
-        checklist_signals=checklists_svc.signals(project.company_id, stages),
+        checklist_signals=checklists_svc.signals(project.company_id, stages) if modules.CHECKLIST in on else {},
         # Etapa D: resumo por pessoa (7 dias) só para supervisor+ — contas em calc.py.
         people=(
             svc.people_progress(project, tz=g.company.timezone, today=_today(), days=7)[:5]
-            if g.membership.has_role(ROLE_SUPERVISOR)
+            if g.membership.has_role(ROLE_SUPERVISOR) and modules.ATRIBUICAO in on
             else []
         ),
         forecast=deadline["forecast"],
@@ -454,6 +462,7 @@ def project_dashboard(project_id):
         concluido=status == calc.STATUS_CONCLUIDA,
         fracao_decorrida=_deadline_fraction(project),
         href_etapa=lambda sid: _stage_fill_href(project.id, sid),
+        aguardando_ativo=modules.is_enabled(g.company, modules.AGUARDANDO_PECA),
     )
     return render_template(
         "app/project_dashboard.html",
@@ -507,9 +516,11 @@ def alerts():
     """Alertas automáticos dos últimos 14 dias (gerados pelo worker; regra em calc.py).
     Supervisor+ (mesmo público do e-mail). Só leitura; empresa sempre a da sessão."""
     today = _today()
+    waiting_on = modules.is_enabled(g.company, modules.AGUARDANDO_PECA)
     rows = [
         {"alert": a, "label": alerts_svc.KIND_LABELS.get(a.kind, a.kind), "text": alerts_svc.describe(a)}
         for a in alerts_svc.recent(g.company.id, today)
+        if waiting_on or a.kind != ALERT_PART_OVERDUE  # R6: “peça atrasada” é do módulo aguardando peça
     ]
     return render_template("app/alerts.html", rows=rows, days=alerts_svc.ALERT_LIST_DAYS,
                            stalled_days=g.company.stalled_days)

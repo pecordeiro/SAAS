@@ -25,8 +25,11 @@
     </legend>
     {{ field(slot.form.name, label="Nome da etapa") }}
     {{ field(slot.form.activities, label="Atividades", hint="Uma por linha: Nome; minutos por unidade", attrs={"rows": 4}) }}
+    {%- if "checklist" in modules %}
+    {#- R6: módulo opcional; desligado, o servidor mantém o checklist que o modelo já tinha. #}
     {{ field(slot.form.checklist, label="Checklist de inspeção (opcional)", hint="Um item por linha (ex.: Torque dos parafusos conferido). Copiado para os projetos novos.", attrs={"rows": 3}) }}
     {{ checkbox(slot.form.checklist_required.name, "Exigir checklist assinado (só avisa; não bloqueia o registro)", checked=slot.form.checklist_required.data, value="y", id=slot.form.checklist_required.id) }}
+    {%- endif %}
   </fieldset>
   {%- endfor %}
   <div>

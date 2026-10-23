@@ -3,11 +3,13 @@
 {% from "components/nav.html" import sidebar_nav, bottom_nav, theme_switch, banner %}
 {% from "components/toast.html" import toast_region %}
 {% from "components/alert.html" import alert %}
+{% from "components/optional.html" import optional_badge %}
 {#
   Layout da área logada (reestruturação R1, docs/plano/reestruturacao.md §4.1):
   - Menu igual à base (Controle de Atividades): Painel, Preencher etapas, Meta e equipe,
     Como funciona. Depois, Projetos e Histórico; no rodapé, "Configurações" agrupa Empresa,
-    Usuários, Assinatura, Privacidade, Modelos, API, Alertas e Unidades (conforme o papel).
+    Usuários, Assinatura, Privacidade, Módulos, Modelos, Planilha e — só com o módulo opcional
+    ligado (R6, ``modules``) — Alertas, API e Unidades, com o selo “Opcional”.
   - < 768 px: barra superior, conteúdo e navegação inferior (as 4 telas + "Mais").
   - ≥ 768 px: menu lateral claro de 220 px.
   Páginas definem `nav_current` (dashboard | fill | team | how | projects | history | …) e
@@ -38,17 +40,20 @@
 {%- endif -%}
 {%- if current_membership and current_membership.has_role("owner") -%}
   {%- set _ = nav_settings.append({"key": "privacy", "label": "Privacidade", "href": url_for("lgpd.index")}) -%}
+  {%- set _ = nav_settings.append({"key": "modules", "label": "Módulos", "href": url_for("empresa.modules")}) -%}
 {%- endif -%}
 {%- if current_membership and current_membership.has_role("supervisor") -%}
   {%- set _ = nav_settings.append({"key": "templates", "label": "Modelos", "href": url_for("modelos.index")}) -%}
-  {%- set _ = nav_settings.append({"key": "alerts", "label": "Alertas", "href": url_for("app.alerts")}) -%}
   {%- set _ = nav_settings.append({"key": "spreadsheet", "label": "Planilha", "href": url_for("dados.import_upload")}) -%}
+  {%- if "alertas" in modules -%}
+  {%- set _ = nav_settings.append({"key": "alerts", "label": "Alertas", "href": url_for("app.alerts"), "optional": True}) -%}
+  {%- endif -%}
 {%- endif -%}
-{%- if config.get("FEATURE_PUBLIC_API") and current_membership and current_membership.has_role("owner") -%}
-  {%- set _ = nav_settings.append({"key": "api", "label": "API", "href": url_for("api_tokens_ui.tokens_index")}) -%}
+{%- if config.get("FEATURE_PUBLIC_API") and "api" in modules and current_membership and current_membership.has_role("owner") -%}
+  {%- set _ = nav_settings.append({"key": "api", "label": "API", "href": url_for("api_tokens_ui.tokens_index"), "optional": True}) -%}
 {%- endif -%}
-{%- if current_membership -%}
-  {%- set _ = nav_settings.append({"key": "units", "label": "Unidades (nº de série)", "href": url_for("qualidade.units_search")}) -%}
+{%- if current_membership and "unidades" in modules -%}
+  {%- set _ = nav_settings.append({"key": "units", "label": "Unidades", "href": url_for("qualidade.units_search"), "optional": True}) -%}
 {%- endif -%}
 {%- set settings_current = (nav_current | default("")) in (nav_settings | map(attribute="key") | list) -%}
 {%- set name_parts = (current_user.name or "?").split() -%}
@@ -76,7 +81,7 @@
         <summary class="sidebar__item">{{ icon("settings") }}<span>Configurações</span>{{ icon("chevron-down", class_="sidebar__chevron") }}</summary>
         <nav class="sidebar__subnav" aria-label="Configurações">
           {%- for item in nav_settings %}
-          <a class="sidebar__subitem" href="{{ item.href }}"{% if item.key == nav_current | default("") %} aria-current="page"{% endif %}>{{ item.label }}</a>
+          <a class="sidebar__subitem" href="{{ item.href }}"{% if item.key == nav_current | default("") %} aria-current="page"{% endif %}>{{ item.label }}{% if item.optional %}{{ optional_badge() }}{% endif %}</a>
           {%- endfor %}
         </nav>
       </details>
@@ -137,7 +142,7 @@
     <nav class="menu-list" aria-labelledby="mais-config">
       <p class="menu-list__group" id="mais-config">Configurações</p>
       {%- for item in nav_settings %}
-      <a class="menu-list__item" href="{{ item.href }}"{% if item.key == nav_current | default("") %} aria-current="page"{% endif %}>{{ item.label }}</a>
+      <a class="menu-list__item" href="{{ item.href }}"{% if item.key == nav_current | default("") %} aria-current="page"{% endif %}>{{ item.label }}{% if item.optional %}{{ optional_badge() }}{% endif %}</a>
       {%- endfor %}
     </nav>
     {%- endif %}

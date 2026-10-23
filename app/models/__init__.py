@@ -64,3 +64,4 @@ from app.models.quality import (  # noqa: F401,E402  (Etapa G)
     TemplateChecklistItem,
     Unit,
 )
+from app.models.modules import CompanyModule  # noqa: F401,E402  (R6: módulos opcionais)

@@ -25,7 +25,7 @@ from app.extensions import db
 from app.formatting import br_number
 from app.forms import BaseForm
 from app.models import PROGRESS_DETAILED, PROGRESS_SIMPLE, ROLE_OPERATOR, ROLE_SUPERVISOR, Activity, Project, Stage
-from app.services import calc, dashboard
+from app.services import calc, dashboard, modules
 from app.services import projects as svc
 from app.services.holidays import holidays_for
 from app.tenancy import get_or_404, tenant_required
@@ -131,9 +131,10 @@ def _fill_ctx(project: Project, stage_id: uuid.UUID | None) -> dict:
         project.start_date, project.due_date, _today(), holidays_for(g.company.id), g.company.workdays()
     )
     late = calc.etapas_atrasadas(result.etapas, fracao) if stages else ()
+    waiting_on = modules.is_enabled(g.company, modules.AGUARDANDO_PECA)  # R6: módulo opcional
     items = []
     for n, (stage, sr) in enumerate(zip(stages, result.etapas), start=1):
-        visual = calc.status_visual(sr.status, stage.waiting_part, late[n - 1] if late else False)
+        visual = calc.status_visual(sr.status, waiting_on and stage.waiting_part, late[n - 1] if late else False)
         items.append(
             {
                 "stage": stage,

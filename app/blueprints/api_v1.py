@@ -36,7 +36,7 @@ from app.extensions import csrf, db, limiter
 from app.forms import BaseForm
 from app.models import ROLE_OWNER, Activity, ApiClient, ApiToken, Company, Project
 from app.services import api_tokens as tokens
-from app.services import calc, entitlements
+from app.services import calc, entitlements, modules
 from app.services import projects as svc
 from app.tenancy import get_or_404, scoped, tenant_required
 
@@ -180,6 +180,9 @@ def authenticate():
     except tokens.TokenError as exc:
         detail = "Token revogado." if exc.code == tokens.REVOKED else "Token expirado."
         return _unauthorized(exc.code, detail)
+    # R6 (ADR-0017): com o módulo API desligado na empresa, a API não existe para ela.
+    if not modules.is_enabled(company, modules.API):
+        return problem(404, "Recurso não encontrado", "not_found")
     if not entitlements.has_feature(company, "api"):
         return problem(
             403,
