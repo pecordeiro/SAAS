@@ -104,10 +104,11 @@ def test_csp_estrita_e_htmx_sem_eval(client):
 def test_assets_locais_existem():
     htmx = (STATIC / "js" / "htmx.min.js").read_text(encoding="utf-8")
     assert 'version:"2.0.4"' in htmx
-    # ADR-0015: IBM Plex Sans 400 e 600, servida pelo próprio site; a Geist saiu.
-    for name in ("ibm-plex-sans-latin-400-normal.woff2", "ibm-plex-sans-latin-600-normal.woff2"):
+    # ADR-0018: DM Sans e Newsreader servidas pelo próprio site em todo o sistema; Plex e Geist saíram.
+    for name in ("dm-sans-latin-400-normal.woff2", "dm-sans-latin-700-normal.woff2", "newsreader-latin-400-normal.woff2"):
         assert (STATIC / "fonts" / name).read_bytes()[:4] == b"wOF2", name
-    assert "SIL Open Font License" in (STATIC / "fonts" / "OFL-IBMPlexSans.txt").read_text(encoding="utf-8")
+    assert "SIL Open Font License" in (STATIC / "fonts" / "OFL-DMSans.txt").read_text(encoding="utf-8")
+    assert not list((STATIC / "fonts").glob("ibm-plex-*"))
     assert not list((STATIC / "fonts").glob("geist-*"))
     # ECharts vendorizado (sem CDN, regra 8) com a licença Apache-2.0 e o NOTICE ao lado.
     vendor = STATIC / "vendor" / "echarts-5.5.1"
@@ -231,3 +232,59 @@ def test_toast_de_registro(client, app, tenants):
     response = post(client, app, f"/app/atividades/{a.activity_id}/registrar", {"delta": 2}, follow_redirects=True)
     assert "+2 em Atividade 1 · 2 de 10" in response.get_data(as_text=True)
 
+
+
+# ---------------------------------------------------------------- ADR-0018: identidade oliva no sistema
+
+
+def _block(text: str, start: str) -> str:
+    return text.split(start)[1].split("\n}\n")[0]
+
+
+def test_tokens_semanticos_valem_a_identidade_oliva():
+    tokens = (CSS / "tokens.css").read_text(encoding="utf-8")
+    light = tokens.split("@media (prefers-color-scheme: dark)")[0]
+    for name, value in (("color-bg", "#FBFBF6"), ("color-text", "#14170D"), ("color-primary", "#455A0F"),
+                        ("color-action", "#455A0F"), ("color-focus", "#455A0F")):
+        assert re.search(rf"--{name}:\s*{value}\b", light, re.I), name
+    assert "var(--font-brand-text)" in light and "var(--font-brand-display)" in light
+    assert "--focus-width: 3px" in light
+    # tema escuro fixado: oliva claro nos mesmos tokens semânticos
+    dark = _block(tokens, ':root[data-theme="dark"] {')
+    for name, value in (("color-bg", "#0F120A"), ("color-primary", "#B7D064"), ("color-action", "#B7D064")):
+        assert re.search(rf"--{name}:\s*{value}\b", dark, re.I), name
+
+
+def test_oliva_nunca_em_dado():
+    """Barras, anel, esteira e selo de andamento usam status/série, nunca primary/action/brand."""
+    components = (CSS / "components.css").read_text(encoding="utf-8")
+    pages = (CSS / "pages.css").read_text(encoding="utf-8")
+    for css, selector in ((components, ".progress__bar::-webkit-progress-value"), (components, ".chart__bar"),
+                          (components, ".badge--progress"), (pages, "  .gauge__fill"), (pages, ".esteira__bloco--doing")):
+        rule = re.search(re.escape(selector) + r"\s*\{([^}]*)\}", css).group(1)
+        assert ("color-status" in rule or "color-doing" in rule) and "color-primary" not in rule, selector
+    # a cor de foco e de link é a da marca, nunca o azul de status
+    tokens = (CSS / "tokens.css").read_text(encoding="utf-8")
+    assert "--color-focus: #2A78D6" not in tokens and "--color-primary: #2A78D6" not in tokens
+
+
+def test_sem_animacao_decorativa_na_area_logada():
+    app_css = "".join((CSS / n).read_text(encoding="utf-8") for n in ("base.css", "layout.css", "components.css", "pages.css"))
+    for keyframe in re.findall(r"@keyframes\s+([\w-]+)", app_css):
+        assert keyframe in {"spin", "sheet-in", "fade-in", "toast-in", "toast-out", "row-flash"}, keyframe
+    assert "transform: scale" not in app_css and "infinite alternate" not in app_css
+    assert "prefers-reduced-motion: reduce" in app_css
+    tokens = (CSS / "tokens.css").read_text(encoding="utf-8")
+    assert re.search(r"--duration-normal:\s*150ms", tokens)
+
+
+def test_email_usa_tokens_da_marca(app):
+    from app.services.email import email_brand
+
+    brand = email_brand()
+    assert brand["primary"].upper() == "#455A0F" and brand["bg"].upper() == "#FBFBF6"
+    with app.test_request_context():
+        from app.services.email import render_message
+
+        html = render_message("a@b.com", "Teste", "invite", inviter_name="A", company_name="B", role_label="C", url="https://x.test/u").html
+    assert "#455A0F" in html and "Newsreader" in html

@@ -217,6 +217,15 @@ migrations no PostgreSQL só rodam com `TEST_DATABASE_URL`; no SQLite aparecem c
 - Testes de navegador (opcionais): `pip install playwright==1.55.0`; `RUN_E2E=1 python -m pytest tests/e2e -q`
   (axe: `E2E_AXE_JS=/caminho/axe.min.js`). Capturas: `python scripts/capturar_telas.py docs/design/capturas/fase6`.
 
+### Identidade oliva em todo o sistema (ADR-0018)
+
+- Os tokens semânticos de `app/static/css/tokens.css` valem a marca oliva (off-white, tinta, oliva escuro; tema
+  escuro equivalente) em toda a área logada, no login e nas páginas de erro; DM Sans no texto, Newsreader em
+  títulos e números grandes (IBM Plex saiu). Botão principal com raio 8 px, foco de 3 px, menu com item ativo
+  oliva suave. O oliva nunca colore dado: barras, rosca, esteira e selos de situação seguem verde/azul/cinza/
+  amarelo/vermelho. Animação reduzida à transição curta, realce da linha salva, menus/diálogos, gráfico uma vez
+  e spinner. E-mails com a mesma paleta via atributos HTML. Capturas: `python scripts/capturar_telas.py <pasta>`.
+
 ### Site público na identidade oliva (R10, ADR-0016)
 
 - Páginas: `/`, `/precos`, `/como-funciona` (como funciona com a sua planilha), `/termos`, `/privacidade`,

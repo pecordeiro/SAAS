@@ -42,7 +42,7 @@ PLAN_EXTRAS = (
 # <meta name="theme-color"> não lê CSS: estes valores repetem --color-bg (app) e --color-brand-bg
 # (páginas públicas) de tokens.css; tests/test_publico_oliva.py confere que continuam iguais.
 THEME_COLORS = {
-    "app": {"light": "#F3F2F1", "dark": "#0D0D0D"},
+    "app": {"light": "#FBFBF6", "dark": "#0F120A"},
     "marca": {"light": "#FBFBF6", "dark": "#0F120A"},
 }
 

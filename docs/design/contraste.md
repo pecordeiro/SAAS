@@ -1,5 +1,60 @@
 # Contraste — verificação WCAG 2.1
 
+## Revisão de 2026-10-23 — identidade oliva em todo o sistema (ADR-0018)
+
+Os tokens semânticos (`--color-bg`, `--color-primary`, `--color-action`, `--color-focus`…) passaram a valer a
+paleta oliva em toda a área logada. Texto normal ≥ 4,5:1; componentes de interface (borda de campo, foco,
+séries de gráfico) ≥ 3:1. Links e foco usam o oliva/tinta, nunca o azul de “em andamento”. O azul só aparece
+em dado (barra, rosca, esteira, selo “Em andamento”). Razões calculadas com a fórmula WCAG 2.1 (script
+`ctr2` do histórico da ADR; reproduzível com qualquer calculadora de luminância relativa).
+
+### Tema claro
+
+| Par | Cores | Razão |
+|---|---|---|
+| texto / fundo | #14170D sobre #FBFBF6 | 17.5:1 |
+| texto / superfície | #14170D sobre #FFFFFF | 18.1:1 |
+| secundário / fundo | #5E6354 sobre #FBFBF6 | 6.0:1 |
+| secundário / superfície-2 | #5E6354 sobre #F0F1E6 | 5.4:1 |
+| sutil / fundo | #6A6F5E sobre #FBFBF6 | 5.0:1 |
+| sutil / superfície | #6A6F5E sobre #FFFFFF | 5.2:1 |
+| link e primary / fundo | #455A0F sobre #FBFBF6 | 7.4:1 |
+| primary / superfície | #455A0F sobre #FFFFFF | 7.7:1 |
+| primary / item ativo (primary-subtle) | #455A0F sobre #E4EAD0 | 6.2:1 |
+| botão: branco / oliva | #FFFFFF sobre #455A0F | 7.7:1 |
+| botão hover: branco / oliva-hover | #FFFFFF sobre #2E3D08 | 11.8:1 |
+| borda de campo / fundo (UI ≥3) | #7C846A sobre #FBFBF6 | 3.8:1 |
+| foco / fundo (UI ≥3) | #455A0F sobre #FBFBF6 | 7.4:1 |
+| selo andamento: azul / subtle | #1F66BD sobre #EAF2FC | 5.0:1 |
+| série neutra / superfície (UI) | #6B6A66 sobre #FFFFFF | 5.4:1 |
+| sucesso / fundo | #18792F sobre #FBFBF6 | 5.3:1 |
+| perigo / fundo | #B42F2F sobre #FBFBF6 | 6.0:1 |
+| aviso / fundo | #8A5A00 sobre #FBFBF6 | 5.7:1 |
+
+### Tema escuro
+
+| Par | Cores | Razão |
+|---|---|---|
+| texto / fundo | #F0F3E4 sobre #0F120A | 16.8:1 |
+| texto / superfície | #F0F3E4 sobre #181C10 | 15.4:1 |
+| secundário / superfície | #A4AB94 sobre #181C10 | 7.3:1 |
+| sutil / superfície | #99A088 sobre #181C10 | 6.4:1 |
+| link e primary / fundo | #B7D064 sobre #0F120A | 11.0:1 |
+| primary / superfície | #B7D064 sobre #181C10 | 10.1:1 |
+| primary / item ativo | #B7D064 sobre #27301A | 8.0:1 |
+| botão: tinta / oliva claro | #14170D sobre #B7D064 | 10.6:1 |
+| botão hover | #14170D sobre #9DB84A | 8.1:1 |
+| borda de campo / superfície (UI) | #6E7459 sobre #181C10 | 3.6:1 |
+| foco / fundo (UI) | #B7D064 sobre #0F120A | 11.0:1 |
+| selo andamento: azul / subtle | #6AA5EE sobre #1F3A5C | 4.5:1 |
+| série neutra / superfície (UI) | #9A998F sobre #181C10 | 6.0:1 |
+| sucesso / superfície | #5CC985 sobre #181C10 | 8.4:1 |
+| perigo / superfície | #FF8A7F sobre #181C10 | 7.6:1 |
+| aviso / superfície | #F2B755 sobre #181C10 | 9.6:1 |
+
+Todos os pares passam. O menor é a borda de campo no tema escuro (3,6:1, componente de interface, mínimo 3:1)
+e o selo “Em andamento” no escuro (4,5:1, texto, mínimo 4,5:1).
+
 ## Revisão de 2026-10-23 — marca oliva nas páginas públicas (ADR-0016)
 
 Método e critérios abaixo (WCAG 2.1 AA). Só os pares usados nas páginas públicas.
@@ -25,7 +80,7 @@ Regras: `--color-brand-muted` nunca sobre o bloco oliva claro (2,18:1; só `--co
 vai sobre ele). `--color-brand-line` é divisória decorativa (1,25:1), sem função de identificar componente.
 Cores de status do painel de exemplo seguem as regras da revisão anterior (sempre com rótulo em texto).
 
-## Revisão de 2026-10-21 — base “Controle de Atividades” (ADR-0015)
+## Histórico — revisão de 2026-10-21 — base (valores da ADR-0015, superados pela ADR-0018 na área logada) “Controle de Atividades” (ADR-0015)
 
 Os valores abaixo valem a partir da R1; a análise da “Prumo Noturno” logo depois fica como histórico.
 

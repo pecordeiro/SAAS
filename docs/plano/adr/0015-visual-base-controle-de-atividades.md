@@ -1,5 +1,6 @@
 # ADR-0015 — Visual da base “Controle de Atividades” (substitui a ADR-0013)
 
+- Nota: **fonte, cor e formas superadas pela ADR-0018** (densidade e eficiência continuam).
 - Status: **aceito** junto com o plano de reestruturação (`docs/plano/reestruturacao.md` §5, aprovado em
   2026-10-21); aplicado na fase R1. Substitui a ADR-0013 (“Prumo Noturno”).
 

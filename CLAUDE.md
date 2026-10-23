@@ -15,7 +15,7 @@ Python 3.12, Flask 3, SQLAlchemy 2, Alembic (Flask-Migrate), PostgreSQL 16,
 Flask-Login, Flask-WTF (CSRF), Flask-Limiter, Gunicorn, pytest. Pagamento: Asaas.
 
 ## Estado atual
-Fases 0–5, 7, 8 e 9 e Etapas B–C concluídas (planos novos; painel interno /interno): esqueleto, calc.py com paridade da planilha, design “Prumo”,
+Fases 0–5, 7, 8 e 9, Etapas B–C e identidade oliva em todo o sistema (ADR-0018) concluídas (planos novos; painel interno /interno): esqueleto, calc.py com paridade da planilha, design “Prumo”,
 schema completo com RLS ligável, regras de negócio (modelos, importação/exportação, limites
 de plano), contas (convites, MFA, bloqueio), segurança e LGPD (CSP com nonce, Redis, logs
 JSON, exportação/exclusão, suporte auditado), assinaturas (Asaas) e API v1 atrás de
@@ -30,8 +30,8 @@ Testes em PostgreSQL via TEST_DATABASE_URL. Ver docs/plano/progresso.md.
 3. Mudança de schema só por migration Alembic revisada. Nunca db.create_all em produção.
 4. Segredos só em variáveis de ambiente. Nada de chave em código, log ou commit.
 5. Sem planilha como fonte de dados. Excel/CSV só para importar e exportar.
-6. Cores, fontes e espaçamentos só por tokens (app/static/css/tokens.css).
-   Nenhuma cor solta em template.
+6. Cores, fontes e espaçamentos só por tokens (app/static/css/tokens.css; identidade oliva, ADR-0018).
+   Nenhuma cor solta em template. O oliva nunca colore dado (barras, rosca, esteira, situação).
 7. Limites de plano são checados no backend, não só escondidos na tela.
 8. Assets servidos pelo próprio site (sem CDN em produção) para manter a CSP estrita.
 9. Backend é a única fonte de regras; o front é só painel (ADR-0009). Nenhum cálculo,

@@ -1,33 +1,11 @@
-/* Site público (ADR-0016): identidade verde-oliva + off-white. Só tokens (cores --color-brand-*, fontes
-   --font-brand-*). Vale para início, preços, como funciona, termos, privacidade e contato, que declaram
-   `marca` no template e recebem a classe .site--marca no body. A área logada e as telas de login não
-   passam por aqui.
+/* Site público (ADR-0016): identidade verde-oliva + off-white, com a vitrine animada. Só tokens. Vale para
+   início, preços, como funciona, termos, privacidade e contato, que declaram `marca` no template e recebem a
+   classe .site--marca no body. A área logada e o login usam os mesmos tokens (ADR-0018), sem esta vitrine.
    Dados nunca usam a marca: barra de etapas, anel e etiquetas seguem as cores de status. */
 @layer components {
-  /* ---------- Escopo: a paleta de marca assume os tokens semânticos só dentro do .site--marca ---------- */
+  /* ---------- Escopo do site público (os tokens semânticos já valem a marca em todo o sistema, ADR-0018) ---------- */
   html:has(.site--marca) { background: var(--color-brand-bg); scroll-behavior: smooth; }
   .site--marca {
-    --color-bg: var(--color-brand-bg);
-    --color-surface: var(--color-brand-surface);
-    --color-surface-2: var(--color-brand-surface-2);
-    --color-text: var(--color-brand-text);
-    --color-text-muted: var(--color-brand-muted);
-    --color-text-subtle: var(--color-brand-subtle);
-    --color-border: var(--color-brand-border);
-    --color-border-subtle: var(--color-brand-line);
-    --color-border-strong: var(--color-brand-line-strong);
-    --color-primary: var(--color-brand);
-    --color-primary-hover: var(--color-brand-hover);
-    --color-primary-contrast: var(--color-brand-contrast);
-    --color-primary-subtle: var(--color-brand-soft);
-    --color-action: var(--color-brand);
-    --color-action-hover: var(--color-brand-hover);
-    --color-action-contrast: var(--color-brand-contrast);
-    --color-focus: var(--color-brand);
-    --color-track: var(--color-brand-line);
-    --font-sans: var(--font-brand-text);
-    --font-display: var(--font-brand-display);
-    --focus-ring: 0 0 0 var(--focus-offset) var(--color-brand-bg), 0 0 0 calc(var(--focus-offset) + var(--focus-width)) var(--color-brand);
     --pub-gap-block: 4rem;
     background: var(--color-brand-bg);
     color: var(--color-brand-text);

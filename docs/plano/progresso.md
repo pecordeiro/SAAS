@@ -1354,3 +1354,16 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
 - Pendências (e o motivo) em `docs/plano/limpeza-pendente.md`: detalhe do projeto e edição do projeto
   ainda têm fluxos sem equivalente no Preencher etapas; `bar_chart`/`gauge` ainda desenham telas vivas;
   classes CSS de nome dinâmico mantidas por segurança.
+
+
+## Identidade oliva em todo o sistema (2026-10-23)
+
+- Status: entregue. Branch `claude/oliva-sistema`. ADR-0018 (supera a ADR-0015 em fonte, cor e formas).
+- Feito:
+  - [x] Tokens semânticos com a paleta oliva (claro e escuro); `.site--marca` não remapeia mais tokens; IBM Plex removida.
+  - [x] DM Sans / Newsreader em toda a área logada; indicadores do Painel em serifa (28 px; principal 40 px).
+  - [x] Dado sem oliva: progresso, rosca, barras e esteira em tokens de status; selo `badge--progress`; série neutra.
+  - [x] Menos animação (ver ADR); gráfico desenha uma vez; `prefers-reduced-motion` zera.
+  - [x] Login/cadastro/erros com rodapé no fim da janela; e-mails na paleta (`email_brand()`).
+  - [x] `scripts/capturar_telas.py` cobre ~50 telas (3 larguras, claro/escuro) e acusa overflow; contraste em `docs/design/contraste.md`.
+- Pendências: rolagem horizontal de 29 px no cabeçalho público em 768 px (anterior); tela de unidade não capturada (sem unidades no seed).
