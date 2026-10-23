@@ -377,18 +377,18 @@ def _subscribe(company, code, status="active", **kw):
 def test_limite_de_projetos_do_plano(ctx):
     company, owner, _ = ctx
     _subscribe(company, ESSENCIAL)
-    _project(company, name="2")
-    _project(company, name="3")
-    assert entitlements.count_active_projects(company.id) == 3
+    for n in ("2", "3", "4", "5"):
+        _project(company, name=n)
+    assert entitlements.count_active_projects(company.id) == 5
     with pytest.raises(entitlements.PlanLimitError) as exc:
-        _project(company, name="4")
-    assert "Essencial permite 3 projetos" in exc.value.message and exc.value.status_code == 402
+        _project(company, name="6")
+    assert "Essencial permite 5 projetos" in exc.value.message and exc.value.status_code == 402
     # Concluído ou arquivado libera vaga
     project = svc.list_projects()[0]
     svc.archive_project(project, owner.id)
-    _project(company, name="4")
+    _project(company, name="6")
     usage = entitlements.usage(company)
-    assert usage["projects"] == 3 and usage["max_projects"] == 3 and usage["writable"]
+    assert usage["projects"] == 5 and usage["max_projects"] == 5 and usage["writable"]
 
 
 def test_plano_empresa_sem_limite_de_projetos_e_features(ctx):
@@ -401,7 +401,7 @@ def test_plano_empresa_sem_limite_de_projetos_e_features(ctx):
 
 def test_limite_de_usuarios_conta_convites_pendentes(ctx):
     company, owner, _ = ctx
-    _subscribe(company, PROFISSIONAL)  # 20 pessoas; o tenant tem 3 vínculos
+    _subscribe(company, PROFISSIONAL)  # 25 pessoas; o tenant tem 3 vínculos
     now = datetime.now(timezone.utc)
     db.session.add(Invitation(company_id=company.id, email="a@x.com", role="operator", token_hash="1" * 64,
                               expires_at=now + timedelta(days=3)))
@@ -409,9 +409,9 @@ def test_limite_de_usuarios_conta_convites_pendentes(ctx):
                               expires_at=now - timedelta(days=1)))  # vencido não conta
     db.session.flush()
     assert entitlements.count_users(company.id) == 4
-    entitlements.check_can_add_user(company, adding=16)
+    entitlements.check_can_add_user(company, adding=21)
     with pytest.raises(entitlements.PlanLimitError):
-        entitlements.check_can_add_user(company, adding=17)
+        entitlements.check_can_add_user(company, adding=22)
     assert not entitlements.has_feature(company, "api")
     with pytest.raises(entitlements.PlanLimitError):
         entitlements.require_feature(company, "api", "API")
@@ -712,8 +712,8 @@ def test_payload_adulterado_e_revalidado(ctx):
 def test_importacao_respeita_limite_do_plano(ctx):
     company, owner, _ = ctx
     _subscribe(company, ESSENCIAL)
-    _project(company, name="2")
-    _project(company, name="3")
+    for n in ("2", "3", "4", "5"):
+        _project(company, name=n)
     result = importer.parse_upload("x.csv", _csv([["L", "2", "", "", "", "", "E", "A", "1", "0", "ativa"]]), 10**6)
     with pytest.raises(entitlements.PlanLimitError):
         importer.save(company, result, owner.id)
@@ -744,10 +744,10 @@ def test_desfazer_em_projeto_concluido_respeita_limite_do_plano(ctx):
     entry = svc.register_progress(project.stages[0].activities[0], 1, None, owner.id)
     db.session.commit()
     assert project.status == PROJECT_DONE
-    # o ctx já tem 1 projeto ativo; com mais 2 o Essencial (3) fica cheio
-    _project(company, name="2")
-    _project(company, name="3")
-    assert entitlements.count_active_projects(company.id) == 3
+    # o ctx já tem 1 projeto ativo; com mais 4 o Essencial (5) fica cheio
+    for n in ("2", "3", "4", "5"):
+        _project(company, name=n)
+    assert entitlements.count_active_projects(company.id) == 5
     db.session.commit()
     with pytest.raises(entitlements.PlanLimitError):
         svc.undo_progress(entry, owner.id)

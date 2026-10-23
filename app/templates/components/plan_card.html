@@ -20,7 +20,8 @@
     <li>{{ icon("check", "sm") }} <span>{{ plan.projects }}</span></li>
     <li>{{ icon("check", "sm") }} <span>{{ plan.users }}</span></li>
     {%- for extra in plan.extras %}<li>{{ icon("check", "sm") }} <span>{{ extra }}</span></li>{% endfor %}
-    <li>{{ icon("check" if plan.trial else "info", "sm") }} <span>{{ (trial_days|string ~ " dias grátis, sem cartão") if plan.trial else ("Preço combinado com você" if not plan.self_service else "Sem teste grátis: a cobrança começa ao contratar") }}</span></li>
+    {%- for service in plan.services %}<li>{{ icon("check", "sm") }} <span>{{ service }}</span></li>{% endfor %}
+    <li>{{ icon("check" if plan.trial else "info", "sm") }} <span>{{ (trial_days|string ~ " dias grátis, sem cartão") if plan.trial else ("Valor combinado em orçamento, sem teste grátis" if not plan.self_service else "Sem teste grátis: a cobrança começa ao contratar") }}</span></li>
   </ul>
   {%- if not plan.self_service %}
   <a class="btn btn--secondary btn--lg btn--block" href="{{ url_for('public.contact') }}"><span class="btn__label">Fale conosco</span></a>

@@ -139,6 +139,7 @@ def plans():
         self_service={p.id: plan_catalog.is_self_service(p) for p in plans},
         trial={p.id: plan_catalog.has_trial(p) for p in plans},
         prices={p.id: billing.price_for(sub, p) for p in plans},
+        implantacao_services=plan_catalog.IMPLANTACAO_SERVICES,
     )
 
 

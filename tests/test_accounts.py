@@ -63,6 +63,13 @@ def _set_plan(app, company_id, code):
         db.session.commit()
 
 
+def _limit_essencial_users(app, n):
+    """O Essencial permite 5 pessoas (ADR-0019); estes testes usam um limite menor, pela tabela."""
+    with app.app_context():
+        get_plan("essencial").max_users = n
+        db.session.commit()
+
+
 # --------------------------------------------------------------------------- e-mail
 
 
@@ -354,7 +361,8 @@ def test_supervisor_nao_convida_owner_e_operador_nao_ve_usuarios(client, app, te
 
 def test_convites_pendentes_contam_no_limite_de_usuarios(client, app, tenants):
     a, _ = tenants
-    _set_plan(app, a.company_id, "essencial")  # 3 pessoas; A já tem 3
+    _set_plan(app, a.company_id, "essencial")
+    _limit_essencial_users(app, 3)  # A já tem 3 pessoas
     login(client, app, a.owner_email)
     blocked = post(client, app, "/app/usuarios/convidar", {"email": "u0@x.com", "role": "operator"})
     assert blocked.status_code == 402 and "permite 3 usuários" in text_of(blocked)
@@ -918,7 +926,8 @@ def test_cadastro_cria_assinatura_trialing(client, app):
 
 def test_limite_de_usuarios_no_convite_e_no_aceite_responde_402(client, app, tenants):
     a, _ = tenants
-    _set_plan(app, a.company_id, "essencial")  # 3 pessoas; A tem 3
+    _set_plan(app, a.company_id, "essencial")
+    _limit_essencial_users(app, 3)  # A tem 3 pessoas
     login(client, app, a.owner_email)
     assert post(client, app, "/app/usuarios/convidar", {"email": "v0@x.com", "role": "operator"}).status_code == 402
     post(client, app, f"/app/usuarios/{_membership_id(app, a.operator_id)}/desativar")

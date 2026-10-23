@@ -48,10 +48,11 @@ estorno sair; `deleted: true` → `canceled`.
 
 ## 3. Regras
 
-- **Planos (Etapa B)**: Essencial R$ 249,90 (3 projetos, 3 pessoas), Profissional R$ 497,00
-  (10 projetos, 20 pessoas), Empresa R$ 997,00 (ilimitado, MFA, API, identidade visual) e
-  Implantação sob consulta (`price_cents` NULL). Valores e limites só na tabela `plans`
-  (`app/services/plans.py` + migration `b1e7c9d2a4f6`; `flask seed-plans` sincroniza).
+- **Planos (ADR-0019)**: Essencial R$ 249,90 (5 projetos, 5 pessoas), Profissional R$ 497,90
+  (10 projetos, 25 pessoas), Empresa R$ 997,90 (ilimitado, MFA, API, identidade visual) e
+  Implantação sob orçamento (`price_cents` NULL; implantação, 1 mês de acompanhamento e
+  treinamento são serviços, só texto). Valores e limites só na tabela `plans`
+  (`app/services/plans.py` + migrations `b1e7c9d2a4f6` e `a9d3f5c1b7e2`; `flask seed-plans` sincroniza).
 - **Teste grátis**: 14 dias sem cartão, **só no Essencial e no Profissional**
   (`plans.TRIAL_PLAN_CODES`). O cadastro começa no Profissional (`TRIAL_DAYS`,
   `DEFAULT_TRIAL_PLAN`; valor fora dos planos com teste é ignorado e cai no Profissional). A
@@ -166,14 +167,14 @@ desenvolvimento). Registre a data, prints e observações em uma seção “Exec
 6. **Assinar**: Escolher plano → Essencial → CNPJ de teste válido (ex.: `11.222.333/0001-81`)
    → deve abrir a fatura do Asaas (`sandbox.asaas.com/i/...`). Confira no painel: cliente,
    assinatura mensal R$ 249,90 com vencimento no fim do teste. Print das duas telas. Repita
-   com o **Empresa** numa empresa nova: R$ 997,00 com vencimento **hoje** (sem teste).
+   com o **Empresa** numa empresa nova: R$ 997,90 com vencimento **hoje** (sem teste).
 7. **Pagar**: na fatura do sandbox, pague por Pix/cartão de teste (ou “Confirmar pagamento”
    no painel). Espere `PAYMENT_CONFIRMED`/`PAYMENT_RECEIVED` → `/app/assinatura` = **Ativa**,
    “Período pago até” = vencimento + 1 mês; `webhook_events` com `processed`. Print.
 8. **Duplicado**: no painel de webhooks, reenvie o mesmo evento → resposta 200 `duplicate` e
    nada muda.
-9. **Trocar plano**: Essencial → Profissional mostra +R$ 247,10 e “vale após o pagamento”;
-   confirme; no Asaas o valor da assinatura e da fatura em aberto vira R$ 497,00; o 4º projeto
+9. **Trocar plano**: Essencial → Profissional mostra +R$ 248,00 e “vale após o pagamento”;
+   confirme; no Asaas o valor da assinatura e da fatura em aberto vira R$ 497,90; o 6º projeto
    continua bloqueado até pagar essa fatura e passa a ser permitido logo depois. Rebaixar
    mostra “vale a partir de DD/MM” (fim do período pago).
 10. **Atraso**: crie (ou espere) uma cobrança vencida no sandbox / altere o vencimento para

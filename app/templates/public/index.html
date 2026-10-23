@@ -119,7 +119,7 @@
   <div class="pub-in">
     <div class="rv"><span class="pub-eyebrow">Preços</span>
       <h2 id="precos-titulo">Preço por empresa, não por pessoa.</h2>
-      <p class="pub-sub">Teste grátis de {{ trial_days }} dias, sem cartão, nos planos Essencial e Profissional. O plano Empresa cobra ao contratar. A Implantação é sob consulta.</p></div>
+      <p class="pub-sub">Teste grátis de {{ trial_days }} dias, sem cartão, nos planos Essencial e Profissional. O plano Empresa cobra ao contratar. A Implantação é sob orçamento, online ou presencial, com acompanhamento de 1 mês e treinamento.</p></div>
     <div class="plans">
       {%- for plan in plans %}
       {{ plan_card(plan, url_for('auth.signup'), trial_days, "h3", loop.index0) }}

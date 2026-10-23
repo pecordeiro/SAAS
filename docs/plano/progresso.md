@@ -1382,3 +1382,17 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
   - [x] Aviso na prévia (não bloqueia) quando a média dos tempos positivos é < 1 em minutos ou > 24 em horas
     (`import_mapping.unit_warning`); a regra fica no serviço, a tela só exibe.
   - [x] Testes em `tests/test_import_unidade.py`. Nenhuma rota nova (isolamento existente inalterado).
+
+## Planos novos (ADR-0019, seção 1) (2026-10-23)
+
+- Status: entregue. Branch `claude/planos-novos`. Códigos de plano não mudam.
+- Feito:
+  - [x] `app/services/plans.py`: Essencial R$ 249,90 (5 projetos, 5 pessoas), Profissional R$ 497,90 (10, 25),
+    Empresa R$ 997,90 (ilimitado), Implantação sob orçamento (ilimitado). Teste de 14 dias só nos dois primeiros.
+  - [x] Migration de dados `a9d3f5c1b7e2` (depois de `f1a7c3e9b2d4`), com downgrade que devolve os valores da Etapa B.
+  - [x] Serviços da Implantação (implantação pela equipe técnica, 1 mês de acompanhamento e manutenção,
+    treinamento) são só texto (`IMPLANTACAO_SERVICES`), exibidos em `/`, `/precos` (card e tabela comparativa) e
+    `/app/assinatura/planos`; nenhum limite nem checagem no código.
+  - [x] Preços e limites das páginas públicas e das telas de assinatura já vinham da tabela `plans`; nada fixo em template.
+  - [x] Testes ajustados aos números novos; docs (`prd.md` D2–D5, `pagamentos.md`, `lancamento.md`, README) atualizados.
+- Pendências: o rótulo de preço da Implantação segue “Sob consulta” nos cards (o texto de apoio diz “sob orçamento, online ou presencial”).

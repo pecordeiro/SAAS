@@ -164,7 +164,9 @@ def test_limite_do_plano_vale_para_o_lote(client, app, tenants, many_bytes):
     a, _ = tenants
     with app.app_context():
         sub = db.session.execute(select(Subscription).where(Subscription.company_id == a.company_id)).scalar_one_or_none()
-        plan_id = catalog.get_plan("essencial").id  # 3 projetos ativos
+        essencial = catalog.get_plan("essencial")
+        essencial.max_projects = 3  # limite menor pela tabela, para caber no arquivo de teste (o catálogo tem 5)
+        plan_id = essencial.id
         if sub is None:
             db.session.add(Subscription(company_id=a.company_id, provider="fake", plan_id=plan_id, status="active"))
         else:

@@ -219,9 +219,9 @@ def test_planos_do_catalogo(app):
     with app.app_context():
         plans = {p.code: p for p in db.session.execute(select(Plan)).scalars()}
         assert set(plans) == {"essencial", "profissional", "empresa", "implantacao"}
-        assert (plans["essencial"].price_cents, plans["essencial"].max_projects, plans["essencial"].max_users) == (24990, 3, 3)
-        assert (plans["profissional"].price_cents, plans["profissional"].max_projects, plans["profissional"].max_users) == (49700, 10, 20)
-        assert (plans["empresa"].price_cents, plans["empresa"].max_projects, plans["empresa"].max_users) == (99700, None, None)
+        assert (plans["essencial"].price_cents, plans["essencial"].max_projects, plans["essencial"].max_users) == (24990, 5, 5)
+        assert (plans["profissional"].price_cents, plans["profissional"].max_projects, plans["profissional"].max_users) == (49790, 10, 25)
+        assert (plans["empresa"].price_cents, plans["empresa"].max_projects, plans["empresa"].max_users) == (99790, None, None)
         assert (plans["implantacao"].price_cents, plans["implantacao"].max_projects, plans["implantacao"].max_users) == (None, None, None)
         assert plans["empresa"].features == {"mfa_required": True, "api": True, "visual_custom": True, "implantacao": False}
         assert plans["implantacao"].features == {"mfa_required": True, "api": True, "visual_custom": True, "implantacao": True}
