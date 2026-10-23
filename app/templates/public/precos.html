@@ -12,7 +12,7 @@
     <div class="pub-head">
       <span class="pub-eyebrow">Preços</span>
       <h1 id="precos-titulo" class="pub-h1">Preço por empresa, não por pessoa.</h1>
-      <p class="pub-sub">{{ trial_days }} dias grátis, sem cartão, no Essencial e no Profissional. O plano Empresa cobra ao contratar e a Implantação é sob consulta. Você troca de plano quando quiser.</p>
+      <p class="pub-sub">{{ trial_days }} dias grátis, sem cartão, no Essencial e no Profissional. O plano Empresa cobra ao contratar e a Implantação é sob orçamento, online ou presencial. Você troca de plano quando quiser.</p>
     </div>
     <div class="plans">
       {%- for plan in plans %}
@@ -38,7 +38,9 @@
       <tr><th scope="row">Verificação em duas etapas obrigatória (MFA)</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.mfa_required else "—" }}</td>{% endfor %}</tr>
       <tr><th scope="row">API para ligar a outros sistemas</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.api else "—" }}</td>{% endfor %}</tr>
       <tr><th scope="row">Identidade visual da sua empresa</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.visual_custom else "—" }}</td>{% endfor %}</tr>
-      <tr><th scope="row">Implantação feita por técnicos nossos</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.implantacao else "—" }}</td>{% endfor %}</tr>
+      <tr><th scope="row">{{ services[0] }}</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.implantacao else "—" }}</td>{% endfor %}</tr>
+      <tr><th scope="row">{{ services[1] }}</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.implantacao else "—" }}</td>{% endfor %}</tr>
+      <tr><th scope="row">{{ services[2] }}</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.implantacao else "—" }}</td>{% endfor %}</tr>
       <tr><th scope="row">Modelos de etapas, histórico e exportação em planilha</th>{% for plan in plans %}<td class="is-num">Sim</td>{% endfor %}</tr>
     </tbody>
     {% endcall %}

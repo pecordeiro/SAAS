@@ -456,10 +456,10 @@ def test_rebaixar_vale_no_fim_do_periodo_pago(bclient, bapp, btenants):
     subscribe(bclient, bapp, a, plan="profissional")
     pay(bclient, bapp, a)
     login(bclient, bapp, a.owner_email)
-    for _ in range(2):
-        assert post(bclient, bapp, "/app/projetos/novo", NEW_PROJECT).status_code == 303  # 3 ativos
+    for _ in range(4):
+        assert post(bclient, bapp, "/app/projetos/novo", NEW_PROJECT).status_code == 303  # 5 ativos
     page = text_of(bclient.get("/app/assinatura/planos/essencial"))
-    assert "R$ 497,00/mês" in page and "R$ 249,90/mês" in page and "−R$ 247,10" in page
+    assert "R$ 497,90/mês" in page and "R$ 249,90/mês" in page and "−R$ 248,00" in page
     period_end = sub_state(bapp, a.company_id)["current_period_end"]
     assert "Vale a partir de" in page
     response = post(bclient, bapp, "/app/assinatura/planos/essencial", follow_redirects=True)
@@ -475,9 +475,9 @@ def test_rebaixar_vale_no_fim_do_periodo_pago(bclient, bapp, btenants):
     with bapp.app_context():
         billing.reconcile_all(now=period_end + timedelta(seconds=1))
     assert sub_state(bapp, a.company_id)["plan"] == "essencial"
-    # requisição seguinte: limite do Essencial (3 projetos)
+    # requisição seguinte: limite do Essencial (5 projetos)
     response = post(bclient, bapp, "/app/projetos/novo", NEW_PROJECT)
-    assert response.status_code == 402 and "Essencial permite 3 projetos ativos" in text_of(response)
+    assert response.status_code == 402 and "Essencial permite 5 projetos ativos" in text_of(response)
 
 
 def test_upgrade_so_vale_com_a_fatura_no_valor_novo_paga(bclient, bapp, btenants):
@@ -485,8 +485,8 @@ def test_upgrade_so_vale_com_a_fatura_no_valor_novo_paga(bclient, bapp, btenants
     subscribe(bclient, bapp, a, plan="essencial")
     pay(bclient, bapp, a)
     login(bclient, bapp, a.owner_email)
-    for _ in range(2):
-        assert post(bclient, bapp, "/app/projetos/novo", NEW_PROJECT).status_code == 303  # 3 ativos
+    for _ in range(4):
+        assert post(bclient, bapp, "/app/projetos/novo", NEW_PROJECT).status_code == 303  # 5 ativos
     provider = fake(bapp)
     next_pid = provider.add_payment("sub_fake_0001")  # próxima mensalidade já gerada pelo Asaas
     assert "Vale após o pagamento" in text_of(bclient.get("/app/assinatura/planos/profissional"))
@@ -494,7 +494,7 @@ def test_upgrade_so_vale_com_a_fatura_no_valor_novo_paga(bclient, bapp, btenants
     assert "valem assim que a fatura no valor novo for paga" in text_of(response)
     state = sub_state(bapp, a.company_id)
     assert state["plan"] == "essencial" and state["pending_plan"] == "profissional"
-    assert provider.store.payments[next_pid]["value_cents"] == 49700
+    assert provider.store.payments[next_pid]["value_cents"] == 49790
     # sem pagar: limites continuam os do Essencial (nada de upgrade grátis)
     assert post(bclient, bapp, "/app/projetos/novo", NEW_PROJECT).status_code == 402
     # paga a fatura no valor novo → limites sobem na requisição seguinte
@@ -587,14 +587,14 @@ def test_rebaixar_plano_com_uso_acima_do_limite_e_recusado(bclient, bapp, btenan
     subscribe(bclient, bapp, a, plan="profissional")
     pay(bclient, bapp, a)
     login(bclient, bapp, a.owner_email)
-    for _ in range(3):
+    for _ in range(5):
         post(bclient, bapp, "/app/projetos/novo", NEW_PROJECT)
     response = post(bclient, bapp, "/app/assinatura/planos/essencial")
     assert response.status_code == 400
-    assert "você tem 4" in text_of(response) and "Arquive ou conclua 1 projeto(s)" in text_of(response)
+    assert "você tem 6" in text_of(response) and "Arquive ou conclua 1 projeto(s)" in text_of(response)
     state = sub_state(bapp, a.company_id)
     assert state["plan"] == "profissional" and state["pending_plan"] is None
-    assert fake(bapp).store.subscriptions["sub_fake_0001"]["value_cents"] == 49700
+    assert fake(bapp).store.subscriptions["sub_fake_0001"]["value_cents"] == 49790
 
 
 def test_downgrade_agendado_que_nao_cabe_mais_nao_e_aplicado(bclient, bapp, btenants):
@@ -608,19 +608,19 @@ def test_downgrade_agendado_que_nao_cabe_mais_nao_e_aplicado(bclient, bapp, bten
     provider = fake(bapp)
     next_pid = provider.add_payment("sub_fake_0001")
     login(bclient, bapp, a.owner_email)
-    for _ in range(2):
-        post(bclient, bapp, "/app/projetos/novo", NEW_PROJECT)  # 3 ativos: cabe no Essencial
+    for _ in range(4):
+        post(bclient, bapp, "/app/projetos/novo", NEW_PROJECT)  # 5 ativos: cabe no Essencial
     assert post(bclient, bapp, "/app/assinatura/planos/essencial").status_code == 302
     assert provider.store.payments[next_pid]["value_cents"] == 24990
     # depois de agendar, o uso cresce (ainda no Profissional)
-    assert post(bclient, bapp, "/app/projetos/novo", NEW_PROJECT).status_code == 303  # 4 ativos
+    assert post(bclient, bapp, "/app/projetos/novo", NEW_PROJECT).status_code == 303  # 6 ativos
     with bapp.app_context():
         billing.reconcile_all(now=period_end + timedelta(seconds=1))
     state = sub_state(bapp, a.company_id)
     assert state["plan"] == "profissional" and state["pending_plan"] is None
     # preço volta ao do plano mantido, no provedor e na fatura em aberto
-    assert provider.store.subscriptions["sub_fake_0001"]["value_cents"] == 49700
-    assert provider.store.payments[next_pid]["value_cents"] == 49700
+    assert provider.store.subscriptions["sub_fake_0001"]["value_cents"] == 49790
+    assert provider.store.payments[next_pid]["value_cents"] == 49790
     with bapp.app_context():
         log = db.session.query(AuditLog).filter_by(company_id=a.company_id, action=billing.DOWNGRADE_CANCELED).one()
         assert log.details["plano_mantido"] == "profissional" and "Arquive ou conclua 1 projeto(s)" in log.details["motivo"]
@@ -639,7 +639,7 @@ def test_escolher_plano_sem_assinatura_vai_para_dados_de_cobranca(bclient, bapp,
     assert "Assinar Essencial" in page and "Assinar Empresa" in page
     response = bclient.get("/app/assinatura/planos/empresa")
     assert response.status_code == 302 and response.headers["Location"].endswith("/app/assinatura/cobranca?plano=empresa")
-    assert "Plano Empresa · R$ 997,00/mês" in text_of(bclient.get("/app/assinatura/cobranca?plano=empresa"))
+    assert "Plano Empresa · R$ 997,90/mês" in text_of(bclient.get("/app/assinatura/cobranca?plano=empresa"))
     assert bclient.get("/app/assinatura/planos/inexistente").status_code == 404
 
 

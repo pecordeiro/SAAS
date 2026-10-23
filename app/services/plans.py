@@ -1,18 +1,20 @@
 """Catálogo de planos (fonte única para `flask seed-plans`, para a migration da Etapa B e
 para os testes).
 
-Quatro planos (decisões D2–D4 do PRD, Etapa B):
+Quatro planos (ADR-0019, que substitui D2–D4 do PRD e a Etapa B):
 
-- ``essencial`` — R$ 249,90/mês, 3 projetos ativos, 3 pessoas, teste grátis;
-- ``profissional`` — R$ 497,00/mês, 10 projetos ativos, 20 pessoas, teste grátis (plano do
-  cadastro novo);
-- ``empresa`` — R$ 997,00/mês, ilimitado, MFA obrigatório, API e identidade visual
-  personalizada; SEM teste grátis (cobrança imediata no checkout);
-- ``implantacao`` — sob consulta (``price_cents`` NULL): tudo do Empresa + implantação por
-  técnicos nossos. Não entra no autosserviço; só ``flask billing-admin set-plan`` atribui.
+- ``essencial`` — R$ 249,90/mês, 5 projetos ativos, 5 pessoas, teste grátis de 14 dias;
+- ``profissional`` — R$ 497,90/mês, 10 projetos ativos, 25 pessoas, teste grátis de 14 dias
+  (plano do cadastro novo);
+- ``empresa`` — R$ 997,90/mês, ilimitado, MFA obrigatório, API e identidade visual
+  adaptada do site; SEM teste grátis (cobrança imediata no checkout);
+- ``implantacao`` — sob orçamento (``price_cents`` NULL, online ou presencial): tudo do
+  Empresa + implantação pela equipe técnica, 1 mês de acompanhamento e manutenção e
+  treinamento do sistema (SERVIÇOS: só texto em ``IMPLANTACAO_SERVICES``, sem limite nem
+  checagem no código). Não entra no autosserviço; só ``flask billing-admin set-plan`` atribui.
 
-As migrations ``a7c2d4e8f901`` (3 planos antigos) e ``b1e7c9d2a4f6`` (Etapa B) gravam os
-mesmos ids (uuid5 do código); `flask seed-plans` é idempotente e sincroniza preço/limites.
+As migrations ``a7c2d4e8f901`` (3 planos antigos), ``b1e7c9d2a4f6`` (Etapa B) e
+``a9d3f5c1b7e2`` (ADR-0019) gravam os mesmos ids (uuid5 do código); `flask seed-plans` é idempotente e sincroniza preço/limites.
 Limite NULL = ilimitado. Preço NULL = sob consulta (sem checkout).
 """
 
@@ -37,6 +39,14 @@ IMPLANTACAO = "implantacao"
 # Só estes planos têm teste grátis (regra de negócio, checada no backend).
 TRIAL_PLAN_CODES = frozenset({ESSENCIAL, PROFISSIONAL})
 
+# Serviços do plano Implantação (ADR-0019): só texto exibido nas telas; nenhum limite nem
+# checagem no código depende deles.
+IMPLANTACAO_SERVICES = (
+    "Implantação feita pela nossa equipe técnica, online ou presencial",
+    "1 mês de acompanhamento e manutenção",
+    "Treinamento do sistema para a sua equipe",
+)
+
 FEATURE_KEYS = ("mfa_required", "api", "visual_custom", "implantacao")
 
 
@@ -59,9 +69,9 @@ def _features(**on: bool) -> dict:
 
 
 PLAN_CATALOG: tuple[PlanSpec, ...] = (
-    PlanSpec(ESSENCIAL, "Essencial", 24990, 3, 3, _features()),
-    PlanSpec(PROFISSIONAL, "Profissional", 49700, 10, 20, _features()),
-    PlanSpec(EMPRESA, "Empresa", 99700, None, None, _features(mfa_required=True, api=True, visual_custom=True)),
+    PlanSpec(ESSENCIAL, "Essencial", 24990, 5, 5, _features()),
+    PlanSpec(PROFISSIONAL, "Profissional", 49790, 10, 25, _features()),
+    PlanSpec(EMPRESA, "Empresa", 99790, None, None, _features(mfa_required=True, api=True, visual_custom=True)),
     PlanSpec(
         IMPLANTACAO,
         "Implantação",

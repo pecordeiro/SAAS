@@ -94,15 +94,15 @@ horas por pessoa para folha de pagamento, emissão de NF-e pelo sistema.
 
 ## 7a. Planos (Etapa B)
 
-Fonte única: tabela `plans` (semeada pela migration `b1e7c9d2a4f6` e por `flask seed-plans`
+Fonte única: tabela `plans` (semeada pelas migrations `b1e7c9d2a4f6` e `a9d3f5c1b7e2` (ADR-0019) e por `flask seed-plans`
 a partir de `app/services/plans.py`). Telas e limites leem do banco; o servidor decide tudo.
 
 | Plano | Código | Preço/mês | Projetos ativos | Pessoas | Teste grátis | Recursos | Como contrata |
 |---|---|---|---|---|---|---|---|
-| Essencial | `essencial` | R$ 249,90 | 3 | 3 | 14 dias | — | Autosserviço (Asaas) |
-| Profissional | `profissional` | R$ 497,00 | 10 | 20 | 14 dias (plano do cadastro) | — | Autosserviço (Asaas) |
-| Empresa | `empresa` | R$ 997,00 | ilimitado | ilimitado | não (cobrança imediata) | MFA obrigatório, API, identidade visual personalizada | Autosserviço (Asaas); abre requisição de identidade visual (Etapa C, evento `plan.visual_custom_contracted`) |
-| Implantação | `implantacao` | sob consulta | ilimitado | ilimitado | não | tudo do Empresa + implantação por técnicos nossos | Só a equipe: `flask billing-admin set-plan --plan implantacao --reason ...` |
+| Essencial | `essencial` | R$ 249,90 | 5 | 5 | 14 dias | — | Autosserviço (Asaas) |
+| Profissional | `profissional` | R$ 497,90 | 10 | 25 | 14 dias (plano do cadastro) | — | Autosserviço (Asaas) |
+| Empresa | `empresa` | R$ 997,90 | ilimitado | ilimitado | não (cobrança imediata) | MFA obrigatório, API, identidade visual adaptada do site | Autosserviço (Asaas); abre requisição de identidade visual (Etapa C, evento `plan.visual_custom_contracted`) |
+| Implantação | `implantacao` | sob orçamento (online ou presencial) | ilimitado | ilimitado | não | tudo do Empresa + implantação pela equipe técnica, 1 mês de acompanhamento e manutenção, treinamento do sistema (serviços: só texto, sem checagem no código) | Só a equipe: `flask billing-admin set-plan --plan implantacao --reason ...` |
 
 ## 8. Decisões pendentes
 
@@ -111,9 +111,9 @@ Só você pode decidir. Cada item já tem uma sugestão padrão, usada no plano 
 | # | Decisão | Sugestão padrão | Por quê | Prazo |
 |---|---|---|---|---|
 | D1 | Nome do produto | “Controle de Produção” (provisório; 3 alternativas saem do Prompt 1) | Descritivo, fácil de achar | Antes da Fase 1 |
-| D2 | Planos e limites | **Decidido (Etapa B)**: Essencial 3 projetos ativos, 3 pessoas · Profissional 10 projetos, 20 pessoas · Empresa ilimitado + MFA obrigatório + API + identidade visual personalizada · Implantação = tudo do Empresa + implantação por técnicos nossos (ver tabela abaixo) | Escala com o tamanho da fábrica | Resolvido |
-| D3 | Preço mensal | **Decidido (Etapa B)**: Essencial R$ 249,90 · Profissional R$ 497,00 · Empresa R$ 997,00 · Implantação sob consulta. Não havia cliente pagante nos preços antigos (R$ 149/349/799): só substituídos | Valor validado pelo usuário | Resolvido |
-| D4 | Teste grátis | **Decidido (Etapa B)**: 14 dias, sem cartão, só no Essencial e no Profissional; cadastro novo começa no Profissional. Empresa sem teste (cobrança imediata); Implantação fora do autosserviço | Tempo para rodar 1 lote completo | Resolvido |
+| D2 | Planos e limites | **Decidido (ADR-0019, substitui a Etapa B)**: Essencial 5 projetos ativos, 5 pessoas · Profissional 10 projetos, 25 pessoas · Empresa ilimitado + MFA obrigatório + API + identidade visual adaptada do site · Implantação = tudo do Empresa + implantação pela equipe técnica, 1 mês de acompanhamento e manutenção, treinamento (ver tabela abaixo) | Escala com o tamanho da fábrica | Resolvido |
+| D3 | Preço mensal | **Decidido (ADR-0019)**: Essencial R$ 249,90 · Profissional R$ 497,90 · Empresa R$ 997,90 · Implantação sob orçamento (online ou presencial). Não havia cliente pagante nos preços antigos (R$ 149/349/799 e depois R$ 497,00/997,00): só substituídos | Valor validado pelo usuário | Resolvido |
+| D4 | Teste grátis | **Decidido (Etapa B, mantido no ADR-0019)**: 14 dias, sem cartão, só no Essencial e no Profissional; cadastro novo começa no Profissional. Empresa sem teste (cobrança imediata); Implantação fora do autosserviço | Tempo para rodar 1 lote completo | Resolvido |
 | D5 | Carência após vencimento | 7 dias, depois modo leitura (nunca apaga dados); plano sob consulta (Implantação) não passa pelo recálculo do Asaas | Boleto compensa em até 3 dias úteis | Resolvido |
 | D6 | Nota fiscal | Emitida manualmente por você (ou contador) no MVP; automação depois | Evita integração fiscal no MVP. **Converse com um contador antes de cobrar.** | Antes da Fase 8 |
 | D7 | Hospedagem | Render (web + worker + Redis) + Postgres gerenciado do Render, região mais próxima do Brasil disponível | Simples, IaC com render.yaml, backups gerenciados | Antes da Fase 10 |

@@ -377,18 +377,18 @@ def _subscribe(company, code, status="active", **kw):
 def test_limite_de_projetos_do_plano(ctx):
     company, owner, _ = ctx
     _subscribe(company, ESSENCIAL)
-    _project(company, name="2")
-    _project(company, name="3")
-    assert entitlements.count_active_projects(company.id) == 3
+    for n in ("2", "3", "4", "5"):
+        _project(company, name=n)
+    assert entitlements.count_active_projects(company.id) == 5
     with pytest.raises(entitlements.PlanLimitError) as exc:
-        _project(company, name="4")
-    assert "Essencial permite 3 projetos" in exc.value.message and exc.value.status_code == 402
+        _project(company, name="6")
+    assert "Essencial permite 5 projetos" in exc.value.message and exc.value.status_code == 402
     # Concluído ou arquivado libera vaga
     project = svc.list_projects()[0]
     svc.archive_project(project, owner.id)
-    _project(company, name="4")
+    _project(company, name="6")
     usage = entitlements.usage(company)
-    assert usage["projects"] == 3 and usage["max_projects"] == 3 and usage["writable"]
+    assert usage["projects"] == 5 and usage["max_projects"] == 5 and usage["writable"]
 
 
 def test_plano_empresa_sem_limite_de_projetos_e_features(ctx):

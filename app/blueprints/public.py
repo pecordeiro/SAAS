@@ -35,7 +35,6 @@ PLAN_EXTRAS = (
     ("mfa_required", "Verificação em duas etapas obrigatória (MFA)"),
     ("api", "API para ligar a outros sistemas"),
     ("visual_custom", "Identidade visual da sua empresa"),
-    ("implantacao", "Implantação feita por técnicos nossos"),
 )
 
 
@@ -62,7 +61,9 @@ def public_plans() -> list[dict]:
             "projects": "Projetos ilimitados" if plan.max_projects is None else f"{plan.max_projects} projetos ativos",
             "users": f"{plan.max_users} pessoas" if plan.max_users else "Pessoas ilimitadas",
             "extras": [label for key, label in PLAN_EXTRAS if (plan.features or {}).get(key)],
-            "features": {key: bool((plan.features or {}).get(key)) for key, _ in PLAN_EXTRAS},
+            "features": {key: bool((plan.features or {}).get(key)) for key in plan_catalog.FEATURE_KEYS},
+            # Serviços do plano Implantação (ADR-0019): só texto, sem limite nem checagem.
+            "services": list(plan_catalog.IMPLANTACAO_SERVICES) if (plan.features or {}).get("implantacao") else [],
             "trial": plan_catalog.has_trial(plan),
             "self_service": plan_catalog.is_self_service(plan),
             "featured": plan.code == FEATURED_PLAN,
@@ -92,7 +93,7 @@ def index():
 
 @bp.get("/precos")
 def pricing():
-    return render_template("public/precos.html", plans=public_plans())
+    return render_template("public/precos.html", plans=public_plans(), services=plan_catalog.IMPLANTACAO_SERVICES)
 
 
 @bp.get("/como-funciona")

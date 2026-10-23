@@ -1,7 +1,7 @@
 """Etapa B — planos novos e cobrança.
 
-Essencial (R$ 249,90; 3 projetos; 3 pessoas; teste), Profissional (R$ 497; 10; 20; teste),
-Empresa (R$ 997; ilimitado; sem teste) e Implantação (sob consulta; só `billing-admin
+Essencial (R$ 249,90; 5 projetos; 5 pessoas; teste), Profissional (R$ 497,90; 10; 25; teste),
+Empresa (R$ 997,90; ilimitado; sem teste) e Implantação (sob orçamento; só `billing-admin
 set-plan`). Tudo checado pelo servidor: limites pelas rotas (402), teste grátis só nos planos
 1 e 2, plano 4 fora do autosserviço, preço e limite lidos da tabela ``plans``.
 """
@@ -110,7 +110,7 @@ def test_catalogo_quatro_planos_ordem_e_regras(app):
 # ---------------------------------------------------------------- limites pelas rotas (402)
 
 
-@pytest.mark.parametrize("code,max_projects", [("essencial", 3), ("profissional", 10)])
+@pytest.mark.parametrize("code,max_projects", [("essencial", 5), ("profissional", 10)])
 def test_limite_de_projetos_pela_rota(client, app, tenants, code, max_projects):
     a, _ = tenants
     _set_sub(app, a.company_id, code)
@@ -121,24 +121,12 @@ def test_limite_de_projetos_pela_rota(client, app, tenants, code, max_projects):
     assert blocked.status_code == 402 and f"permite {max_projects} projetos ativos" in text_of(blocked)
 
 
-@pytest.mark.parametrize("code,max_users", [("essencial", 3), ("profissional", 20)])
+@pytest.mark.parametrize("code,max_users", [("essencial", 5), ("profissional", 25)])
 def test_limite_de_pessoas_pela_rota(client, app, tenants, code, max_users):
     a, _ = tenants
     _set_sub(app, a.company_id, code)
     login(client, app, a.owner_email)
-    if max_users <= 3:
-        # Essencial: os 3 vínculos do tenant já lotam o plano; o convite é barrado na hora.
-        blocked = post(client, app, "/app/usuarios/convidar", {"email": "cheio@x.com", "role": "operator"})
-        assert blocked.status_code == 402
-        with app.app_context():
-            from app.models import Membership
-
-            mid = db.session.execute(
-                select(Membership.id).where(Membership.user_id == a.operator_id, Membership.company_id == a.company_id)
-            ).scalar_one()
-        assert post(client, app, f"/app/usuarios/{mid}/desativar").status_code == 303
-    else:
-        _add_invites(app, a.company_id, max_users - 3 - 1)  # 3 vínculos + convites = limite - 1
+    _add_invites(app, a.company_id, max_users - 3 - 1)  # 3 vínculos + convites = limite - 1
     assert post(client, app, "/app/usuarios/convidar", {"email": "ok@x.com", "role": "operator"}).status_code == 303
     blocked = post(client, app, "/app/usuarios/convidar", {"email": "nao@x.com", "role": "operator"})
     assert blocked.status_code == 402 and f"permite {max_users} usuários" in text_of(blocked)
@@ -220,7 +208,7 @@ def test_empresa_sem_teste_cobra_hoje_e_so_vale_pago(bclient, bapp, btenants):
     state = sub_state(bapp, a.company_id)
     assert state["status"] == SUB_TRIALING and state["plan"] == "profissional" and state["pending_plan"] == "empresa"
     [first] = payments(bapp, a.company_id)
-    assert first.value_cents == 99700
+    assert first.value_cents == 99790
     assert first.due_date == billing.local_date(billing.now_utc())  # sem esperar o fim do teste
     assert _events(bapp, a.company_id, events.PLAN_VISUAL_CUSTOM_CONTRACTED) == []
     pay(bclient, bapp, a)
@@ -287,6 +275,21 @@ def test_telas_com_os_quatro_planos_respondem_200(bclient, bapp, btenants):
         assert bclient.get(f"/app/assinatura/planos/{code}").status_code == 200
 
 
+def test_precos_novos_e_servicos_da_implantacao_nas_paginas(client):
+    """ADR-0019: preços, limites e textos dos serviços vêm do catálogo/tabela, nunca do template."""
+    for path in ("/", "/precos"):
+        html = text_of(client.get(path))
+        for price in ("249,90", "497,90", "997,90"):
+            assert price in html, (path, price)
+        for old in ("R$ 497,00", "R$ 997,00", "R$ 497 ", "R$ 997 "):
+            assert old not in html, (path, old)
+        for service in catalog.IMPLANTACAO_SERVICES:
+            assert service in html, (path, service)
+        assert "5 projetos ativos" in html and "25 pessoas" in html
+    # sem limite nem checagem: os serviços não são recursos do catálogo
+    assert not [k for k in catalog.FEATURE_KEYS if "treinamento" in k or "acompanhamento" in k]
+
+
 def test_set_plan_exige_motivo_audita_e_emite_evento(bclient, bapp, btenants):
     a, b = btenants
     subscribe(bclient, bapp, a)
@@ -339,11 +342,11 @@ def _sub_with(price_now, price_new):
 @pytest.mark.parametrize(
     "now,new,kind,upgrade",
     [
-        (24990, 49700, billing.UPGRADE, True),
-        (49700, 24990, billing.DOWNGRADE, False),
-        (49700, 49700, billing.SAME_PRICE, True),  # mesmo preço: só depois de pago, nunca na hora
-        (49700, None, billing.MANAGED, False),
-        (None, 49700, billing.MANAGED, False),
+        (24990, 49790, billing.UPGRADE, True),
+        (49790, 24990, billing.DOWNGRADE, False),
+        (49790, 49790, billing.SAME_PRICE, True),  # mesmo preço: só depois de pago, nunca na hora
+        (49790, None, billing.MANAGED, False),
+        (None, 49790, billing.MANAGED, False),
     ],
 )
 def test_compare_plans_trata_igual_e_nulo(app, now, new, kind, upgrade):
@@ -361,7 +364,7 @@ def test_troca_pendente_de_mesmo_preco_nao_vale_na_hora(app, tenants):
     a, _ = tenants
     _set_sub(app, a.company_id, "profissional")
     with app.app_context():
-        twin = Plan(code="gemeo", name="Gêmeo", price_cents=49700, max_projects=10, max_users=20, features={})
+        twin = Plan(code="gemeo", name="Gêmeo", price_cents=49790, max_projects=10, max_users=25, features={})
         db.session.add(twin)
         db.session.flush()
         sub = billing.subscription_for(a.company_id)

@@ -49,16 +49,16 @@ def _count(app, model, **filters):
 # ---------------------------------------------------------------- 402
 
 
-def test_criar_quarto_projeto_no_essencial_responde_402_chamando_a_rota(client, app, tenants):
+def test_criar_sexto_projeto_no_essencial_responde_402_chamando_a_rota(client, app, tenants):
     a, _ = tenants
     _subscribe(app, a.company_id)
-    _add_projects(app, a.company_id, 2)  # 3 ativos
+    _add_projects(app, a.company_id, 4)  # 5 ativos
     login(client, app, a.supervisor_email)
     before = _count(app, Project, company_id=a.company_id)
     response = post(client, app, "/app/projetos/novo", NEW)
     assert response.status_code == 402
     page = text_of(response)
-    assert "Essencial permite 3 projetos ativos" in page and "Ver planos" in page
+    assert "Essencial permite 5 projetos ativos" in page and "Ver planos" in page
     assert _count(app, Project, company_id=a.company_id) == before
     # duplicar também é criação
     assert post(client, app, f"/app/projetos/{a.project_id}/duplicar").status_code == 402

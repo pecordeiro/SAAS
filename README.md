@@ -42,9 +42,9 @@ checkout no Asaas (Pix, boleto ou cartão), webhook idempotente (`POST /webhooks
 carência de 7 dias com e-mail e faixa, modo leitura depois, troca de plano com projeção,
 faturas, cancelamento até o fim do período, `flask billing-reconcile` e
 `flask billing-admin` (ver [`docs/plano/pagamentos.md`](docs/plano/pagamentos.md)).
-Etapa B (planos novos): Essencial R$ 249,90 (3 projetos, 3 pessoas), Profissional R$ 497,00
-(10 projetos, 20 pessoas), Empresa R$ 997,00 (ilimitado, sem teste grátis) e Implantação sob
-consulta (só `flask billing-admin set-plan --company <uuid> --plan implantacao --reason "..."`).
+Planos (ADR-0019): Essencial R$ 249,90 (5 projetos, 5 pessoas), Profissional R$ 497,90
+(10 projetos, 25 pessoas), Empresa R$ 997,90 (ilimitado, sem teste grátis) e Implantação sob
+orçamento, online ou presencial, com 1 mês de acompanhamento e treinamento (só `flask billing-admin set-plan --company <uuid> --plan implantacao --reason "..."`).
 Teste grátis de 14 dias só no Essencial e no Profissional. Em produção `APP_BASE_URL` (https)
 é obrigatório: sem ele o app não sobe.
 Etapa D (colaboração): autoria de cada lançamento no detalhe e no histórico (inclusive quem

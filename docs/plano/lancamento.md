@@ -48,7 +48,7 @@ Registro.br).
 - Pronto quando: domínio ativo no painel; host canônico definido por escrito (vira `APP_BASE_URL`).
 
 **P-02 · Contador: nota fiscal e enquadramento (D6)** — [P]
-- Como: levar `pagamentos.md` §1–2 e os preços (R$ 249,90 / 497,00 / 997,00). Perguntar: quem emite NFS-e
+- Como: levar `pagamentos.md` §1–2 e os preços (R$ 249,90 / 497,90 / 997,90). Perguntar: quem emite NFS-e
   de cada mensalidade (manual, ou a automação do Asaas), CNAE/regime, retenções, como tratar estorno e
   plano “Implantação” sob consulta. **Antes da primeira cobrança real.**
 - Pronto quando: resposta escrita do contador + processo de emissão definido (quem/quando/onde).
@@ -216,7 +216,7 @@ fechadas, 404 de `/interno`, SEO, redirecionamentos, certificado e textos legais
 
 | Passo | Ação | Resultado esperado |
 |---|---|---|
-| C1 | Abrir `/` , `/precos` | preços R$ 249,90 / 497,00 / 997,00; cadeado HTTPS; sem erro no console |
+| C1 | Abrir `/` , `/precos` | preços R$ 249,90 / 497,90 / 997,90; cadeado HTTPS; sem erro no console |
 | C2 | Cadastrar a empresa A (`/cadastro`) | e-mail de confirmação **chega** (Resend) em < 1 min |
 | C3 | Confirmar e-mail, entrar (`/entrar`) | painel vazio; faixa “Teste grátis · faltam 14 dias” |
 | C4 | Criar modelo de etapas e um projeto (qtd 10, prazo) | prazo em dias úteis calculado; feriado nacional respeitado |

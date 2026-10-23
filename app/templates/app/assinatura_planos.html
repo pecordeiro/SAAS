@@ -38,8 +38,8 @@
       {%- if plan.features.get("mfa_required") %}<li>{{ icon("check") }}<span>MFA obrigatório</span></li>{% endif %}
       {%- if plan.features.get("api") %}<li>{{ icon("check") }}<span>API de integração</span></li>{% endif %}
       {%- if plan.features.get("visual_custom") %}<li>{{ icon("check") }}<span>Identidade visual personalizada</span></li>{% endif %}
-      {%- if plan.features.get("implantacao") %}<li>{{ icon("check") }}<span>Implantação por técnicos nossos</span></li>{% endif %}
-      {%- if not self_service[plan.id] %}<li>{{ icon("info") }}<span>Sob consulta — fale conosco</span></li>
+      {%- if plan.features.get("implantacao") %}{% for service in implantacao_services %}<li>{{ icon("check") }}<span>{{ service }}</span></li>{% endfor %}{% endif %}
+      {%- if not self_service[plan.id] %}<li>{{ icon("info") }}<span>Sob orçamento, online ou presencial — fale conosco</span></li>
       {%- elif not trial[plan.id] %}<li>{{ icon("info") }}<span>Sem teste grátis: cobrança ao contratar</span></li>{% endif %}
     </ul>
     {%- if not self_service[plan.id] %}
