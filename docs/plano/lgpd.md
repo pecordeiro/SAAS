@@ -26,6 +26,9 @@ Fase 7. **Rascunho técnico — precisa de revisão jurídica antes do go-live (
 | Fotos de evidência (Etapa G) | pode aparecer pessoa/rosto na foto; quem enviou | armazenamento S3/R2 (objeto) + `activity_photos` (metadados) | prova de montagem / não conformidade | execução de contrato (V) com a empresa; a empresa é controladora |
 | Comentários e respostas de inspeção (Etapa G) | autor (usuário); texto livre pode citar pessoas | `activity_comments`, `inspection_answers` | qualidade e rastreabilidade | execução de contrato (V) |
 
+| Briefing de identidade visual (ADR-0019): nome e telefone/e-mail do contato, textos e imagens (logo, fotos de produto) | contato indicado pela empresa; pode aparecer pessoa na foto | `visual_briefings`, `visual_briefing_files` (+ objetos `<empresa>/briefing/`) | adaptar a identidade visual contratada | execução de contrato (V); a empresa é controladora |
+| Reserva da ligação: nome e telefone de quem atende | contato indicado pela empresa | `call_bookings` (empresa) e cópia em `call_slots.booked_contact_*` (plataforma, para a equipe ligar) | fazer a ligação contratada | execução de contrato (V) |
+
 Fotos: GPS, modelo da câmera e demais metadados EXIF são removidos no envio (reencode); a
 interface avisa para não fotografar pessoas sem necessidade.
 
@@ -93,3 +96,12 @@ flask suporte expirar                   # de hora em hora (o acesso já não val
 - Confirmar região do Render e assinar DPAs (Render, Resend, Sentry).
 - Exportação gera o ZIP em memória: para empresas muito grandes, gerar em segundo plano.
 - Tela para o usuário pedir exclusão da própria conta (hoje pelo encarregado).
+
+## ADR-0019 — briefing e ligação
+- Exportação: `visual_briefings.csv`, `visual_briefing_files.csv` (metadados) e `call_bookings.csv` saem no ZIP
+  como as demais tabelas da empresa; as imagens abrem na tela do briefing.
+- Expurgo: as imagens do briefing saem do armazenamento ANTES das linhas (como as fotos de evidência); a cópia
+  do contato nos horários da plataforma (`call_slots`) é apagada e o horário fica livre
+  (`services/agenda.py::release_company`).
+- A equipe (`/interno`) não lê o conteúdo do briefing nem as imagens; vê só status, data e o contato da ligação.
+
