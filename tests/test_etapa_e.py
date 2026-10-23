@@ -118,20 +118,20 @@ def test_painel_sem_estilo_inline_sem_cdn_e_esteira_acessivel(client, app, tenan
         assert re.search(rf'data-chart="{chart}" role="img" aria-label="[^"]+"', corpo), chart
 
 
-def test_painel_etapas_levam_ao_detalhe_com_a_etapa_aberta(client, app, tenants):
+def test_painel_etapas_levam_ao_preencher_com_a_etapa_aberta(client, app, tenants):
+    """R3: clicar numa etapa do painel abre “Preencher etapas” já nela (a tela de detalhe deixou de ser o destino)."""
     a, _ = tenants
     _projeto_rico(app, a)
     login(client, app, a.operator_email)
     html = _painel(client, a).get_data(as_text=True)
-    links = set(re.findall(r'href="(/app/projetos/[^"]+\?etapa=[^"]+)"', html))
+    links = set(re.findall(r'href="(/app/preencher[^"]*etapa=[^"]+)"', html))
     assert len(links) == 5  # um por etapa (barras e tabela repetem o mesmo destino)
     alvo = sorted(links)[0].replace("&amp;", "&")
-    page = client.get(alvo).get_data(as_text=True)
+    resp = client.get(alvo)
+    assert resp.status_code == 200
     etapa_id = re.search(r"etapa=([0-9a-f-]{36})", alvo).group(1)
-    assert re.search(rf'<details class="stage[^"]*" id="etapa-{etapa_id}" open', page)
-    # as outras etapas (exceto a que abriria sozinha) seguem recolhidas
-    abertas = re.findall(r'<details class="stage[^"]*" id="etapa-[0-9a-f-]+"( open)?', page)
-    assert abertas.count(" open") == 1
+    assert etapa_id in resp.get_data(as_text=True)
+
 
 
 def test_detalhe_ignora_etapa_de_outro_projeto_ou_invalida(client, app, tenants):
