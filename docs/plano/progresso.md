@@ -1367,3 +1367,18 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
   - [x] Login/cadastro/erros com rodapé no fim da janela; e-mails na paleta (`email_brand()`).
   - [x] `scripts/capturar_telas.py` cobre ~50 telas (3 larguras, claro/escuro) e acusa overflow; contraste em `docs/design/contraste.md`.
 - Pendências: rolagem horizontal de 29 px no cabeçalho público em 768 px (anterior); tela de unidade não capturada (sem unidades no seed).
+
+
+## Importação: ajuda por campo e unidade do tempo (2026-10-23)
+
+- Status: entregue. Branch `claude/planilha-ajuda`. ADR-0019 §5 (mapeamento continua por lista, sem arrastar).
+- Feito:
+  - [x] Tela de colunas com “Como preencher cada campo” (texto curto com exemplo, vem de `import_mapping.FIELD_HELP`).
+  - [x] Seletor “Unidade do tempo” (minutos, padrão, ou horas). O servidor converte horas em minutos
+    (`import_mapping.parse_mapped(time_unit=...)`), com os mesmos limites (`MAX_MINUTES`) aplicados depois da conversão.
+    Valor fora de minutos/horas dá erro na tela de colunas (nunca cai em minutos); campo ausente vale minutos.
+  - [x] A unidade acompanha o fluxo no formulário (e no “Voltar às colunas”); a prévia mostra o tempo ideal somado, já em
+    minutos, e a unidade da planilha.
+  - [x] Aviso na prévia (não bloqueia) quando a média dos tempos positivos é < 1 em minutos ou > 24 em horas
+    (`import_mapping.unit_warning`); a regra fica no serviço, a tela só exibe.
+  - [x] Testes em `tests/test_import_unidade.py`. Nenhuma rota nova (isolamento existente inalterado).
