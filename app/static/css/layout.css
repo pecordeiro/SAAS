@@ -377,7 +377,7 @@
   .banner__text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .banner__text strong { font-weight: var(--font-weight-semibold); }
   .banner__body { color: var(--color-text-muted); }
-  .banner__action { flex: none; font-weight: var(--font-weight-semibold); white-space: nowrap; }
+  .banner__action { flex: none; display: inline-flex; align-items: center; min-height: var(--touch-min); font-weight: var(--font-weight-semibold); white-space: nowrap; }
   .banner__close {
     flex: none;
     display: inline-flex;

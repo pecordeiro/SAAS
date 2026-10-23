@@ -1246,3 +1246,21 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
   mm/dd/yyyy); arquivo de vários projetos aceita até 10 projetos (teto de 30 abas da leitura); modo simples
   ainda grava 1 subatividade por etapa (TODO R4); `/security-review` não rodado neste ambiente.
 
+
+## R2 · Ajustes visuais (Painel e telas novas)
+
+- Conferidas em 375, 768 e 1280 px, claro e escuro: Painel (operação e de um projeto), Preencher etapas,
+  Meta e equipe, Como funciona, Importar planilha e Restaurar (playwright, capturas fora do repositório).
+- Corrigido só com tokens e CSS/JS próprios (sem `style=` inline):
+  - prazo cortado na tabela de projetos do Painel (`.prazo-text` agora quebra linha);
+  - cards de gráfico na mesma linha com alturas iguais (`.painel-grid` estica; a área do gráfico cresce e o
+    `painel.js` redesenha com `ResizeObserver`);
+  - overflow horizontal em 375 px em Preencher etapas e Meta e equipe (colunas das grades `fill` e
+    `team-grid` com `minmax(0, 1fr)`; `.table-scroll` e `.project-tabs` como contexto de posição);
+  - alvos de toque >= 44 px no celular (abas de projeto, `btn--sm`, controle segmentado, links do banner,
+    da esteira e das pendências); no desktop seguem 36 px (`--touch-min`);
+  - tabela de subatividades mais compacta; separador entre etapas da lista; `scripts/build_assets.py --check` ok.
+- Ficou: a coluna “Tempo restante” da tabela de Preencher etapas rola dentro do card em larguras < 1400 px;
+  blocos estreitos da esteira (etapas de pouco tempo) têm largura proporcional (< 44 px no celular);
+  links dentro de frases seguem com altura de texto. Auditoria Web Interface Guidelines: guideline remota
+  não buscada (sem rede); conferidos rótulos, foco visível e contraste nas telas acima.

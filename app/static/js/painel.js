@@ -118,6 +118,7 @@
     var key = el.getAttribute("data-chart");
     if (charts[key]) charts[key].dispose();
     charts[key] = window.echarts.init(el, null, { renderer: "canvas" });
+    if (window.ResizeObserver) new ResizeObserver(function () { charts[key].resize(); }).observe(el);
     return charts[key];
   }
 
