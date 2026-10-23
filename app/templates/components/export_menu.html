@@ -1,0 +1,26 @@
+{% from "components/icon.html" import icon %}
+{#
+  Menu “Exportar” do projeto (R7). Padrão: a planilha no formato da equipe (abas
+  Acompanhamento e Equipe, com fórmulas). As listas simples (.csv/.xlsx) continuam aqui.
+  Só para supervisor+ (as rotas recusam os demais; o menu só não aparece para eles).
+#}
+{% macro export_menu(project) -%}
+<details class="action-menu export-menu">
+  <summary class="btn btn--secondary">{{ icon("download", class_="btn__icon") }}<span class="btn__label">Exportar</span>{{ icon("chevron-down", "sm", class_="export-menu__chevron") }}</summary>
+  <div class="action-menu__list export-menu__list">
+    <a class="action-menu__item export-menu__item" href="{{ url_for('dados.export_layout_xlsx', project_id=project.id) }}" download>
+      <span class="export-menu__title">Planilha no formato da equipe (.xlsx)</span>
+      <span class="export-menu__desc">Etapas, totais, Tabelas 1 e 2 e aba Equipe, com fórmulas</span>
+    </a>
+    <p class="export-menu__group">Lista simples</p>
+    <a class="action-menu__item export-menu__item" href="{{ url_for('dados.export_csv', project_id=project.id) }}" download>
+      <span class="export-menu__title">Lista simples (.csv)</span>
+      <span class="export-menu__desc">Uma linha por atividade</span>
+    </a>
+    <a class="action-menu__item export-menu__item" href="{{ url_for('dados.export_xlsx', project_id=project.id) }}" download>
+      <span class="export-menu__title">Lista simples (.xlsx)</span>
+      <span class="export-menu__desc">Uma linha por atividade, para filtrar no Excel</span>
+    </a>
+  </div>
+</details>
+{%- endmacro %}

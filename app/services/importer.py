@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 import uuid
 import zipfile
 from dataclasses import asdict, dataclass, field
@@ -549,9 +550,79 @@ def _a(ws: Sheet, row: int) -> str:
 def parse_reference(grid: Grid) -> ImportResult:
     """Layout da planilha de referência (e da exportação “layout da base”, que é o mesmo):
     título em A1, “Meta…” com a quantidade em B, blocos de etapa; na aba Equipe, pessoas,
-    horas por dia e (só na exportação do site) início e prazo."""
-    result = ImportResult(source=SOURCE_REFERENCE)
+    horas por dia e (só na exportação do site) início e prazo.
+
+    Arquivo com VÁRIOS projetos (abas “<Nome> - Acompanhamento”…): este lê o primeiro (o
+    principal, abas sem prefixo); ``parse_reference_many`` lê todos."""
     ws = next((s for s in grid.sheets if _find_blocks(s)), None)
+    team = next((s for s in grid.sheets if s.title.casefold() == "equipe"), None)
+    return _parse_reference_sheets(ws, team)
+
+
+# Abas de um projeto no arquivo da equipe: “Acompanhamento”, “Equipe”, “Como funciona” (o
+# principal) e “<Nome> - Acompanhamento”, “<Nome> - Equipe”, “<Nome> - Como funciona” (os
+# demais). Regra da base: um projeto existe se as TRÊS abas existirem.
+ROLE_TRACKING = "acompanhamento"
+ROLE_TEAM = "equipe"
+ROLE_HOWTO = "como funciona"
+_PROJECT_SHEET = re.compile(
+    r"^\s*(?:(?P<name>.+?)\s+[-–—]\s+)?(?P<role>acompanhamento|equipe|como funciona)\s*$", re.IGNORECASE
+)
+_TITLE_PREFIX = re.compile(r"^\s*acompanhamento\s+da\s+montagem\s*[-–—:]\s*", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class ReferenceProject:
+    """Um projeto encontrado no arquivo: ``key`` vazio = o principal (abas sem prefixo)."""
+
+    key: str
+    tracking: str  # título da aba de acompanhamento
+    team: str  # título da aba Equipe
+
+
+def reference_projects(grid: Grid) -> list[ReferenceProject]:
+    """Projetos do arquivo pela regra das três abas, na ordem das abas (principal primeiro).
+    Função pura sobre os títulos das abas."""
+    groups: dict[str, dict[str, str]] = {}
+    names: dict[str, str] = {}
+    for sheet in grid.sheets:
+        match = _PROJECT_SHEET.match(sheet.title or "")
+        if not match:
+            continue
+        name = " ".join((match.group("name") or "").split())
+        key = name.casefold()
+        names.setdefault(key, name)
+        groups.setdefault(key, {}).setdefault(match.group("role").casefold(), sheet.title)
+    found = [
+        ReferenceProject(names[key], roles[ROLE_TRACKING], roles[ROLE_TEAM])
+        for key, roles in groups.items()
+        if {ROLE_TRACKING, ROLE_TEAM, ROLE_HOWTO} <= roles.keys()
+    ]
+    return sorted(found, key=lambda p: p.key != "")
+
+
+def project_name_from_title(title: str, fallback: str = "") -> str:
+    """“Acompanhamento da Montagem – Agro” → “Agro”; sem o prefixo, o título como está."""
+    title = _clean(title)
+    short = _TITLE_PREFIX.sub("", title).strip()
+    return (short if short and short != title else (title or fallback) or "Projeto importado")[:160]
+
+
+def parse_reference_many(grid: Grid) -> list[tuple[ReferenceProject, ImportResult]]:
+    """Todos os projetos do arquivo (regra das três abas), cada um com o seu resultado e os
+    seus erros. O nome vem do A1 sem “Acompanhamento da Montagem –” (ou do prefixo das abas).
+    Lista vazia = o arquivo não segue o padrão de vários projetos."""
+    out = []
+    for project in reference_projects(grid):
+        ws = grid.sheet(project.tracking)
+        result = _parse_reference_sheets(ws if ws is not None and _find_blocks(ws) else None, grid.sheet(project.team))
+        result.name = project_name_from_title(_a(ws, 1) if ws is not None else "", project.key)
+        out.append((project, result))
+    return out
+
+
+def _parse_reference_sheets(ws: Sheet | None, team: Sheet | None) -> ImportResult:
+    result = ImportResult(source=SOURCE_REFERENCE)
     if ws is None:
         result.error(1, "A", "nenhum bloco de etapa encontrado (título “N. Nome” seguido de “Unidades previstas”)")
         return result
@@ -566,7 +637,6 @@ def parse_reference(grid: Grid) -> ImportResult:
                 raise ValueError
         except ValueError:
             result.error(meta_row, "B (meta)", f"número inteiro entre 1 e {MAX_QUANTITY}")
-    team = next((s for s in grid.sheets if s.title.casefold() == "equipe"), None)
     if team is not None:
         for r in range(1, min(team.max_row, 60) + 1):
             title = _a(team, r).casefold()

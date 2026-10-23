@@ -31,6 +31,15 @@
   document.addEventListener("change", function (event) {
     var input = event.target;
     if (input && input.name === "tema" && input.closest("[data-theme-form]")) applyTheme(input.value);
+    // Envio de arquivo (R7): mostra o nome escolhido ao lado do botão (só apresentação).
+    if (input && input.type === "file" && input.closest("[data-upload]")) {
+      var label = input.closest("[data-upload]").querySelector("[data-upload-name]");
+      var file = input.files && input.files[0];
+      if (label) {
+        label.textContent = file ? file.name : "Nenhum arquivo escolhido";
+        label.classList.toggle("has-file", !!file);
+      }
+    }
   });
 
   /* ---------- Stepper (− / +): só mexe no campo; min/max são dica visual.

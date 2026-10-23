@@ -1,0 +1,17 @@
+{% from "components/icon.html" import icon %}
+{#
+  Indicador de passos de um fluxo (R7 — importar planilha). items = [(rótulo, nota|None)];
+  current = número do passo atual (1-based). Passo feito ganha ✓, o atual aria-current="step".
+  Só mostra onde a pessoa está: quem decide o passo é o servidor.
+#}
+{% macro steps(items, current, label="Passos") -%}
+<ol class="wizard" aria-label="{{ label }}">
+  {%- for text, note in items %}
+  {%- set n = loop.index %}
+  <li class="wizard__item{% if n < current %} is-done{% elif n == current %} is-current{% endif %}"{% if n == current %} aria-current="step"{% endif %}>
+    <span class="wizard__num" aria-hidden="true">{% if n < current %}{{ icon("check", "sm") }}{% else %}{{ n }}{% endif %}</span>
+    <span class="wizard__text"><span class="visually-hidden">Passo {{ n }} de {{ items|length }}{% if n < current %}, feito{% endif %}: </span>{{ text }}{% if note %} <span class="wizard__note">{{ note }}</span>{% endif %}</span>
+  </li>
+  {%- endfor %}
+</ol>
+{%- endmacro %}

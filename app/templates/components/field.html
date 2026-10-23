@@ -71,3 +71,27 @@
 </div>
 {%- endif -%}
 {%- endmacro %}
+
+{#
+  Envio de arquivo (R7). O <input type="file"> nativo mostra “Choose File” no idioma do
+  navegador; aqui ele fica visualmente escondido (mas focável) e o rótulo vira o botão em
+  pt-BR. O foco do teclado aparece no botão (.upload__input:focus-visible + .upload__button).
+  Com JS, o nome do arquivo escolhido aparece ao lado (só apresentação).
+#}
+{% macro file_upload(f, accept, button_label="Escolher arquivo", hint=None, required=True, label=None) -%}
+{%- set hint_id = f.id ~ "-dica" -%}
+{%- set err_id = f.id ~ "-erro" -%}
+{%- set described = [] -%}
+{%- if hint %}{% set _ = described.append(hint_id) %}{% endif -%}
+{%- if f.errors %}{% set _ = described.append(err_id) %}{% endif -%}
+<div class="field upload{% if f.errors %} field--error{% endif %}" data-upload>
+  <p class="field__label" id="{{ f.id }}-rotulo">{{ label or f.label.text }}</p>
+  <div class="upload__zone">
+    <input class="upload__input visually-hidden" type="file" id="{{ f.id }}" name="{{ f.name }}" accept="{{ accept }}"{% if required %} required{% endif %} aria-labelledby="{{ f.id }}-rotulo {{ f.id }}-botao"{% if described %} aria-describedby="{{ described|join(' ') }}"{% endif %}{% if f.errors %} aria-invalid="true"{% endif %}>
+    <label class="btn btn--secondary upload__button" for="{{ f.id }}" id="{{ f.id }}-botao">{{ icon("arrow-up", class_="btn__icon") }}<span class="btn__label">{{ button_label }}</span></label>
+    <span class="upload__name js-only" data-upload-name aria-live="polite">Nenhum arquivo escolhido</span>
+  </div>
+  {%- if hint %}<p class="field__hint" id="{{ hint_id }}">{{ hint }}</p>{% endif %}
+  {%- if f.errors %}<p class="field__error" id="{{ err_id }}">{{ icon("alert", "sm") }}<span>{{ f.errors|select("string")|join(" ") }}</span></p>{% endif %}
+</div>
+{%- endmacro %}

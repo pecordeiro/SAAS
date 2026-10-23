@@ -204,6 +204,13 @@ class ImportMapForm(BaseForm):
     action = StringField(validators=[Optional(), AnyOf(["previa", "ver"])])
 
 
+class ImportManyForm(BaseForm):
+    """R7 — arquivo com vários projetos: ``payload`` = lista assinada (empresa + usuário + 1 h)
+    dos projetos lidos; os escolhidos vêm em ``pick`` (índices, lidos de ``request.form``)."""
+
+    payload = HiddenField(validators=[DataRequired()])
+
+
 class ImportConfirmForm(BaseForm):
     payload = HiddenField(validators=[DataRequired()])
     name = StringField("Nome do projeto", filters=[_strip], validators=[Optional(), Length(max=160)])

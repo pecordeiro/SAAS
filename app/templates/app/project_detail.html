@@ -5,6 +5,7 @@
 {% from "components/empty_state.html" import empty_state %}
 {% from "components/modal.html" import confirm_dialog %}
 {% from "components/field.html" import checkbox %}
+{% from "components/export_menu.html" import export_menu %}
 {% set nav_current = "fill" %}
 {% set nav_project = project %}
 {% block title %}{{ project.name }} · Controle de Produção{% endblock %}
@@ -29,11 +30,10 @@
     {{ button("Histórico", "secondary", icon="history", href=url_for('app.project_history', project_id=project.id)) }}
     {{ button("Unidades", "secondary", icon="package", href=url_for('qualidade.units', project_id=project.id)) }}
     {%- if can_edit %}
+    {{ export_menu(project) }}
     <details class="action-menu">
       <summary class="btn btn--secondary" aria-label="Mais ações do projeto">{{ icon("more") }}<span>Ações</span></summary>
       <div class="action-menu__list">
-        <a class="action-menu__item" href="{{ url_for('dados.export_csv', project_id=project.id) }}">Exportar CSV</a>
-        <a class="action-menu__item" href="{{ url_for('dados.export_xlsx', project_id=project.id) }}">Exportar XLSX</a>
         <a class="action-menu__item" href="{{ url_for('edicao.project_edit', project_id=project.id) }}">Editar projeto</a>
         {%- if project.template_version_id %}<a class="action-menu__item" href="{{ url_for('edicao.project_compare', project_id=project.id) }}">Comparar com o modelo</a>{% endif %}
         <a class="action-menu__item action-menu__item--danger" href="#arquivar-projeto" aria-haspopup="dialog">Arquivar projeto</a>

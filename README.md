@@ -22,6 +22,11 @@ lançamento compensatório), importação CSV/XLSX e da planilha de referência 
 pré-visualização (`/app/importar`), exportação CSV/XLSX neutralizada, limites de plano e
 modo leitura (HTTP 402, `app/services/entitlements.py`), eventos de domínio
 (`services/events.py`) e auditoria (`services/audit.py::record`).
+Reestruturação R7–R8 (telas): importar planilha em 3 passos (`/app/importar`: enviar →
+escolher colunas com “Isto é…” por coluna, ou escolher projetos quando o arquivo da equipe traz
+vários (abas “<Nome> - Acompanhamento/Equipe/Como funciona”) → prévia com erros por linha e
+confirmar), menu “Exportar” no projeto (planilha no formato da equipe com fórmulas ou lista
+simples) e “Restaurar para uma data” no histórico (prévia antes → depois, confirmar, desfazer).
 Fase 8 (assinaturas e pagamento) entregue: `PaymentProvider` com Asaas e Fake
 (`app/services/billing/`), teste grátis de 14 dias sem cartão, assinar com CPF/CNPJ validado e
 checkout no Asaas (Pix, boleto ou cartão), webhook idempotente (`POST /webhooks/asaas`),

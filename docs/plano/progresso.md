@@ -1194,3 +1194,55 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
 - Pendências: `charts.py` e macros SVG de `components/chart.html` sem uso no painel (remover na R9);
   `<meta name="theme-color">` (exige cor no template; resolver com token/CSS na R9); capturas em
   `docs/design/capturas/` desatualizadas; testes em PostgreSQL não rodados nesta fase (só SQLite, a pedido).
+
+## Reestruturação R7–R8 — telas (planilha e restaurar) (2026-10-21)
+
+- Status: entregue (telas no visual da ADR-0015). Branch `claude/r7-r8-telas`.
+- **Importar** (`/app/importar`, Configurações › Planilha, botão “Importar planilha” em Projetos):
+  - [x] Indicador de passos 1–2–3 (`components/steps.html`, classe `wizard`)
+  - [x] Passo 1: envio com botão próprio em pt-BR (`components/field.html::file_upload`: input nativo
+    escondido mas focável, rótulo vira botão, foco visível; nome do arquivo com JS); limite (2 MB, 5.000 linhas)
+    dito antes; arquivo grande → 413 com a mensagem do limite e o que fazer
+  - [x] Passo 2 (colunas): aba e linha de cabeçalho (“Reler a aba”), tabela coluna + 3 exemplos + select
+    “Isto é…” (Etapa; Subatividade, Tempo ideal, Previstas/meta, Concluídas, % da etapa, Prazo “(opcional)”),
+    sugestão já marcada, aviso do modo (simples × detalhado) e de coluna repetida/sem Etapa decidido no
+    servidor (`GET /app/importar/colunas/modo`, HTMX troca só o aviso); aba sem dados avisada
+    (`import_mapping.mapping_from_columns`, `mode_of`, `COLUMN_CHOICES`; o formato antigo campo → coluna
+    continua aceito)
+  - [x] Passo 3: prévia (modo, etapas, atividades, meta, prazo; tabela por etapa), erros por linha numa tabela
+    (Linha · Coluna · Problema) com “Voltar às colunas” sem reenviar o arquivo (grade assinada)
+  - [x] **Arquivo com vários projetos** (pedido do dono): regra das três abas — “Acompanhamento”, “Equipe”,
+    “Como funciona” (principal) e “<Nome> - Acompanhamento/Equipe/Como funciona” (demais). Funções puras
+    `importer.reference_projects`, `project_name_from_title` (A1 “Acompanhamento da Montagem – X” → “X”) e
+    `parse_reference_many`; `parse_reference` mantém o comportamento de um projeto. Passo 2 lista os projetos
+    (nome, etapas, atividades, meta; todos marcados; projeto com erro aparece com os erros e sem caixa),
+    passo 3 prévia, confirmação cria um projeto por item numa transação. Limite do plano conferido no backend
+    antes de gravar (402 com “dá para importar N: desmarque K”) e de novo em cada `create_project`.
+    Rotas `POST /app/importar/projetos` e `POST /app/importar/confirmar-varios` (lista assinada com
+    empresa + usuário + 1 h). Implementação própria; testada só com planilha SINTÉTICA gerada da referência
+    pública (nenhum dado de cliente no repositório).
+- **Exportar** (`components/export_menu.html`): menu no detalhe, no painel e no histórico do projeto
+  (supervisor+): “Planilha no formato da equipe (.xlsx)” (padrão, abas sem prefixo) e “Lista simples
+  (.csv/.xlsx)”. No celular o menu ocupa a largura da faixa de ações (sem rolagem lateral).
+- **Restaurar** (`edicao/restore.html`): botão “Restaurar para uma data” no histórico do projeto
+  (supervisor+, projeto não arquivado); campo data e hora local (fuso da empresa, `max` = agora), resumo
+  antes → depois (progresso, unidades prontas, tarefas, tempo que falta), tabela por etapa e atividade
+  (agora · depois · diferença), confirmação; 409 “Algo mudou desde a prévia” com a prévia nova; “Nada a
+  restaurar”; lista das restaurações (voltou para, feita em, por, lançamentos) com “Desfazer restauração”
+  em diálogo de confirmação; selo “restauração”/“desfaz restauração” nas linhas do histórico, sem “Desfazer”.
+- Testes: `tests/test_r7_varios_projetos.py` (9: regra das três abas, nome pelo título, um resultado por
+  projeto, planilha de um projeto igual, projeto com erro, escolher e importar, limite do plano no lote,
+  operador 403, “quero escolher as colunas”); `test_isolation.py`: aviso do modo não lê dados (A/B) e
+  recusa operador, lista de vários projetos assinada para B recusada nas duas rotas; testes de tela de
+  `test_r7_planilha.py`, `test_fase4_routes.py` e `test_r8_restaurar.py` ajustados aos textos novos.
+  Suíte completa em SQLite (PostgreSQL não rodado, a pedido).
+- Verificação: fluxo real com playwright-cli num servidor local (SQLite próprio): planilha “Fase/Item/
+  Minutos/Feitas” (modo detalhado), “Etapa/%” (modo simples), planilha com erros, aba sem dados, arquivo
+  de 3 MB, arquivo sintético com 3 projetos (importados 2); exportação aberta e recalculada no LibreOffice
+  sem erro; restaurar, 409 com duas abas, nada a restaurar e desfazer. Capturas 375/768/1280 claro/escuro
+  fora do repositório. Auditoria Web Interface Guidelines nos arquivos mexidos (rótulo específico no
+  passo 1, `autocomplete="off"`, foco/hover no resumo dos projetos, numeração dupla nas etapas).
+- Pendências: o campo `datetime-local` segue o idioma do navegador (em navegador em inglês aparece
+  mm/dd/yyyy); arquivo de vários projetos aceita até 10 projetos (teto de 30 abas da leitura); modo simples
+  ainda grava 1 subatividade por etapa (TODO R4); `/security-review` não rodado neste ambiente.
+
