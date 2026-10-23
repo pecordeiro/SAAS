@@ -31,7 +31,7 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 from app.extensions import db
-from app.models import Company, Project
+from app.models import PROGRESS_DETAILED, PROGRESS_SIMPLE, Company, Project
 from app.services import audit
 from app.services.exporter import (
     COL_ACTIVITY,
@@ -97,10 +97,9 @@ class ImportResult:
     errors: list[RowError] = field(default_factory=list)
     # R7: avisos que não impedem a gravação (ex.: “meta não informada, usamos 100”).
     notes: list[str] = field(default_factory=list)
-    # R7: "detalhado" (subatividades) ou "simples" (só etapa + %). TODO(R4): o modelo ainda
-    # não tem o modo; um projeto "simples" é gravado com UMA subatividade por etapa, com o
-    # nome da etapa e as peças = % × meta. Quando a R4 criar ``Project.mode``, ``save`` deve
-    # gravar o modo e o % direto da etapa em vez da subatividade substituta.
+    # R7/R4: "detalhado" (subatividades) ou "simples" (só etapa + %). ``save`` grava o modo em
+    # ``Project.progress_mode``; no simples cada etapa tem a atividade interna (nome da etapa,
+    # peças = % × meta por ``calc.pecas_de_percentual``), a mesma representação da tela.
     mode: str = MODE_DETAILED
 
     @property
@@ -721,6 +720,7 @@ def save(company: Company, result: ImportResult, user_id: uuid.UUID | None, name
         hours_per_day=result.hours_per_day,
         stages=result.stages,
         source="import",
+        progress_mode=PROGRESS_SIMPLE if result.mode == MODE_SIMPLE else PROGRESS_DETAILED,
     )
     record_initial_progress(project, user_id)
     audit.record(

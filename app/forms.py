@@ -131,8 +131,11 @@ class StageSlotForm(Form):
         parsed = parse_activities(field.data)
         if parsed and not self.name.data:
             raise ValidationError("Dê um nome à etapa.")
-        if self.name.data and not parsed:
+        if self.name.data and not parsed and not getattr(self, "allow_without_activities", False):
             raise ValidationError("Inclua pelo menos uma atividade.")
+        if getattr(self, "allow_without_activities", False) and len(parsed) > 1:
+            # R4, modo simples: a etapa tem só o %; uma linha opcional dá o tempo da etapa.
+            raise ValidationError("No modo simples, deixe em branco ou use uma linha só (o tempo da etapa).")
         self.parsed = parsed
 
 

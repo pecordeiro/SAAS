@@ -25,6 +25,9 @@ from app.models.billing import (  # noqa: F401
 )
 from app.models.platform import ApiClient, ApiToken, AuditLog, DomainEvent  # noqa: F401
 from app.models.production import (  # noqa: F401
+    PROGRESS_DETAILED,
+    PROGRESS_MODES,
+    PROGRESS_SIMPLE,
     PROJECT_ACTIVE,
     PROJECT_DONE,
     Activity,

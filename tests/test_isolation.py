@@ -103,7 +103,7 @@ def test_toda_rota_com_uuid_tem_caso_de_isolamento(app_factory, flags):
     """Varre o url_map (com e sem as flags que registram blueprints) e falha se alguma rota
     com <uuid:> não tiver caso A/B. Rota com dois <uuid:> também precisa estar listada."""
     app = app_factory(flags)
-    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI + ROUTES_ETAPA_D + ROUTES_ETAPA_E + ROUTES_ETAPA_F + ROUTES_ETAPA_G + ROUTES_ETAPA_G_CHECKLIST + ROUTES_ETAPA_G_UNIDADES + ROUTES_R8
+    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI + ROUTES_ETAPA_D + ROUTES_ETAPA_E + ROUTES_ETAPA_F + ROUTES_ETAPA_G + ROUTES_ETAPA_G_CHECKLIST + ROUTES_ETAPA_G_UNIDADES + ROUTES_R8 + ROUTES_R3_R5
     cobertas = {template.replace("{id}", "") for _, template, _, _ in todas}
     # Etapa C: /interno é da plataforma (sem empresa na URL); acesso cruzado = não ser equipe → 404,
     # coberto por tests/test_etapa_c_interno.py::test_interno_e_404_para_quem_nao_e_equipe.
@@ -1225,13 +1225,79 @@ def test_r1_atalho_com_projeto_de_outra_empresa_responde_404(client, app, tenant
 
 @pytest.mark.parametrize("url", ROUTES_R1_ATALHOS)
 def test_r1_atalho_leva_so_ao_projeto_da_propria_empresa(client, app, tenants, url):
+    """R3–R5: os atalhos viraram telas próprias; sem ?projeto= abrem o projeto da empresa."""
     a, b = tenants
     login(client, app, a.operator_email)
-    for suffix in ("", f"?projeto={a.project_id}"):
+    for suffix in ("", f"?projeto={a.project_id}", f"?projeto={a.project_id}&etapa={b.stage_id}"):
         response = client.get(url + suffix)
-        assert response.status_code == 303
-        location = response.headers["Location"]
-        assert str(a.project_id) in location and str(b.project_id) not in location
+        assert response.status_code == 200
+        html = response.get_data(as_text=True)
+        assert "Projeto A" in html and "Projeto B" not in html and ("Etapa 1" in html or url != "/app/preencher")
+        if "etapa=" not in suffix:  # o id digitado na URL volta só no link “tema” da própria página
+            assert str(b.project_id) not in html and str(b.stage_id) not in html
+
+
+# ---------------------------------------------------------------- Reestruturação R3–R5
+# Preencher etapas (células), Meta e equipe e modo de progresso. Owner de A pedindo recurso de
+# B → 404 e nada muda em B; na própria empresa a rota funciona. ``data`` pode ser função do
+# Tenant (ids reais).
+ROUTES_R3_R5 = [
+    ("POST", "/app/preencher/atividades/{id}", "activity_id", {"campo": "units_done", "units_done": "1", "version": "1"}),
+    ("POST", "/app/preencher/etapas/{id}", "stage_id", {"campo": "name", "name": "Invasora", "version": "1"}),
+    ("POST", "/app/preencher/etapas/{id}/atividades", "stage_id", {"name": "Invasora", "ideal_minutes": "5"}),
+    ("POST", "/app/preencher/projetos/{id}/etapas", "project_id", {"name": "Invasora"}),
+    ("POST", "/app/preencher/etapas/{id}/desfazer-exclusao", "stage_id", None),
+    ("POST", "/app/preencher/atividades/{id}/desfazer-exclusao", "activity_id", None),
+    ("POST", "/app/meta-e-equipe/{id}", "project_id", {"campo": "people", "people": "7"}),
+    ("POST", "/app/meta-e-equipe/{id}/modo", "project_id", {"progress_mode": "simples"}),
+]
+
+
+def _archive_for_undo(app, tenant, template):
+    """As rotas de desfazer exclusão só funcionam em etapa/atividade excluída."""
+    if "desfazer-exclusao" not in template:
+        return
+    with app.app_context():
+        if "/etapas/" in template:
+            db.session.get(Stage, tenant.stage_id).archived_at = db.func.now()
+        else:
+            db.session.get(Activity, tenant.activity_id).archived_at = db.func.now()
+        db.session.commit()
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_R3_R5)
+def test_r3_r5_recurso_de_outra_empresa_responde_404(client, app, tenants, method, template, field, data):
+    a, b = tenants
+    _archive_for_undo(app, b, template)
+    with app.app_context():
+        before = _snapshot(b.company_id)
+    login(client, app, a.owner_email)
+    for headers in ({}, {"HX-Request": "true"}):
+        response = post(client, app, template.format(id=getattr(b, field)), data, headers=headers)
+        assert response.status_code == 404
+    with app.app_context():
+        assert _snapshot(b.company_id) == before
+        assert db.session.get(Project, b.project_id).progress_mode == "detalhado"
+        assert db.session.get(Project, b.project_id).people == 1
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_R3_R5)
+def test_r3_r5_mesma_rota_funciona_na_propria_empresa(client, app, tenants, method, template, field, data):
+    a, _ = tenants
+    _archive_for_undo(app, a, template)
+    login(client, app, a.owner_email)
+    response = post(client, app, template.format(id=getattr(a, field)), data)
+    # modo simples recusado (etapa com 2 atividades) responde 400 com a explicação: passou do 404
+    assert response.status_code in (200, 302, 303, 400)
+    assert response.status_code != 400 or "/modo" in template
+
+
+def test_r3_r5_preencher_de_a_nao_mostra_b(client, app, tenants):
+    a, b = tenants
+    login(client, app, a.owner_email)
+    for url in ("/app/preencher", "/app/meta-e-equipe", "/app/como-funciona"):
+        html = client.get(url).get_data(as_text=True)
+        assert "Projeto B" not in html and str(b.project_id) not in html and str(b.activity_id) not in html
 
 
 def test_r2_painel_da_operacao_mostra_so_a_propria_empresa(client, app, tenants):

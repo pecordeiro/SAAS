@@ -149,7 +149,8 @@ def test_mapeamento_detalhado_com_etapa_herdada_e_meta_digitada(ctx):
 
 
 def test_mapeamento_modo_simples_etapa_e_percentual(ctx):
-    """Só etapa + % → modo simples: uma subatividade com o nome da etapa (TODO R4)."""
+    """Só etapa + % → modo simples (R4: projeto gravado no modo simples, cada etapa com a
+    atividade interna de mesmo nome e o tempo padrão do modo simples)."""
     company, owner = ctx
     grid = importer.load_grid("etapas.csv", _csv([
         ["Etapa", "% concluído", "Meta"],
@@ -172,6 +173,8 @@ def test_mapeamento_modo_simples_etapa_e_percentual(ctx):
     db.session.commit()
     pcts = [round(e.progresso, 2) for e in svc.summary(project).etapas]
     assert pcts == [1.0, 0.45, 0.1]
+    assert project.progress_mode == "simples"
+    assert {a.ideal_minutes for s in project.stages for a in s.activities} == {svc.SIMPLE_DEFAULT_MINUTES}
 
 
 def test_mapeamento_sem_meta_usa_100_para_guardar_o_percentual():

@@ -1,0 +1,65 @@
+{% from "components/icon.html" import icon %}
+{#
+  Pedaços de “Preencher etapas” (R3). Cada pedaço que muda ao salvar uma célula tem id fixo e
+  aceita `oob` (hx-swap-oob): a resposta do servidor troca só os números, nunca o campo onde a
+  pessoa está digitando. Todos os números chegam prontos do servidor (calc.py); aqui só se
+  imprime (ADR-0009). Sem estilo inline (CSP): barras são <progress>.
+#}
+
+{%- macro oob_attr(oob) -%}{% if oob %} hx-swap-oob="true"{% endif %}{%- endmacro %}
+
+{# Lista da esquerda: nome, %, mini barras (azul = pelas tarefas, laranja = unidades) e situação. #}
+{% macro stage_info(it, oob=False) -%}
+<span class="stage-item__info" id="lista-info-{{ it.stage.id }}"{{ oob_attr(oob) }}>
+  <span class="stage-item__row">
+    <span class="stage-item__name">{{ it.label }}</span>
+    <span class="stage-item__pct num">{{ it.r.progresso|pct(0) }}</span>
+  </span>
+  <progress class="mini mini--tasks" value="{{ [it.r.progresso, 1]|min }}" max="1" aria-label="Pelas tarefas: {{ it.r.progresso|pct(0) }}">{{ it.r.progresso|pct(0) }}</progress>
+  <progress class="mini mini--units" value="{{ [it.units_ratio, 1]|min }}" max="1" aria-label="Unidades: {{ it.r.unidades }} de {{ it.r.previstas }}">{{ it.units_ratio|pct(0) }}</progress>
+  <span class="status-tag status-tag--{{ it.visual }}">{{ it.visual_label }}</span>
+</span>
+{%- endmacro %}
+
+{# Valores calculados do cabeçalho da etapa. #}
+{% macro head_values(sel, quantity, oob=False) -%}
+<span class="edit-head__values" id="etapa-valores"{{ oob_attr(oob) }}>
+  <span class="ro"><span class="ro__label">Previstas (meta)</span><span class="ro__value num">{{ quantity }}</span></span>
+  <span class="ro"><span class="ro__label">Unidades concluídas</span><span class="ro__value num">{{ sel.r.unidades }}</span></span>
+  <span class="ro"><span class="ro__label">Peso no projeto</span><span class="ro__value num">{{ sel.r.peso_no_projeto|pct(1) }}</span></span>
+</span>
+{%- endmacro %}
+
+{% macro last_entry(activity, last, tz, oob=False) -%}
+{%- set e = last.get(activity.id) -%}
+<span class="row-author" id="quem-{{ activity.id }}"{{ oob_attr(oob) }}>{% if e %}{{ e.user.name if e.user else "Pessoa removida" }}, {{ e.at|datahora }}{% endif %}</span>
+{%- endmacro %}
+
+{% macro version_input(id, name, form_id, value, oob=False) -%}
+<input type="hidden" id="{{ id }}" name="{{ name }}" form="{{ form_id }}" value="{{ value }}"{{ oob_attr(oob) }}>
+{%- endmacro %}
+
+{# As duas caixas: progresso pelas tarefas (azul) e unidades concluídas (laranja). #}
+{% macro boxes(sel, simple, oob=False) -%}
+<div class="twobox" id="etapa-caixas"{{ oob_attr(oob) }}>
+  <div class="box box--tasks">
+    <p class="box__label">{% if simple %}Progresso da etapa{% else %}Progresso pelas tarefas (conta as parciais){% endif %}</p>
+    <p class="box__big num">{{ sel.r.progresso|pct(1) }}</p>
+    {%- if not simple %}
+    <p class="box__sub">{{ sel.r.tarefas_concluidas }} de {{ sel.r.tarefas }} subatividade{{ "" if sel.r.tarefas == 1 else "s" }} em 100%</p>
+    {%- endif %}
+  </div>
+  <div class="box box--units">
+    <p class="box__label">Unidades concluídas ÷ previstas{% if not simple %} (menor nº de peças entre as subatividades){% endif %}</p>
+    <p class="box__big num">{{ sel.r.unidades }}/{{ sel.r.previstas }} · {{ sel.units_ratio|pct(0) }}</p>
+    <p class="box__sub">Situação: {{ sel.visual_label }}</p>
+  </div>
+</div>
+{%- endmacro %}
+
+{# Linha de “Salvo · quem, quando” (ou o erro). aria-live: leitores de tela ouvem o resultado. #}
+{% macro save_status(message, error=False, oob=False) -%}
+<p class="save-status{% if error %} save-status--error{% endif %}" id="salvo-status" role="{{ 'alert' if error else 'status' }}" aria-live="polite"{{ oob_attr(oob) }}>
+  {%- if message %}{{ icon("alert" if error else "check", "sm") }}<span>{{ message }}</span>{% endif -%}
+</p>
+{%- endmacro %}

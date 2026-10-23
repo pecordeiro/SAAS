@@ -67,6 +67,11 @@ PROGRESS_UNDONE = "progress.undone"
 # R8 — restaurar o projeto para uma data (lançamentos compensatórios) e desfazer a restauração.
 PROJECT_RESTORED = "project.restored"
 PROJECT_RESTORE_UNDONE = "project.restore_undone"
+# R3–R4 — Preencher etapas e modo de progresso.
+STAGE_UNARCHIVED = "stage.unarchived"
+ACTIVITY_UNARCHIVED = "activity.unarchived"
+PROGRESS_CORRECTED = "progress.corrected"
+PROJECT_MODE_CHANGED = "project.progress_mode"
 COMPANY_UPDATED = "company.updated"
 HOLIDAY_ADDED = "holiday.added"
 HOLIDAY_REMOVED = "holiday.removed"
@@ -116,6 +121,10 @@ ACTION_LABELS = {
     PROGRESS_UNDONE: "Registro desfeito",
     PROJECT_RESTORED: "Projeto restaurado",
     PROJECT_RESTORE_UNDONE: "Restauração desfeita",
+    STAGE_UNARCHIVED: "Exclusão da etapa desfeita",
+    ACTIVITY_UNARCHIVED: "Exclusão da atividade desfeita",
+    PROGRESS_CORRECTED: "Peças corrigidas para menos",
+    PROJECT_MODE_CHANGED: "Modo de progresso alterado",
     COMPANY_UPDATED: "Dados da empresa alterados",
     HOLIDAY_ADDED: "Feriado incluído",
     HOLIDAY_REMOVED: "Feriado removido",

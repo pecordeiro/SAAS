@@ -14,9 +14,9 @@ Campos: etapa (obrigatória), subatividade, tempo ideal (min), previstas/meta, c
 
 - Com coluna de subatividade → modo detalhado: uma atividade por linha (a etapa vazia herda a
   da linha de cima, como em planilhas com células mescladas).
-- Sem subatividade → modo SIMPLES: uma linha por etapa, com o % (ou as peças). TODO(R4): o
-  modelo ainda não tem o modo simples; cada etapa vira UMA subatividade com o nome da etapa e
-  peças = % × meta (``calc.pecas_de_percentual``). Ver ``importer.ImportResult.mode``.
+- Sem subatividade → modo SIMPLES (R4: o projeto é gravado com ``progress_mode = "simples"``):
+  uma linha por etapa, com o % (ou as peças). Cada etapa tem a atividade interna com o nome da
+  etapa e peças = % × meta (``calc.pecas_de_percentual``). Ver ``importer.ImportResult.mode``.
 
 A grade pode ir ASSINADA no formulário entre as etapas (``grid_to_data``/``grid_from_data``):
 nada é gravado em disco e a pessoa não precisa enviar o arquivo de novo.
@@ -53,7 +53,7 @@ from app.services.importer import (
     _int,
     _read_activity,
 )
-from app.services.projects import NewActivity, NewStage
+from app.services.projects import SIMPLE_DEFAULT_MINUTES, NewActivity, NewStage
 
 F_STAGE = "etapa"
 F_ACTIVITY = "subatividade"
@@ -364,7 +364,10 @@ def parse_mapped(
         units = _units(result, line, values, get)
         if units is False:
             continue
-        activity = _read_activity(result, line, activity_name, get(values, F_MINUTES), units, blank_is_zero=True)
+        raw_minutes = get(values, F_MINUTES)
+        if simple and not _clean(raw_minutes):
+            raw_minutes = SIMPLE_DEFAULT_MINUTES  # R4: etapa sem tempo pesa o padrão do modo simples
+        activity = _read_activity(result, line, activity_name, raw_minutes, units, blank_is_zero=True)
         if activity is None:
             continue
         if len(stage.activities) >= MAX_ACTIVITIES_PER_STAGE:

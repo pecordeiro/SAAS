@@ -75,8 +75,23 @@
     <section class="card stack" aria-labelledby="etapas-titulo">
       <div>
         <h2 class="section-title" id="etapas-titulo">Etapas (sem modelo)</h2>
-        <p class="muted text-sm">Preencha só as etapas que vai usar. Em cada uma, uma atividade por linha: <code>Nome; minutos por unidade</code>.</p>
+        <p class="muted text-sm">Preencha só as etapas que vai usar.</p>
       </div>
+      <fieldset class="fieldset stack--sm">
+        <legend class="field__label">{{ form.progress_mode.label.text }}</legend>
+        <div class="radio-cards">
+          {%- for value, label, desc in [("simples", "Simples", "Você lança o % de cada etapa. Atividades ficam em branco (ou uma linha com o tempo da etapa)."), ("detalhado", "Detalhado", "Subatividades com tempo ideal e peças, igual à planilha: uma por linha, Nome; minutos por unidade.")] %}
+          <label class="radio-card">
+            <input type="radio" name="progress_mode" value="{{ value }}"{% if (form.progress_mode.data or "simples") == value %} checked{% endif %}>
+            <span class="radio-card__body">
+              <span class="radio-card__title">{{ label }}</span>
+              <span class="radio-card__meta muted text-sm">{{ desc }}</span>
+            </span>
+          </label>
+          {%- endfor %}
+        </div>
+        <p class="muted text-sm">Com modelo, o projeto usa o modo detalhado. Dá para trocar depois em Meta e equipe.</p>
+      </fieldset>
       {%- for error in form.stages.errors if error is string %}<p class="field__error">{{ icon("alert", "sm") }}<span>{{ error }}</span></p>{% endfor %}
       {%- for slot in form.stages %}
       {%- if loop.index == 3 %}

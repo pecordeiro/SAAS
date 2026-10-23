@@ -18,9 +18,9 @@
 {%- set _proj = nav_project.id if nav_project is defined and nav_project else None -%}
 {%- set nav_items = [
   {"key": "dashboard", "label": "Painel", "short": "Painel", "href": url_for("app.home"), "icon": "dashboard"},
-  {"key": "fill", "label": "Preencher etapas", "short": "Preencher", "href": url_for("app.fill", projeto=_proj), "icon": "edit"},
-  {"key": "team", "label": "Meta e equipe", "short": "Meta e equipe", "href": url_for("app.goal_team", projeto=_proj), "icon": "team"},
-  {"key": "how", "label": "Como funciona", "short": "Como funciona", "href": url_for("app.how_it_works", projeto=_proj), "icon": "help"},
+  {"key": "fill", "label": "Preencher etapas", "short": "Preencher", "href": url_for("preencher.fill", projeto=_proj), "icon": "edit"},
+  {"key": "team", "label": "Meta e equipe", "short": "Meta e equipe", "href": url_for("preencher.goal_team", projeto=_proj), "icon": "team"},
+  {"key": "how", "label": "Como funciona", "short": "Como funciona", "href": url_for("preencher.how", projeto=_proj), "icon": "help"},
 ] -%}
 {%- set nav_records = [
   {"key": "projects", "label": "Projetos", "href": url_for("app.projects"), "icon": "projects"},

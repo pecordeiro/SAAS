@@ -46,6 +46,9 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
     app.register_blueprint(public_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(app_bp)
+    from app.blueprints.preencher import bp as preencher_bp
+
+    app.register_blueprint(preencher_bp)  # R3–R5: Preencher etapas, Meta e equipe, Como funciona
     app.register_blueprint(account_bp)  # Fase 5: /conta
     app.register_blueprint(team_bp)  # Fase 5: /app/usuarios e /convite
     app.register_blueprint(dev_bp)  # /estilo: responde 404 fora de development
