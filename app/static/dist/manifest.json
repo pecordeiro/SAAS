@@ -4,5 +4,6 @@
   "htmx.js": "dist/htmx.e209dda5c8.js",
   "painel.js": "dist/painel.9b69b4d358.js",
   "preencher.js": "dist/preencher.20d354768a.js",
-  "site.css": "dist/site.dd31e76fb5.css"
+  "publico.js": "dist/publico.8b70da5de4.js",
+  "site.css": "dist/site.83111f8fda.css"
 }

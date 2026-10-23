@@ -21,6 +21,7 @@ THEMES = ("system",) + THEMES_FIXED
 SITEMAP_PAGES = (
     ("public.index", "1.0"),
     ("public.pricing", "0.9"),
+    ("public.how_it_works", "0.8"),
     ("auth.signup", "0.6"),
     ("auth.login", "0.3"),
     ("public.contact", "0.4"),
@@ -31,11 +32,19 @@ SITEMAP_PAGES = (
 LEGAL_UPDATED = date(2026, 10, 14)
 FEATURED_PLAN = "profissional"
 PLAN_EXTRAS = (
-    ("mfa_required", "MFA obrigatório"),
-    ("api", "API de integração"),
-    ("visual_custom", "Identidade visual personalizada"),
-    ("implantacao", "Implantação por técnicos nossos"),
+    ("mfa_required", "Verificação em duas etapas obrigatória (MFA)"),
+    ("api", "API para ligar a outros sistemas"),
+    ("visual_custom", "Identidade visual da sua empresa"),
+    ("implantacao", "Implantação feita por técnicos nossos"),
 )
+
+
+# <meta name="theme-color"> não lê CSS: estes valores repetem --color-bg (app) e --color-brand-bg
+# (páginas públicas) de tokens.css; tests/test_publico_oliva.py confere que continuam iguais.
+THEME_COLORS = {
+    "app": {"light": "#F3F2F1", "dark": "#0D0D0D"},
+    "marca": {"light": "#FBFBF6", "dark": "#0F120A"},
+}
 
 
 def public_plans() -> list[dict]:
@@ -72,6 +81,7 @@ def inject_site():
         "contact_email": current_app.config.get("CONTACT_EMAIL"),
         "site_base_url": _base_url() if request else "",
         "trial_days": current_app.config.get("TRIAL_DAYS", 14),
+        "theme_colors": THEME_COLORS,
     }
 
 
@@ -83,6 +93,11 @@ def index():
 @bp.get("/precos")
 def pricing():
     return render_template("public/precos.html", plans=public_plans())
+
+
+@bp.get("/como-funciona")
+def how_it_works():
+    return render_template("public/como_funciona.html")
 
 
 @bp.get("/termos")

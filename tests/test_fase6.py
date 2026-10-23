@@ -43,7 +43,7 @@ def test_precos_vem_da_tabela_plans(client, app):
         db.session.commit()
     html = client.get("/precos").get_data(as_text=True)
     assert "123" in html and "Essencial" in html and "Profissional" in html and "Empresa" in html
-    assert "Mais escolhido" in html
+    assert "Recomendado" in html
 
 
 def test_sitemap_e_robots(client):

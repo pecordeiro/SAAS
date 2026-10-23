@@ -17,10 +17,11 @@ ONE_YEAR = 60 * 60 * 24 * 365
 
 # Fallback sem build: o que o site.css reúne, na mesma ordem.
 SOURCE_FALLBACK = {
-    "site.css": [f"css/{n}.css" for n in ("tokens", "base", "layout", "components", "pages", "utilities")],
+    "site.css": [f"css/{n}.css" for n in ("tokens", "base", "layout", "components", "pages", "publico", "utilities")],
     "app.js": ["js/app.js"],
     "arrastar.js": ["js/arrastar.js"],  # Etapa D: edição do projeto e Preencher etapas
     "preencher.js": ["js/preencher.js"],  # R3–R5: células que salvam ao sair do campo
+    "publico.js": ["js/publico.js"],  # R10: animações do site público (ADR-0016)
     "htmx.js": ["js/htmx.min.js"],
     "painel.js": ["js/painel.js"],  # R2: gráficos do Painel (só nas páginas de painel)
     "echarts.js": ["vendor/echarts-5.5.1/echarts.min.js"],  # Apache-2.0 (LICENSE e NOTICE na mesma pasta)

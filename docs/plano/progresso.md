@@ -1264,3 +1264,26 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
   blocos estreitos da esteira (etapas de pouco tempo) têm largura proporcional (< 44 px no celular);
   links dentro de frases seguem com altura de texto. Auditoria Web Interface Guidelines: guideline remota
   não buscada (sem rede); conferidos rótulos, foco visível e contraste nas telas acima.
+## R10 — Página pública na identidade oliva (2026-10-23)
+
+- Status: entregue. Branch `claude/r10-oliva` (a partir de `claude/prompt-mestre-producao-s2y4fq`). ADR-0016
+  (aceito, aprovado pelo dono em 2026-10-23).
+- Feito:
+  - [x] Tokens `--color-brand-*`, fontes e escala de marca em `tokens.css` (+ cópia em `docs/design/`);
+    contraste em `docs/design/contraste.md`.
+  - [x] Newsreader e DM Sans (OFL) vendorizadas em `app/static/fonts/` (baixadas do pacote @fontsource via npm).
+  - [x] `publico.css` (escopo `.site--marca`) e `publico.js` (animações, reduzir movimento) no
+    `build_assets.py`; manifesto refeito.
+  - [x] Páginas: início (título, aparelho sobre bloco oliva, faixa rolante, 3 passos, planilha, opcionais como
+    chaves, 4 planos, dúvidas, chamada final), preços (4 planos, tabela, dúvidas), **nova** `/como-funciona`
+    (como funciona com a sua planilha), termos, privacidade, contato.
+  - [x] Bug do “14” em `/precos`: `trial_days` passou a ser argumento do macro `plan_card`.
+  - [x] Textos sem jargão (MFA explicado, “API para ligar a outros sistemas”).
+  - [x] SEO: títulos, descrições, OG, canonical, sitemap (+ `/como-funciona`), `theme-color` claro/escuro.
+  - [x] Logotipo, favicon, apple-touch e og-image na paleta oliva.
+- Testes: `tests/test_publico_oliva.py` (200 nas 6 páginas, sem `style=`/script inline/CDN, textos-chave,
+  “14 dias grátis” nos cards, `theme-color` igual aos tokens, fontes e licenças, marca só no site público,
+  dados só em cores de status, movimento reduzido); `test_fase6.py` ajustado (“Recomendado”).
+- Verificação visual: playwright em 375, 768 e 1280 px, claro e escuro (capturas fora do repositório).
+- Pendências: login e cadastro seguem no visual da área logada; imagem de compartilhamento a validar com o
+  dono; `/security-review` e PostgreSQL não rodados neste ambiente.

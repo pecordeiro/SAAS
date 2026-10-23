@@ -6,22 +6,36 @@
   Layout do site público (telas.md, “Telas públicas”): cabeçalho com logo e links,
   ☰ no celular abre folha com os links; rodapé. Páginas preenchem `content`
   (dentro de .container) ou `main` (largura livre).
+  Identidade oliva (ADR-0016): páginas que declaram `{% set marca = true %}` no topo (início, preços,
+  como funciona, termos, privacidade, contato) usam a paleta de marca, Newsreader e DM Sans, e o
+  publico.js (animações). Login, cadastro e convite continuam no visual da área logada.
 #}
-{% block body_class %}site{% endblock %}
+{% block body_class %}site{% if marca %} site--marca{% endif %}{% endblock %}
+{% block head_extra %}
+  {%- if marca %}
+  {%- for src in asset_urls("publico.js") %}
+  <script src="{{ src }}"></script>
+  {%- endfor %}
+  {%- endif %}
+{% endblock %}
 {% block body %}
 <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
 <header class="site-header">
   <div class="container site-header__inner">
     <a class="brand" href="{{ url_for('public.index') }}">
-      <img class="brand__logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="" width="32" height="32">
+      <img class="brand__logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="" width="40" height="40">
       <span>Controle de Produção</span>
     </a>
     <nav class="site-nav" aria-label="Site">
+      {%- if marca %}
+      <a class="site-nav__link" href="{{ url_for('public.index') }}#como">Como funciona</a>
+      <a class="site-nav__link" href="{{ url_for('public.how_it_works') }}"{% if request.endpoint == 'public.how_it_works' %} aria-current="page"{% endif %}>Sua planilha</a>
+      {%- endif %}
       <a class="site-nav__link" href="{{ url_for('public.pricing') }}"{% if request.endpoint == 'public.pricing' %} aria-current="page"{% endif %}>Preços</a>
       {%- if current_user.is_authenticated %}
       {{ button("Abrir o painel", "primary", href=url_for('app.home')) }}
       {%- else %}
-      <a class="site-nav__link" href="{{ url_for('auth.login') }}">Entrar</a>
+      <a class="site-nav__link site-nav__login" href="{{ url_for('auth.login') }}">Entrar</a>
       {{ button("Teste grátis", "primary", href=url_for('auth.signup')) }}
       {%- endif %}
     </nav>
@@ -36,6 +50,8 @@
 <footer class="site-footer">
   <div class="container site-footer__inner">
     <nav class="cluster" aria-label="Rodapé">
+      <a href="{{ url_for('public.how_it_works') }}">Sua planilha</a>
+      <span aria-hidden="true">·</span>
       <a href="{{ url_for('public.pricing') }}">Preços</a>
       <span aria-hidden="true">·</span>
       <a href="{{ url_for('public.terms') }}">Termos</a>
@@ -59,6 +75,8 @@
       <a class="btn btn--ghost btn--icon sheet__close" href="#fechar" aria-label="Fechar menu" data-dialog-cancel>{{ icon("x") }}</a>
     </div>
     <nav class="menu-list" aria-label="Site">
+      <a class="menu-list__item" href="{{ url_for('public.index') }}#como">Como funciona</a>
+      <a class="menu-list__item" href="{{ url_for('public.how_it_works') }}">Funciona com a sua planilha</a>
       <a class="menu-list__item" href="{{ url_for('public.pricing') }}">Preços</a>
       {%- if current_user.is_authenticated %}
       <a class="menu-list__item" href="{{ url_for('app.home') }}">Painel</a>

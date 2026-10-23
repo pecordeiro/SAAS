@@ -191,6 +191,16 @@ migrations no PostgreSQL só rodam com `TEST_DATABASE_URL`; no SQLite aparecem c
 - Testes de navegador (opcionais): `pip install playwright==1.55.0`; `RUN_E2E=1 python -m pytest tests/e2e -q`
   (axe: `E2E_AXE_JS=/caminho/axe.min.js`). Capturas: `python scripts/capturar_telas.py docs/design/capturas/fase6`.
 
+### Site público na identidade oliva (R10, ADR-0016)
+
+- Páginas: `/`, `/precos`, `/como-funciona` (como funciona com a sua planilha), `/termos`, `/privacidade`,
+  `/contato`; os planos (preço e limites) vêm sempre da tabela `plans`.
+- Visual verde-oliva + off-white só nelas (tokens `--color-brand-*`, escopo `.site--marca` em
+  `app/static/css/publico.css`); a área logada segue na ADR-0015. Dado (anel, esteira, etiquetas) usa só cores de status.
+- Fontes Newsreader e DM Sans (OFL) em `app/static/fonts/`; animações em `app/static/js/publico.js`
+  (respeitam `prefers-reduced-motion`). Depois de mexer em CSS/JS: `python scripts/build_assets.py`.
+- Para a página de uma empresa nova declarar a marca, basta `{% set marca = true %}` no template.
+
 ### Migrations
 
 ```bash
