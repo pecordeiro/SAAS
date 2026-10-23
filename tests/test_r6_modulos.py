@@ -659,3 +659,17 @@ def test_rls_company_modules_so_da_propria_empresa(app, tenants):
                 rls.disable(conn)
                 conn.execute(text(f"DROP OWNED BY {role}"))
                 conn.execute(text(f"DROP ROLE {role}"))
+
+
+def test_toda_rota_de_qualidade_pertence_a_um_modulo(app_factory):
+    """Falha fechada: rota nova do blueprint `qualidade` sem módulo no CATALOG ficaria aberta com o módulo
+    desligado. Ou entra no catálogo, ou entra na lista de rotas do núcleo abaixo (decisão consciente)."""
+    app = app_factory({"FEATURE_PUBLIC_API": True})
+    NUCLEO_QUALIDADE: set[str] = set()
+    soltas = sorted(
+        r.endpoint for r in app.url_map.iter_rules()
+        if r.endpoint.startswith("qualidade.")
+        and modules.module_for_endpoint(r.endpoint) is None
+        and r.endpoint not in NUCLEO_QUALIDADE
+    )
+    assert not soltas, f"rotas de qualidade fora de qualquer módulo: {soltas}"
