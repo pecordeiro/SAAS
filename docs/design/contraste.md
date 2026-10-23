@@ -1,5 +1,30 @@
 # Contraste — verificação WCAG 2.1
 
+## Revisão de 2026-10-23 — marca oliva nas páginas públicas (ADR-0016)
+
+Método e critérios abaixo (WCAG 2.1 AA). Só os pares usados nas páginas públicas.
+
+| Tema | Par | Razão | Critério |
+|---|---|---|---|
+| Claro | `--color-brand-text` sobre `--color-brand-bg` | 17,47:1 | texto |
+| Claro | `--color-brand-muted` sobre `--color-brand-bg` / `-surface` / `-surface-2` | 5,97 / 6,20 / 5,44:1 | texto |
+| Claro | `--color-brand-subtle` sobre `--color-brand-bg` / `-surface-2` | 5,00 / 4,55:1 | texto |
+| Claro | `--color-brand` sobre `--color-brand-bg` / `-surface` / `-soft` | 7,43 / 7,71 / 6,24:1 | texto (links, botão de contorno) |
+| Claro | `--color-brand-contrast` sobre `--color-brand` / `-hover` | 7,71 / 11,75:1 | texto do botão |
+| Claro | `--color-brand-block-text` sobre `--color-brand-block` | 6,39:1 | texto (chamada final) |
+| Claro | `--color-brand-border` sobre `-bg` / `-surface` / `-surface-2` | 3,77 / 3,91 / 3,43:1 | UI |
+| Escuro | `--color-brand-text` sobre `--color-brand-bg` | 16,78:1 | texto |
+| Escuro | `--color-brand-muted` sobre `-bg` / `-surface` / `-surface-2` | 7,95 / 7,28 / 6,52:1 | texto |
+| Escuro | `--color-brand-subtle` sobre `-surface` / `-surface-2` | 6,38 / 5,72:1 | texto |
+| Escuro | `--color-brand` sobre `-bg` / `-surface` / `-soft` | 11,00 / 10,08 / 8,02:1 | texto |
+| Escuro | `--color-brand-contrast` sobre `--color-brand` / `-hover` | 10,55 / 8,11:1 | texto do botão |
+| Escuro | `--color-brand-block-text` sobre `--color-brand-block` | 8,40:1 | texto |
+| Escuro | `--color-brand-border` sobre `-bg` / `-surface` / `-surface-2` | 3,87 / 3,55 / 3,18:1 | UI |
+
+Regras: `--color-brand-muted` nunca sobre o bloco oliva claro (2,18:1; só `--color-brand-block-text`
+vai sobre ele). `--color-brand-line` é divisória decorativa (1,25:1), sem função de identificar componente.
+Cores de status do painel de exemplo seguem as regras da revisão anterior (sempre com rótulo em texto).
+
 ## Revisão de 2026-10-21 — base “Controle de Atividades” (ADR-0015)
 
 Os valores abaixo valem a partir da R1; a análise da “Prumo Noturno” logo depois fica como histórico.

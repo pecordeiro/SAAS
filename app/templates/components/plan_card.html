@@ -1,34 +1,33 @@
 {% from "components/icon.html" import icon %}
-{% from "components/badge.html" import badge %}
-{% from "components/button.html" import button %}
 {#
-  Card de plano — telas.md §2. `plan` vem de public.public_plans() (tabela plans). O plano
-  destacado é o do teste grátis (borda primária, selo “Mais escolhido”). Preço None = sob
-  consulta: sem checkout, o botão leva ao contato (o servidor recusa o plano no autosserviço).
+  Card de plano das páginas públicas (ADR-0016). `plan` vem de public.public_plans() (tabela plans):
+  preço e limites nunca ficam no template. O plano com teste grátis e destaque (Profissional) leva
+  o selo “Recomendado”. Preço None = sob consulta: sem checkout, o botão leva ao contato (o servidor
+  recusa o plano no autosserviço).
+  `trial_days` é argumento explícito: macros importados sem “with context” não enxergam o contexto
+  da página (era o que apagava o “14” de “14 dias grátis, sem cartão”).
 #}
-{% macro plan_card(plan, signup_url, heading="h3") -%}
-<article class="card plan{% if plan.featured %} plan--featured{% endif %}" aria-labelledby="plano-{{ plan.code }}">
-  <div class="plan__head">
-    <{{ heading }} class="plan__name" id="plano-{{ plan.code }}">{{ plan.name }}</{{ heading }}>
-    {%- if plan.featured %}{{ badge("Mais escolhido", "info") }}{% endif %}
-  </div>
+{% macro plan_card(plan, signup_url, trial_days, heading="h3", delay=0) -%}
+<article class="plan rv{% if plan.featured %} plan--hi{% endif %}" data-delay="{{ delay }}" aria-labelledby="plano-{{ plan.code }}">
+  {%- if plan.featured %}<span class="plan__flag">Recomendado</span>{% endif %}
+  <{{ heading }} class="plan__name" id="plano-{{ plan.code }}">{{ plan.name }}</{{ heading }}>
   {%- if plan.price is none %}
   <p class="plan__price">Sob consulta</p>
   {%- else %}
-  <p class="plan__price"><span class="plan__currency">R$</span> {{ plan.price|num(0) if plan.price == plan.price|int else plan.price|num(2) }} <span class="kpi__unit">/mês</span></p>
+  <p class="plan__price"><span class="plan__currency">R$</span> {{ plan.price|num(0) if plan.price == plan.price|int else plan.price|num(2) }} <span class="plan__per">/mês</span></p>
   {%- endif %}
   <ul class="plan__list">
-    <li>{{ icon("check", "sm") }} {{ plan.projects }}</li>
-    <li>{{ icon("check", "sm") }} {{ plan.users }}</li>
-    {%- for extra in plan.extras %}<li>{{ icon("check", "sm") }} {{ extra }}</li>{% endfor %}
-    <li>{{ icon("check" if plan.trial else "info", "sm") }} {{ (trial_days ~ " dias grátis, sem cartão") if plan.trial else ("Sob consulta — fale conosco" if not plan.self_service else "Sem teste grátis: cobrança ao contratar") }}</li>
+    <li>{{ icon("check", "sm") }} <span>{{ plan.projects }}</span></li>
+    <li>{{ icon("check", "sm") }} <span>{{ plan.users }}</span></li>
+    {%- for extra in plan.extras %}<li>{{ icon("check", "sm") }} <span>{{ extra }}</span></li>{% endfor %}
+    <li>{{ icon("check" if plan.trial else "info", "sm") }} <span>{{ (trial_days|string ~ " dias grátis, sem cartão") if plan.trial else ("Preço combinado com você" if not plan.self_service else "Sem teste grátis: a cobrança começa ao contratar") }}</span></li>
   </ul>
   {%- if not plan.self_service %}
-  {{ button("Fale conosco", "secondary", block=True, href=url_for('public.contact')) }}
+  <a class="btn btn--secondary btn--lg btn--block" href="{{ url_for('public.contact') }}"><span class="btn__label">Fale conosco</span></a>
   {%- elif plan.featured %}
-  {{ button("Começar teste grátis", "primary", block=True, href=signup_url) }}
+  <a class="btn btn--primary btn--lg btn--block" href="{{ signup_url }}"><span class="btn__label">Começar teste grátis</span></a>
   {%- else %}
-  {{ button("Começar com o " ~ plan.name, "secondary", block=True, href=signup_url) }}
+  <a class="btn btn--secondary btn--lg btn--block" href="{{ signup_url }}"><span class="btn__label">Começar com o {{ plan.name }}</span></a>
   {%- endif %}
 </article>
 {%- endmacro %}

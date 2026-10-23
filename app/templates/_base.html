@@ -11,6 +11,9 @@
   <title>{% block title %}Controle de Produção{% endblock %}</title>
   <meta name="description" content="{% block description %}Acompanhe a produção por etapas: unidades concluídas, horas que faltam e prazo em dias úteis, do celular ao escritório.{% endblock %}">
   <meta name="color-scheme" content="light dark">
+  {%- set tc = theme_colors['marca' if marca else 'app'] %}
+  <meta name="theme-color" content="{{ tc.light }}" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="{{ tc.dark }}" media="(prefers-color-scheme: dark)">
   {%- block robots %}{% endblock %}
   {%- block canonical %}
   <link rel="canonical" href="{{ (config.get('APP_BASE_URL') or request.url_root).rstrip('/') ~ request.path }}">
@@ -29,8 +32,13 @@
   <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
   <link rel="icon" href="{{ url_for('static', filename='img/favicon-32.png') }}" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}">
+  {%- if marca %}
+  <link rel="preload" href="{{ url_for('static', filename='fonts/dm-sans-latin-400-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{{ url_for('static', filename='fonts/newsreader-latin-400-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
+  {%- else %}
   <link rel="preload" href="{{ url_for('static', filename='fonts/ibm-plex-sans-latin-400-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="{{ url_for('static', filename='fonts/ibm-plex-sans-latin-600-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
+  {%- endif %}
   {%- for href in asset_urls("site.css") %}
   <link rel="stylesheet" href="{{ href }}">
   {%- endfor %}

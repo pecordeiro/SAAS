@@ -1,10 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
-  
-  <!-- Símbolo "medidor": três segmentos de arco sobre bloco azul; o último, mais claro, é a etapa ainda por fazer.
-       Mesma geometria do favicon. Nome em HTML ao lado (o nome ainda será decidido). -->
-  <rect width="40" height="40" rx="11" fill="#2759F0"/>
-  <path d="M9 27 A11 11 0 0 1 13.85 17.88" fill="none" stroke="#FFFFFF" stroke-width="5"/>
-  <path d="M14.84 17.29 A11 11 0 0 1 25.16 17.29" fill="none" stroke="#FFFFFF" stroke-width="5"/>
-  <path d="M26.15 17.88 A11 11 0 0 1 31 27" fill="none" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="5"/>
-  <circle cx="20" cy="27" r="2.6" fill="#FFFFFF"/>
+  <!-- Símbolo "medidor" (ADR-0016): três segmentos de arco sobre bloco verde-oliva; o último, mais claro, é a
+       etapa ainda por fazer. Mesma geometria do favicon. Nome em HTML ao lado. -->
+  <rect width="40" height="40" rx="11" fill="#455A0F"/>
+  <path d="M9 27 A11 11 0 0 1 13.85 17.88" fill="none" stroke="#FBFBF6" stroke-width="5"/>
+  <path d="M14.84 17.29 A11 11 0 0 1 25.16 17.29" fill="none" stroke="#FBFBF6" stroke-width="5"/>
+  <path d="M26.15 17.88 A11 11 0 0 1 31 27" fill="none" stroke="#FBFBF6" stroke-opacity="0.45" stroke-width="5"/>
+  <circle cx="20" cy="27" r="2.6" fill="#FBFBF6"/>
 </svg>

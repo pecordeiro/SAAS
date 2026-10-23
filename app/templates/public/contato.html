@@ -1,15 +1,19 @@
 {% extends "base_publica.html" %}
 {% from "components/icon.html" import icon %}
+{% set marca = true %}
 {% block title %}Contato · Controle de Produção{% endblock %}
 {% block description %}Fale com o Controle de Produção: dúvidas sobre planos, suporte e privacidade, por e-mail.{% endblock %}
-{% block content %}
-<div class="legal__text">
-  <h1 class="page-title">Contato</h1>
-  <p class="landing-lead">Dúvidas sobre planos, suporte ou privacidade? Escreva para a gente.</p>
-  <div class="card mt-6 stack">
-    <h2 class="section-title">E-mail</h2>
-    <p class="contact__email">{{ contact_email }}</p>
-    <p class="muted text-sm">Respondemos em dias úteis. Para suporte, informe o nome da empresa e o que aconteceu; nunca envie sua senha.</p>
+{% block main %}
+<section class="pub-sec pub-sec--first" aria-labelledby="contato-titulo">
+  <div class="pub-in pub-narrow">
+    <span class="pub-eyebrow pub-up" data-delay="0">Contato</span>
+    <h1 id="contato-titulo" class="pub-h1 pub-up" data-delay="1">Fale com a gente.</h1>
+    <p class="pub-sub pub-up" data-delay="2">Dúvidas sobre planos, suporte ou privacidade? Escreva para a gente.</p>
+    <div class="pub-card pub-contact pub-up" data-delay="3">
+      <h2>E-mail</h2>
+      <p class="pub-contact__email">{{ contact_email }}</p>
+      <p class="pub-note">Respondemos em dias úteis. Para suporte, informe o nome da empresa e o que aconteceu. Nunca envie a sua senha.</p>
+    </div>
   </div>
-</div>
+</section>
 {% endblock %}

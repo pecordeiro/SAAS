@@ -81,7 +81,46 @@
   --color-track: #E6E4DF;           /* trilho da barra de progresso / anel */
   --color-overlay: rgb(11 11 11 / 0.45); /* fundo atrás do modal */
 
+  /* ---------- Marca oliva (ADR-0016): SÓ páginas públicas, logotipo e links da marca ----------
+     Nunca em dado: barras, gráficos e etiquetas de situação seguem as cores de status acima.
+     A área logada (/app) não usa estes tokens. Contraste dos pares: docs/design/contraste.md. */
+  --color-brand-bg: #FBFBF6;          /* fundo off-white das páginas públicas */
+  --color-brand-surface: #FFFFFF;     /* cartões e painéis */
+  --color-brand-surface-2: #F0F1E6;   /* cinza-oliva claro: faixas, trilhos, itens */
+  --color-brand-text: #14170D;        /* tinta */
+  --color-brand-muted: #5E6354;       /* texto secundário */
+  --color-brand-subtle: #6A6F5E;      /* metadados, notas */
+  --color-brand-line: #E1E3D3;        /* divisória de card (decorativa) */
+  --color-brand-line-strong: #CDD0BA; /* divisória sob cabeçalho de tabela */
+  --color-brand-border: #7C846A;      /* borda de componente (campo, botão de contorno) ≥ 3:1 */
+  --color-brand: #455A0F;             /* marca oliva escuro: botão, link, foco */
+  --color-brand-hover: #2E3D08;
+  --color-brand-contrast: #FFFFFF;    /* texto sobre --color-brand */
+  --color-brand-soft: #E4EAD0;        /* destaque leve da marca */
+  --color-brand-block: #8F9F78;       /* bloco oliva atrás do aparelho e da chamada final */
+  --color-brand-block-text: #14170D;  /* texto sobre o bloco oliva */
+  --color-brand-frame: #101208;       /* moldura do aparelho */
+  --color-brand-frame-detail: #2B2E22;
+  --color-brand-pulse: #7CF0A0;       /* ponto pulsante do selo (decorativo) */
+
   /* ---------- Tipografia ---------- */
+  /* Páginas públicas: Newsreader (títulos) e DM Sans (texto), woff2 em app/static/fonts/ (OFL). */
+  --font-brand-display: "Newsreader", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --font-brand-text: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-size-brand-hero: clamp(2.875rem, 8.4vw, 7rem);   /* título da página inicial */
+  --font-size-brand-h1: clamp(2.5rem, 6vw, 4.5rem);       /* título das outras páginas públicas */
+  --font-size-brand-h2: clamp(2.25rem, 5vw, 3.75rem);
+  --font-size-brand-h2-lg: clamp(2.375rem, 5.4vw, 4.25rem);
+  --font-size-brand-h3: 1.625rem;
+  --font-size-brand-h4: 1.375rem;
+  --font-size-brand-kpi: 2rem;
+  --font-size-brand-price: clamp(2.375rem, 3.6vw, 2.875rem);
+  --font-size-brand-lead: 1.125rem;
+  --font-size-brand-body: 1rem;
+  --line-height-brand-display: 0.96;
+  --letter-spacing-brand-display: -0.05em;
+  --letter-spacing-brand-title: -0.035em;
+
   /* IBM Plex Sans servida pelo próprio site (woff2 em app/static/fonts/, licença OFL). */
   --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --font-display: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
@@ -133,6 +172,9 @@
   --radius-md: 6px;     /* botões, campos */
   --radius-lg: 8px;     /* cards, modais */
   --radius-pill: 999px; /* barra de progresso */
+  --radius-brand-sm: 0.875rem;  /* páginas públicas: painel interno, itens */
+  --radius-brand-md: 1.625rem;  /* cartões, moldura do aparelho */
+  --radius-brand-lg: 2.25rem;   /* bloco oliva, chamada final */
 
   /* ---------- Bordas ---------- */
   --border-width: 1px;
@@ -143,6 +185,8 @@
   --shadow-2: 0 2px 4px rgb(11 11 11 / 0.06), 0 8px 24px -8px rgb(11 11 11 / 0.18);  /* menu, toast */
   --shadow-3: 0 24px 48px -16px rgb(11 11 11 / 0.30), 0 2px 6px rgb(11 11 11 / 0.08); /* modal, folha inferior */
   --shadow-primary: none; /* botão principal sem brilho */
+  --shadow-brand: 0 24px 60px -12px rgb(30 38 10 / 0.18);              /* cartões públicos ao passar o mouse */
+  --shadow-brand-device: 0 40px 80px -16px rgb(16 18 8 / 0.40);       /* aparelho do início */
 
   /* ---------- Foco visível ---------- */
   --focus-width: 2px;
@@ -166,6 +210,8 @@
   --content-max: 1360px;
   --content-narrow: 440px;           /* formulários de autenticação */
   --content-text: 720px;             /* termos, privacidade */
+  --content-brand: 75rem;            /* páginas públicas: largura útil (1200 px) */
+  --content-brand-device: 48.75rem;  /* aparelho do início */
   --sidebar-width: 220px;
   --topbar-height: 52px;
   --bottom-nav-height: 60px;
@@ -184,6 +230,8 @@
   --duration-fast: 120ms;
   --duration-normal: 200ms;
   --easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --easing-brand: cubic-bezier(0.2, 0.7, 0.2, 1);  /* entradas das páginas públicas */
+  --duration-brand: 700ms;
 }
 
 /* ---------- Desktop: controles mais compactos (32–36 px) ---------- */
@@ -248,6 +296,25 @@
     --color-overlay: rgb(0 0 0 / 0.65);
     --shadow-2: 0 2px 4px rgb(0 0 0 / 0.40), 0 4px 12px rgb(0 0 0 / 0.35);
     --shadow-3: 0 8px 24px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.40);
+    --color-brand-bg: #0F120A;
+    --color-brand-surface: #181C10;
+    --color-brand-surface-2: #20261A;
+    --color-brand-text: #F0F3E4;
+    --color-brand-muted: #A4AB94;
+    --color-brand-subtle: #99A088;
+    --color-brand-line: #2E3524;
+    --color-brand-line-strong: #3B4430;
+    --color-brand-border: #6E7459;
+    --color-brand: #B7D064;
+    --color-brand-hover: #9DB84A;
+    --color-brand-contrast: #14170D;
+    --color-brand-soft: #27301A;
+    --color-brand-block: #3E4A2C;
+    --color-brand-block-text: #F0F3E4;
+    --color-brand-frame: #050603;
+    --color-brand-frame-detail: #2B2E22;
+    --shadow-brand: 0 24px 60px -12px rgb(0 0 0 / 0.55);
+    --shadow-brand-device: 0 40px 80px -16px rgb(0 0 0 / 0.70);
   }
 }
 
@@ -301,6 +368,25 @@
   --color-overlay: rgb(0 0 0 / 0.65);
   --shadow-2: 0 2px 4px rgb(0 0 0 / 0.40), 0 4px 12px rgb(0 0 0 / 0.35);
   --shadow-3: 0 8px 24px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.40);
+  --color-brand-bg: #0F120A;
+  --color-brand-surface: #181C10;
+  --color-brand-surface-2: #20261A;
+  --color-brand-text: #F0F3E4;
+  --color-brand-muted: #A4AB94;
+  --color-brand-subtle: #99A088;
+  --color-brand-line: #2E3524;
+  --color-brand-line-strong: #3B4430;
+  --color-brand-border: #6E7459;
+  --color-brand: #B7D064;
+  --color-brand-hover: #9DB84A;
+  --color-brand-contrast: #14170D;
+  --color-brand-soft: #27301A;
+  --color-brand-block: #3E4A2C;
+  --color-brand-block-text: #F0F3E4;
+  --color-brand-frame: #050603;
+  --color-brand-frame-detail: #2B2E22;
+  --shadow-brand: 0 24px 60px -12px rgb(0 0 0 / 0.55);
+  --shadow-brand-device: 0 40px 80px -16px rgb(0 0 0 / 0.70);
 }
 
 /* ---------- Movimento reduzido ---------- */

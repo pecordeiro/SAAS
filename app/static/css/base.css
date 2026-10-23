@@ -19,6 +19,37 @@
   font-display: swap;
 }
 
+/* Páginas públicas (ADR-0016): Newsreader (títulos) e DM Sans (texto), licença OFL, servidas pelo
+   próprio site. Só são baixadas nas páginas que as usam (o navegador carrega a fonte sob demanda). */
+@font-face {
+  font-family: "Newsreader";
+  src: url("../fonts/newsreader-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Newsreader";
+  src: url("../fonts/newsreader-latin-400-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "DM Sans";
+  src: url("../fonts/dm-sans-latin-400-normal.woff2") format("woff2");
+  font-weight: 400 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "DM Sans";
+  src: url("../fonts/dm-sans-latin-700-normal.woff2") format("woff2");
+  font-weight: 600 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer base {
   *,
   *::before,

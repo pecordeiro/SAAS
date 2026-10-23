@@ -3,12 +3,13 @@
 Uso:  python scripts/build_assets.py [--check]
 
 Saída em ``app/static/dist/``:
-- ``site.<hash>.css``  = tokens + base + layout + components + pages + utilities, minificado
+- ``site.<hash>.css``  = tokens + base + layout + components + pages + publico + utilities, minificado
 - ``app.<hash>.js``    = ``static/js/app.js`` minificado
 - ``arrastar.<hash>.js`` = ``static/js/arrastar.js`` minificado (só na edição do projeto)
 - ``htmx.<hash>.js``   = ``static/js/htmx.min.js`` copiado (já vem minificado)
 - ``painel.<hash>.js``  = ``static/js/painel.js`` minificado (só nas páginas de painel)
 - ``preencher.<hash>.js`` = ``static/js/preencher.js`` minificado (Preencher etapas e Meta e equipe)
+- ``publico.<hash>.js`` = ``static/js/publico.js`` minificado (animações do site público, ADR-0016)
 - ``manifest.json``    = {"site.css": "dist/site.<hash>.css", ...}
 
 O ECharts (``static/vendor/echarts-5.5.1/``) não passa por aqui: já vem minificado e a versão
@@ -30,7 +31,7 @@ ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "app" / "static"
 DIST = STATIC / "dist"
 
-CSS_ORDER = ("tokens", "base", "layout", "components", "pages", "utilities")
+CSS_ORDER = ("tokens", "base", "layout", "components", "pages", "publico", "utilities")
 
 
 def _digest(data: bytes) -> str:
@@ -49,6 +50,7 @@ def build_outputs() -> dict[str, tuple[str, bytes]]:
     htmx = (STATIC / "js" / "htmx.min.js").read_bytes()
     painel_min = rjsmin.jsmin((STATIC / "js" / "painel.js").read_text(encoding="utf-8")).encode("utf-8")
     fill_min = rjsmin.jsmin((STATIC / "js" / "preencher.js").read_text(encoding="utf-8")).encode("utf-8")
+    pub_min = rjsmin.jsmin((STATIC / "js" / "publico.js").read_text(encoding="utf-8")).encode("utf-8")
     return {
         "site.css": (f"site.{_digest(css_min)}.css", css_min),
         "app.js": (f"app.{_digest(js_min)}.js", js_min),
@@ -56,6 +58,7 @@ def build_outputs() -> dict[str, tuple[str, bytes]]:
         "htmx.js": (f"htmx.{_digest(htmx)}.js", htmx),
         "painel.js": (f"painel.{_digest(painel_min)}.js", painel_min),
         "preencher.js": (f"preencher.{_digest(fill_min)}.js", fill_min),
+        "publico.js": (f"publico.{_digest(pub_min)}.js", pub_min),
     }
 
 
