@@ -39,7 +39,8 @@ log = logging.getLogger(__name__)
 BACKENDS = ("local", "s3", "none")
 EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()
 _UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
-KEY_RE = re.compile(rf"^{_UUID}/fotos/{_UUID}(?:-mini)?\.jpg$")
+# ADR-0019: ``briefing/`` guarda o logo e as fotos de produto do briefing de identidade visual.
+KEY_RE = re.compile(rf"^{_UUID}/(?:fotos|briefing)/{_UUID}(?:-mini)?\.jpg$")
 
 
 class StorageError(Exception):
@@ -57,6 +58,12 @@ class StorageDisabled(StorageError):
 def photo_key(company_id: uuid.UUID, object_id: uuid.UUID, *, mini: bool = False) -> str:
     """Chave do objeto: prefixo da empresa + uuid gerado aqui (nunca o nome do arquivo enviado)."""
     key = f"{uuid.UUID(str(company_id))}/fotos/{uuid.UUID(str(object_id))}{'-mini' if mini else ''}.jpg"
+    return check_key(key)
+
+
+def briefing_key(company_id: uuid.UUID, object_id: uuid.UUID, *, mini: bool = False) -> str:
+    """ADR-0019: chave de um arquivo do briefing (logo/foto de produto), na pasta da empresa."""
+    key = f"{uuid.UUID(str(company_id))}/briefing/{uuid.UUID(str(object_id))}{'-mini' if mini else ''}.jpg"
     return check_key(key)
 
 

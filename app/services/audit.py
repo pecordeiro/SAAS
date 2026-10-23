@@ -85,6 +85,15 @@ SUPPORT_ACCESS_GRANTED = "support.access_granted"
 SUPPORT_ACCESS_REVOKED = "support.access_revoked"
 SUPPORT_ACCESS_EXPIRED = "support.access_expired"
 ACCOUNT_CLAIMED_BY_RESET = "account.claimed_by_reset"
+# ADR-0019 — briefing de identidade visual e ligação. Detalhes sem o texto do briefing nem a imagem.
+VISUAL_BRIEFING_SAVED = "visual.briefing_saved"
+VISUAL_BRIEFING_SUBMITTED = "visual.briefing_submitted"
+VISUAL_FILE_ADDED = "visual.file_added"
+VISUAL_FILE_DELETED = "visual.file_deleted"
+CALL_BOOKED = "call.booked"
+CALL_CHANGE_REQUESTED = "call.change_requested"
+CALL_RELEASED = "call.released"
+CALL_CHANGE_DECLINED = "call.change_declined"
 
 ACTION_LABELS = {
     ROLE_CHANGED: "Papel alterado",
@@ -139,6 +148,14 @@ ACTION_LABELS = {
     SUPPORT_ACCESS_REVOKED: "Acesso de suporte revogado",
     SUPPORT_ACCESS_EXPIRED: "Acesso de suporte expirado",
     ACCOUNT_CLAIMED_BY_RESET: "Conta retomada pelo dono do e-mail",
+    VISUAL_BRIEFING_SAVED: "Briefing de identidade visual salvo",
+    VISUAL_BRIEFING_SUBMITTED: "Briefing de identidade visual enviado à equipe",
+    VISUAL_FILE_ADDED: "Imagem do briefing enviada",
+    VISUAL_FILE_DELETED: "Imagem do briefing apagada",
+    CALL_BOOKED: "Ligação agendada",
+    CALL_CHANGE_REQUESTED: "Mudança na ligação pedida",
+    CALL_RELEASED: "Ligação cancelada pela equipe",
+    CALL_CHANGE_DECLINED: "Pedido de mudança na ligação recusado",
 }
 
 

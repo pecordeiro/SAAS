@@ -1,0 +1,4 @@
+{% extends "emails/_base.txt" %}
+{% block body %}A empresa {{ company_name }} marcou a ligação de identidade visual para {{ when }} (horário de Brasília). O contato está no painel interno.
+
+Ver horários e reservas: {{ url }}{% endblock %}

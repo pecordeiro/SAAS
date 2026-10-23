@@ -168,6 +168,15 @@ class Config:
     PHOTO_UPLOAD_RATE_LIMIT = "30 per minute; 300 per hour"
     COMMENT_MAX_CHARS = 1000
 
+    # ADR-0019 — briefing de identidade visual e agendamento da ligação (app/blueprints/identidade.py).
+    # Limite das rotas novas (POST): por IP e por empresa (chave = empresa da sessão).
+    VISUAL_RATE_LIMIT_IP = "20 per minute; 200 per hour"
+    VISUAL_RATE_LIMIT_COMPANY = "30 per minute; 300 per hour"
+    # Rotas novas do /interno (horários e reservas): por IP.
+    INTERNO_RATE_LIMIT = "60 per minute"
+    BRIEFING_PHOTOS_MAX = 10  # fotos de produto por briefing (logo: 1)
+    CALL_MIN_LEAD_MINUTES = 60  # o horário precisa começar pelo menos isto depois de agora
+
     @classmethod
     def from_env(cls) -> dict:
         """Lê as variáveis de ambiente na hora de criar o app (não na importação)."""
@@ -235,9 +244,18 @@ class Config:
             "STORAGE_S3_SECRET_ACCESS_KEY",
             "STORAGE_S3_ADDRESSING",
             "PHOTO_UPLOAD_RATE_LIMIT",
+            "VISUAL_RATE_LIMIT_IP",
+            "VISUAL_RATE_LIMIT_COMPANY",
+            "INTERNO_RATE_LIMIT",
         ):
             values[key] = os.environ.get(key) or getattr(cls, key)
-        for key in ("PHOTOS_MAX_PER_ACTIVITY", "PHOTOS_MAX_PER_COMPANY", "STORAGE_TIMEOUT_SECONDS"):
+        for key in (
+            "PHOTOS_MAX_PER_ACTIVITY",
+            "PHOTOS_MAX_PER_COMPANY",
+            "STORAGE_TIMEOUT_SECONDS",
+            "BRIEFING_PHOTOS_MAX",
+            "CALL_MIN_LEAD_MINUTES",
+        ):
             try:
                 values[key] = max(1, int(os.environ.get(key, getattr(cls, key))))
             except ValueError:

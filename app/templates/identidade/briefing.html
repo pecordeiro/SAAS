@@ -1,0 +1,152 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/field.html" import field, file_upload %}
+{% from "components/steps.html" import steps %}
+{% from "components/empty_state.html" import empty_state %}
+{% from "identidade/_honeypot.html" import honeypot as hp %}
+{% set nav_current = "visual" %}
+{% block title %}Identidade visual · Controle de Produção{% endblock %}
+{% block content %}
+{#
+  ADR-0019 §2 — briefing de identidade visual (só o proprietário, plano Empresa/Implantação).
+  Estado, campos que faltam e se dá para editar vêm do servidor (services/visual.py); a tela só mostra.
+#}
+<header class="page-header">
+  <div class="page-header__titles">
+    <h1>Identidade visual</h1>
+    <p class="page-header__subtitle muted">Conte como é a sua empresa. A equipe usa estas respostas para adaptar o visual do sistema à sua marca.</p>
+  </div>
+  <div class="page-header__actions">
+    {{ button("Agendar a ligação", "secondary", href=url_for("identidade.call")) }}
+  </div>
+</header>
+
+<div class="stack--lg briefing-page">
+  {{ steps([("Nova", None), ("Briefing preenchido", None), ("Em andamento", None), ("Entregue", None)], step, label="Andamento da identidade visual") }}
+
+  {%- if not editable %}
+  {{ alert("info", "A equipe já está trabalhando na sua identidade visual", "Para mudar alguma resposta, fale com a equipe: ela reabre o briefing para você.") }}
+  {%- elif request_ and request_.status == "briefing_filled" %}
+  {{ alert("success", "Briefing enviado à equipe", "Você ainda pode ajustar as respostas até a equipe começar o trabalho.") }}
+  {%- endif %}
+
+  {%- if editable %}
+  <form class="card stack" method="post" action="{{ url_for('identidade.briefing') }}" novalidate aria-labelledby="briefing-titulo">
+    {{ form.csrf_token }}
+    {{ hp(honeypot, "hp-briefing") }}
+    <h2 class="card__title" id="briefing-titulo">Briefing</h2>
+    {%- if error %}<div tabindex="-1" data-autofocus>{{ alert("danger", error, role="alert") }}</div>{% endif %}
+
+    <fieldset class="fieldset stack">
+      <legend class="section-title">Empresa e produtos</legend>
+      {{ field(form.company_name, required=True, hint="Como a marca aparece para o cliente.") }}
+      {{ field(form.products, required=True, hint="O que vocês fabricam ou montam. Uma linha por produto, se preferir.", attrs={"rows": 4, "maxlength": 1000}) }}
+    </fieldset>
+
+    <fieldset class="fieldset stack">
+      <legend class="section-title">Preferências</legend>
+      <div class="form-row form-row--2">
+        {{ field(form.colors, optional=True, hint="Ex.: verde-escuro e cinza, ou os códigos da marca.") }}
+        {{ field(form.fonts, optional=True, hint="Ex.: a fonte do logo ou do site atual.") }}
+      </div>
+      {{ field(form.reference_sites, optional=True, hint="Até 5 endereços que vocês gostam, um por linha, começando com https://.", attrs={"rows": 3}) }}
+      <fieldset class="fieldset field{% if form.tone.errors %} field--error{% endif %}" aria-describedby="tom-dica">
+        <legend class="field__label">Tom de voz <span class="field__req">(opcional)</span></legend>
+        <p class="field__hint" id="tom-dica">Tom de voz é o jeito que a marca fala com o cliente: mais sério, equilibrado ou mais próximo.</p>
+        <div class="choice-row">
+          {%- for value, label in form.tone.choices %}
+          <label class="check"><input type="radio" name="tone" value="{{ value }}"{% if (form.tone.data or "") == value %} checked{% endif %}><span>{{ label }}</span></label>
+          {%- endfor %}
+        </div>
+      </fieldset>
+    </fieldset>
+
+    <fieldset class="fieldset stack">
+      <legend class="section-title">Contato para a ligação</legend>
+      <p class="muted text-sm">Quem a equipe procura para conversar sobre a marca.</p>
+      {{ field(form.contact_name, required=True) }}
+      <div class="form-row form-row--2">
+        {{ field(form.contact_phone, hint="Telefone ou e-mail: pelo menos um.", attrs={"inputmode": "tel", "autocomplete": "tel"}) }}
+        {{ field(form.contact_email, attrs={"inputmode": "email", "autocomplete": "email"}) }}
+      </div>
+    </fieldset>
+
+    {%- if missing %}
+    <p class="muted text-sm">Para enviar à equipe, falta: {{ missing|join(", ") }}. Você pode salvar e terminar depois.</p>
+    {%- endif %}
+    <div class="form-actions">{{ button("Salvar briefing", "primary") }}</div>
+  </form>
+  {%- elif briefing %}
+  <section class="card stack" aria-labelledby="respostas-titulo">
+    <h2 class="card__title" id="respostas-titulo">Suas respostas</h2>
+    <dl class="briefing-summary">
+      <div><dt>Nome da empresa</dt><dd>{{ briefing.company_name or "—" }}</dd></div>
+      <div><dt>Produtos</dt><dd>{{ briefing.products or "—" }}</dd></div>
+      <div><dt>Cores de preferência</dt><dd>{{ briefing.colors or "—" }}</dd></div>
+      <div><dt>Fontes de preferência</dt><dd>{{ briefing.fonts or "—" }}</dd></div>
+      <div><dt>Sites de referência</dt><dd>{{ briefing.reference_sites or "—" }}</dd></div>
+      <div><dt>Tom de voz</dt><dd>{{ tone_labels.get(briefing.tone, "Sem preferência") }}</dd></div>
+      <div><dt>Contato</dt><dd>{{ briefing.contact_name or "—" }}{% if briefing.contact_phone %} · {{ briefing.contact_phone }}{% endif %}{% if briefing.contact_email %} · {{ briefing.contact_email }}{% endif %}</dd></div>
+    </dl>
+  </section>
+  {%- endif %}
+
+  <section class="card stack" id="imagens" aria-labelledby="imagens-titulo">
+    <h2 class="card__title" id="imagens-titulo">Logo e fotos de produto</h2>
+    {%- if file_error %}<div tabindex="-1" data-autofocus>{{ alert("danger", file_error, role="alert") }}</div>{% endif %}
+    {%- set all_files = logos + photos %}
+    {%- if all_files %}
+    <ul class="photo-grid" role="list">
+      {%- for f in all_files %}
+      <li class="photo-card">
+        <a class="photo-card__link" href="{{ url_for('identidade.file_view', file_id=f.id) }}">
+          <img class="photo-card__img" src="{{ url_for('identidade.file_view', file_id=f.id, tamanho='mini') }}" alt="{{ 'Logo' if f.kind == 'logo' else 'Foto de produto ' ~ loop.index }}" width="{{ f.width }}" height="{{ f.height }}">
+        </a>
+        <p class="photo-card__meta text-sm"><span class="text-strong">{{ "Logo" if f.kind == "logo" else "Foto de produto" }}</span> <span class="muted num">· {{ f.created_at|datahora }}</span></p>
+        {%- if editable %}
+        <form method="post" action="{{ url_for('identidade.file_delete', file_id=f.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {{ button("Apagar", "ghost", icon="trash") }}
+        </form>
+        {%- endif %}
+      </li>
+      {%- endfor %}
+    </ul>
+    {%- else %}
+    {{ empty_state("Nenhuma imagem ainda", "Envie o logo atual (se houver) e fotos dos produtos.", icon="folder") }}
+    {%- endif %}
+
+    {%- if editable and storage_enabled %}
+    <form class="stack" method="post" action="{{ url_for('identidade.file_upload') }}" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {{ hp(honeypot, "hp-arquivo") }}
+      <div class="form-row form-row--2">
+        <div class="field">
+          <label class="field__label" for="arquivo-tipo">Tipo</label>
+          <select class="field__input" id="arquivo-tipo" name="tipo">
+            <option value="produto">Foto de produto ({{ photos|length }}/{{ photos_max }})</option>
+            <option value="logo"{% if not logos %} selected{% endif %}>Logo ({{ logos|length }}/1)</option>
+          </select>
+        </div>
+        {{ file_upload({"id": "arquivo", "name": "arquivo", "label": {"text": "Imagem"}, "errors": []}, ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp", button_label="Escolher imagem", hint="JPEG, PNG ou WebP até " ~ photo_max_mb ~ " MB. Os dados da câmera e a localização são removidos.") }}
+      </div>
+      <div>{{ button("Enviar imagem", "primary", icon="plus") }}</div>
+    </form>
+    {%- elif editable %}
+    <p class="muted text-sm">O envio de imagens não está configurado neste ambiente.</p>
+    {%- endif %}
+  </section>
+
+  <section class="card stack--sm" aria-labelledby="ligacao-titulo">
+    <h2 class="card__title" id="ligacao-titulo">Ligação com a equipe</h2>
+    {%- if booking %}
+    <p>Marcada para <span class="text-strong num">{{ booking.slot.starts_at|datahora }}</span> (horário de Brasília).</p>
+    {%- else %}
+    <p class="muted">Escolha um horário para conversar com a equipe sobre a marca.</p>
+    {%- endif %}
+    <div>{{ button("Ver a ligação" if booking else "Escolher horário", "secondary", href=url_for("identidade.call")) }}</div>
+  </section>
+</div>
+{% endblock %}

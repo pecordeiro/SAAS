@@ -26,6 +26,10 @@ Reestruturação R9 (limpeza): saíram os gráficos SVG antigos que o Painel com
 (macros de `components/chart.html`, geometria de `services/charts.py`), CSS sem uso, a rota
 `/app/etapas/<id>` e funções de serviço sem chamada; o que ficou em dúvida está em
 `docs/plano/limpeza-pendente.md`.
+ADR-0019 (briefing e ligação): no plano Empresa ou Implantação, o proprietário preenche o briefing de
+identidade visual em `/app/identidade-visual` (textos, logo e fotos de produto) e marca a ligação com a
+equipe em `/app/identidade-visual/ligacao` (horários de Brasília, reserva atômica). A equipe cria os
+horários e decide pedidos de cancelar/remarcar em `/interno/horarios`, sem ler o briefing.
 Reestruturação R7–R8 (telas): importar planilha em 3 passos (`/app/importar`: enviar →
 escolher colunas com “Isto é…” por coluna, ou escolher projetos quando o arquivo da equipe traz
 vários (abas “<Nome> - Acompanhamento/Equipe/Como funciona”) → prévia com erros por linha e

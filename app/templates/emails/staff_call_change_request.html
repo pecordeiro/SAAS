@@ -1,0 +1,6 @@
+{% extends "emails/_base.html" %}
+{% block body %}
+  <p>A empresa {{ company_name }} pediu: {{ kind|lower }} (ligação de {{ when }}, horário de Brasília). Decida no painel interno: cancelar a reserva ou mantê-la.</p>
+  <p><a href="{{ url }}">Ver horários e reservas</a></p>
+  <p><small>Se o botão não abrir, copie o endereço: {{ url }}</small></p>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends "interno/base.html" %}
+{% from "components/field.html" import field %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/badge.html" import badge %}
+{% from "components/table.html" import data_table %}
+{% block title %}Horários da ligação · Painel interno{% endblock %}
+{% block content %}
+{#
+  ADR-0019 §3 — horários (dado da plataforma) e reservas. Mostra empresa, contato da ligação e
+  data a partir da cópia guardada no horário; NÃO lê o briefing nem as imagens da empresa.
+#}
+<header class="page-header">
+  <div class="page-header__titles">
+    <h1>Horários da ligação</h1>
+    <p class="page-header__subtitle muted">Horários de Brasília. Só aparecem para empresas no plano Empresa ou Implantação.</p>
+  </div>
+</header>
+{%- if error %}{{ alert("danger", error, role="alert") }}{% endif %}
+
+<section class="card stack" aria-labelledby="novo-titulo">
+  <h2 class="section-title" id="novo-titulo">Novo horário</h2>
+  <form method="post" action="{{ url_for('interno.slot_create') }}" class="stack" novalidate>
+    {{ form.csrf_token }}
+    <div class="form-row form-row--2">
+      {{ field(form.day, required=True) }}
+      {{ field(form.at, required=True) }}
+    </div>
+    {{ field(form.duration, required=True, hint="Entre 10 e 240 minutos.") }}
+    <div>{{ button("Criar horário", "primary") }}</div>
+  </form>
+</section>
+
+{%- if slots %}
+{% call data_table([("Início", ""), ("Duração", "is-desktop"), ("Situação", ""), ("Empresa e contato", ""), ("Ações", "")], caption="Horários a partir de 7 dias atrás") %}
+<tbody>
+  {%- for slot in slots %}
+  {%- set req = requests.get(slot.visual_request_id) %}
+  <tr>
+    <td data-label="Início" class="num">{{ local(slot.starts_at).strftime("%d/%m/%Y %H:%M") }}</td>
+    <td data-label="Duração" class="is-desktop num">{{ slot.duration_minutes }} min</td>
+    <td data-label="Situação">
+      {%- if slot.booked_at %}
+        {%- if slot.change_request %}{{ badge("Pedido: " ~ slot.change_request, "warning", "alert") }}{% else %}{{ badge("Reservado", "info", "check") }}{% endif %}
+      {%- else %}{{ badge("Livre", "neutral", "circle") }}{%- endif %}
+    </td>
+    <td data-label="Empresa e contato">
+      {%- if slot.booked_at %}
+      {%- if req %}<a class="row-link" href="{{ url_for('interno.detail', request_id=req.id) }}">{{ req.company_name }}</a>{% else %}—{% endif %}
+      <br><span class="muted text-sm">{{ slot.booked_contact_name or "—" }} · <span class="num">{{ slot.booked_contact_phone or "—" }}</span></span>
+      {%- else %}—{%- endif %}
+    </td>
+    <td data-label="Ações">
+      <div class="cluster">
+      {%- if slot.booked_at %}
+        <form method="post" action="{{ url_for('interno.slot_decide', slot_id=slot.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="acao" value="liberar">
+          {{ button("Cancelar reserva", "ghost") }}
+        </form>
+        {%- if slot.change_request %}
+        <form method="post" action="{{ url_for('interno.slot_decide', slot_id=slot.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="acao" value="manter">
+          {{ button("Manter reserva", "ghost") }}
+        </form>
+        {%- endif %}
+      {%- else %}
+        <form method="post" action="{{ url_for('interno.slot_remove', slot_id=slot.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {{ button("Remover", "ghost", icon="trash") }}
+        </form>
+      {%- endif %}
+      </div>
+    </td>
+  </tr>
+  {%- endfor %}
+</tbody>
+{% endcall %}
+{%- else %}
+<p class="muted">Nenhum horário cadastrado.</p>
+{%- endif %}
+{% endblock %}

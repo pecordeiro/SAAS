@@ -42,6 +42,10 @@
   {%- set _ = nav_settings.append({"key": "privacy", "label": "Privacidade", "href": url_for("lgpd.index")}) -%}
   {%- set _ = nav_settings.append({"key": "modules", "label": "Módulos", "href": url_for("empresa.modules")}) -%}
 {%- endif -%}
+{#- ADR-0019: só o proprietário com plano Empresa/Implantação (visual_menu vem do servidor; a rota recusa sozinha). -#}
+{%- if visual_menu | default(false) -%}
+  {%- set _ = nav_settings.append({"key": "visual", "label": "Identidade visual", "href": url_for("identidade.briefing")}) -%}
+{%- endif -%}
 {%- if current_membership and current_membership.has_role("supervisor") -%}
   {%- set _ = nav_settings.append({"key": "templates", "label": "Modelos", "href": url_for("modelos.index")}) -%}
   {%- set _ = nav_settings.append({"key": "spreadsheet", "label": "Planilha", "href": url_for("dados.import_upload")}) -%}

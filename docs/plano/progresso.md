@@ -1396,3 +1396,34 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
   - [x] Preços e limites das páginas públicas e das telas de assinatura já vinham da tabela `plans`; nada fixo em template.
   - [x] Testes ajustados aos números novos; docs (`prd.md` D2–D5, `pagamentos.md`, `lancamento.md`, README) atualizados.
 - Pendências: o rótulo de preço da Implantação segue “Sob consulta” nos cards (o texto de apoio diz “sob orçamento, online ou presencial”).
+
+## ADR-0019 — briefing de identidade visual e agendamento da ligação (2026-10-23)
+
+- Status: entregue na branch local `claude/briefing-agenda` (a partir de `5d6c91a`). Migration
+  `c5a1e9d7b3f2` (down_revision `f1a7c3e9b2d4`; o orquestrador reencadeia com a irmã `a9d3f5c1b7e2`).
+- Feito:
+  - [x] Briefing (dado da empresa, RLS): `visual_briefings` + `visual_briefing_files`; só plano com
+    `visual_custom` (senão 404), só o proprietário (403), modo leitura 402. Sites validados (http/https,
+    até 5, 300 caracteres), tom de voz explicado na tela, contato da ligação.
+  - [x] Estados nova → briefing preenchido → em andamento → entregue (`visual_requests.status` ganhou
+    `briefing_filled`). Briefing completo salvo → `briefing_filled` + e-mail à equipe
+    (`STAFF_NOTIFY_EMAIL`). Edição só até "em andamento"; depois só se a equipe reabrir no painel.
+  - [x] Imagens (logo 1, fotos `BRIEFING_PHOTOS_MAX`): extensão + conteúdo (`photos.process`), reencode,
+    chave `<empresa>/briefing/<uuid>.jpg`, servidas por rota autenticada com cabeçalhos fixos.
+  - [x] Agenda: `call_slots` (plataforma, só equipe em `/interno/horarios`, MFA, `platform_audit_logs`) e
+    `call_bookings` (empresa, RLS, UNIQUE `slot_id` e `company_id`). Reserva atômica (violação da UNIQUE
+    tratada; testada com duas tentativas e, no PostgreSQL, com duas conexões ao mesmo tempo). Fuso
+    America/Sao_Paulo (UTC no banco). Cliente pede cancelar/remarcar; equipe libera ou mantém.
+  - [x] E-mails: cliente (ligação marcada; decisão da equipe) e equipe (briefing preenchido, ligação
+    marcada, pedido de mudança), sem texto do briefing nem contato.
+  - [x] Spam: honeypot `website`, CSRF, limites `VISUAL_RATE_LIMIT_IP`/`VISUAL_RATE_LIMIT_COMPANY` e
+    `INTERNO_RATE_LIMIT` (config.py e .env.example).
+  - [x] LGPD: tabelas novas no export e no expurgo (imagens apagadas antes das linhas; cópia do contato no
+    horário limpa). `docs/plano/seguranca.md` e `docs/plano/lgpd.md` atualizados.
+  - [x] Testes: `tests/test_adr19_briefing_agenda.py`, casos A/B em `tests/test_isolation.py`, exceção
+    `call_slots` em `tests/test_schema.py`.
+- Decisões: a marca "ocupado" e a cópia do contato ficam no horário (plataforma) porque o RLS esconde as
+  reservas das outras empresas e o painel não lê tabela de empresa (mesmo padrão de
+  `visual_requests.contact_*`). Uma reserva por empresa de cada vez. Briefing "completo" = nome da
+  empresa, produtos, nome do contato e telefone ou e-mail.
+- Pendências: leitura do briefing pela equipe (outro ADR, item 4 do ADR-0019).

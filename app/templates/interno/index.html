@@ -9,6 +9,7 @@
     <p class="page-header__subtitle muted">Requisições abertas quando uma empresa contrata o plano Empresa ou Implantação.</p>
   </div>
 </header>
+<p><a href="{{ url_for('interno.slots') }}">Horários da ligação e reservas</a></p>
 <nav class="cluster" aria-label="Filtrar por estado">
   <a href="{{ url_for('interno.index') }}"{% if not status %} aria-current="page"{% endif %}>Todas</a>
   {%- for key, label in labels.items() %}
@@ -24,7 +25,7 @@
     <td data-label="Plano" class="is-desktop">{{ item.plan_code }}</td>
     <td data-label="Contato" class="is-desktop">{{ item.contact_name or "—" }}{% if item.contact_email %} · {{ item.contact_email }}{% endif %}</td>
     <td data-label="Aberta em">{{ item.created_at|data }}</td>
-    <td data-label="Estado">{{ badge(labels[item.status], "success" if item.status == "delivered" else ("warning" if item.status == "in_progress" else "info")) }}</td>
+    <td data-label="Estado">{{ badge(labels[item.status], {"delivered": "success", "in_progress": "warning", "briefing_filled": "info"}.get(item.status, "neutral")) }}</td>
   </tr>
   {%- endfor %}
 </tbody>

@@ -1,0 +1,4 @@
+{% extends "emails/_base.txt" %}
+{% block body %}A empresa {{ company_name }} pediu: {{ kind|lower }} (ligação de {{ when }}, horário de Brasília). Decida no painel interno: cancelar a reserva ou mantê-la.
+
+Ver horários e reservas: {{ url }}{% endblock %}

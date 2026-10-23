@@ -78,6 +78,18 @@ legítimo de um cúmplice.
 | T | conteúdo trocado no bucket servido como foto | SHA-256 da imagem gravada conferido na leitura; resposta com `Content-Type: image/jpeg` fixo, `nosniff`, CSP `default-src 'none'; sandbox`, `Cache-Control: private` | `test_objeto_adulterado_*` |
 | I | chave do S3 em log/erro | segredos só por env; erros do provedor sem URL assinada nem chave; `repr` sem segredo | `test_s3_*` |
 
+### Briefing de identidade visual e reserva da ligação (ADR-0019)
+| STRIDE | Ameaça | Mitigação | Código / teste |
+|---|---|---|---|
+| E/I | empresa sem o plano ou papel errado abre o briefing/agenda | rota checa no servidor: sem `visual_custom` → 404 (todos os papéis); não proprietário → 403; escrita em modo leitura → 402; menu só esconde | `blueprints/identidade.py::visual_owner_required`; `tests/test_adr19_briefing_agenda.py::test_sem_visual_custom_*`, `test_supervisor_e_operador_*`, `test_modo_leitura_*` |
+| I/T | A lê/edita/reserva com id de B (IDOR) | ids da URL por `get_or_404` (empresa da sessão); briefing/reserva sempre da sessão; RLS `tenant_isolation` em `visual_briefings`, `visual_briefing_files`, `call_bookings` | `tests/test_isolation.py::test_adr19_*`; `test_rls_tabelas_novas_so_da_propria_empresa` (PG) |
+| T/E | upload malicioso no logo/fotos | extensão do nome (.jpg/.jpeg/.png/.webp) E conteúdo (`photos.process`: magic bytes, dimensões, decodificação, reencode JPEG sem EXIF); chave `<company_id>/briefing/<uuid>.jpg` gerada no servidor; 1 logo e `BRIEFING_PHOTOS_MAX` fotos; corpo ≤ `PHOTO_MAX_REQUEST_BYTES` só nesta rota; servida só por `/app/identidade-visual/arquivos/<uuid>` com `image/jpeg` fixo, `nosniff`, CSP `sandbox`, `private` | `services/visual.py::add_file`; `test_upload_valida_extensao_e_conteudo_*` |
+| E/T | pedido de mudança ou liberação tocando o horário de outra empresa | a cópia no horário (`call_slots`, sem RLS) guarda `booked_company_id`; o pedido só altera o horário com `booked_company_id`, `visual_request_id` da reserva e `booked_at` preenchido (rowcount = 1, senão erro); a equipe abre o contexto RLS da empresa do horário para apagar a reserva | `test_empresa_b_nao_marca_pedido_no_horario_de_a`, `test_equipe_libera_pela_empresa_do_horario_mesmo_sem_a_requisicao` |
+| T/D | corrida na reserva (duas empresas, mesmo horário) | `UNIQUE(call_bookings.slot_id)` decide (a 2ª inserção é recusada e tratada) + `UPDATE ... WHERE booked_at IS NULL`; tela desatualizada → 409 | `services/agenda.py::book`; `test_concorrencia_duas_tentativas_*`, `test_concorrencia_real_duas_conexoes_postgres` (PG) |
+| D | spam/robô nos formulários | campo armadilha `website` (preenchido → 400, nada grava); CSRF; limite por IP (`VISUAL_RATE_LIMIT_IP`) e por empresa da sessão (`VISUAL_RATE_LIMIT_COMPANY`) | `test_campo_armadilha_*`, `test_limite_por_ip_*`, `test_limite_por_empresa_*` |
+| I | equipe lendo dado da empresa | `/interno` mostra só status, horários e a CÓPIA do contato da ligação guardada no horário (plataforma); não lê `visual_briefings` nem as imagens (leitura entre empresas fica para outro ADR); ação da equipe sobre a reserva usa o contexto RLS da empresa só durante a ação e vai para `platform_audit_logs` | `test_equipe_gerencia_horarios_e_ve_reservas_sem_ler_o_briefing` |
+| R/I | texto do briefing em log/e-mail | `audit_logs` só com nomes de campos, tipo e tamanho de imagem; e-mail à equipe com nome da empresa, data e link (sem contato nem texto) | `test_salvar_incompleto_*`, `test_proprietario_preenche_e_equipe_e_avisada_*` |
+
 ### Checklist e unidades (Etapa G)
 | STRIDE | Ameaça | Mitigação | Código / teste |
 |---|---|---|---|
@@ -134,6 +146,8 @@ JS é arquivo em `/static`.
 | webhooks (qualquer blueprint “webhook”) | `WEBHOOK_RATE_LIMIT` |
 | API v1 | `API_RATE_LIMIT` (token existente) + `API_RATE_LIMIT_IP` |
 | exportar / excluir empresa | `LGPD_EXPORT_RATE_LIMIT`, `LGPD_DELETE_RATE_LIMIT` |
+| briefing, imagens e reserva da ligação (POST) | `VISUAL_RATE_LIMIT_IP` (IP) + `VISUAL_RATE_LIMIT_COMPANY` (empresa) |
+| `/interno` horários e reservas (POST, só equipe) | `INTERNO_RATE_LIMIT` |
 
 ## Dependências
 `pip-audit` 2.10.1 em 2026-10-14: “No known vulnerabilities found” (requirements + dev).
