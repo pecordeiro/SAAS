@@ -313,7 +313,7 @@ def test_importar_planilha_de_referencia_pela_tela(client, app, tenants):
 def test_previa_avisa_limite_e_confirmacao_respeita_402(client, app, tenants):
     a, _ = tenants
     _subscribe(app, a.company_id)
-    _add_projects(app, a.company_id, 2)
+    _add_projects(app, a.company_id, 4)
     login(client, app, a.supervisor_email)
     with app.app_context():
         project = db.session.get(Project, a.project_id)
