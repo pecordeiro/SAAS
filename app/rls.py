@@ -70,6 +70,10 @@ RLS_TABLES: tuple[str, ...] = (
     "inspection_answers",
     "units",  # migration d9a3b6e2f8c5 (número de série)
     "company_modules",  # migration f1a7c3e9b2d4 (R6: módulos opcionais)
+    # ADR-0019 (briefing de identidade visual e reserva da ligação): migration c5a1e9d7b3f2.
+    "visual_briefings",
+    "visual_briefing_files",
+    "call_bookings",
 )
 
 _UNSET: Any = object()

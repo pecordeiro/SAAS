@@ -32,7 +32,10 @@ HSTS = "max-age=63072000; includeSubDomains"
 
 # Etapa G: rotas de upload com teto próprio (chave de config), maior que MAX_CONTENT_LENGTH.
 # Só elas; qualquer outra rota continua com o teto global (≈ 2,25 MB).
-UPLOAD_LIMIT_BY_ENDPOINT = {"qualidade.photo_upload": "PHOTO_MAX_REQUEST_BYTES"}
+UPLOAD_LIMIT_BY_ENDPOINT = {
+    "qualidade.photo_upload": "PHOTO_MAX_REQUEST_BYTES",
+    "identidade.file_upload": "PHOTO_MAX_REQUEST_BYTES",  # ADR-0019: logo/foto do briefing
+}
 
 
 class InMemoryUploadRequest(Request):

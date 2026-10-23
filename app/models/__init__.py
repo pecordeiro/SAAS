@@ -40,6 +40,7 @@ from app.models.templates import Template, TemplateActivity, TemplateStage, Temp
 from app.models.security import THROTTLE_ACCOUNT, THROTTLE_IP, LoginThrottle  # noqa: F401
 from app.models.privacy import PlatformAuditLog  # noqa: F401,E402  (Fase 7)
 from app.models.staff import (  # noqa: F401,E402  (Etapa C)
+    VISUAL_BRIEFING_FILLED,
     VISUAL_DELIVERED,
     VISUAL_IN_PROGRESS,
     VISUAL_NEW,
@@ -65,3 +66,9 @@ from app.models.quality import (  # noqa: F401,E402  (Etapa G)
     Unit,
 )
 from app.models.modules import CompanyModule  # noqa: F401,E402  (R6: módulos opcionais)
+from app.models.visual import (  # noqa: F401,E402  (ADR-0019: briefing e agendamento)
+    CallBooking,
+    CallSlot,
+    VisualBriefing,
+    VisualBriefingFile,
+)

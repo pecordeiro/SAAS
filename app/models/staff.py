@@ -19,9 +19,11 @@ from app.extensions import db
 from app.models.base import UUIDPk, utcnow
 
 VISUAL_NEW = "new"
+# ADR-0019: o proprietário salvou o briefing completo (edição liberada até "em andamento").
+VISUAL_BRIEFING_FILLED = "briefing_filled"
 VISUAL_IN_PROGRESS = "in_progress"
 VISUAL_DELIVERED = "delivered"
-VISUAL_STATUSES = (VISUAL_NEW, VISUAL_IN_PROGRESS, VISUAL_DELIVERED)
+VISUAL_STATUSES = (VISUAL_NEW, VISUAL_BRIEFING_FILLED, VISUAL_IN_PROGRESS, VISUAL_DELIVERED)
 
 
 class VisualRequest(UUIDPk, db.Model):
@@ -29,7 +31,7 @@ class VisualRequest(UUIDPk, db.Model):
     __table_args__ = (
         Index("ix_visual_requests_company", "company_id"),
         Index("ix_visual_requests_status_created", "status", "created_at"),
-        CheckConstraint("status IN ('new', 'in_progress', 'delivered')", name="status_valid"),
+        CheckConstraint("status IN ('new', 'briefing_filled', 'in_progress', 'delivered')", name="status_valid"),
     )
 
     company_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
