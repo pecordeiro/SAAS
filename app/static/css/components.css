@@ -614,11 +614,9 @@
     box-shadow: var(--shadow-1);
     padding: var(--space-4);
   }
-  .card--flush { padding: 0; overflow: hidden; }
   .card__title { font-family: var(--font-sans); font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); margin-bottom: var(--space-3); letter-spacing: 0; }
   @media (min-width: 48em) {
     .card { padding: var(--space-4) var(--space-5); }
-    .card--flush { padding: 0; }
   }
 
   /* ---------- Avatar (iniciais) ---------- */

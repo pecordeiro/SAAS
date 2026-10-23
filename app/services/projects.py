@@ -367,20 +367,6 @@ def is_undone(entry: ProgressEntry) -> bool:
     )
 
 
-def undone_ids(entries: list[ProgressEntry]) -> set[uuid.UUID]:
-    """Ids dos registros (da lista) que já foram desfeitos."""
-    if not entries:
-        return set()
-    return set(
-        db.session.execute(
-            select(ProgressEntry.reverts_entry_id).where(
-                ProgressEntry.company_id == entries[0].company_id,
-                ProgressEntry.reverts_entry_id.in_([e.id for e in entries]),
-            )
-        ).scalars()
-    )
-
-
 # ---------------------------------------------------------------- atribuição (Etapa D)
 
 
@@ -1079,11 +1065,6 @@ def summary(project: Project) -> calc.ResultadoProjeto:
         pessoas=project.people,
         horas_dia=float(project.hours_per_day),
     )
-
-
-def company_holidays() -> list[date]:
-    """Feriados nacionais (company_id NULL) + os da empresa da sessão."""
-    return holidays_for(current_company_id())
 
 
 def forecast_end(project: Project, result: calc.ResultadoProjeto, company: Company, today: date) -> date | None:

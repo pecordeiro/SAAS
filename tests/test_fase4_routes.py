@@ -186,7 +186,6 @@ def test_edicao_do_projeto_pelas_telas(client, app, tenants):
     assert post(client, app, f"/app/atividades/{a.activity_id}/registrar", {"delta": 1}).status_code == 404
     assert "Nova" in text_of(client.get(f"/app/projetos/{a.project_id}/historico"))
     assert post(client, app, f"/app/etapas/{a.stage_id}/arquivar").status_code == 303
-    assert client.get(f"/app/etapas/{a.stage_id}").status_code == 404
     # duplicar e arquivar projeto
     assert post(client, app, f"/app/projetos/{a.project_id}/duplicar").status_code == 303
     assert post(client, app, f"/app/projetos/{a.project_id}/arquivar", {}).status_code == 303

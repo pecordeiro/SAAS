@@ -1327,3 +1327,30 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
   ADR-0017); preferências de e-mail no Perfil aparecem mesmo com o módulo desligado (valem para todas as
   empresas da pessoa); `/security-review` não rodado neste ambiente.
 
+
+## Reestruturação R9 — limpeza do front antigo (2026-10-23)
+
+- Status: entregue. Branch `claude/r9-limpeza`. Sem mudança de comportamento: só saiu o que nada usava.
+- Método: grafo do Graphify de `app/` (3190 nós) + varredura por texto de templates, macros, classes CSS
+  (com checagem de nomes montados dinamicamente), rotas (`url_map` × `url_for` × testes), funções de
+  serviço e dependências. Nada de segurança, LGPD, API, cobrança, worker ou `services/modules.py` foi tocado.
+- Removido:
+  - [x] `components/chart.html`: macros `legend`, `grouped_bars`, `donut`, `treemap_chart`,
+    `stacked_columns`, `team_columns` (SVG do servidor trocado pelo ECharts). Ficam `bar_chart` e `gauge`.
+  - [x] `services/charts.py`: `rosca`, `teto_bonito`, `colunas`, `treemap`, `cortar_texto` e auxiliar
+    (fica `medidor`); `tests/test_charts.py` enxugado para o que restou.
+  - [x] CSS (`pages.css`, `components.css`, `layout.css`, `utilities.css`): ~135 linhas de regras sem
+    uso — `.hero*`, `.proof*`, `.landing-*`, `.cta-band*`, `.steps`/`.steps__*`, `.pricing-hero`, `.faq`,
+    `.contact__email`, `.dash-grid`, `.dash-kpis`, `.kpi--gauge`/`.kpi__gauge*`, `.legend--stack`,
+    `.gbars*`, `.donut*`, `.treemap`/`.tm*`, `.cols*`, `.chart-scroll`, `.chart__bar--b`,
+    `.legend__swatch--{a,b,trabalhadas,faltam,due}`, `.card--flush`, `.sidebar__group`, `.nowrap`.
+    `tokens.css` e `docs/design/tokens.css` intactos. `site.css` regenerado (`build_assets.py`).
+  - [x] Rota `GET /app/etapas/<id>` (`app.stage_detail`, só redirecionava ao detalhe; sem link) e seus
+    casos em `test_isolation.py` e `test_fase4_routes.py`.
+  - [x] Funções de serviço sem chamada: `importer.parse_xlsx`, `projects.company_holidays`,
+    `projects.undone_ids` (e a linha de teste que a exercia).
+- Conferido e sem sobra: nenhum template órfão (todos renderizados ou incluídos), JS sem seletor morto,
+  `@keyframes` todos usados, nenhuma dependência sem uso.
+- Pendências (e o motivo) em `docs/plano/limpeza-pendente.md`: detalhe do projeto e edição do projeto
+  ainda têm fluxos sem equivalente no Preencher etapas; `bar_chart`/`gauge` ainda desenham telas vivas;
+  classes CSS de nome dinâmico mantidas por segurança.

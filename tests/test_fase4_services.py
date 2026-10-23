@@ -299,8 +299,7 @@ def test_desfazer_grava_compensatorio_append_only(ctx):
     db.session.commit()
     assert reversal.delta == -2 and reversal.reverts_entry_id == entry.id
     assert activity.units_done == 0 and activity.version == 3
-    assert svc.is_undone(entry) and svc.undone_ids(svc.history(project)) == {entry.id}
-    assert svc.undone_ids([]) == set()
+    assert svc.is_undone(entry)
     assert db.session.get(ProgressEntry, entry.id).delta == 2  # original intacto
     with pytest.raises(svc.ProgressError):
         svc.undo_progress(entry, owner.id)

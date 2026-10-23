@@ -20,7 +20,6 @@
   .num { font-variant-numeric: var(--font-numeric); }
   .text-sm { font-size: var(--font-size-sm); }
   .text-strong { font-weight: var(--font-weight-semibold); }
-  .nowrap { white-space: nowrap; }
   .text-success { color: var(--color-success); }
   .text-danger { color: var(--color-danger); }
   .mt-2 { margin-top: var(--space-2); }

@@ -16,7 +16,6 @@ ROUTES = [
     ("GET", "/app/projetos/{id}", "project_id", None),
     ("GET", "/app/projetos/{id}/historico", "project_id", None),
     ("POST", "/app/projetos/{id}/etapas", "project_id", {"name": "Invasora"}),
-    ("GET", "/app/etapas/{id}", "stage_id", None),
     ("POST", "/app/etapas/{id}/atividades", "stage_id", {"name": "Invasora", "ideal_minutes": "5"}),
     ("GET", "/app/atividades/{id}", "activity_id", None),
     ("POST", "/app/atividades/{id}/registrar", "activity_id", {"delta": 1}),

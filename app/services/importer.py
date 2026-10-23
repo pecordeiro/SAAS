@@ -493,10 +493,6 @@ def parse_csv(data: bytes) -> ImportResult:
     return auto_parse(_csv_grid(data), strict=False)
 
 
-def parse_xlsx(data: bytes) -> ImportResult:
-    return auto_parse(_xlsx_grid(data), strict=False)
-
-
 # ---------------------------------------------------------------- XLSX (proteções)
 
 
