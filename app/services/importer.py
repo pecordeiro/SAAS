@@ -102,10 +102,21 @@ class ImportResult:
     # ``Project.progress_mode``; no simples cada etapa tem a atividade interna (nome da etapa,
     # peças = % × meta por ``calc.pecas_de_percentual``), a mesma representação da tela.
     mode: str = MODE_DETAILED
+    # Planilha com mapeamento de colunas: unidade em que a coluna de tempo foi lida
+    # (``import_mapping.UNIT_MINUTES``/``UNIT_HOURS``) ou ``None`` quando não há coluna de tempo.
+    # Os tempos de ``stages`` já estão em MINUTOS; a prévia mostra a unidade para conferência.
+    time_unit: str | None = None
+    # Avisos que não impedem a gravação nem vão no payload (ex.: unidade de tempo provavelmente errada).
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
         return not self.errors
+
+    @property
+    def total_minutes(self) -> Decimal:
+        """Soma do tempo ideal (minutos) de todas as atividades lidas, já convertido."""
+        return sum((a.ideal_minutes for s in self.stages for a in s.activities), Decimal("0"))
 
     @property
     def activity_count(self) -> int:
@@ -725,6 +736,8 @@ def to_payload(result: ImportResult) -> dict:
     data = asdict(result)
     data.pop("errors")
     data.pop("notes")
+    data.pop("warnings")
+    data.pop("time_unit")
     data["start_date"] = result.start_date.isoformat() if result.start_date else None
     data["due_date"] = result.due_date.isoformat() if result.due_date else None
     data["hours_per_day"] = str(result.hours_per_day)

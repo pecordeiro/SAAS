@@ -29,7 +29,7 @@ Reestruturação R9 (limpeza): saíram os gráficos SVG antigos que o Painel com
 Reestruturação R7–R8 (telas): importar planilha em 3 passos (`/app/importar`: enviar →
 escolher colunas com “Isto é…” por coluna, ou escolher projetos quando o arquivo da equipe traz
 vários (abas “<Nome> - Acompanhamento/Equipe/Como funciona”) → prévia com erros por linha e
-confirmar), menu “Exportar” no projeto (planilha no formato da equipe com fórmulas ou lista
+confirmar; a tela de colunas traz ajuda por campo e a unidade do tempo, minutos ou horas, convertida no servidor e mostrada na prévia), menu “Exportar” no projeto (planilha no formato da equipe com fórmulas ou lista
 simples) e “Restaurar para uma data” no histórico (prévia antes → depois, confirmar, desfazer).
 Reestruturação R6 (opcionais, ADR-0017): o núcleo é acompanhar etapas; responsáveis e progresso
 por pessoa, alertas e relatório semanal, aguardando peça, fotos e comentários, checklist de

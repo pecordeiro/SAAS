@@ -172,7 +172,8 @@ def _preview(form, result, name, status_error=400, back=None):
 
 
 def _mapping_page(grid, *, name=None, sheet=None, header_row=None, chosen=None, token=None, quantity=None,
-                  result=None, status=200, map_errors=None):
+                  result=None, status=200, map_errors=None,
+                  time_unit=mapping_svc.UNIT_MINUTES):
     inspection = mapping_svc.inspect(grid, sheet, header_row)
     if token is None:
         token = _grid_serializer().dumps(
@@ -188,6 +189,7 @@ def _mapping_page(grid, *, name=None, sheet=None, header_row=None, chosen=None, 
         data={
             "grid": token, "current_sheet": inspection.sheet, "sheet": inspection.sheet,
             "header_row": inspection.header_row, "quantity": quantity, "name": name,
+            "time_unit": time_unit if time_unit in mapping_svc.TIME_UNIT_KEYS else mapping_svc.UNIT_MINUTES,
             **{k: ("" if selected.get(k) is None else str(selected[k])) for k in mapping_svc.FIELD_KEYS},
         },
     )
@@ -200,6 +202,7 @@ def _mapping_page(grid, *, name=None, sheet=None, header_row=None, chosen=None, 
     return render_template(
         "dados/import_map.html", form=form, inspection=inspection, result=result,
         column_field=column_field, column_choices=mapping_svc.COLUMN_CHOICES,
+        field_help=mapping_svc.FIELD_HELP, fields=mapping_svc.FIELDS,
         mode=mapping_svc.mode_of(selected), has_stage=selected.get(mapping_svc.F_STAGE) is not None,
         map_errors=map_errors or [], limit_mb=_limit_mb(),
     ), status
@@ -245,7 +248,10 @@ def _int_or_none(value):
 @tenant_required(ROLE_SUPERVISOR)
 def import_columns():
     form = ImportMapForm()
-    if not form.validate():
+    valid = form.validate()
+    # Unidade do tempo fora de minutos/horas: erro claro na tela de colunas (nunca vira "minutos").
+    bad_unit = not valid and set(form.errors) == {"time_unit"}
+    if not valid and not bad_unit:
         return _page(ImportForm(formdata=None), 400, upload_error="Dados inválidos. Envie o arquivo de novo.")
     try:
         data = _grid_serializer().loads(form.grid.data, max_age=PAYLOAD_MAX_AGE)
@@ -263,7 +269,13 @@ def import_columns():
             chosen, map_errors = {k: _int_or_none(getattr(form, k).data) for k in mapping_svc.FIELD_KEYS}, []
         else:
             chosen, map_errors = mapping_svc.mapping_from_columns(by_column)
-        common = {"name": form.name.data, "sheet": sheet, "token": form.grid.data, "quantity": form.quantity.data}
+        unit = form.time_unit.data
+        common = {"name": form.name.data, "sheet": sheet, "token": form.grid.data, "quantity": form.quantity.data,
+                  "time_unit": unit}
+        if bad_unit:
+            return _mapping_page(grid, header_row=header_row, chosen=chosen if same_sheet else None,
+                                 map_errors=["Unidade do tempo inválida: escolha minutos ou horas."], status=400,
+                                 **{**common, "time_unit": mapping_svc.UNIT_MINUTES})
         if form.action.data == "ver" or not same_sheet:
             return _mapping_page(grid, header_row=header_row, chosen=chosen if same_sheet else None, **common)
         inspection = mapping_svc.inspect(grid, sheet, header_row)
@@ -271,7 +283,8 @@ def import_columns():
             return _mapping_page(grid, header_row=inspection.header_row, chosen=chosen, map_errors=map_errors,
                                  status=400, **common)
         result = mapping_svc.parse_mapped(
-            grid, inspection.sheet, inspection.header_row, chosen, quantity=form.quantity.data, name=form.name.data
+            grid, inspection.sheet, inspection.header_row, chosen, quantity=form.quantity.data, name=form.name.data,
+            time_unit=unit,
         )
         if not result.ok and all(e.column in ("colunas", "aba") for e in result.errors):
             # Erro de mapeamento (coluna repetida, sem etapa): fica no passo 2.
@@ -282,7 +295,7 @@ def import_columns():
     back = {
         "grid": form.grid.data, "sheet": inspection.sheet, "header_row": inspection.header_row,
         "columns": {idx: key for key, idx in chosen.items() if isinstance(idx, int) and idx >= 0},
-        "quantity": form.quantity.data, "name": form.name.data,
+        "quantity": form.quantity.data, "name": form.name.data, "time_unit": unit,
     }
     return _preview(ImportForm(formdata=None), result, form.name.data, back=back)
 

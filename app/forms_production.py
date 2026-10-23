@@ -199,6 +199,11 @@ class ImportMapForm(BaseForm):
     percentual = _column_choice("% concluído")
     prazo = _column_choice("Prazo (data)")
     quantity = IntegerField("Meta (unidades previstas)", validators=[Optional(), NumberRange(min=1, max=100000)])
+    # Unidade da coluna de tempo: só "minutos" ou "horas" (outro valor é erro, sem padrão silencioso).
+    # Campo ausente (formulário antigo) vale "minutos"; a conversão é do servidor.
+    time_unit = SelectField(
+        "Unidade do tempo", choices=[("minutos", "Minutos"), ("horas", "Horas")], default="minutos",
+    )
     name = StringField("Nome do projeto", filters=[_strip], validators=[Optional(), Length(max=160)])
     # Botões ``name="action"``: “ver” relê a aba/cabeçalho; “previa” (padrão) gera a prévia.
     action = StringField(validators=[Optional(), AnyOf(["previa", "ver"])])
