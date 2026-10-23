@@ -1,4 +1,5 @@
 {% extends "base_app.html" %}
+{% from "components/optional.html" import optional_badge %}
 {% from "components/badge.html" import badge %}
 {% from "components/table.html" import data_table %}
 {% from "components/empty_state.html" import empty_state %}
@@ -12,8 +13,8 @@
 #}
 <header class="page-header">
   <div class="page-header__titles">
-    <h1>Alertas</h1>
-    <p class="page-header__subtitle muted">Últimos {{ days }} dias · prazo em risco, atraso previsto, etapa parada há {{ stalled_days }} dias úteis ou mais e peça atrasada.</p>
+    <h1>Alertas{{ optional_badge() }}</h1>
+    <p class="page-header__subtitle muted">Últimos {{ days }} dias · prazo em risco, atraso previsto{% if "aguardando_peca" in modules %}, etapa parada há {{ stalled_days }} dias úteis ou mais e peça atrasada{% else %} e etapa parada há {{ stalled_days }} dias úteis ou mais{% endif %}.</p>
   </div>
 </header>
 

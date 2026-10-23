@@ -27,6 +27,11 @@ escolher colunas com “Isto é…” por coluna, ou escolher projetos quando o 
 vários (abas “<Nome> - Acompanhamento/Equipe/Como funciona”) → prévia com erros por linha e
 confirmar), menu “Exportar” no projeto (planilha no formato da equipe com fórmulas ou lista
 simples) e “Restaurar para uma data” no histórico (prévia antes → depois, confirmar, desfazer).
+Reestruturação R6 (opcionais, ADR-0017): o núcleo é acompanhar etapas; responsáveis e progresso
+por pessoa, alertas e relatório semanal, aguardando peça, fotos e comentários, checklist de
+inspeção, número de série e API viram **módulos opcionais**, desligados por padrão e ligados pelo
+proprietário em Configurações › Módulos (`/app/empresa/modulos`). Desligado, o módulo some do menu
+e das telas e as rotas dele respondem 404.
 Fase 8 (assinaturas e pagamento) entregue: `PaymentProvider` com Asaas e Fake
 (`app/services/billing/`), teste grátis de 14 dias sem cartão, assinar com CPF/CNPJ validado e
 checkout no Asaas (Pix, boleto ou cartão), webhook idempotente (`POST /webhooks/asaas`),
@@ -157,6 +162,23 @@ migrations no PostgreSQL só rodam com `TEST_DATABASE_URL`; no SQLite aparecem c
   `calc.py`). Nenhuma conta no navegador.
 - `/app/preencher`, `/app/meta-e-equipe` e `/app/como-funciona` ainda redirecionam para as telas
   existentes mais próximas (telas próprias na R3/R5).
+
+### Módulos opcionais (reestruturação R6)
+
+- Catálogo e regra em `app/services/modules.py` (ADR-0017); estado por empresa em `company_modules`
+  (migration `f1a7c3e9b2d4`, com RLS). Sem linha = desligado: empresa nova vê só o núcleo.
+- Módulos: `atribuicao` (responsáveis e progresso por pessoa), `alertas` (alertas e relatório
+  semanal), `aguardando_peca`, `fotos` (fotos e comentários), `checklist`, `unidades` (número de
+  série) e `api` (só com `FEATURE_PUBLIC_API`; o plano continua exigindo a feature `api`).
+- A recusa é do servidor: `tenancy.tenant_required` chama `modules.guard_endpoint` e devolve 404
+  para qualquer rota de módulo desligado (antes do papel); a API faz o mesmo no token. Templates só
+  leem `modules` para esconder menu e fragmentos, e mostram o selo “Opcional”
+  (`components/optional.html`) no que é de módulo.
+- O worker pula alertas e relatório de empresa sem `alertas`; sem `aguardando_peca` a marca é
+  ignorada (painel, alertas, relatório); sem `atribuicao` o e-mail de atribuição não sai.
+- Só o proprietário liga/desliga; cada mudança vai para `audit_logs` (`module.enabled` /
+  `module.disabled`). Desligar não apaga dado. Empresas que já existiam ganharam ligados os módulos
+  em que já tinham dados (migration).
 
 ### Interface (Fase 2)
 

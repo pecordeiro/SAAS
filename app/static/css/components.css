@@ -455,6 +455,8 @@
   }
   .badge .icon { width: var(--space-3); height: var(--space-3); }
   .badge--optional { background: transparent; border: var(--border-width) solid var(--color-border-strong); color: var(--color-text-muted); font-weight: var(--font-weight-regular); }
+  /* R6: selo “Opcional” ao lado de título, botão ou item de menu (components/optional.html). */
+  .optional-tag { margin-left: var(--space-2); vertical-align: middle; flex: none; }
   .badge--success { background: var(--color-success-subtle); color: var(--color-success); }
   .badge--warning { background: var(--color-warning-subtle); color: var(--color-warning); }
   .badge--neutral { background: var(--color-neutral-subtle); color: var(--color-neutral); }

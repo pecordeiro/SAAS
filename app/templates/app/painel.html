@@ -46,7 +46,7 @@
 <section class="card painel-block" aria-labelledby="g-esteira">
   <div class="chart-card__head">
     <h2 class="section-title" id="g-esteira">Esteira de etapas</h2>
-    {{ p.status_legend() }}
+    {{ p.status_legend(waiting=d.aguardando_ativo) }}
   </div>
   <div class="esteiras">
     {%- for proj in d.projetos %}
@@ -73,9 +73,9 @@
     <div class="chart-card__head"><h2 class="section-title" id="g-status">Situação das etapas</h2></div>
     <div class="status-split">
       <div class="chart-box chart-box--status" data-chart="status" role="img" aria-label="Rosca: {% for x in d.grafico.status %}{{ x.name }} {{ x.value }}{{ ', ' if not loop.last }}{% endfor %}."></div>
-      {{ p.status_legend(d.contagem, with_today=False) }}
+      {{ p.status_legend(d.contagem, with_today=False, waiting=d.aguardando_ativo) }}
     </div>
-    {{ p.pendencias(d.pendencias, show_project=True) }}
+    {{ p.pendencias(d.pendencias, show_project=True, waiting=d.aguardando_ativo) }}
   </section>
 </div>
 

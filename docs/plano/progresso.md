@@ -1246,3 +1246,43 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
   mm/dd/yyyy); arquivo de vários projetos aceita até 10 projetos (teto de 30 abas da leitura); modo simples
   ainda grava 1 subatividade por etapa (TODO R4); `/security-review` não rodado neste ambiente.
 
+## Reestruturação R6 — Opcionais (2026-10-23)
+
+- Status: entregue. Branch `claude/r6-opcionais`. ADR-0017 (aceito dentro do plano, §4.5 e D5).
+- Entregas:
+  - [x] Catálogo único `app/services/modules.py`: `atribuicao` (responsáveis e progresso por pessoa),
+    `alertas` (alertas e relatório semanal), `aguardando_peca`, `fotos` (fotos e comentários),
+    `checklist` (checklist de inspeção), `unidades` (número de série) e `api` (só com
+    `FEATURE_PUBLIC_API`). Cada módulo lista as suas rotas (25 endpoints + `api_v1.*`/`api_tokens_ui.*`).
+  - [x] Tabela `company_modules` (migration `f1a7c3e9b2d4`, RLS `tenant_isolation`, em `RLS_TABLES`);
+    sem linha = desligado. Upgrade/downgrade conferidos em SQLite e PostgreSQL 16.
+  - [x] Migração de dados: empresas existentes ganham ligado o módulo em que já têm dados (responsável,
+    alerta ou relatório semanal, marca/previsão de peça, comentário/foto, checklist/inspeção, série,
+    cliente/token da API), lendo empresa a empresa com `app.company_id` (funciona com RLS forçado).
+  - [x] Recusa central: `tenant_required` → `modules.guard_endpoint` (404 antes do papel); API por
+    token → 404 em JSON. Empresa nova (cadastro) vê só o núcleo.
+  - [x] Telas: menu (Alertas, API, Unidades só com o módulo), detalhe do projeto (Unidades, aguardando
+    peça, fotos e comentários, checklist, quadro Pessoas, “Resp.”), editar projeto (responsável),
+    editor de modelos (checklist), checklist (unidade), unidade (inspeções), evidências (checklist),
+    Empresa (“etapa parada”), painéis e Preencher etapas (situação “aguardando peça”, legenda e lista).
+    Selo “Opcional” (`components/optional.html`) em tudo o que é de módulo.
+  - [x] Servidor ignora campo de módulo desligado em tela do núcleo (checklist do modelo mantém o que
+    tinha; inspeção sem unidade; “etapa parada” mantém o valor).
+  - [x] Worker: alertas e relatório só com `alertas`; sem `aguardando_peca` nada de “peça atrasada” nem
+    coluna no relatório; sem `atribuicao` sem e-mail de atribuição e sem aba Pessoas.
+  - [x] Configurações › Módulos (`/app/empresa/modulos`, só proprietário, POST com CSRF, 402 em modo
+    leitura), cada mudança em `audit_logs` (`module.enabled`/`module.disabled`).
+  - [x] Limites de plano à parte: módulo API ligado não libera a API num plano sem ela.
+- Testes: `tests/test_r6_modulos.py` (varredura de TODAS as rotas de cada módulo → 404 desligado, para
+  owner e operador; ligado funciona; menu e detalhe; painel sem aguardando peça; editor de modelos;
+  inspeção sem unidade; só proprietário; auditoria; chave desconhecida; CSRF; modo leitura; A/B;
+  worker/e-mails; plano; migration com dados em SQLite e PostgreSQL; RLS de `company_modules`) e
+  `test_isolation.py` (`test_r6_*`: A não muda B nem com id de B no formulário ou na sessão; só
+  proprietário). `make_tenant` liga todos os módulos por padrão (empresa “existente”);
+  `modules=()` = só o núcleo.
+- Verificação: tela de Módulos em 375/768/1280, claro e escuro, antes e depois de ligar módulos pela
+  própria tela (sem rolagem lateral), e detalhe do projeto com módulos ligados (capturas fora do repo).
+- Pendências: exportações (CSV/XLSX, LGPD) e o JSON da API continuam com campos de módulo (decisão do
+  ADR-0017); preferências de e-mail no Perfil aparecem mesmo com o módulo desligado (valem para todas as
+  empresas da pessoa); `/security-review` não rodado neste ambiente.
+

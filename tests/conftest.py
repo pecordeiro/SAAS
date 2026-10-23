@@ -193,13 +193,35 @@ class Tenant:
     activity_id: object
 
 
-def make_tenant(label: str, quantity: int = 10, plan: str | None = None) -> Tenant:
+ALL_MODULES = object()  # marcador: liga todos os módulos opcionais (padrão de make_tenant)
+
+
+def set_tenant_modules(company_id, modules) -> None:
+    """Grava direto o estado dos módulos opcionais (R6) da empresa, sem auditoria: ``modules`` é a
+    lista de chaves ligadas (as demais ficam desligadas). Para testar a TELA de módulos use a rota."""
+    from app.models import CompanyModule
+    from app.services.modules import KEYS
+
+    wanted = set(KEYS if modules is ALL_MODULES else modules)
+    _db.session.execute(CompanyModule.__table__.delete().where(CompanyModule.company_id == company_id))
+    for key in KEYS:
+        if key in wanted:
+            _db.session.add(CompanyModule(company_id=company_id, module=key, enabled=True))
+    _db.session.flush()
+
+
+def make_tenant(label: str, quantity: int = 10, plan: str | None = None, modules=ALL_MODULES) -> Tenant:
     """Empresa com 3 pessoas (owner, supervisor, operador) e 1 projeto. Sem ``plan``: sem
     assinatura (teste grátis implícito no plano de teste). Com ``plan``: assinatura ativa
-    (paga) nesse plano — ex.: ``plan="empresa"`` para ter a feature ``api``."""
+    (paga) nesse plano — ex.: ``plan="empresa"`` para ter a feature ``api``.
+
+    R6: por padrão TODOS os módulos opcionais vêm ligados (empresa “existente”, que já usa os
+    recursos — os testes antigos de cada módulo continuam valendo). ``modules=()`` = empresa só
+    com o núcleo; ``modules=("fotos",)`` = só esse ligado."""
     company = Company(name=f"Empresa {label}")
     _db.session.add(company)
     _db.session.flush()
+    set_tenant_modules(company.id, modules)
     users = {}
     for role in (ROLE_OWNER, ROLE_SUPERVISOR, ROLE_OPERATOR):
         user = User(email=f"{role}.{label.lower()}@exemplo.com", name=f"{role} {label}", password_hash=hash_password(PASSWORD))

@@ -1,4 +1,5 @@
 {% extends "base_app.html" %}
+{% from "components/optional.html" import optional_badge %}
 {% from "components/button.html" import button %}
 {% from "components/badge.html" import badge %}
 {% from "components/empty_state.html" import empty_state %}
@@ -9,7 +10,7 @@
 {# Etapa G — busca por número de série em todos os projetos ativos da empresa da sessão. #}
 <header class="page-header">
   <div class="page-header__titles">
-    <h1>Buscar unidade</h1>
+    <h1>Buscar unidade{{ optional_badge() }}</h1>
     <p class="page-header__subtitle muted">Encontre o equipamento pelo número de série e veja o histórico completo.</p>
   </div>
 </header>

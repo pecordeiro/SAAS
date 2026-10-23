@@ -2,6 +2,7 @@
   Coluna lateral do detalhe: equipe e prazo + registros recentes. Troca por id no fragmento.
   Variáveis: project, result, deadline, forecast, recent, people/can_edit (Etapa D).
 #}
+{% from "components/optional.html" import optional_badge %}
 {%- set weekdays = current_company.workdays() %}
 <div class="stack--lg" id="lateral"{% if oob %} hx-swap-oob="true"{% endif %}>
   <section class="card" aria-labelledby="equipe-titulo">
@@ -20,9 +21,9 @@
       <div><dt>Tempo total</dt><dd>{{ result.tempo_total_h|horas }}</dd></div>
     </dl>
   </section>
-  {%- if can_edit %}
+  {%- if can_edit and "atribuicao" in modules %}
   <section class="card" aria-labelledby="pessoas-titulo">
-    <h2 class="section-title" id="pessoas-titulo">Pessoas · 7 dias</h2>
+    <h2 class="section-title" id="pessoas-titulo"><span>Pessoas · 7 dias</span>{{ optional_badge() }}</h2>
     {%- if people %}
     <ul class="recent">
       {%- for r in people %}

@@ -4,6 +4,7 @@
 {% from "components/button.html" import button %}
 {% from "components/alert.html" import alert %}
 {% from "components/modal.html" import confirm_dialog %}
+{% from "components/optional.html" import optional_badge %}
 {% set nav_current = "team" %}
 {% set nav_project = project %}
 {% block title %}Editar · {{ project.name }}{% endblock %}
@@ -112,6 +113,7 @@
           <span class="muted text-sm">min · {{ activity.units_done }}/{{ project.quantity }}</span>
           {{ button("Confirmar e salvar" if ac else "Salvar", "primary" if ac else "secondary") }}
         </form>
+        {%- if "atribuicao" in modules %}
         <form class="cluster" method="post" action="{{ url_for('edicao.activity_assign', activity_id=activity.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <label class="visually-hidden" for="atv-resp-{{ activity.id }}">Responsável por {{ activity.name }}</label>
@@ -120,7 +122,9 @@
             {%- for m in members %}<option value="{{ m.id }}"{% if activity.assignee_id == m.id %} selected{% endif %}>{{ m.name }}</option>{% endfor %}
           </select>
           {{ button("Atribuir", "secondary") }}
+          {{ optional_badge() }}
         </form>
+        {%- endif %}
         {{ move_buttons(url_for('edicao.activity_move', activity_id=activity.id)) }}
         {%- if stages|length > 1 %}
         <form class="cluster" method="post" action="{{ url_for('edicao.activity_position', activity_id=activity.id) }}">

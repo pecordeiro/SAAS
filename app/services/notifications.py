@@ -114,6 +114,10 @@ def on_activity_assigned(event: DomainEvent) -> None:
     existe, não está arquivada e continua com o mesmo responsável; a pessoa ainda é membro
     ativo; a preferência ``notify_assignment`` está ligada; não foi ela mesma que se atribuiu.
     Qualquer “não” → nada a enviar (o evento é marcado publicado)."""
+    from app.services import modules
+
+    if not modules.is_enabled(event.company_id, modules.ATRIBUICAO):
+        return  # R6: módulo desligado depois da atribuição → nada a enviar
     payload = event.payload or {}
     activity_id = _uuid(payload.get("activity_id"))
     assignee_id = _uuid(payload.get("assignee_user_id"))
@@ -202,6 +206,9 @@ def _project_rows(company: Company, start: date, end: date, today: date) -> list
             .group_by(Stage.project_id)
         ).all()
     )
+    from app.services import modules
+
+    waiting_on = modules.is_enabled(company, modules.AGUARDANDO_PECA)
     rows = []
     for project in projects:
         result = svc.summary(project)
@@ -221,9 +228,10 @@ def _project_rows(company: Company, start: date, end: date, today: date) -> list
                 "Prazo": project.due_date,
                 "Término previsto": forecast,
                 "Atraso previsto (dias úteis)": svc.delay_workdays(project, forecast, company) if late else 0,
-                "Etapas aguardando peça": waiting.get(project.id, 0),
             }
         )
+        if waiting_on:
+            rows[-1]["Etapas aguardando peça"] = waiting.get(project.id, 0)
     return rows
 
 
@@ -287,9 +295,13 @@ def weekly_report(company: Company, now: datetime, force: bool = False) -> dict 
     except IntegrityError:  # outro worker marcou primeiro
         db.session.rollback()
         return None
+    from app.services import modules
+
     start, end = today - timedelta(days=7), today - timedelta(days=1)
     projects = _project_rows(company, start, end, today)
-    people = _people_rows(company, start, end)
+    # R6: progresso por pessoa é do módulo “atribuição”; aguardando peça, do módulo dele.
+    by_person = modules.is_enabled(company, modules.ATRIBUICAO)
+    people = _people_rows(company, start, end) if by_person else []
     sent = 0
     recipients_ = recipients(company.id, "notify_weekly") if (projects or people) else []
     if recipients_:
@@ -298,7 +310,10 @@ def weekly_report(company: Company, now: datetime, force: bool = False) -> dict 
         period = f"{br_date(start)} a {br_date(end)}"
         attachment = Attachment(
             filename=f"relatorio-semanal-{period_key}.xlsx",
-            content=exporter.weekly_xlsx(projects, people, period),
+            content=exporter.weekly_xlsx(
+                projects, people, period, waiting=modules.is_enabled(company, modules.AGUARDANDO_PECA),
+                by_person=by_person,
+            ),
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         context = dict(
@@ -323,6 +338,7 @@ def weekly_report(company: Company, now: datetime, force: bool = False) -> dict 
 
 def run_weekly_reports(now: datetime) -> dict[str, int]:
     from app import rls
+    from app.services import modules
     from app.services.worker import company_ids
 
     total = {"companies": 0, "emails": 0}
@@ -332,6 +348,9 @@ def run_weekly_reports(now: datetime) -> dict[str, int]:
             if company is None or company.deletion_requested_at is not None:
                 continue
             rls.set_context(company_id=company.id)
+            if not modules.is_enabled(company, modules.ALERTAS):
+                db.session.rollback()
+                continue  # R6: relatório semanal é do módulo “alertas”
             details = weekly_report(company, now)
             db.session.commit()
             if details is not None:

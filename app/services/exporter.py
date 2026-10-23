@@ -232,16 +232,18 @@ def _xlsx_value(value):
     return neutralize(value)
 
 
-def weekly_xlsx(projects: list[dict], people: list[dict], period: str) -> bytes:
+def weekly_xlsx(projects: list[dict], people: list[dict], period: str, *, waiting: bool = True,
+                by_person: bool = True) -> bytes:
     """XLSX do relatório semanal: aba “Projetos” e aba “Pessoas”. Números já calculados por
-    quem chama (calc/serviços); aqui só escreve, com a mesma proteção contra fórmula."""
+    quem chama (calc/serviços); aqui só escreve, com a mesma proteção contra fórmula.
+    R6: sem o módulo “aguardando peça” a coluna dele sai; sem “atribuição”, a aba Pessoas sai."""
     from openpyxl import Workbook
 
     wb = Workbook()
-    sheets = (
-        ("Projetos", WEEKLY_PROJECT_COLUMNS, projects),
-        ("Pessoas", WEEKLY_PEOPLE_COLUMNS, people),
-    )
+    project_columns = tuple(c for c in WEEKLY_PROJECT_COLUMNS if waiting or c != "Etapas aguardando peça")
+    sheets = [("Projetos", project_columns, projects)]
+    if by_person:
+        sheets.append(("Pessoas", WEEKLY_PEOPLE_COLUMNS, people))
     for index, (title, columns, items) in enumerate(sheets):
         ws = wb.active if index == 0 else wb.create_sheet()
         ws.title = title

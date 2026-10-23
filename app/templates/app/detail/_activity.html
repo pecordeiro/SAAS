@@ -10,11 +10,12 @@
   last_entries (último lançamento por atividade: autoria, Etapa D).
 #}
 {%- set last = last_entries.get(activity.id) %}
+{%- set assignee = activity.assignee if "atribuicao" in modules else none %}
 {%- macro by_line() -%}
-{%- if activity.assignee or last %}
+{%- if assignee or last %}
 <span class="activity__by muted">
-  {%- if activity.assignee %}<span class="activity__assignee">Resp.: {{ activity.assignee.name }}</span>{% endif %}
-  {%- if activity.assignee and last %} · {% endif %}
+  {%- if assignee %}<span class="activity__assignee">Resp.: {{ assignee.name }}</span>{% endif %}
+  {%- if assignee and last %} · {% endif %}
   {%- if last %}<span class="activity__last">Último: {{ last.user.name if last.user else "—" }} {{ "%+d"|format(last.delta) }} · <span class="num">{{ last.at|datahora }}</span></span>{% endif -%}
 </span>
 {%- endif %}

@@ -69,6 +69,7 @@ RLS_TABLES: tuple[str, ...] = (
     "stage_inspections",
     "inspection_answers",
     "units",  # migration d9a3b6e2f8c5 (número de série)
+    "company_modules",  # migration f1a7c3e9b2d4 (R6: módulos opcionais)
 )
 
 _UNSET: Any = object()
