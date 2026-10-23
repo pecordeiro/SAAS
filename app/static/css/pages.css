@@ -1003,6 +1003,13 @@
   .import-head .section-title { margin: 0; }
   .import-summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); font-size: var(--font-size-md); }
   .import-summary .badge { flex: none; }
+  .import-help { border: var(--border-width) solid var(--color-border-subtle); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); }
+  .import-help__title { cursor: pointer; font-weight: var(--font-weight-semibold); }
+  .import-help__list { display: grid; gap: var(--space-3); margin: var(--space-3) 0 0; }
+  .import-help__item dt { font-weight: var(--font-weight-semibold); }
+  .import-help__item dd { margin: 0; font-size: var(--font-size-md); }
+  .import-time { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-3); margin: 0; }
+  .import-time__label { color: var(--color-text-muted); }
   .import-where { display: grid; gap: var(--space-4); }
   @media (min-width: 48em) {
     .import-where { grid-template-columns: repeat(auto-fit, minmax(calc(5 * var(--space-12)), 1fr)); align-items: start; }

@@ -48,6 +48,18 @@
 
     {% include "dados/_import_mode.html" %}
 
+    <details class="import-help" open>
+      <summary class="import-help__title">Como preencher cada campo</summary>
+      <dl class="import-help__list">
+        {%- for key, label, required in fields %}
+        <div class="import-help__item">
+          <dt>{{ label }}{% if required %} <span class="muted">(obrigatório)</span>{% endif %}</dt>
+          <dd class="muted">{{ field_help[key] }}</dd>
+        </div>
+        {%- endfor %}
+      </dl>
+    </details>
+
     {%- if inspection.columns %}
     <div class="table-wrap">
       <table class="table table--cards import-map">
@@ -84,6 +96,13 @@
     {%- else %}
     <p class="muted">Nenhuma coluna com dados nesta aba.</p>
     {%- endif %}
+  </section>
+
+  <section class="card stack" aria-labelledby="unidade-titulo">
+    <h2 class="section-title" id="unidade-titulo">Unidade do tempo</h2>
+    <div class="import-where">
+      {{ field(form.time_unit, hint="Em que unidade está a coluna de tempo ideal. Se escolher horas, convertemos para minutos e mostramos o total na prévia.") }}
+    </div>
   </section>
 
   <section class="card stack" aria-labelledby="projeto-titulo">
