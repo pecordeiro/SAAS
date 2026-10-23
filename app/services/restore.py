@@ -294,6 +294,14 @@ def _write(
     return entries
 
 
+def _lock_project(project: Project) -> None:
+    """Serializa restaurar/desfazer no mesmo projeto (duplo clique, duas abas): o segundo espera o primeiro
+    confirmar e então vê o estado novo. No SQLite (testes) o FOR UPDATE é ignorado."""
+    db.session.execute(
+        select(Project.id).where(Project.id == project.id, Project.company_id == project.company_id).with_for_update()
+    )
+
+
 def restore_apply(
     project: Project,
     at: datetime,
@@ -304,6 +312,7 @@ def restore_apply(
 ) -> RestoreResult:
     """Volta as peças das atividades para ``at``. Sem commit (quem chama faz)."""
     _ensure_open(project)
+    _lock_project(project)
     preview = restore_preview(project, at)
     if not expected_token or expected_token != preview.token:
         raise RestoreConflict(CONFLICT_MESSAGE)
@@ -371,6 +380,7 @@ def restore_undo(project: Project, restore_id: uuid.UUID, actor_id: uuid.UUID | 
 
     Relativo, como o desfazer de registro: o que foi lançado depois da restauração continua.
     Se a inversão deixaria alguma atividade abaixo de 0 ou acima das previstas, recusa."""
+    _lock_project(project)
     entries = _group(project, restore_id)
     if not entries:
         raise RestoreNotFound(str(restore_id))
