@@ -54,7 +54,7 @@
   .btn--ghost:active { background: var(--color-surface-2); color: var(--color-text); }
 
   .btn--lg { min-height: var(--control-height-lg); padding-inline: var(--space-5); }
-  .btn--sm { min-height: var(--space-8); padding-inline: var(--space-3); font-size: var(--font-size-sm); }
+  .btn--sm { min-height: max(var(--space-8), var(--touch-min)); padding-inline: var(--space-3); font-size: var(--font-size-sm); }
   .btn--block { display: flex; width: 100%; }
   .btn--icon { width: var(--touch-min); min-width: var(--touch-min); padding: 0; }
   .btn--icon.btn--lg { width: var(--touch-comfortable); min-width: var(--touch-comfortable); padding: 0; }
