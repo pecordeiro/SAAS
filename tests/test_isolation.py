@@ -102,11 +102,14 @@ def test_toda_rota_com_uuid_tem_caso_de_isolamento(app_factory, flags):
     """Varre o url_map (com e sem as flags que registram blueprints) e falha se alguma rota
     com <uuid:> não tiver caso A/B. Rota com dois <uuid:> também precisa estar listada."""
     app = app_factory(flags)
-    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI + ROUTES_ETAPA_D + ROUTES_ETAPA_E + ROUTES_ETAPA_F + ROUTES_ETAPA_G + ROUTES_ETAPA_G_CHECKLIST + ROUTES_ETAPA_G_UNIDADES + ROUTES_R8 + ROUTES_R3_R5
+    todas = ROUTES + FASE4_ROUTES + ROUTES_CONTAS + ROUTES_FASE6_EXTRA + ROUTES_API + ROUTES_API_UI + ROUTES_ETAPA_D + ROUTES_ETAPA_E + ROUTES_ETAPA_F + ROUTES_ETAPA_G + ROUTES_ETAPA_G_CHECKLIST + ROUTES_ETAPA_G_UNIDADES + ROUTES_R8 + ROUTES_R3_R5 + ROUTES_ADR19
     cobertas = {template.replace("{id}", "") for _, template, _, _ in todas}
     # Etapa C: /interno é da plataforma (sem empresa na URL); acesso cruzado = não ser equipe → 404,
     # coberto por tests/test_etapa_c_interno.py::test_interno_e_404_para_quem_nao_e_equipe.
     cobertas |= {"/interno/requisicoes/", "/interno/requisicoes//estado"}
+    # ADR-0019: horários da ligação são da plataforma; cruzado = não ser equipe → 404
+    # (tests/test_adr19_briefing_agenda.py::test_horarios_do_interno_sao_404_para_quem_nao_e_equipe).
+    cobertas |= {"/interno/horarios//remover", "/interno/horarios//reserva"}
     vistas = 0
     for rule in app.url_map.iter_rules():
         if "<uuid:" not in rule.rule:
@@ -1429,3 +1432,121 @@ def test_r6_modulos_so_proprietario(client, app, tenants):
         post(client, app, "/sair")
     with app.app_context():
         assert _modules.enabled_keys(a.company_id) == frozenset(_modules.KEYS)
+
+
+# ================================================================ ADR-0019: briefing e ligação
+# Empresas A e B no plano Empresa (``visual_custom``), cada uma com briefing, uma imagem e uma
+# reserva. A, com o id de B na URL ou no corpo: não vê, não edita, não reserva, não pede mudança.
+
+from app.models import CallBooking, CallSlot, VisualBriefing, VisualBriefingFile  # noqa: E402
+from app.services import agenda as _agenda  # noqa: E402
+from app.services import visual as _visual  # noqa: E402
+
+
+@dataclass
+class TenantV:
+    base: object
+    file_id: object
+    booking_id: object
+    slot_id: object
+
+    def __getattr__(self, name):
+        return getattr(self.base, name)
+
+
+def _make_tenant_v(label: str, days: int) -> TenantV:
+    from app.models.base import utcnow
+
+    base = make_tenant(label, plan="empresa")
+    company = db.session.get(Company, base.company_id)
+    _visual.save_briefing(company, _visual.BriefingInput(company_name=f"Briefing {label}", products=f"Produto {label}"), base.owner_id)
+    row = _visual.add_file(company, "logo", "logo.jpg", _fotos.jpeg(), base.owner_id)
+    slot = CallSlot(starts_at=(utcnow() + _td(days=days)).replace(second=0, microsecond=0), duration_minutes=30)
+    db.session.add(slot)
+    db.session.flush()
+    booking = _agenda.book(company, slot.id, _agenda.Contact(f"Contato {label}", "11 90000-0000"), base.owner_id)
+    db.session.commit()
+    return TenantV(base, file_id=row.id, booking_id=booking.id, slot_id=slot.id)
+
+
+@pytest.fixture()
+def tenants_v(app):
+    with app.app_context():
+        return _make_tenant_v("A", 2), _make_tenant_v("B", 3)
+
+
+ROUTES_ADR19 = [
+    ("GET", "/app/identidade-visual/arquivos/{id}", "file_id", None),
+    ("POST", "/app/identidade-visual/arquivos/{id}/apagar", "file_id", {}),
+    ("POST", "/app/identidade-visual/ligacao/{id}/pedido", "booking_id", {"tipo": "cancelar"}),
+]
+
+
+def _snapshot_v(app, t) -> dict:
+    from app.services import storage as storage_mod
+
+    with app.app_context():
+        q = db.session.query
+        briefing = q(VisualBriefing).filter_by(company_id=t.company_id).one()
+        booking = q(CallBooking).filter_by(company_id=t.company_id).one()
+        slot = db.session.get(CallSlot, t.slot_id)
+        row = db.session.get(VisualBriefingFile, t.file_id)
+        return {
+            "briefing": (briefing.company_name, briefing.products, briefing.updated_at),
+            "files": sorted(str(f.id) for f in q(VisualBriefingFile).filter_by(company_id=t.company_id)),
+            "object": storage_mod.get_storage().get(row.object_key) if row else None,
+            "booking": (booking.slot_id, booking.change_request),
+            "slot": (slot.booked_at, slot.change_request, slot.booked_contact_name),
+        }
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_ADR19)
+def test_adr19_recurso_de_outra_empresa_responde_404(client, app, tenants_v, method, template, field, data):
+    a, b = tenants_v
+    before = _snapshot_v(app, b)
+    login(client, app, a.owner_email)
+    response = _call(client, app, method, template.format(id=getattr(b, field)), data)
+    assert response.status_code == 404
+    assert b"Briefing B" not in response.data and b"Contato B" not in response.data
+    assert _snapshot_v(app, b) == before
+    if field == "file_id":
+        assert client.get(f"/app/identidade-visual/arquivos/{b.file_id}?tamanho=mini").status_code == 404
+
+
+@pytest.mark.parametrize("method,template,field,data", ROUTES_ADR19)
+def test_adr19_mesma_rota_funciona_na_propria_empresa(client, app, tenants_v, method, template, field, data):
+    a, b = tenants_v
+    before_b = _snapshot_v(app, b)
+    login(client, app, a.owner_email)
+    response = _call(client, app, method, template.format(id=getattr(a, field)), data)
+    assert response.status_code in (200, 302, 303)
+    assert _snapshot_v(app, b) == before_b
+
+
+def test_adr19_telas_de_a_nao_mostram_b_e_a_nao_reserva_nem_edita_b(client, app, tenants_v):
+    a, b = tenants_v
+    before_b = _snapshot_v(app, b)
+    login(client, app, a.owner_email)
+    briefing = client.get("/app/identidade-visual").get_data(as_text=True)
+    call = client.get("/app/identidade-visual/ligacao").get_data(as_text=True)
+    assert "Briefing A" in briefing and "Contato A" in call
+    for html in (briefing, call):
+        assert "Briefing B" not in html and "Produto B" not in html and "Contato B" not in html
+        assert str(b.file_id) not in html and str(b.booking_id) not in html and str(b.slot_id) not in html
+    # Salvar o briefing mandando o id da empresa B no corpo: só A muda.
+    post(client, app, "/app/identidade-visual", {"company_name": "Invasor", "company_id": str(b.company_id)})
+    # Reservar o horário já reservado por B (id de B no corpo): recusado, nada muda.
+    with app.app_context():
+        db.session.query(CallBooking).filter_by(company_id=a.company_id).delete()
+        db.session.commit()
+    taken = post(client, app, "/app/identidade-visual/ligacao",
+                 {"slot_id": str(b.slot_id), "contact_name": "Invasor", "contact_phone": "11 90000-0000"})
+    assert taken.status_code == 409
+    # Empresa forjada na sessão (sem vínculo com B) não dá acesso ao que é de B.
+    with client.session_transaction() as sess:
+        sess["company_id"] = str(b.company_id)
+    assert client.get(f"/app/identidade-visual/arquivos/{b.file_id}").status_code == 404
+    assert "Briefing B" not in client.get("/app/identidade-visual").get_data(as_text=True)
+    assert _snapshot_v(app, b) == before_b
+    with app.app_context():
+        assert db.session.query(VisualBriefing).filter_by(company_id=a.company_id).one().company_name == "Invasor"

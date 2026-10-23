@@ -44,6 +44,7 @@ EXCEPTIONS = {
     "login_throttles": "bloqueio de login por conta/IP: chega antes de saber a empresa (Fase 5)",
     "platform_audit_logs": "auditoria da plataforma: sobrevive ao expurgo LGPD da empresa (Fase 7)",
     "visual_requests": "dado da plataforma (painel /interno, só equipe): company_id nullable e sem RLS por empresa; o expurgo LGPD apaga as linhas (Etapa C)",
+    "call_slots": "horários da ligação (ADR-0019): dado da plataforma, a equipe cria em /interno; a reserva da empresa fica em call_bookings (RLS); o expurgo LGPD limpa a cópia do contato",
 }
 
 
