@@ -63,6 +63,33 @@ F_DONE = "concluidas"
 F_PCT = "percentual"
 F_DUE = "prazo"
 
+# Unidade da coluna de tempo. O servidor converte horas em minutos; o navegador só escolhe.
+UNIT_MINUTES = "minutos"
+UNIT_HOURS = "horas"
+TIME_UNITS: tuple[tuple[str, str], ...] = ((UNIT_MINUTES, "Minutos"), (UNIT_HOURS, "Horas"))
+TIME_UNIT_KEYS = tuple(k for k, _ in TIME_UNITS)
+MINUTES_PER_HOUR = Decimal("60")
+# Aviso de unidade provavelmente errada (só exibição; não bloqueia): média dos tempos positivos.
+UNIT_WARN_MEAN_MINUTES_BELOW = Decimal("1")   # em minutos, média < 1 min sugere horas
+UNIT_WARN_MEAN_HOURS_ABOVE = Decimal("24")    # em horas, média > 24 h por unidade sugere minutos
+
+# Texto de ajuda por campo (curto, com exemplo), mostrado na tela de mapeamento.
+FIELD_HELP: dict[str, str] = {
+    F_STAGE: "O grupo de trabalho, ex.: Soldagem. É a única coluna obrigatória.",
+    F_ACTIVITY: (
+        "A tarefa dentro da etapa, ex.: Soldar suporte. Se a sua planilha não tem esse nível, "
+        "deixe sem coluna e o projeto entra no modo simples."
+    ),
+    F_MINUTES: "Quanto tempo leva para fazer uma unidade, ex.: 12 (minutos) ou 0,2 (horas). Escolha a unidade abaixo.",
+    F_PLANNED: (
+        "Quantas unidades o projeto vai produzir, ex.: 200. Vale o mesmo número em todas as linhas; "
+        "sem essa coluna, digite a meta em Projeto."
+    ),
+    F_DONE: "Quantas unidades já ficaram prontas naquela linha, ex.: 80.",
+    F_PCT: "Quanto da etapa já está pronto, ex.: 45%, 45 ou 0,45. Serve quando a planilha não traz as peças.",
+    F_DUE: "A data de entrega, ex.: 31/12/2026. Se houver várias datas, usamos a última.",
+}
+
 # (chave, rótulo na tela, obrigatório)
 FIELDS: tuple[tuple[str, str, bool], ...] = (
     (F_STAGE, "Etapa", True),
@@ -163,7 +190,7 @@ def suggest(headers: list) -> dict[str, int | None]:
 COLUMN_CHOICES: tuple[tuple[str, str], ...] = (
     (F_STAGE, "Etapa"),
     (F_ACTIVITY, "Subatividade (opcional)"),
-    (F_MINUTES, "Tempo ideal em min (opcional)"),
+    (F_MINUTES, "Tempo ideal (opcional)"),
     (F_PLANNED, "Previstas / meta (opcional)"),
     (F_DONE, "Concluídas (opcional)"),
     (F_PCT, "% da etapa (opcional)"),
@@ -333,9 +360,17 @@ def parse_mapped(
     *,
     quantity: int | None = None,
     name: str | None = None,
+    time_unit: str = UNIT_MINUTES,
 ) -> ImportResult:
-    """Lê a aba com o mapeamento dado. ``quantity`` (meta digitada) vale mais que a coluna."""
+    """Lê a aba com o mapeamento dado. ``quantity`` (meta digitada) vale mais que a coluna.
+
+    ``time_unit``: unidade da coluna de tempo ("minutos" ou "horas"). Horas são convertidas aqui,
+    em minutos, com os mesmos limites de sempre; qualquer outro valor é erro (sem padrão
+    silencioso)."""
     result = ImportResult(source=grid.kind)
+    if time_unit not in TIME_UNIT_KEYS:
+        result.error(0, "unidade", "escolha minutos ou horas")
+        return result
     sheet = grid.sheet(sheet_title)
     if sheet is None or not sheet.rows or not 1 <= header_row <= sheet.max_row:
         result.error(0, "aba", "aba ou linha de cabeçalho inválida")
@@ -349,6 +384,8 @@ def parse_mapped(
     result.name = (_clean(name) or base or sheet.title or "Projeto importado")[:160]
     simple = mapping.get(F_ACTIVITY) is None
     result.mode = MODE_SIMPLE if simple else MODE_DETAILED
+    if mapping.get(F_MINUTES) is not None:
+        result.time_unit = time_unit
 
     def get(values, key):
         idx = mapping.get(key)
@@ -370,6 +407,7 @@ def parse_mapped(
     _read_due(result, rows, get)
 
     stages: dict[str, NewStage] = {}
+    seen_times: list = []  # tempos como vieram na planilha (para o aviso de unidade)
     current: NewStage | None = None
     for line, values in rows:
         stage_name = _clean(get(values, F_STAGE))
@@ -406,6 +444,9 @@ def parse_mapped(
         raw_minutes = get(values, F_MINUTES)
         if simple and not _clean(raw_minutes):
             raw_minutes = SIMPLE_DEFAULT_MINUTES  # R4: etapa sem tempo pesa o padrão do modo simples
+        else:
+            seen_times.append(raw_minutes)
+            raw_minutes = _to_minutes(raw_minutes, time_unit)
         activity = _read_activity(result, line, activity_name, raw_minutes, units, blank_is_zero=True)
         if activity is None:
             continue
@@ -416,6 +457,10 @@ def parse_mapped(
     result.stages = list(stages.values())
     if not result.stages and not result.errors:
         result.error(header_row + 1, FIELD_LABELS[F_STAGE], "nenhuma etapa encontrada")
+    if mapping.get(F_MINUTES) is not None:
+        warning = unit_warning(seen_times, time_unit)
+        if warning:
+            result.warnings.append(warning)
     if mapping.get(F_DONE) is not None and mapping.get(F_PCT) is not None:
         result.notes.append("Com peças e % mapeados, valem as peças; o % foi usado só onde as peças estão vazias.")
     if simple:
@@ -423,6 +468,46 @@ def parse_mapped(
             "Sem subatividades: cada etapa entra com uma subatividade de mesmo nome (modo simples)."
         )
     return result
+
+
+def _to_minutes(raw, unit: str):
+    """Valor da célula de tempo em MINUTOS (``Decimal``). Em minutos, devolve a célula como veio.
+    Valor ilegível volta como veio: ``_read_activity`` registra o erro da linha; o teto
+    ``MAX_MINUTES`` também é conferido lá, já na unidade convertida."""
+    if unit != UNIT_HOURS or not _clean(raw):
+        return raw
+    try:
+        return _decimal(raw) * MINUTES_PER_HOUR
+    except (ValueError, InvalidOperation):
+        return raw
+
+
+def unit_warning(raw_values, unit: str) -> str | None:
+    """Aviso (não bloqueia) quando os tempos parecem estar em outra unidade: média dos valores
+    positivos abaixo de 1 em minutos, ou acima de 24 em horas. ``None`` se tudo parece normal."""
+    numbers = []
+    for raw in raw_values:
+        try:
+            d = _decimal(raw) if _clean(raw) else None
+        except (ValueError, InvalidOperation):
+            continue
+        if d is not None and d > 0:
+            numbers.append(d)
+    if not numbers:
+        return None
+    mean = sum(numbers) / len(numbers)
+    shown = f"{mean:.2f}".rstrip("0").rstrip(".").replace(".", ",")
+    if unit == UNIT_MINUTES and mean < UNIT_WARN_MEAN_MINUTES_BELOW:
+        return (
+            f"Os tempos são muito pequenos para minutos (média de {shown}). Se a planilha usa horas, "
+            "volte às colunas e escolha “Horas”."
+        )
+    if unit == UNIT_HOURS and mean > UNIT_WARN_MEAN_HOURS_ABOVE:
+        return (
+            f"Os tempos são muito grandes para horas (média de {shown}). Se a planilha usa minutos, "
+            "volte às colunas e escolha “Minutos”."
+        )
+    return None
 
 
 def _read_quantity(result: ImportResult, rows, get, quantity: int | None) -> None:
