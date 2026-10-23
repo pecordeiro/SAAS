@@ -22,6 +22,10 @@ lançamento compensatório), importação CSV/XLSX e da planilha de referência 
 pré-visualização (`/app/importar`), exportação CSV/XLSX neutralizada, limites de plano e
 modo leitura (HTTP 402, `app/services/entitlements.py`), eventos de domínio
 (`services/events.py`) e auditoria (`services/audit.py::record`).
+Reestruturação R9 (limpeza): saíram os gráficos SVG antigos que o Painel com ECharts substituiu
+(macros de `components/chart.html`, geometria de `services/charts.py`), CSS sem uso, a rota
+`/app/etapas/<id>` e funções de serviço sem chamada; o que ficou em dúvida está em
+`docs/plano/limpeza-pendente.md`.
 Reestruturação R7–R8 (telas): importar planilha em 3 passos (`/app/importar`: enviar →
 escolher colunas com “Isto é…” por coluna, ou escolher projetos quando o arquivo da equipe traz
 vários (abas “<Nome> - Acompanhamento/Equipe/Como funciona”) → prévia com erros por linha e

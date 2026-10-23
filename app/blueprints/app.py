@@ -644,13 +644,6 @@ def stage_create(project_id):
     return redirect(url_for("app.project_detail", project_id=project.id), 303)
 
 
-@bp.get("/etapas/<uuid:stage_id>")
-@tenant_required(ROLE_OPERATOR)
-def stage_detail(stage_id):
-    stage = get_or_404(Stage, stage_id)
-    return redirect(url_for("app.project_detail", project_id=stage.project_id, _anchor=f"etapa-{stage.id}"))
-
-
 @bp.post("/etapas/<uuid:stage_id>/atividades")
 @tenant_required(ROLE_SUPERVISOR)
 def activity_create(stage_id):
