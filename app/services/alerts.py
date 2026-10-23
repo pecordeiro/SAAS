@@ -288,6 +288,7 @@ def run_all(now: datetime) -> dict[str, int]:
             company = db.session.get(Company, company_id)
             if company is None or company.deletion_requested_at is not None:
                 continue
+            rls.set_context(company_id=company.id)  # com RLS forçado, company_modules só aparece com o contexto da empresa
             if not modules.is_enabled(company, modules.ALERTAS):
                 continue  # R6: módulo desligado = nenhum alerta gravado nem e-mail
             created, sent = run_company(company, now)

@@ -325,6 +325,9 @@ def _read_activity(
 MAX_GRID_ROWS = 5000
 MAX_GRID_COLS = 60
 MAX_GRID_SHEETS = 30
+TEXT_DEMAIS = "Planilha com texto demais. Deixe só a aba com os dados e tente de novo."
+MAX_CELL_CHARS = 1000        # nomes já são cortados em 160; o resto de uma célula nunca é usado
+MAX_GRID_CHARS = 5_000_000   # texto total da grade: um .xlsx pequeno pode repetir a mesma célula grande 100 mil vezes
 
 
 @dataclass
@@ -384,11 +387,16 @@ def _csv_grid(data: bytes, filename: str = "") -> Grid:
     reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter)
     rows: list[list] = []
     lines: list[int] = []
+    total = 0
     try:
         for row in reader:
             if len(rows) >= MAX_GRID_ROWS:
                 break
-            rows.append(list(row[:MAX_GRID_COLS]))
+            row = [c[:MAX_CELL_CHARS] for c in row[:MAX_GRID_COLS]]
+            total += sum(len(c) for c in row)
+            if total > MAX_GRID_CHARS:
+                raise ImportError_(TEXT_DEMAIS)
+            rows.append(row)
             lines.append(reader.line_num)
     except csv.Error as exc:  # pragma: no cover - CSV malformado raro
         raise ImportError_(f"CSV inválido: {exc}") from None
@@ -397,7 +405,9 @@ def _csv_grid(data: bytes, filename: str = "") -> Grid:
 
 def _cell_value(value):
     """Valores do openpyxl para a grade: só tipos simples (vão em JSON no formulário)."""
-    if value is None or isinstance(value, (str, int, float, bool)):
+    if isinstance(value, str):
+        return value[:MAX_CELL_CHARS]
+    if value is None or isinstance(value, (int, float, bool)):
         return value
     if isinstance(value, datetime):
         return value.date() if value.time() == datetime.min.time() else value
@@ -409,16 +419,20 @@ def _cell_value(value):
 def _xlsx_grid(data: bytes, filename: str = "") -> Grid:
     wb = _open_workbook(data)
     sheets = []
+    total = 0
     for ws in wb.worksheets[:MAX_GRID_SHEETS]:
-        rows = [
-            _trim([_cell_value(v) for v in values])
-            for values in ws.iter_rows(
-                min_row=1,
-                max_row=min(ws.max_row or 1, MAX_GRID_ROWS),
-                max_col=min(ws.max_column or 1, MAX_GRID_COLS),
-                values_only=True,
-            )
-        ]
+        rows = []
+        for values in ws.iter_rows(
+            min_row=1,
+            max_row=min(ws.max_row or 1, MAX_GRID_ROWS),
+            max_col=min(ws.max_column or 1, MAX_GRID_COLS),
+            values_only=True,
+        ):
+            row = _trim([_cell_value(v) for v in values])
+            total += sum(len(v) for v in row if isinstance(v, str))
+            if total > MAX_GRID_CHARS:
+                raise ImportError_(TEXT_DEMAIS)
+            rows.append(row)
         while rows and not rows[-1]:
             rows.pop()
         sheets.append(Sheet(str(ws.title), rows))

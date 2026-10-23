@@ -493,3 +493,70 @@ def test_exportar_planilha_no_layout_pela_tela_e_importar_de_volta(client, app, 
     operator = app.test_client()
     login(operator, app, a.operator_email)
     assert operator.get(f"/app/projetos/{a.project_id}/exportar-planilha.xlsx").status_code == 403
+
+
+def _xlsx_bomba(linhas: int = 5000, colunas: int = 20, tamanho: int = 2 * 1024 * 1024) -> bytes:
+    """xlsx mínimo, escrito à mão: UMA shared string grande referenciada por todas as células (a prova de
+    conceito da revisão de segurança: ~28 KB no arquivo, centenas de MB se cada célula virasse texto)."""
+    import io
+    import zipfile
+
+    from openpyxl.utils import get_column_letter
+
+    cells = "".join(
+        f'<row r="{r}">' + "".join(f'<c r="{get_column_letter(c)}{r}" t="s"><v>0</v></c>' for c in range(1, colunas + 1)) + "</row>"
+        for r in range(1, linhas + 1)
+    )
+    files = {
+        "[Content_Types].xml": '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>',
+        "_rels/.rels": '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+        "xl/workbook.xml": '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Dados" sheetId="1" r:id="rId1"/></sheets></workbook>',
+        "xl/_rels/workbook.xml.rels": '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>',
+        "xl/worksheets/sheet1.xml": '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'
+        + cells + "</sheetData></worksheet>",
+        "xl/sharedStrings.xml": '<?xml version="1.0"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="1" uniqueCount="1"><si><t>'
+        + "x" * tamanho + "</t></si></sst>",
+    }
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, body in files.items():
+            z.writestr(name, body)
+    return buf.getvalue()
+
+
+def test_planilha_com_texto_demais_e_recusada_sem_estourar_memoria():
+    """Achado alto da revisão de segurança: .xlsx pequeno com a mesma célula grande 100 mil vezes."""
+    import pytest
+
+    from app.services import importer
+
+    data = _xlsx_bomba()
+    assert len(data) < 2 * 1024 * 1024  # passa no limite de envio e no teto descompactado
+    with pytest.raises(importer.ImportError_, match="texto demais"):
+        importer.load_grid("x.xlsx", data, 2 * 1024 * 1024)
+
+
+def test_celula_grande_e_cortada_e_planilha_normal_segue_igual():
+    import io
+
+    import openpyxl
+
+    from app.services import importer
+
+    wb = openpyxl.Workbook()
+    wb.active.append(["Etapa", "Atividade", "Tempo"])
+    wb.active.append(["a" * 5000, "Montar", 10])
+    buf = io.BytesIO()
+    wb.save(buf)
+    grid = importer.load_grid("x.xlsx", buf.getvalue(), 2 * 1024 * 1024)
+    assert len(grid.sheets[0].rows[1][0]) == importer.MAX_CELL_CHARS
+    assert grid.sheets[0].rows[1][2] == 10
