@@ -166,7 +166,9 @@ def export_company(company: Company) -> tuple[bytes, dict[str, int]]:
             "Não incluídos por segurança: hashes de senha e de tokens, segredo do MFA.\n"
             "Fotos de evidência: activity_photos.csv lista os METADADOS (atividade, data, quem\n"
             "enviou, tamanho, SHA-256); os arquivos de imagem não vão no ZIP — abra cada foto na\n"
-            "tela da atividade ou peça ao encarregado de dados a cópia das imagens.\n\n"
+            "tela da atividade ou peça ao encarregado de dados a cópia das imagens.\n"
+            "Briefing de identidade visual: visual_briefings.csv (texto) e visual_briefing_files.csv\n"
+            "(metadados do logo e das fotos de produto; as imagens abrem na tela do briefing).\n\n"
             "Arquivos e linhas:\n" + "".join(f"  {name}: {n}\n" for name, n in counts.items())
         )
         zf.writestr("LEIA-ME.txt", readme.encode("utf-8"))
@@ -325,6 +327,13 @@ def purge_company(company_id: uuid.UUID, *, operator: str, now: datetime | None 
         from app.services import photos as photos_svc
 
         result.objects_deleted = photos_svc.delete_company_objects(company_id, dry_run=dry_run)
+        # ADR-0019: imagens do briefing (mesma regra das fotos) e a cópia do contato da ligação
+        # nos horários da plataforma (call_slots não tem company_id: liberados aqui).
+        from app.services import agenda as agenda_svc
+        from app.services import visual as visual_svc
+
+        result.objects_deleted += visual_svc.delete_company_objects(company_id, dry_run=dry_run)
+        agenda_svc.release_company(company_id, dry_run=dry_run)
         for table in reversed(company_tables()):
             if dry_run:
                 result.rows[table.name] = _count(table, company_id)

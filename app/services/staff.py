@@ -33,7 +33,12 @@ VISUAL_REQUEST_OPENED = "staff.visual_request_opened"
 VISUAL_STATUS_CHANGED = "staff.visual_status_changed"
 STAFF_GRANTED = "staff.granted"
 STAFF_REVOKED = "staff.revoked"
-STATUS_LABELS = {VISUAL_NEW: "Nova", "in_progress": "Em andamento", VISUAL_DELIVERED: "Entregue"}
+STATUS_LABELS = {
+    VISUAL_NEW: "Nova",
+    "briefing_filled": "Briefing preenchido",
+    "in_progress": "Em andamento",
+    VISUAL_DELIVERED: "Entregue",
+}
 MIN_REASON = 15
 MAX_NOTES = 4000
 
