@@ -153,6 +153,7 @@ def book(company: Company, slot_id: uuid.UUID | str | None, contact: Contact, us
         .values(
             booked_at=now,
             visual_request_id=request_id,
+            booked_company_id=company_id,
             booked_contact_name=contact.name,
             booked_contact_phone=contact.phone,
             change_request=None,
@@ -192,13 +193,22 @@ def request_change(company: Company, booking: CallBooking, kind: str, user_id: u
     if booking.company_id != company.id:  # defesa: a rota já buscou na empresa da sessão
         raise AgendaError("Reserva não encontrada.")
     now = now or utcnow()
-    booking.change_request, booking.change_requested_at = kind, now
-    db.session.execute(
+    # A cópia no horário (plataforma, sem RLS) só muda se o horário estiver reservado PARA ESTA
+    # empresa e requisição: um id de reserva forjado nunca marca pedido no horário de outra empresa.
+    marked = db.session.execute(
         update(CallSlot)
-        .where(CallSlot.id == booking.slot_id)
+        .where(
+            CallSlot.id == booking.slot_id,
+            CallSlot.booked_at.isnot(None),
+            CallSlot.booked_company_id == company.id,
+            CallSlot.visual_request_id == booking.visual_request_id,
+        )
         .values(change_request=kind, change_requested_at=now)
         .execution_options(synchronize_session=False)
     )
+    if marked.rowcount != 1:
+        raise AgendaError("Reserva não encontrada.")
+    booking.change_request, booking.change_requested_at = kind, now
     audit.record(
         audit.CALL_CHANGE_REQUESTED,
         company_id=company.id,
@@ -295,20 +305,19 @@ class _CompanyContext:
         return False
 
 
-def _company_of(slot: CallSlot) -> uuid.UUID | None:
-    req = db.session.get(VisualRequest, slot.visual_request_id) if slot.visual_request_id else None
-    return req.company_id if req is not None else None
-
-
 def release(slot: CallSlot, actor: User) -> VisualRequest | None:
     """A equipe cancela a reserva (a pedido do cliente ou não): apaga a reserva da empresa e libera
     o horário (commit). Devolve a requisição (para o e-mail ao cliente)."""
     if slot.booked_at is None:
         raise AgendaError("Esse horário não está reservado.")
     request_ = db.session.get(VisualRequest, slot.visual_request_id) if slot.visual_request_id else None
-    company_id = request_.company_id if request_ is not None else None
+    company_id = slot.booked_company_id or (request_.company_id if request_ is not None else None)
     pedido = slot.change_request
-    if company_id is not None:
+    if company_id is None:
+        # Sem a empresa (cópia antiga ou requisição apagada): apaga a reserva pelo horário mesmo assim
+        # (com o RLS forçado e sem contexto, nada é apagado — e o horário continua preso pela UNIQUE).
+        db.session.execute(delete(CallBooking).where(CallBooking.slot_id == slot.id))
+    else:
         with _CompanyContext(company_id):
             booking = db.session.execute(
                 select(CallBooking).where(CallBooking.slot_id == slot.id, CallBooking.company_id == company_id)
@@ -335,7 +344,7 @@ def decline(slot: CallSlot, actor: User) -> VisualRequest | None:
     if slot.booked_at is None or not slot.change_request:
         raise AgendaError("Não há pedido de mudança para esse horário.")
     request_ = db.session.get(VisualRequest, slot.visual_request_id) if slot.visual_request_id else None
-    company_id = request_.company_id if request_ is not None else None
+    company_id = slot.booked_company_id or (request_.company_id if request_ is not None else None)
     pedido = slot.change_request
     if company_id is not None:
         with _CompanyContext(company_id):
@@ -362,6 +371,7 @@ def decline(slot: CallSlot, actor: User) -> VisualRequest | None:
 def _clear(slot: CallSlot) -> None:
     slot.booked_at = None
     slot.visual_request_id = None
+    slot.booked_company_id = None
     slot.booked_contact_name = None
     slot.booked_contact_phone = None
     slot.change_request = None
@@ -377,7 +387,7 @@ def release_company(company_id: uuid.UUID, *, dry_run: bool = False) -> int:
     booked_slot_ids = list(
         db.session.execute(select(CallBooking.slot_id).where(CallBooking.company_id == company_id)).scalars()
     )
-    conditions = []
+    conditions = [CallSlot.booked_company_id == company_id]
     if request_ids:
         conditions.append(CallSlot.visual_request_id.in_(request_ids))
     if booked_slot_ids:

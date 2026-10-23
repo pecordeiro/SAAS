@@ -917,3 +917,60 @@ def test_concorrencia_real_duas_conexoes_postgres(app_factory):
     with app.app_context():
         assert db.session.query(CallBooking).filter_by(slot_id=slot_id).count() == 1
         assert db.session.get(CallSlot, slot_id).booked_at is not None
+
+
+# ================================================================ revisão de segurança: pedido e liberação
+
+
+def test_empresa_b_nao_marca_pedido_no_horario_de_a(vapp, pair):
+    """Reserva forjada/inconsistente de B apontando para o horário de A: o UPDATE na cópia do horário
+    filtra por empresa, requisição e reservado; nada muda em A e B recebe erro."""
+    a, b = pair
+    with vapp.app_context():
+        slot_a = _slot()
+        agenda.book(_company(a.company_id), slot_a, agenda.Contact("Maria", "11 98888-7777"), a.owner_id)
+        db.session.commit()
+        req_b = visual.ensure_request(_company(b.company_id))
+        db.session.commit()
+        fake = CallBooking(company_id=b.company_id, slot_id=slot_a, visual_request_id=req_b.id,
+                           contact_name="B", contact_phone="11 90000-0000")  # nunca gravada (UNIQUE)
+        with pytest.raises(agenda.AgendaError):
+            agenda.request_change(_company(b.company_id), fake, "remarcar", b.owner_id)
+        db.session.rollback()
+        # Mesmo com a empresa de A, uma requisição que não é a da reserva não marca nada.
+        other = CallBooking(company_id=a.company_id, slot_id=slot_a, visual_request_id=uuid.uuid4(),
+                            contact_name="X", contact_phone="11 90000-0000")
+        with pytest.raises(agenda.AgendaError):
+            agenda.request_change(_company(a.company_id), other, "cancelar", a.owner_id)
+        db.session.rollback()
+        slot = db.session.get(CallSlot, slot_a)
+        assert slot.change_request is None and slot.booked_company_id == a.company_id
+        assert agenda.booking_for(a.company_id).change_request is None
+        assert db.session.query(AuditLog).filter_by(action="call.change_requested").count() == 0
+        # Horário livre (sem reserva) também é recusado.
+        free = _slot(timedelta(days=4))
+        ghost = CallBooking(company_id=b.company_id, slot_id=free, visual_request_id=req_b.id,
+                            contact_name="B", contact_phone="11 90000-0000")
+        with pytest.raises(agenda.AgendaError):
+            agenda.request_change(_company(b.company_id), ghost, "remarcar", b.owner_id)
+        db.session.rollback()
+        assert db.session.get(CallSlot, free).change_request is None
+
+
+def test_equipe_libera_pela_empresa_do_horario_mesmo_sem_a_requisicao(vapp, pair):
+    a, _ = pair
+    with vapp.app_context():
+        slot_id = _slot()
+        agenda.book(_company(a.company_id), slot_id, agenda.Contact("Maria", "11 98888-7777"), a.owner_id)
+        db.session.commit()
+        slot = db.session.get(CallSlot, slot_id)
+        slot.visual_request_id = None  # cópia sem a requisição (ex.: apagada)
+        db.session.commit()
+        actor = db.session.get(User, _staff_user(vapp))
+        agenda.release(db.session.get(CallSlot, slot_id), actor)
+        assert agenda.booking_for(a.company_id) is None
+        freed = db.session.get(CallSlot, slot_id)
+        assert freed.booked_at is None and freed.booked_company_id is None
+        # o horário volta a ser reservável
+        agenda.book(_company(a.company_id), slot_id, agenda.Contact("Maria", "11 98888-7777"), a.owner_id)
+        db.session.commit()

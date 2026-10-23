@@ -119,6 +119,7 @@ def upgrade():
         sa.Column('created_by', sa.String(length=254), nullable=True),
         sa.Column('booked_at', sa.DateTime(timezone=True), nullable=True),
         sa.Column('visual_request_id', sa.Uuid(), nullable=True),
+        sa.Column('booked_company_id', sa.Uuid(), nullable=True),
         sa.Column('booked_contact_name', sa.String(length=120), nullable=True),
         sa.Column('booked_contact_phone', sa.String(length=30), nullable=True),
         sa.Column('change_request', sa.String(length=20), nullable=True),
@@ -133,6 +134,7 @@ def upgrade():
     )
     op.create_index('ix_call_slots_booked_starts', 'call_slots', ['booked_at', 'starts_at'], unique=False)
     op.create_index(op.f('ix_call_slots_visual_request_id'), 'call_slots', ['visual_request_id'], unique=False)
+    op.create_index(op.f('ix_call_slots_booked_company_id'), 'call_slots', ['booked_company_id'], unique=False)
 
     op.create_table(
         'call_bookings',
@@ -164,6 +166,7 @@ def upgrade():
 def downgrade():
     # Políticas somem junto com as tabelas (DROP TABLE apaga as políticas do RLS).
     op.drop_table('call_bookings')
+    op.drop_index(op.f('ix_call_slots_booked_company_id'), table_name='call_slots')
     op.drop_index(op.f('ix_call_slots_visual_request_id'), table_name='call_slots')
     op.drop_index('ix_call_slots_booked_starts', table_name='call_slots')
     op.drop_table('call_slots')

@@ -132,6 +132,9 @@ class CallSlot(UUIDPk, db.Model):
     # Marca de ocupado + cópia para o painel (preenchidas na mesma transação da reserva).
     booked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     visual_request_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, index=True)
+    # Empresa dona da reserva (sem FK, como visual_requests.company_id): a equipe abre o contexto RLS
+    # dela para apagar/alterar a reserva, e o pedido do cliente só toca o horário da própria empresa.
+    booked_company_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, index=True)
     booked_contact_name: Mapped[str | None] = mapped_column(String(NAME_MAX))
     booked_contact_phone: Mapped[str | None] = mapped_column(String(PHONE_MAX))
     change_request: Mapped[str | None] = mapped_column(String(20))
