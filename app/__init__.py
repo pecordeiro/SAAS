@@ -87,6 +87,9 @@ def create_app(config_name: str | None = None, overrides: dict | None = None) ->
     from app.blueprints.interno import bp as interno_bp  # Etapa C: /interno (só equipe)
 
     app.register_blueprint(interno_bp)
+    from app.blueprints.identidade import bp as identidade_bp  # ADR-0019: briefing e ligação
+
+    app.register_blueprint(identidade_bp)
     from app.blueprints.interno import staff_cli
 
     app.cli.add_command(staff_cli)

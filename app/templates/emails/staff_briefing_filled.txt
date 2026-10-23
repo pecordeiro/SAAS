@@ -1,0 +1,4 @@
+{% extends "emails/_base.txt" %}
+{% block body %}A empresa {{ company_name }} preencheu o briefing de identidade visual. A requisição está em "Briefing preenchido" no painel interno.
+
+Abrir o painel interno: {{ url }}{% endblock %}

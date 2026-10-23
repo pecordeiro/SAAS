@@ -1,0 +1,6 @@
+{% extends "emails/_base.txt" %}
+{% block body %}Olá, {{ name }}.
+
+A ligação com a equipe para falar da identidade visual da sua empresa está marcada para {{ when }} (horário de Brasília), com duração de {{ duration }} minutos.
+
+Precisa remarcar ou cancelar? Peça pela tela da ligação: {{ url }}{% endblock %}
