@@ -170,10 +170,30 @@ def external_url(endpoint: str, **values) -> str:
     raise RuntimeError("APP_BASE_URL é obrigatório para montar links de e-mail fora de development/test.")
 
 
+_EMAIL_TOKENS = {
+    "bg": "color-bg", "surface": "color-surface", "text": "color-text", "muted": "color-text-muted",
+    "primary": "color-primary", "line": "color-border-subtle",
+}
+
+
+def email_brand() -> dict[str, str]:
+    """Cores e fontes do tema claro lidas de ``tokens.css`` (ADR-0018), para os atributos legados do e-mail.
+    E-mail não enxerga CSS do site; a fonte de verdade continua sendo o arquivo de tokens."""
+    import re
+
+    text = (Path(__file__).resolve().parents[1] / "static" / "css" / "tokens.css").read_text(encoding="utf-8")
+    light = text.split("@media (prefers-color-scheme: dark)")[0]
+    out = {k: re.search(rf"--{name}:\s*(#[0-9A-Fa-f]{{6}})", light).group(1) for k, name in _EMAIL_TOKENS.items()}
+    out["font_text"] = re.search(r"--font-brand-text:\s*([^;]+);", light).group(1).replace('"', "")
+    out["font_display"] = re.search(r"--font-brand-display:\s*([^;]+);", light).group(1).replace('"', "")
+    return out
+
+
 def render_message(to: str, subject: str, template: str, attachments=(), **context) -> EmailMessage:
     """Monta a mensagem a partir de ``emails/<template>.txt`` e ``.html`` (sem enviar)."""
     context.setdefault("subject", subject)
     context.setdefault("site_url", _site_url())
+    context.setdefault("brand", email_brand())
     return EmailMessage(
         to=to,
         subject=subject,

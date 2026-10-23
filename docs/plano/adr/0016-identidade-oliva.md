@@ -1,5 +1,6 @@
 # ADR-0016 — Identidade verde-oliva nas páginas públicas
 
+- Nota: a ADR-0018 levou esta identidade para a área logada (`/app`), login e e-mails.
 - Status: **aceito**. Aprovado pelo dono em 2026-10-23 (referência visual HTML “v6 oliva”). Aplicado na R10.
   Não substitui a ADR-0015: a área logada (`/app`) mantém o visual da base “Controle de Atividades”.
 

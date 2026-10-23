@@ -8,7 +8,7 @@
   (dentro de .container) ou `main` (largura livre).
   Identidade oliva (ADR-0016): páginas que declaram `{% set marca = true %}` no topo (início, preços,
   como funciona, termos, privacidade, contato) usam a paleta de marca, Newsreader e DM Sans, e o
-  publico.js (animações). Login, cadastro e convite continuam no visual da área logada.
+  publico.js (animações). Login, cadastro, convite e erros usam a mesma identidade (ADR-0018), sem animação.
 #}
 {% block body_class %}site{% if marca %} site--marca{% endif %}{% endblock %}
 {% block head_extra %}

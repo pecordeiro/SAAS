@@ -44,6 +44,7 @@
       waiting: css("--color-status-waiting"),
       late: css("--color-status-late"),
       todo: css("--color-status-todo"),
+      neutral: css("--color-series-neutral"),
       border: css("--color-border-subtle"),
     };
   }
@@ -56,9 +57,16 @@
   var AXIS_FONT = 12;
   var LABEL_FONT = 11;
 
+  // O gráfico desenha uma vez (curto), na primeira exibição; trocar de tema ou girar o aparelho não repete.
+  // Com movimento reduzido não anima nada.
+  var firstDraw = !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
   function base(t) {
     return {
-      animation: false,
+      animation: firstDraw,
+      animationDuration: 400,
+      animationEasing: "cubicOut",
+      animationDurationUpdate: 0,
       aria: { show: false },
       textStyle: { fontFamily: t.font, color: t.muted, fontSize: AXIS_FONT },
       tooltip: {
@@ -279,7 +287,7 @@
         { name: "Trabalho que falta", type: "bar", barWidth: 14, barGap: "15%", itemStyle: { color: t.tasks, borderRadius: [0, 3, 3, 0] },
           data: rows.map(function (r) { return r.need == null ? 0 : r.need; }),
           label: { show: true, position: "right", color: t.text, fontSize: LABEL_FONT, formatter: function (p) { return rows[p.dataIndex].needText; } } },
-        { name: "Até o prazo", type: "bar", barWidth: 14, itemStyle: { color: t.subtle, borderRadius: [0, 3, 3, 0] },
+        { name: "Até o prazo", type: "bar", barWidth: 14, itemStyle: { color: t.neutral, borderRadius: [0, 3, 3, 0] },
           data: rows.map(function (r) { return r.until == null ? 0 : r.until; }),
           label: { show: true, position: "right", color: t.muted, fontSize: LABEL_FONT, formatter: function (p) { return rows[p.dataIndex].untilText; } } },
       ],
@@ -323,9 +331,10 @@
   function start() {
     wasNarrow = narrow();
     drawAll();
+    firstDraw = false;
   }
 
-  // Espera a fonte do site (IBM Plex Sans) para medir os rótulos certo.
+  // Espera a fonte do site (DM Sans) para medir os rótulos certo.
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(start, start);
   } else {

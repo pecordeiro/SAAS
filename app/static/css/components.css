@@ -32,9 +32,8 @@
     text-decoration: none;
     cursor: pointer;
     transition: background-color var(--duration-fast) var(--easing-standard),
-      transform var(--duration-fast) var(--easing-standard);
+      border-color var(--duration-fast) var(--easing-standard);
   }
-  .btn:active { transform: scale(0.98); }
 
   .btn--primary { background: var(--color-action); color: var(--color-action-contrast); box-shadow: var(--shadow-primary); }
   .btn--primary:hover,
@@ -65,7 +64,6 @@
     background: var(--color-surface-2);
     border-color: var(--color-border-subtle);
     color: var(--color-text-muted);
-    transform: none;
   }
 
   .btn__spinner {
@@ -188,7 +186,7 @@
     border-radius: var(--radius-md);
     font-family: var(--font-display);
     font-size: var(--font-size-3xl);
-    font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-regular);
     font-variant-numeric: var(--font-numeric);
     line-height: var(--line-height-tight);
     text-align: center;
@@ -379,7 +377,7 @@
   .kpi__value {
     font-family: var(--font-display);
     font-size: var(--font-size-kpi);
-    font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-regular);
     font-variant-numeric: var(--font-numeric);
     line-height: var(--line-height-tight);
     letter-spacing: var(--letter-spacing-tight);
@@ -420,12 +418,12 @@
     border: 0;
     border-radius: var(--radius-pill);
     background: var(--color-track);
-    color: var(--color-primary);
+    color: var(--color-status-doing);
     overflow: hidden;
   }
   .progress__bar::-webkit-progress-bar { background: var(--color-track); border-radius: var(--radius-pill); }
-  .progress__bar::-webkit-progress-value { background: var(--color-primary); border-radius: var(--radius-pill); }
-  .progress__bar::-moz-progress-bar { background: var(--color-primary); border-radius: var(--radius-pill); }
+  .progress__bar::-webkit-progress-value { background: var(--color-status-doing); border-radius: var(--radius-pill); }
+  .progress__bar::-moz-progress-bar { background: var(--color-status-doing); border-radius: var(--radius-pill); }
   .progress--done .progress__bar { color: var(--color-success); }
   .progress--done .progress__bar::-webkit-progress-value { background: var(--color-success); }
   .progress--done .progress__bar::-moz-progress-bar { background: var(--color-success); }
@@ -462,6 +460,8 @@
   .badge--neutral { background: var(--color-neutral-subtle); color: var(--color-neutral); }
   .badge--danger { background: var(--color-danger-subtle); color: var(--color-danger); }
   .badge--info { background: var(--color-primary-subtle); color: var(--color-primary); }
+  /* Situação “em andamento”: o azul do dado, nunca o oliva da marca. */
+  .badge--progress { background: var(--color-doing-subtle); color: var(--color-doing-text); }
 
   /* ---------- 8. Alerta ---------- */
   .alert {
@@ -517,7 +517,7 @@
     pointer-events: auto;
     /* Some sozinho em 5 s mesmo sem JS; pausa com o ponteiro ou o foco em cima. */
     animation: toast-in var(--duration-normal) var(--easing-standard),
-      toast-out var(--duration-normal) var(--easing-standard) 5s forwards;
+      toast-out var(--duration-fast) var(--easing-standard) 5s forwards;
   }
   .toast:hover,
   .toast:focus-within { animation-play-state: paused; }
@@ -526,8 +526,8 @@
   .toast__close { color: var(--color-inverse-text); margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-3)) calc(-1 * var(--space-2)) 0; }
   .toast__close:hover { background: transparent; color: var(--color-inverse-text); }
   .toast.is-dismissed { display: none; }
-  @keyframes toast-in { from { opacity: 0; transform: translateY(var(--space-2)); } }
-  @keyframes toast-out { to { opacity: 0; visibility: hidden; transform: translateY(var(--space-2)); } }
+  @keyframes toast-in { from { opacity: 0; } }
+  @keyframes toast-out { to { opacity: 0; visibility: hidden; } }
   @media (min-width: 48em) {
     .toast-region,
     .app-shell ~ .toast-region {
@@ -574,7 +574,7 @@
 
   /* ---------- 15. Gráfico de barras (SVG gerado no servidor) ---------- */
   .chart { display: flex; flex-direction: column; gap: var(--space-3); }
-  .chart__bar { fill: var(--color-primary); }
+  .chart__bar { fill: var(--color-status-doing); }
   .chart__bar.is-done { fill: var(--color-success); }
   .chart__track { fill: var(--color-track); }
   .chart-h { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -679,10 +679,8 @@
     min-height: var(--space-4);
     background: var(--color-surface-2);
     border-radius: var(--radius-sm);
-    animation: pulse calc(6 * var(--duration-normal)) var(--easing-standard) infinite alternate;
   }
   .skeleton--number { height: var(--font-size-2xl); width: 60%; }
-  @keyframes pulse { to { opacity: 0.5; } }
 
   /* ---------- Lista de definição compacta ---------- */
   .meta-list { display: grid; gap: var(--space-2); }

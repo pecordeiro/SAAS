@@ -42,8 +42,9 @@
     color: var(--color-text);
     text-decoration: none;
     font-family: var(--font-display);
-    font-weight: var(--font-weight-semibold);
-    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-regular);
+    font-size: var(--font-size-card-title);
+    letter-spacing: var(--letter-spacing-title);
     line-height: var(--line-height-tight);
   }
   .brand:hover { color: var(--color-text); }
@@ -82,6 +83,9 @@
   .site-nav__link:hover { background: var(--color-surface-2); color: var(--color-text); }
 
   .site-main { padding-block: var(--space-8) var(--space-12); }
+  /* Telas de login, cadastro e erro: o rodapé fica no fim da janela mesmo com pouco conteúdo. */
+  body.site:not(.site--marca) { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+  body.site:not(.site--marca) .site-main { flex: 1 0 auto; }
 
   .site-footer {
     border-top: var(--border-width) solid var(--color-border-subtle);
@@ -143,8 +147,8 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-family: var(--font-display);
-    font-weight: var(--font-weight-semibold);
-    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-regular);
+    font-size: var(--font-size-card-title);
   }
 
   .app-sidebar { display: none; }
@@ -181,13 +185,13 @@
     line-height: var(--line-height-tight);
   }
   .bottom-nav__item:hover { color: var(--color-text); }
-  .bottom-nav__item[aria-current="page"] { color: var(--color-text); font-weight: var(--font-weight-semibold); }
+  .bottom-nav__item[aria-current="page"] { color: var(--color-primary); font-weight: var(--font-weight-semibold); }
   .bottom-nav__item[aria-current="page"]::before {
     content: "";
     position: absolute;
     inset: 0 var(--space-4) auto;
     height: calc(2 * var(--border-width));
-    background: var(--color-text);
+    background: var(--color-primary);
     border-radius: 0 0 var(--radius-sm) var(--radius-sm);
   }
 
@@ -244,8 +248,8 @@
   .sidebar__item .icon { width: var(--space-4); height: var(--space-4); }
   .sidebar__item:hover { background: var(--color-surface-2); color: var(--color-text); }
   .sidebar__item[aria-current="page"] {
-    background: var(--color-neutral-subtle);
-    color: var(--color-text);
+    background: var(--color-primary-subtle);
+    color: var(--color-primary);
     font-weight: var(--font-weight-semibold);
   }
   .sidebar__footer {
@@ -333,7 +337,7 @@
   .sidebar__footer .theme-form { padding: var(--space-2) var(--space-3); }
   .sidebar__settings > summary { list-style: none; cursor: pointer; }
   .sidebar__settings > summary::-webkit-details-marker { display: none; }
-  .sidebar__chevron { margin-left: auto; transition: transform var(--duration-fast) var(--easing-standard); }
+  .sidebar__chevron { margin-left: auto; }
   .sidebar__settings[open] .sidebar__chevron { transform: rotate(180deg); }
   .sidebar__subnav { display: flex; flex-direction: column; padding: var(--space-1) 0 var(--space-2) calc(var(--space-3) + var(--space-4) + var(--space-3)); }
   .sidebar__subitem {
@@ -347,7 +351,7 @@
     text-decoration: none;
   }
   .sidebar__subitem:hover { background: var(--color-surface-2); color: var(--color-text); }
-  .sidebar__subitem[aria-current="page"] { background: var(--color-neutral-subtle); color: var(--color-text); font-weight: var(--font-weight-semibold); }
+  .sidebar__subitem[aria-current="page"] { background: var(--color-primary-subtle); color: var(--color-primary); font-weight: var(--font-weight-semibold); }
 
   .bottom-nav__item { min-width: 0; padding-inline: var(--space-1); font-size: var(--font-size-sm); text-align: center; }
   .bottom-nav__item span { overflow-wrap: anywhere; }

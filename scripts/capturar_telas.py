@@ -1,6 +1,6 @@
 """Captura cada tela em 375, 768 e 1280 px, tema claro e escuro (Playwright + Chromium).
 
-Uso:  python scripts/capturar_telas.py docs/design/capturas/fase6
+Uso:  python scripts/capturar_telas.py <pasta>   (CAP_ONLY=a,b  CAP_WIDTHS=375  CAP_SCHEMES=light filtram)
 Sobe o app com dados fictícios (telas.md §0: lote CX-10, 5 etapas) num SQLite temporário.
 Os PNGs são reduzidos (paleta de 128 cores) para o conjunto ficar bem abaixo de 10 MB.
 """
@@ -96,69 +96,143 @@ def shot(page, path: Path):
     image.save(path, optimize=True)
 
 
+def enable_modules(app):
+    """Liga os módulos opcionais para a captura (alertas, API, unidades/qualidade)."""
+    from app.services import modules as msvc
+
+    with app.app_context():
+        company = db.session.execute(db.select(Company)).scalars().first()
+        msvc.set_modules(company, {m.key: True for m in msvc.available()}, None)
+        db.session.commit()
+
+
+# (nome, caminho) das telas fixas; {pid} = projeto, {tid} = modelo, {aid} = atividade.
+PUBLIC = [("inicio", "/"), ("precos", "/precos"), ("como-funciona-pub", "/como-funciona"), ("termos", "/termos"),
+          ("privacidade-pub", "/privacidade"), ("contato", "/contato")]
+AUTH = [("entrar", "/entrar"), ("cadastro", "/cadastro"), ("senha-esqueci", "/senha/esqueci"),
+        ("senha-redefinir", "/senha/redefinir/token-invalido"), ("cadastro-confirme", "/cadastro/confirme"),
+        ("convite", "/convite/token-invalido"), ("erro-404", "/nao-existe")]
+LOGGED = [
+    ("painel-operacao", "/app/"),
+    ("painel-projeto", "/app/projetos/{pid}/painel"),
+    ("preencher", "/app/preencher?projeto={pid}"),
+    ("meta-equipe", "/app/meta-e-equipe?projeto={pid}"),
+    ("como-funciona", "/app/como-funciona"),
+    ("projetos", "/app/projetos"),
+    ("projeto-novo", "/app/projetos/novo"),
+    ("projeto-detalhe", "/app/projetos/{pid}"),
+    ("projeto-pessoas", "/app/projetos/{pid}/pessoas"),
+    ("projeto-historico", "/app/projetos/{pid}/historico"),
+    ("projeto-editar", "/app/projetos/{pid}/editar"),
+    ("projeto-modelo", "/app/projetos/{pid}/modelo"),
+    ("projeto-restaurar", "/app/projetos/{pid}/restaurar"),
+    ("projeto-unidades", "/app/projetos/{pid}/unidades"),
+    ("historico", "/app/historico"),
+    ("importar", "/app/importar"),
+    ("modelos", "/app/modelos"),
+    ("modelo-novo", "/app/modelos/novo"),
+    ("modelo-editar", "/app/modelos/{tid}"),
+    ("modelo-versoes", "/app/modelos/{tid}/versoes"),
+    ("empresa", "/app/empresa"),
+    ("modulos", "/app/empresa/modulos"),
+    ("usuarios", "/app/usuarios"),
+    ("assinatura", "/app/assinatura"),
+    ("assinatura-planos", "/app/assinatura/planos"),
+    ("assinatura-cobranca", "/app/assinatura/cobranca"),
+    ("assinatura-faturas", "/app/assinatura/faturas"),
+    ("privacidade", "/app/privacidade"),
+    ("alertas", "/app/alertas"),
+    ("api", "/app/integracoes/api"),
+    ("unidades-busca", "/app/unidades"),
+    ("perfil", "/conta/perfil"),
+    ("mfa", "/conta/mfa"),
+    ("empresas", "/conta/empresas"),
+]
+# Telas que dependem de um link da listagem: (nome, listagem, seletor do link)
+FOLLOW = [
+    ("unidade", "/app/projetos/{pid}/unidades", "a[href*='/app/unidades/']"),
+    ("checklist", "/app/projetos/{pid}", "a[href*='/checklist']"),
+    ("evidencias", "/app/projetos/{pid}", "a[href*='/evidencias']"),
+]
+
+
 def main(out_dir: str) -> None:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     for old in out.glob("*.png"):
         old.unlink()
+    only = os.environ.get("CAP_ONLY")  # lista de nomes separados por vírgula
+    widths = tuple(int(w) for w in os.environ.get("CAP_WIDTHS", "375,768,1280").split(","))
+    schemes = tuple(os.environ.get("CAP_SCHEMES", "light,dark").split(","))
     port = _free_port()
     base = f"http://127.0.0.1:{port}"
     tmp = tempfile.mkdtemp()
-    app = create_app("test", {"SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp}/c.db", "SECRET_KEY": "x" * 40, "APP_BASE_URL": base})
+    app = create_app("test", {"SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp}/c.db", "SECRET_KEY": "x" * 40, "APP_BASE_URL": base,
+                              "FEATURE_PUBLIC_API": True})
     with app.app_context():
         db.create_all()
     project_id, template_id, activity_id = seed(app)
+    enable_modules(app)
     server = make_server("127.0.0.1", port, app, threaded=True)
     threading.Thread(target=server.serve_forever, daemon=True).start()
+    ids = {"pid": project_id, "tid": template_id, "aid": activity_id}
+    problems: list[str] = []
 
-    public = [("inicio", "/"), ("precos", "/precos"), ("termos", "/termos"), ("privacidade", "/privacidade"),
-              ("contato", "/contato"), ("entrar", "/entrar"), ("cadastro", "/cadastro"), ("404", "/nao-existe")]
-    logged = [
-        ("projetos", "/app/projetos"),
-        ("projetos-busca", "/app/projetos?q=painel&status=todos"),
-        ("detalhe", f"/app/projetos/{project_id}"),
-        ("historico-projeto", f"/app/projetos/{project_id}/historico"),
-        ("historico-geral", "/app/historico"),
-        ("novo-projeto", "/app/projetos/novo"),
-        ("modelos", "/app/modelos"),
-        ("modelo-editor", f"/app/modelos/{template_id}"),
-        ("importar", "/app/importar"),
-        ("usuarios", "/app/usuarios"),
-        ("empresa", "/app/empresa"),
-        ("perfil", "/conta/perfil"),
-    ]
+    def want(name):
+        return not only or name in only.split(",")
+
+    def snap(page, name, width, scheme, wait=0):
+        if wait:
+            page.wait_for_timeout(wait)
+        shot(page, out / f"{name}-{width}-{scheme}.png")
+        over = page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
+        if over > 0:
+            problems.append(f"overflow horizontal {over}px: {name} {width} {scheme}")
+
     exe = os.environ.get("E2E_CHROMIUM") or CHROME_FALLBACK
     with sync_playwright() as pw:
         try:
             browser = pw.chromium.launch()
         except Exception:  # noqa: BLE001
             browser = pw.chromium.launch(executable_path=exe)
-        for scheme in SCHEMES:
-            for width in VIEWPORTS:
+        for scheme in schemes:
+            for width in widths:
                 ctx = browser.new_context(viewport={"width": width, "height": 800}, color_scheme=scheme, locale="pt-BR")
                 page = ctx.new_page()
-                for name, path in public:
-                    page.goto(base + path)
-                    shot(page, out / f"{name}-{width}-{scheme}.png")
+                for name, path in PUBLIC + AUTH:
+                    if want(name):
+                        page.goto(base + path)
+                        snap(page, name, width, scheme)
                 page.goto(base + "/entrar")
                 page.fill("#email", "owner@exemplo.com.br")
                 page.fill("#password", PASSWORD)
                 page.click("button[type=submit].btn--primary")
                 page.wait_for_url(lambda u: "/entrar" not in u)
-                for name, path in logged:
-                    page.goto(base + path)
-                    if name == "novo-projeto":
-                        page.wait_for_timeout(600)  # resumo via HTMX
-                    shot(page, out / f"{name}-{width}-{scheme}.png")
-                # folha de registro (celular/tablet) ou linha inline (desktop)
-                page.goto(f"{base}/app/projetos/{project_id}#registrar-{activity_id}")
-                page.wait_for_timeout(400)
-                shot(page, out / f"detalhe-registro-{width}-{scheme}.png")
+                for name, path in LOGGED:
+                    if want(name):
+                        resp = page.goto(base + path.format(**ids))
+                        if resp is not None and resp.status >= 400:
+                            problems.append(f"HTTP {resp.status}: {path}")
+                        snap(page, name, width, scheme, wait=1200 if name.startswith("painel") else 150)
+                for name, listing, selector in FOLLOW:
+                    if want(name):
+                        page.goto(base + listing.format(**ids))
+                        link = page.query_selector(selector)
+                        if link:
+                            page.goto(base + link.get_attribute("href"))
+                            snap(page, name, width, scheme)
+                        else:
+                            problems.append(f"sem link para {name}")
+                if want("registro"):
+                    page.goto(f"{base}/app/projetos/{project_id}#registrar-{activity_id}")
+                    snap(page, "registro", width, scheme, wait=300)
                 ctx.close()
         browser.close()
     server.shutdown()
     total = sum(p.stat().st_size for p in out.glob("*.png"))
     print(f"{len(list(out.glob('*.png')))} PNGs, {total / 1e6:.1f} MB em {out}")
+    for item in problems:
+        print("PROBLEMA:", item)
 
 
 if __name__ == "__main__":
