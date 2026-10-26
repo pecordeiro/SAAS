@@ -202,6 +202,12 @@ Registro.br).
   pública do monitor; avisar o piloto do que é teste. (F10-6)
 - Pronto quando: piloto consegue cadastrar, criar modelo, projeto e registrar peças sem ajuda.
 
+**P-23 · Horários da ligação e e-mail de aviso da equipe (ADR-0019)** — [P]
+- Como: depois do P-17 (conta de equipe), abrir `/interno/horarios` e cadastrar os dias e horários em que você atende
+  (horário de Brasília). Sem horário cadastrado, o cliente dos planos Empresa e Implantação não tem o que escolher.
+  Definir `STAFF_NOTIFY_EMAIL` (para onde vão os avisos de briefing preenchido e de ligação marcada) no serviço web.
+- Pronto quando: um cliente de teste num plano com identidade visual marca um horário e você recebe o e-mail de aviso.
+
 ---
 
 ## Parte C — Smoke test pós-deploy (passo a passo)

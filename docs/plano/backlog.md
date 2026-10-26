@@ -198,3 +198,13 @@ consulta, fora do autosserviço (só `flask billing-admin set-plan`).
 **F10-4 (M)** Alertas: erro, uptime de `/health`, webhook falhando, outbox parada.
 **F10-5 (M)** Cobrança real de valor baixo paga e estornada.
 **F10-6 (S)** Página de status, e-mail de suporte, painel interno com métricas do PRD.
+
+
+## Itens adicionados em 2026-10-26
+
+- Formulário público de contato (hoje `/contato` só mostra o e-mail): se for criado, precisa de ADR, CSRF, limite por IP e campo armadilha.
+- API pública: implementar detalhe do projeto, eventos e registro de progresso (hoje 501) só se for oferecida no lançamento.
+- Acesso do profissional / e-mail de auditoria do plano Implantação e leitura do briefing pela equipe: escrever ADR quando o endereço existir.
+- Teste grátis de 14 dias nos planos 1 e 2: confirmar com o dono.
+- Rótulo/preço do plano Implantação: hoje “Sob orçamento” (preço nulo = sem checkout).
+- Liberar horário reservado sem empresa gravada em dados antigos com RLS forçado (caso-limite sem teste).

@@ -1427,3 +1427,21 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
   `visual_requests.contact_*`). Uma reserva por empresa de cada vez. Briefing "completo" = nome da
   empresa, produtos, nome do contato e telefone ou e-mail.
 - Pendências: leitura do briefing pela equipe (outro ADR, item 4 do ADR-0019).
+
+
+## Consolidação e guia do projeto (2026-10-26)
+
+- Estado da branch principal: planos novos, briefing/agendamento, importação com unidade do tempo e pendências finais juntados;
+  uma única cabeça de migration (`c5a1e9d7b3f2`, depois de `a9d3f5c1b7e2`).
+- Guia completo em PDF (o que existe, mapa do código, conectores passo a passo, vídeos, pendências): `docs/guia/Controle-de-Producao-Guia-Completo.pdf`.
+  Os links de vídeo vieram de busca e não foram assistidos; conferir a data antes de seguir.
+- Revisão de segurança por leitura do código novo (ADR-0019): nenhum achado de alta confiança; o achado médio da reserva (pedido de
+  remarcação preso à empresa do horário) foi corrigido e testado.
+- Em aberto (resumo; lista completa na seção 12 do guia):
+  - Suíte em PostgreSQL 16 na branch principal e prova do RLS (depende de URL de teste ou de PostgreSQL local autorizado).
+  - Render conectado, mas vazio: criação do banco de staging foi bloqueada pelo sistema de permissões (nada criado).
+  - Decisões do dono: teste grátis de 14 dias (mantido por padrão), acesso do profissional/e-mail de auditoria (plano Implantação),
+    leitura do briefing pela equipe, formulário de contato, API pública no lançamento (3 rotas ainda 501), fotos reais e og-image.
+  - Contas e chaves externas (P-01 a P-23 em `lancamento.md`).
+- Ocorrências a lembrar: um agente contornou uma trava para subir PostgreSQL local (arquivos removidos; sem dados reais);
+  a branch foi enviada ao remoto antes do fim da suíte completa (que passou depois: 1114 aprovados em SQLite).
