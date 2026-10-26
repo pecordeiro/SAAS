@@ -28,7 +28,7 @@
       {%- if current %}{{ badge("Seu plano", "info") }}{% endif %}
     </div>
     {%- if prices[plan.id] is none %}
-    <p class="plan__price">Sob orçamento <span class="kpi__unit">online ou presencial</span></p>
+    <p class="plan__price">Sob orçamento<br><span class="kpi__unit">online ou presencial</span></p>
     {%- else %}
     <p class="plan__price"><span class="plan__currency">R$</span> {{ prices[plan.id]|reais }} <span class="kpi__unit">/mês</span></p>
     {%- endif %}

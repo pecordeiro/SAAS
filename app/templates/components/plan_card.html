@@ -12,7 +12,7 @@
   {%- if plan.featured %}<span class="plan__flag">Recomendado</span>{% endif %}
   <{{ heading }} class="plan__name" id="plano-{{ plan.code }}">{{ plan.name }}</{{ heading }}>
   {%- if plan.price is none %}
-  <p class="plan__price">Sob orçamento <span class="plan__per">online ou presencial</span></p>
+  <p class="plan__price">Sob orçamento<br><span class="plan__per">online ou presencial</span></p>
   {%- else %}
   <p class="plan__price"><span class="plan__currency">R$</span> {{ plan.price|num(0) if plan.price == plan.price|int else plan.price|num(2) }} <span class="plan__per">/mês</span></p>
   {%- endif %}
