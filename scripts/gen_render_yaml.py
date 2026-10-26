@@ -109,6 +109,12 @@ def app_env_vars(env: dict, names: dict, *, owner: str | None) -> list[dict]:
         "STORAGE_S3_REGION": "auto",
         "STORAGE_S3_ADDRESSING": "path",
         "SENTRY_TRACES_SAMPLE_RATE": "0",
+        # ADR-0019: limites do briefing/agendamento (valores seguros padrão; o endereço da equipe é segredo, acima).
+        "VISUAL_RATE_LIMIT_IP": "20 per minute; 200 per hour",
+        "VISUAL_RATE_LIMIT_COMPANY": "30 per minute; 300 per hour",
+        "INTERNO_RATE_LIMIT": "60 per minute",
+        "BRIEFING_PHOTOS_MAX": "10",
+        "CALL_MIN_LEAD_MINUTES": "60",
     }
     out: list[dict] = [{"key": k, "value": v} for k, v in values.items()]
     out.append({"key": "DATABASE_URL", "fromDatabase": {"name": names["db"], "property": "connectionString"}})

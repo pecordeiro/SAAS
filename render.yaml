@@ -42,6 +42,16 @@ services:
     value: path
   - key: SENTRY_TRACES_SAMPLE_RATE
     value: '0'
+  - key: VISUAL_RATE_LIMIT_IP
+    value: 20 per minute; 200 per hour
+  - key: VISUAL_RATE_LIMIT_COMPANY
+    value: 30 per minute; 300 per hour
+  - key: INTERNO_RATE_LIMIT
+    value: 60 per minute
+  - key: BRIEFING_PHOTOS_MAX
+    value: '10'
+  - key: CALL_MIN_LEAD_MINUTES
+    value: '60'
   - key: DATABASE_URL
     fromDatabase:
       name: controle-db
@@ -116,6 +126,16 @@ services:
     value: path
   - key: SENTRY_TRACES_SAMPLE_RATE
     value: '0'
+  - key: VISUAL_RATE_LIMIT_IP
+    value: 20 per minute; 200 per hour
+  - key: VISUAL_RATE_LIMIT_COMPANY
+    value: 30 per minute; 300 per hour
+  - key: INTERNO_RATE_LIMIT
+    value: 60 per minute
+  - key: BRIEFING_PHOTOS_MAX
+    value: '10'
+  - key: CALL_MIN_LEAD_MINUTES
+    value: '60'
   - key: DATABASE_URL
     fromDatabase:
       name: controle-db
@@ -235,6 +255,16 @@ services:
     value: path
   - key: SENTRY_TRACES_SAMPLE_RATE
     value: '0'
+  - key: VISUAL_RATE_LIMIT_IP
+    value: 20 per minute; 200 per hour
+  - key: VISUAL_RATE_LIMIT_COMPANY
+    value: 30 per minute; 300 per hour
+  - key: INTERNO_RATE_LIMIT
+    value: 60 per minute
+  - key: BRIEFING_PHOTOS_MAX
+    value: '10'
+  - key: CALL_MIN_LEAD_MINUTES
+    value: '60'
   - key: DATABASE_URL
     fromDatabase:
       name: controle-db
@@ -388,6 +418,16 @@ services:
     value: path
   - key: SENTRY_TRACES_SAMPLE_RATE
     value: '0'
+  - key: VISUAL_RATE_LIMIT_IP
+    value: 20 per minute; 200 per hour
+  - key: VISUAL_RATE_LIMIT_COMPANY
+    value: 30 per minute; 300 per hour
+  - key: INTERNO_RATE_LIMIT
+    value: 60 per minute
+  - key: BRIEFING_PHOTOS_MAX
+    value: '10'
+  - key: CALL_MIN_LEAD_MINUTES
+    value: '60'
   - key: DATABASE_URL
     fromDatabase:
       name: controle-db
