@@ -148,11 +148,11 @@ def slot_create():
     if not form.validate_on_submit():
         return _slots_page(form, status=400)
     try:
-        agenda.create_slot(form.day.data, form.at.data, form.duration.data, current_user)
+        slot = agenda.create_slot(form.day.data, form.at.data, form.duration.data, current_user)
     except agenda.AgendaError as exc:
         db.session.rollback()
         return _slots_page(form, status=400, error=str(exc))
-    flash("Horário criado.", "success")
+    flash(f"Horário criado: {agenda.local(slot.starts_at).strftime('%d/%m/%Y %H:%M')} (Brasília).", "success")
     return redirect(url_for("interno.slots"), code=303)
 
 
