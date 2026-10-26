@@ -171,6 +171,17 @@ def test_mensagens_nunca_trazem_valor_de_segredo():
     assert "SEGREDO_UNICO" not in texto and "SENHA_UNICA" not in texto
 
 
+def test_staff_notify_email_ausente_e_aviso_e_nunca_imprime_o_valor():
+    findings, ok = configcheck.evaluate(prod_config(STAFF_NOTIFY_EMAIL=None), "production")
+    assert ok and "STAFF_NOTIFY_EMAIL" in codes(findings, configcheck.AVISO)
+    assert "STAFF_NOTIFY_EMAIL" not in codes(findings, configcheck.ERRO)
+    _, ok_strict = configcheck.evaluate(prod_config(STAFF_NOTIFY_EMAIL=None), "production", strict=True)
+    assert not ok_strict  # --strict reprova aviso
+    findings, _ = configcheck.evaluate(prod_config(STAFF_NOTIFY_EMAIL="equipe-UNICA@exemplo.com"), "production", strict=True)
+    assert "equipe-UNICA" not in "\n".join(f.line() for f in findings)
+    assert "STAFF_NOTIFY_EMAIL" not in codes(findings, configcheck.AVISO)
+
+
 def test_weak_secret():
     assert configcheck.weak_secret("x" * 10)
     assert configcheck.weak_secret("ab" * 20)

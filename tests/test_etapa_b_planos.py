@@ -154,7 +154,7 @@ def test_preco_e_limite_vem_do_banco(client, app, tenants):
         catalog.get_plan("profissional").max_projects = 1
         db.session.commit()
     html = client.get("/precos").get_data(as_text=True)
-    assert "1.234" in html and "Sob consulta" in html
+    assert "1.234" in html and "Sob orçamento" in html
     # teste grátis implícito no Profissional: o limite novo (1) vale na hora
     login(client, app, a.supervisor_email)
     blocked = post(client, app, "/app/projetos/novo", NEW_PROJECT)
@@ -251,7 +251,7 @@ def test_implantacao_fora_do_autosservico(bclient, bapp, btenants):
         company = db.session.get(Company, a.company_id)
         plan = catalog.get_plan("implantacao")
         info = billing.BillingInfo("X Ltda", "11.222.333/0001-81", "a@b.com")
-        with pytest.raises(billing.BillingError, match="Sob consulta|sob consulta"):
+        with pytest.raises(billing.BillingError, match="Sob orçamento|sob orçamento"):
             billing.subscribe(company, plan, info, None)
         with pytest.raises(billing.BillingError):
             billing.change_plan(company, plan, None)
@@ -263,12 +263,12 @@ def test_telas_com_os_quatro_planos_respondem_200(bclient, bapp, btenants):
     a, _ = btenants
     for path in ("/", "/precos"):
         html = text_of(bclient.get(path))
-        assert "Sob consulta" in html and "Implantação" in html and "249,90" in html and "Fale conosco" in html
+        assert "Sob orçamento" in html and "Implantação" in html and "249,90" in html and "Fale conosco" in html
     login(bclient, bapp, a.owner_email)
     assert bclient.get("/app/assinatura").status_code == 200
     page = bclient.get("/app/assinatura/planos")
     html = text_of(page)
-    assert page.status_code == 200 and "Sob consulta" in html and "/app/assinatura/planos/implantacao" not in html
+    assert page.status_code == 200 and "Sob orçamento" in html and "/app/assinatura/planos/implantacao" not in html
     assert "Sem teste grátis" in html
     subscribe(bclient, bapp, a, plan="profissional")
     for code in ("essencial", "empresa"):
@@ -308,7 +308,7 @@ def test_set_plan_exige_motivo_audita_e_emite_evento(bclient, bapp, btenants):
     assert log.details["motivo"] == "Contrato de implantação 2026-11" and log.details["para"] == "implantacao"
     assert len(_events(bapp, a.company_id, events.PLAN_VISUAL_CUSTOM_CONTRACTED)) == 1
     assert _plan_code(bapp, b.company_id) == "profissional"  # B intacta
-    # reconciliação não derruba o contrato sob consulta
+    # reconciliação não derruba o contrato sob orçamento
     assert run(bapp, "billing-reconcile").exit_code == 0
     assert sub_state(bapp, a.company_id)["status"] == SUB_ACTIVE
     # o proprietário não troca nem cancela pelo autosserviço (recusa, sem 500)

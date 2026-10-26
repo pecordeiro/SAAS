@@ -27,6 +27,7 @@ from app import create_app  # noqa: E402
 from app.extensions import db  # noqa: E402
 from app.models import Company, Holiday, Membership, User, ROLE_OPERATOR, ROLE_OWNER, ROLE_SUPERVISOR  # noqa: E402
 from app.services import projects as svc  # noqa: E402
+from app.services import units as units_svc  # noqa: E402
 from app.services import templates as tsvc  # noqa: E402
 from app.services.holidays import seed_national_holidays  # noqa: E402
 from app.services.passwords import hash_password  # noqa: E402
@@ -85,6 +86,8 @@ def seed(app):
                     svc.register_progress(activity, step, activity.version, who.id)
                     left -= step
         svc.register_progress(late.stages[0].activities[0], 1, 1, users[ROLE_OPERATOR].id)
+        # Números de série (módulo unidades): sem eles a tela de unidade não tem link para capturar.
+        units_svc.generate(project, "CX10-", 1, 5, 3, users[ROLE_OWNER].id)
         db.session.add(Holiday(company_id=company.id, day=date(today.year, 12, 24), name="Recesso de fim de ano"))
         db.session.commit()
         return project.id, template.id, project.stages[1].activities[2].id

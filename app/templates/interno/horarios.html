@@ -23,8 +23,8 @@
   <form method="post" action="{{ url_for('interno.slot_create') }}" class="stack" novalidate>
     {{ form.csrf_token }}
     <div class="form-row form-row--2">
-      {{ field(form.day, required=True) }}
-      {{ field(form.at, required=True) }}
+      {{ field(form.day, required=True, hint="Use o seletor; o formato depende do navegador (aqui a lista sempre mostra dd/mm/aaaa).") }}
+      {{ field(form.at, required=True, hint="Use o seletor; hora de Brasília, no formato HH:MM.") }}
     </div>
     {{ field(form.duration, required=True, hint="Entre 10 e 240 minutos.") }}
     <div>{{ button("Criar horário", "primary") }}</div>

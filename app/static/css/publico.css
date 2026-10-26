@@ -415,6 +415,11 @@
     .pub-opts--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .site--marca .plans { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   }
+  /* Tablet (768–1023 px): a navegação completa não cabe com o respiro de desktop; links mais justos. */
+  @media (min-width: 48em) and (max-width: 63.99em) {
+    .site--marca .site-nav__link { padding-inline: var(--space-2); }
+    .site--marca .site-nav .btn { margin-left: var(--space-1); }
+  }
   /* Celular: menu em folha (☰); só o botão de teste fica no cabeçalho. */
   @media (max-width: 47.99em) {
     .site--marca .brand { font-size: var(--font-size-lg); }

@@ -693,6 +693,17 @@ def test_equipe_gerencia_horarios_e_ve_reservas_sem_ler_o_briefing(vapp, vclient
         assert len(logs) == 1 and logs[0].operator == "equipe@exemplo.com"
 
 
+def test_horarios_do_interno_mostram_data_em_pt_br_e_ajuda_do_seletor(vapp, vclient, pair):
+    _session_as(vclient, vapp, _staff_user(vapp))
+    day = (datetime.now(agenda.TZ) + timedelta(days=11)).date()
+    created = post(vclient, vapp, "/interno/horarios", {"day": day.isoformat(), "at": "15:45", "duration": "30"})
+    assert created.status_code == 303
+    page = text_of(vclient.get("/interno/horarios", follow_redirects=False))
+    assert f"Horário criado: {day:%d/%m/%Y} 15:45" in page  # confirmação em pt-BR (Brasília)
+    assert f"{day:%d/%m/%Y} 15:45" in page  # lista sempre em dd/mm/aaaa HH:MM
+    assert "Use o seletor; o formato depende do navegador" in page
+
+
 def test_interno_filtra_e_rotula_o_estado_briefing_preenchido(vapp, vclient, pair):
     a, _ = pair
     owner = vapp.test_client()

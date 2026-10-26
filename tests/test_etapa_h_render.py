@@ -250,6 +250,24 @@ def test_arquivos_de_ambiente_listam_as_novas_variaveis():
         assert nome in exemplo, nome
 
 
+NOVAS_ADR19 = ("VISUAL_RATE_LIMIT_IP", "VISUAL_RATE_LIMIT_COMPANY", "INTERNO_RATE_LIMIT", "BRIEFING_PHOTOS_MAX", "CALL_MIN_LEAD_MINUTES")
+
+
+def test_variaveis_do_briefing_e_agenda_no_blueprint_e_no_exemplo(blueprint):
+    """Padrões seguros nos Blueprints (iguais aos do Config); o e-mail da equipe é digitado no web (sync: false)."""
+    from app.config import Config
+
+    bp, _ = blueprint
+    (web,) = by_name(bp, "web").values()
+    env = env_of(web)
+    for nome in NOVAS_ADR19:
+        assert str(getattr(Config, nome)) == env[nome]["value"], nome
+    assert env["STAFF_NOTIFY_EMAIL"].get("sync") is False and "value" not in env["STAFF_NOTIFY_EMAIL"]
+    exemplo = (ROOT / ".env.example").read_text(encoding="utf-8")
+    for nome in (*NOVAS_ADR19, "STAFF_NOTIFY_EMAIL"):
+        assert re.search(rf"^#?\s*{nome}=", exemplo, re.M), nome
+
+
 def test_ferramentas_de_assets_do_dockerfile_batem_com_requirements_dev():
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
     dev = (ROOT / "requirements-dev.txt").read_text(encoding="utf-8")

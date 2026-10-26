@@ -17,7 +17,7 @@
 </header>
 
 {%- if managed_current %}
-<div class="mb-4">{{ alert("info", "Plano gerido pela nossa equipe", "Seu plano é sob consulta: para mudar ou cancelar, fale conosco.", action=("Fale conosco", url_for('public.contact'))) }}</div>
+<div class="mb-4">{{ alert("info", "Plano gerido pela nossa equipe", "Seu plano é sob orçamento: para mudar ou cancelar, fale conosco.", action=("Fale conosco", url_for('public.contact'))) }}</div>
 {%- endif %}
 <div class="plans">
   {%- for plan in plans %}
@@ -28,7 +28,7 @@
       {%- if current %}{{ badge("Seu plano", "info") }}{% endif %}
     </div>
     {%- if prices[plan.id] is none %}
-    <p class="plan__price">Sob consulta</p>
+    <p class="plan__price">Sob orçamento<br><span class="kpi__unit">online ou presencial</span></p>
     {%- else %}
     <p class="plan__price"><span class="plan__currency">R$</span> {{ prices[plan.id]|reais }} <span class="kpi__unit">/mês</span></p>
     {%- endif %}

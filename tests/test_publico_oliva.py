@@ -45,7 +45,7 @@ def test_titulo_e_textos_chave_do_inicio(client):
                  "Perguntas frequentes", "Descubra onde cada lote está hoje.", "Começar teste grátis de 14 dias"):
         assert text in html, text
     # preços e limites vêm da tabela plans
-    assert "249,90" in html and "Sob consulta" in html and "Recomendado" in html
+    assert "249,90" in html and "Sob orçamento" in html and "Recomendado" in html
 
 
 def test_precos_mostra_14_dias_gratis(client):
