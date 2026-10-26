@@ -12,7 +12,7 @@
 <header class="page-header">
   <div class="page-header__titles">
     <h1>Assinatura</h1>
-    <p class="page-header__subtitle">Plano {{ sub.plan.name }} · {% if price is none %}sob consulta{% else %}R$ {{ price|reais }}/mês{% endif %}{% if sub.discount_percent %} ({{ sub.discount_percent }}% de desconto){% endif %}</p>
+    <p class="page-header__subtitle">Plano {{ sub.plan.name }} · {% if price is none %}sob orçamento{% else %}R$ {{ price|reais }}/mês{% endif %}{% if sub.discount_percent %} ({{ sub.discount_percent }}% de desconto){% endif %}</p>
     <div class="page-header__meta">{{ badge(status_label, status_tone) }}</div>
   </div>
   <div class="page-header__actions">

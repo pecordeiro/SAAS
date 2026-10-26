@@ -221,7 +221,7 @@ def ensure_subscription(company: Company) -> Subscription:
     return sub
 
 
-MANAGED_MESSAGE = "Plano sob consulta: fale conosco para contratar ou mudar."
+MANAGED_MESSAGE = "Plano sob orçamento: fale conosco para contratar ou mudar."
 MANAGED_CURRENT_MESSAGE = "Seu plano é gerido pela nossa equipe: fale conosco para mudar ou cancelar."
 
 
@@ -969,7 +969,7 @@ def admin_discount(company: Company, percent: int, reason: str) -> Subscription:
         raise BillingError(f"Desconto entre 0 e {MAX_DISCOUNT_PERCENT}%.")
     sub = ensure_subscription(company)
     if plan_catalog.is_managed(sub.plan):
-        raise BillingError("Plano sob consulta: o valor é combinado no contrato, sem desconto aqui.")
+        raise BillingError("Plano sob orçamento: o valor é combinado no contrato, sem desconto aqui.")
     old = sub.discount_percent or 0
     sub.discount_percent = percent or None
     if sub.provider_subscription_id and not needs_checkout(sub):

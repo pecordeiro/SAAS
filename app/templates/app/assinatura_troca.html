@@ -25,8 +25,8 @@
   {{ form.csrf_token }}
   <h2 class="card__title">Projeção</h2>
   <dl class="meta-list">
-    <div><dt>Hoje ({{ p.current_plan.name }})</dt><dd>{% if p.current_cents is none %}Sob consulta{% else %}R$ {{ p.current_cents|reais }}/mês{% endif %}</dd></div>
-    <div><dt>Novo ({{ p.plan.name }})</dt><dd class="text-strong">{% if p.new_cents is none %}Sob consulta{% else %}R$ {{ p.new_cents|reais }}/mês{% endif %}</dd></div>
+    <div><dt>Hoje ({{ p.current_plan.name }})</dt><dd>{% if p.current_cents is none %}Sob orçamento{% else %}R$ {{ p.current_cents|reais }}/mês{% endif %}</dd></div>
+    <div><dt>Novo ({{ p.plan.name }})</dt><dd class="text-strong">{% if p.new_cents is none %}Sob orçamento{% else %}R$ {{ p.new_cents|reais }}/mês{% endif %}</dd></div>
     {%- if p.difference_cents is not none %}
     <div><dt>Diferença por mês</dt><dd>{{ "+" if p.difference_cents > 0 else ("−" if p.difference_cents < 0 else "") }}R$ {{ (p.difference_cents|abs)|reais }}</dd></div>
     {%- endif %}

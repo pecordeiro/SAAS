@@ -2,7 +2,7 @@
 {#
   Card de plano das páginas públicas (ADR-0016). `plan` vem de public.public_plans() (tabela plans):
   preço e limites nunca ficam no template. O plano com teste grátis e destaque (Profissional) leva
-  o selo “Recomendado”. Preço None = sob consulta: sem checkout, o botão leva ao contato (o servidor
+  o selo “Recomendado”. Preço None = sob orçamento: sem checkout, o botão leva ao contato (o servidor
   recusa o plano no autosserviço).
   `trial_days` é argumento explícito: macros importados sem “with context” não enxergam o contexto
   da página (era o que apagava o “14” de “14 dias grátis, sem cartão”).
@@ -12,7 +12,7 @@
   {%- if plan.featured %}<span class="plan__flag">Recomendado</span>{% endif %}
   <{{ heading }} class="plan__name" id="plano-{{ plan.code }}">{{ plan.name }}</{{ heading }}>
   {%- if plan.price is none %}
-  <p class="plan__price">Sob consulta</p>
+  <p class="plan__price">Sob orçamento <span class="plan__per">online ou presencial</span></p>
   {%- else %}
   <p class="plan__price"><span class="plan__currency">R$</span> {{ plan.price|num(0) if plan.price == plan.price|int else plan.price|num(2) }} <span class="plan__per">/mês</span></p>
   {%- endif %}
