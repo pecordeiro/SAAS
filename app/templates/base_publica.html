@@ -1,5 +1,6 @@
 {% extends "_base.html" %}
 {% from "components/icon.html" import icon %}
+{% import "components/brand.html" as brand %}
 {% from "components/button.html" import button %}
 {% from "components/toast.html" import toast_region %}
 {#
@@ -23,8 +24,7 @@
 <header class="site-header">
   <div class="container site-header__inner">
     <a class="brand" href="{{ url_for('public.index') }}">
-      <img class="brand__logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="" width="40" height="40">
-      <span>Controle de Produção</span>
+      {{ brand.logo(40) }}
     </a>
     <nav class="site-nav" aria-label="Site">
       {%- if marca %}

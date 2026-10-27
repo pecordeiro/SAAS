@@ -51,7 +51,6 @@
     white-space: nowrap;
   }
   .site--marca .brand:hover { color: var(--color-brand-text); }
-  .site--marca .brand__logo { width: var(--space-9); height: var(--space-9); border-radius: var(--radius-brand-sm); }
   .site--marca .site-nav { gap: var(--space-1); }
   .site--marca .site-nav__link {
     font-size: var(--font-size-md);

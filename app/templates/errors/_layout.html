@@ -5,9 +5,10 @@
 #}
 {% extends ("base_app.html" if (not force_public | default(false)) and current_user.is_authenticated and current_company else "base_publica.html") %}
 {% from "components/button.html" import button %}
+{% import "components/brand.html" as brand %}
 {% block content %}
 <div class="error-page">
-  <img class="brand__logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="" width="32" height="32">
+  {{ brand.symbol(32, "") }}
   <p class="error-page__code" aria-hidden="true">{% block code %}{% endblock %}</p>
   <h1 class="error-page__title">{% block heading %}{% endblock %}</h1>
   <p class="muted">{% block message %}{% endblock %}</p>

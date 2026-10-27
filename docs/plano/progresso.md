@@ -1445,3 +1445,12 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
   - Contas e chaves externas (P-01 a P-23 em `lancamento.md`).
 - Ocorrências a lembrar: um agente contornou uma trava para subir PostgreSQL local (arquivos removidos; sem dados reais);
   a branch foi enviada ao remoto antes do fim da suíte completa (que passou depois: 1114 aprovados em SQLite).
+
+
+## Identidade Teroz e correção visual (2026-10-27) — aguardando aprovação do commit
+- **Correção da sobreposição em "Preencher etapas"** (`pages.css`): lista e painel com `min-width:0`, coluna única
+  até 80em, título da etapa quebrando linha, cabeçalhos da tabela quebrando. Conferido a 1330, 1280, 1024 e 375 px.
+- **Identidade Teroz** (ADR-0020, proposta): logotipo vetorial e variantes, favicon 16/32, apple-touch, og-image,
+  macro `components/brand.html`, símbolo pequeno e centralizado no menu lateral. Fontes do site inalteradas.
+- Pendente do plano: abas de projeto no estilo da imagem 2 e o quadro de tarefas (será a ADR-0021).
+- Suíte completa: 1118 passed, 84 skipped, 3 xfailed (antes dos novos testes); `test_marca_teroz.py`: 6 passed.

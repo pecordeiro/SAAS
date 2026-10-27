@@ -780,11 +780,12 @@
   .save-status--error { color: var(--color-danger); font-weight: var(--font-weight-semibold); }
 
   .fill { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); align-items: start; }
-  @media (min-width: 64em) {
+  /* Duas colunas só quando o painel da etapa tem largura para a tabela; abaixo disso a lista fica em cima. */
+  @media (min-width: 80em) {
     .fill { grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr); }
     .fill__list { position: sticky; top: var(--space-4); }
   }
-  .fill__list { padding: var(--space-2); }
+  .fill__list { padding: var(--space-2); min-width: 0; }
   .fill__panel { min-width: 0; }
   .fill__hint { margin: var(--space-3) 0 0; font-size: var(--font-size-sm); color: var(--color-text-muted); max-width: 72ch; }
   .fill__list-hint { margin: var(--space-2) var(--space-2) 0; font-size: var(--font-size-sm); color: var(--color-text-subtle); }
@@ -793,6 +794,7 @@
   .stage-list { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
   .stage-item {
     display: flex;
+    min-width: 0;
     align-items: center;
     gap: var(--space-1);
     border: var(--border-width) solid transparent;
@@ -803,9 +805,9 @@
   .stage-item.is-current { background: var(--color-surface-2); border-color: var(--color-border-subtle); }
   .stage-item .drag-handle { min-width: var(--space-6); }
   .stage-item__link { flex: 1; min-width: 0; padding: var(--space-2); color: var(--color-text); text-decoration: none; }
-  .stage-item__info { display: grid; gap: var(--space-1); }
-  .stage-item__row { display: flex; justify-content: space-between; gap: var(--space-2); align-items: baseline; }
-  .stage-item__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--font-weight-semibold); }
+  .stage-item__info { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); min-width: 0; }
+  .stage-item__row { display: flex; justify-content: space-between; gap: var(--space-2); align-items: baseline; min-width: 0; }
+  .stage-item__name { min-width: 0; overflow-wrap: anywhere; font-weight: var(--font-weight-semibold); }
   .stage-item__pct { flex: none; font-weight: var(--font-weight-semibold); }
   .stage-item__menu { flex: none; }
 
@@ -884,12 +886,12 @@
   .table-scroll { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .etab { width: 100%; border-collapse: collapse; font-size: var(--font-size-md); font-variant-numeric: var(--font-numeric); }
   .etab th, .etab td { padding: var(--space-1) var(--space-2); border-bottom: var(--border-width) solid var(--color-border-subtle); text-align: left; vertical-align: middle; }
-  .etab thead th { font-size: var(--font-size-sm); font-weight: var(--font-weight-regular); color: var(--color-text-muted); border-bottom-color: var(--color-border-strong); white-space: nowrap; }
+  .etab thead th { font-size: var(--font-size-sm); font-weight: var(--font-weight-regular); color: var(--color-text-muted); border-bottom-color: var(--color-border-strong); }
   .etab tbody th { font-weight: var(--font-weight-semibold); }
   .etab .num { text-align: right; }
   .etab td.num .cell { max-width: 5.5rem; margin-left: auto; display: block; }
   .etab tfoot th, .etab tfoot td { font-weight: var(--font-weight-semibold); border-bottom: 0; border-top: var(--border-width) solid var(--color-border-strong); }
-  .etab__name { min-width: 11rem; }
+  .etab__name { min-width: 9rem; }
   .etab__name-cell { display: flex; align-items: center; gap: var(--space-1); }
   .etab__name-cell .drag-handle { min-width: var(--space-6); }
   .etab__actions { white-space: nowrap; text-align: right; }
@@ -899,7 +901,7 @@
   .action-menu__label { font-size: var(--font-size-sm); color: var(--color-text-muted); }
   .row-author { display: block; margin-top: calc(var(--space-1) / 2); font-size: var(--font-size-sm); color: var(--color-text-subtle); }
   .row-author:empty { display: none; }
-  .pct-cell { display: flex; align-items: center; gap: var(--space-2); min-width: 7rem; }
+  .pct-cell { display: flex; align-items: center; gap: var(--space-2); min-width: 5rem; }
   .pct-cell .mini { flex: 1; min-width: 3rem; }
   .pct-cell .num { flex: none; white-space: nowrap; }
   .etab__new td { border-bottom: 0; }

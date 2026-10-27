@@ -1,5 +1,6 @@
 {% extends "_base.html" %}
 {% from "components/icon.html" import icon %}
+{% import "components/brand.html" as brand %}
 {% from "components/nav.html" import sidebar_nav, bottom_nav, theme_switch, banner %}
 {% from "components/toast.html" import toast_region %}
 {% from "components/alert.html" import alert %}
@@ -71,8 +72,7 @@
 <div class="app-shell">
   <aside class="app-sidebar" aria-label="Menu lateral">
     <a class="brand" href="{{ url_for('app.home') }}">
-      <img class="brand__logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="" width="28" height="28">
-      <span>Controle de Produção</span>
+      {{ brand.symbol(24, "Teroz, Controle de Produção — Painel") }}
     </a>
     {%- if current_company %}
     <p class="sidebar__company">{{ current_company.name }}<br><span class="sidebar__role">{{ role_label }}</span></p>
@@ -103,7 +103,7 @@
   </aside>
 
   <header class="app-topbar">
-    <a href="{{ url_for('app.home') }}" class="app-topbar__logo"><img class="brand__logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="Controle de Produção — Painel" width="28" height="28"></a>
+    <a href="{{ url_for('app.home') }}" class="app-topbar__logo">{{ brand.symbol(28, "Teroz, Controle de Produção — Painel") }}</a>
     <span class="app-topbar__company">{{ current_company.name if current_company else "Controle de Produção" }}</span>
     <a class="avatar" href="#mais" aria-haspopup="dialog" aria-controls="mais" title="{{ current_user.name }}"><span aria-hidden="true">{{ initials }}</span><span class="visually-hidden">Conta e opções de {{ current_user.name }}</span></a>
   </header>
