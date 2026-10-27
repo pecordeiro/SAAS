@@ -406,6 +406,26 @@
   --shadow-brand-device: 0 40px 80px -16px rgb(0 0 0 / 0.70);
 }
 
+/* ---------- Site público no tema claro por padrão ----------
+   Vale só nas páginas com .site--marca (início, preços, como funciona, termos, privacidade e contato):
+   com o aparelho em modo escuro, elas continuam claras. O modo escuro vale quando a pessoa escolhe “Escuro”
+   (data-theme="dark"). Fica depois do bloco escuro para vencê-lo; os valores são os do tema claro acima. */
+@media (prefers-color-scheme: dark) {
+  :root:has(.site--marca):not([data-theme="dark"]) {
+    color-scheme: light;
+    --color-bg: #FBFBF6; --color-surface: #FFFFFF; --color-surface-2: #F0F1E6;
+    --color-text: #14170D; --color-text-muted: #5E6354; --color-text-subtle: #6A6F5E;
+    --color-border-subtle: #E1E3D3; --color-border-strong: #CDD0BA;
+    --color-brand-bg: #FBFBF6; --color-brand-surface: #FFFFFF; --color-brand-surface-2: #F0F1E6;
+    --color-brand-text: #14170D; --color-brand-muted: #5E6354; --color-brand-subtle: #6A6F5E;
+    --color-brand-line: #E1E3D3; --color-brand-line-strong: #CDD0BA; --color-brand-border: #7C846A;
+    --color-brand: #455A0F; --color-brand-hover: #2E3D08; --color-brand-contrast: #FFFFFF;
+    --color-brand-soft: #E4EAD0; --color-brand-block: #8F9F78; --color-brand-block-text: #14170D;
+    --color-brand-frame: #101208; --color-brand-frame-detail: #2B2E22;
+    --shadow-brand: 0 24px 60px -12px rgb(30 38 10 / 0.18); --shadow-brand-device: 0 40px 80px -16px rgb(16 18 8 / 0.40);
+  }
+}
+
 /* ---------- Movimento reduzido ---------- */
 @media (prefers-reduced-motion: reduce) {
   :root {

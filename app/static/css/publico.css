@@ -347,3 +347,10 @@
     .pub-step.is-on .pub-step__bar { transform: scaleX(1); }
   }
 }
+
+
+/* Logotipo do site público: no tema claro por padrão, também com o aparelho em modo escuro (ver tokens.css). */
+@media (prefers-color-scheme: dark) {
+  :root:has(.site--marca):not([data-theme="dark"]) .brand__logo--claro { display: block; }
+  :root:has(.site--marca):not([data-theme="dark"]) .brand__logo--escuro { display: none; }
+}
