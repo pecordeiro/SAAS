@@ -3,8 +3,8 @@
 {% from "components/modal.html" import confirm_dialog %}
 {#
   Cabeçalho comum de Preencher etapas, Meta e equipe e Como funciona (painel do dono): no topo,
-  um botão por projeto ATIVO da empresa da sessão (trocar de projeto), e para supervisor+ ✎
-  renomear (campo em Meta e equipe), ✕ apagar (= arquivar, com confirmação; o histórico fica) e
+  um botão por projeto ATIVO da empresa da sessão (trocar de projeto), e para supervisor+ o lápis
+  (renomear, campo em Meta e equipe), o X apagar (= arquivar, com confirmação; o histórico fica) e
   “+ Novo projeto” (só o nome; nasce no modo simples com 5 etapas). Depois, o título da tela
   (page_title) e projeto + modo. page_endpoint = rota da tela atual (os botões levam a ela).
 #}
@@ -15,19 +15,19 @@
     <li class="project-tabs__item{% if pid == project.id %} is-current{% endif %}">
       <a class="project-tabs__link" href="{{ url_for(page_endpoint, projeto=pid) }}"{% if pid == project.id %} aria-current="page"{% endif %}>{{ pname }}</a>
       {%- if pid == project.id and can_manage %}
-      <a class="project-tabs__action" href="{{ url_for('preencher.goal_team', projeto=pid, _anchor='meta-nome') }}" title="Renomear projeto" aria-label="Renomear o projeto {{ pname }}">✎</a>
-      <a class="project-tabs__action project-tabs__action--danger" href="#apagar-projeto" aria-haspopup="dialog" title="Apagar projeto" aria-label="Apagar o projeto {{ pname }}">✕</a>
+      <a class="project-tabs__action" href="{{ url_for('preencher.goal_team', projeto=pid, _anchor='meta-nome') }}" title="Renomear projeto" aria-label="Renomear o projeto {{ pname }}">{{ icon("edit", "sm") }}</a>
+      <a class="project-tabs__action project-tabs__action--danger" href="#apagar-projeto" aria-haspopup="dialog" title="Apagar projeto" aria-label="Apagar o projeto {{ pname }}">{{ icon("x", "sm") }}</a>
       {%- endif %}
     </li>
     {%- endfor %}
     {%- if can_manage %}
     <li class="project-tabs__item project-tabs__item--new">
       <details class="project-new">
-        <summary class="project-tabs__link project-tabs__plus" title="Novo projeto (nasce com 5 etapas, modo simples)">+ <span class="visually-hidden">Novo projeto</span></summary>
+        <summary class="project-tabs__link project-tabs__plus" title="Novo projeto (nasce com 5 etapas, modo simples)">{{ icon("plus", "sm") }}<span class="visually-hidden">Novo projeto</span></summary>
         <form class="project-new__form" method="post" action="{{ url_for('preencher.project_quick_new') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <label class="visually-hidden" for="projeto-novo-nome">Nome do novo projeto</label>
-          <input class="field__input" id="projeto-novo-nome" name="name" maxlength="160" required autocomplete="off" placeholder="Nome do projeto…">
+          <input class="field__input" id="projeto-novo-nome" name="name" maxlength="160" required autocomplete="off" placeholder="Ex.: Lote 2026-015">
           <button class="btn btn--primary btn--sm" type="submit">Criar</button>
         </form>
       </details>

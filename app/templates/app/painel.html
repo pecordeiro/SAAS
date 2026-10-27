@@ -19,7 +19,7 @@
 {% block content %}
 {#
   Painel da operação (R2, primeira tela): todos os projetos ativos, na vertical — cabeçalho
-  com frase-resumo, 5 indicadores somados (calc.resumo_operacao), uma esteira por projeto,
+  com frase-resumo, 5 indicadores somados (calc.resumo_operacao),
   gráficos por projeto, situação das etapas e a tabela de projetos. Só exibe (ADR-0009).
 #}
 {%- set s = d.resumo -%}
@@ -36,27 +36,16 @@
 {%- else %}
 
 {%- set prox = d.proximo %}
-{{ p.kpi_strip(d.medidor, s.progresso_geral|pct(0), (s.tempo_trabalhado_h|num(1)) ~ " h trabalhadas de " ~ (s.tempo_total_h|num(1)) ~ " h", [
+{{ p.kpi_strip(d.medidor, s.progresso_geral|pct(0), (s.tempo_trabalhado_h|num(1)) ~ " h trabalhadas de " ~ (s.tempo_total_h|num(1)) ~ " h", [
   ("Unidades prontas", s.unidades_concluidas, "/ " ~ s.previstas, "somando os projetos ativos", None),
   ("Etapas concluídas", s.etapas_concluidas, "/ " ~ s.etapas, "tarefas concluídas: " ~ s.tarefas_concluidas ~ " de " ~ s.tarefas, None),
   ("Horas que faltam", s.tempo_restante_h|num(1), "h", (s.projetos ~ (" projeto" if s.projetos == 1 else " projetos")), None),
   ("Dias úteis até o prazo", prox.prazo.until if prox else None, (("dia útil" if prox.prazo.until == 1 else "dias úteis") if prox else None), (prox.project.name ~ " · " ~ prox.prazo.short) if prox else "nenhum projeto com prazo", prox.prazo.tone if prox else None, (prox.project.name ~ ": " ~ prox.prazo.text) if prox else None),
 ]) }}
 
-<section class="card painel-block" aria-labelledby="g-esteira">
-  <div class="chart-card__head">
-    <h2 class="section-title" id="g-esteira">Esteira de etapas</h2>
-    {{ p.status_legend(waiting=d.aguardando_ativo) }}
-  </div>
-  <div class="esteiras">
-    {%- for proj in d.projetos %}
-    {{ p.esteira(proj.esteira, proj.project.name, title_href=proj.href, prazo=proj.prazo) }}
-    {%- endfor %}
-  </div>
-  {%- if total_active > d.projetos|length %}
-  <p class="muted text-sm mt-2">Mostrando {{ d.projetos|length }} de {{ total_active }} projetos ativos. <a href="{{ url_for('app.projects') }}">Ver todos</a></p>
-  {%- endif %}
-</section>
+{%- if total_active > d.projetos|length %}
+<p class="muted text-sm mt-2">Mostrando {{ d.projetos|length }} de {{ total_active }} projetos ativos. <a href="{{ url_for('app.projects') }}">Ver todos</a></p>
+{%- endif %}
 
 <div class="painel-grid">
   {% call p.chart_card("g-tarefas", "Tarefas × unidades por projeto", "tasks", "Barras por projeto: progresso pelas tarefas e unidades prontas. Valores na tabela de dados.", legend=[("tasks", "Pelas tarefas"), ("units", "Unidades prontas")], class_="painel-grid__main") %}

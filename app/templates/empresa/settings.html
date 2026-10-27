@@ -61,7 +61,7 @@
       <form class="inline-form" method="post" action="{{ url_for('empresa.holiday_add') }}" novalidate>
         {{ holiday_form.csrf_token }}
         {{ field(holiday_form.day, attrs={"required": true}) }}
-        {{ field(holiday_form.name, attrs={"required": true, "placeholder": "Recesso de fim de ano"}) }}
+        {{ field(holiday_form.name, attrs={"required": true, "placeholder": "Recesso de fim de ano"}, id="feriado-nome") }}
         {{ button("Incluir feriado", "secondary", icon="plus") }}
       </form>
       {%- if holidays %}

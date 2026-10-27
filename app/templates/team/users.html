@@ -41,7 +41,7 @@
           <form class="cluster" method="post" action="{{ url_for('team.change_role', membership_id=m.id) }}">
             {{ action_form.csrf_token }}
             <label class="visually-hidden" for="papel-{{ m.id }}">Papel de {{ m.user.name }}</label>
-            <select class="field__input" id="papel-{{ m.id }}" name="role">
+            <select class="field__input field__input--inline" id="papel-{{ m.id }}" name="role">
               {%- for value, label in [("operator", "Operador"), ("supervisor", "Supervisor"), ("owner", "Proprietário")] %}
               <option value="{{ value }}"{% if m.role == value %} selected{% endif %}>{{ label }}</option>
               {%- endfor %}

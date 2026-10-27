@@ -442,7 +442,7 @@ DASHBOARD_TABLES = (("tarefas", "Tabela 1 · Tarefas"), ("unidades", "Tabela 2 �
 @bp.get("/projetos/<uuid:project_id>/painel")
 @tenant_required(ROLE_OPERATOR)
 def project_dashboard(project_id):
-    """Painel de um projeto (R2): cabeçalho com frase-resumo, 5 indicadores, esteira de etapas,
+    """Painel de um projeto (R2): cabeçalho com frase-resumo, 5 indicadores,
     gráficos (ECharts local, só desenha o JSON do servidor) e Tabelas 1/2. Só leitura; todos os
     números vêm de calc.py (ADR-0009)."""
     project = get_or_404(Project, project_id)

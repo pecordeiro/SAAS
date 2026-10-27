@@ -51,7 +51,7 @@
 </section>
 {%- endmacro %}
 
-{# ---------- Legenda das situações (o quadrado é a própria marca da esteira/rosca) ---------- #}
+{# ---------- Legenda das situações (o quadrado é a própria marca da rosca) ---------- #}
 {#- waiting=False: módulo opcional “aguardando peça” desligado (R6) — a situação some da legenda. -#}
 {% macro status_legend(contagem=None, with_today=True, waiting=True) -%}
 <ul class="legend" role="list">
@@ -62,31 +62,6 @@
   <li class="legend__item"><span class="legend__today" aria-hidden="true"></span>Hoje (pelo prazo)</li>
   {%- endif %}
 </ul>
-{%- endmacro %}
-
-{# ---------- 3. Esteira de etapas: um bloco por etapa, largura ∝ tempo, cor = situação ---------- #}
-{% macro esteira(est, name, title_href=None, prazo=None) -%}
-<div class="esteira">
-  <div class="esteira__head">
-    {%- if title_href %}<a class="esteira__name" href="{{ title_href }}">{{ name }}</a>{% else %}<span class="esteira__name">{{ name }}</span>{% endif %}
-    {%- if prazo %}<span class="esteira__prazo esteira__prazo--{{ prazo.tone }}">{{ prazo.text }}</span>{% endif %}
-  </div>
-  {%- if est.blocos %}
-  <svg class="esteira__bar" viewBox="0 0 1000 24" preserveAspectRatio="none" role="group" aria-label="Etapas de {{ name }}, na ordem; clique para preencher">
-    {%- for b in est.blocos %}
-    <a href="{{ b.href }}" aria-label="{{ b.title }}"><rect class="esteira__bloco esteira__bloco--{{ b.visual }}" x="{{ b.x }}" y="0" width="{{ b.w }}" height="24"><title>{{ b.title }}</title></rect></a>
-    {%- endfor %}
-    {%- if est.hoje is not none %}
-    <line class="esteira__hoje" x1="{{ est.hoje }}" x2="{{ est.hoje }}" y1="0" y2="24"></line>
-    {%- endif %}
-  </svg>
-  <p class="esteira__foot">
-    {%- if est.atual %}Etapa atual: <a href="{{ est.blocos[est.atual.n - 1].href }}">{{ est.atual.label }}</a> · {{ est.atual.visual_nome|lower }}{% else %}Todas as etapas concluídas{% endif -%}
-  </p>
-  {%- else %}
-  <p class="esteira__foot">Sem etapas ainda.</p>
-  {%- endif %}
-</div>
 {%- endmacro %}
 
 {# ---------- Cartão de gráfico: título, legenda, área do ECharts e tabela de dados ---------- #}

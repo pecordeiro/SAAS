@@ -134,19 +134,28 @@
     if (href) window.location.href = href;
   }
 
+  // Mistura duas cores #rrggbb (só apresentação: o quanto cada bloco está pronto vem do servidor).
+  function mix(from, to, k) {
+    function p(hex) { var h = hex.replace("#", ""); return [0, 2, 4].map(function (i) { return parseInt(h.substr(i, 2), 16); }); }
+    var a = p(from), b = p(to);
+    return "rgb(" + a.map(function (v, i) { return Math.round(v + (b[i] - v) * k); }).join(",") + ")";
+  }
+
   /* ---------- 4. Tarefas × unidades (por etapa ou por projeto) ---------- */
   function drawTasks(el, t) {
     var rows = DATA.rows || [];
-    el.style.height = rowsHeight(rows.length, 44) + "px";
+    el.style.height = rowsHeight(rows.length, 48) + "px";
     var chart = init(el);
     var pct = function (p) { return p.value > 0 ? Math.round(p.value * 100) + "%" : ""; };
+    var track = { show: true, itemStyle: { color: t.grid, opacity: 0.55, borderRadius: 6 } };
     chart.setOption(Object.assign(base(t), {
-      grid: { left: 8, right: 40, top: 8, bottom: 8, containLabel: true },
-      xAxis: valueAxis(t, { min: 0, max: 1, interval: narrow() ? 0.5 : 0.25, axisLabel: { color: t.subtle, fontSize: AXIS_FONT, formatter: function (v) { return Math.round(v * 100) + "%"; } } }),
+      grid: { left: 8, right: 44, top: 8, bottom: 8, containLabel: true },
+      xAxis: valueAxis(t, { min: 0, max: 1, interval: narrow() ? 0.5 : 0.25, splitLine: { lineStyle: { color: t.grid, width: 1, type: "dashed" } },
+        axisLabel: { color: t.subtle, fontSize: AXIS_FONT, formatter: function (v) { return Math.round(v * 100) + "%"; } } }),
       yAxis: categoryAxis(t, rows.map(function (r) { return r.label; })),
       tooltip: Object.assign(base(t).tooltip, {
         trigger: "axis",
-        axisPointer: { type: "shadow", shadowStyle: { color: t.grid, opacity: 0.4 } },
+        axisPointer: { type: "shadow", shadowStyle: { color: t.grid, opacity: 0.35 } },
         formatter: function (ps) {
           var r = rows[ps[0].dataIndex];
           return "<strong>" + esc(r.label) + "</strong><br>" + dot("tasks") + "Pelas tarefas: <strong>" + esc(r.tasksText) +
@@ -154,10 +163,12 @@
         },
       }),
       series: [
-        { name: "Pelas tarefas", type: "bar", barWidth: 14, barGap: "15%", itemStyle: { color: t.tasks, borderRadius: [0, 3, 3, 0] },
+        { name: "Pelas tarefas", type: "bar", barWidth: 12, barGap: "25%", showBackground: true, backgroundStyle: track.itemStyle,
+          itemStyle: { color: t.tasks, borderRadius: 6 },
           data: rows.map(function (r) { return r.tasks; }),
-          label: { show: true, position: "right", color: t.text, fontSize: LABEL_FONT, formatter: pct } },
-        { name: "Unidades", type: "bar", barWidth: 14, itemStyle: { color: t.units, borderRadius: [0, 3, 3, 0] },
+          label: { show: true, position: "right", color: t.text, fontSize: LABEL_FONT, fontWeight: 600, formatter: pct } },
+        { name: "Unidades", type: "bar", barWidth: 12, showBackground: true, backgroundStyle: track.itemStyle,
+          itemStyle: { color: t.units, borderRadius: 6 },
           data: rows.map(function (r) { return r.units; }),
           label: { show: true, position: "right", color: t.muted, fontSize: LABEL_FONT, formatter: pct } },
       ],
@@ -184,13 +195,13 @@
         trigger: "item",
         formatter: function (p) { return dot(p.data.key) + esc(p.name) + ": <strong>" + p.value + "</strong> " + (p.value === 1 ? "etapa" : "etapas"); },
       }),
-      graphic: [{
-        type: "text", left: "center", top: "middle",
-        style: { text: done + "/" + total + "\nconcluídas", fill: t.text, font: "600 16px " + t.font, textAlign: "center", lineHeight: 20 },
-      }],
+      graphic: [
+        { type: "text", left: "center", top: "37%", style: { text: done + "/" + total, fill: t.text, font: "600 26px " + t.font, textAlign: "center" } },
+        { type: "text", left: "center", top: "56%", style: { text: "concluídas", fill: t.muted, font: "400 12px " + t.font, textAlign: "center" } },
+      ],
       series: [{
-        type: "pie", radius: ["66%", "92%"], center: ["50%", "50%"], padAngle: total > 1 ? 1.5 : 0,
-        itemStyle: { borderRadius: 2 }, label: { show: false }, labelLine: { show: false },
+        type: "pie", radius: ["62%", "90%"], center: ["50%", "50%"], padAngle: total > 1 ? 3 : 0,
+        itemStyle: { borderRadius: 8 }, label: { show: false }, labelLine: { show: false },
         emphasis: { scale: false },
         data: items.filter(function (s) { return s.value > 0; }).map(function (s) {
           return { name: s.name, value: s.value, key: s.key, itemStyle: { color: colors[s.key] } };
@@ -199,18 +210,53 @@
     }));
   }
 
-  /* ---------- 5. Horas (trabalhadas × faltam), nome no eixo ---------- */
+  /* ---------- 4b. Quanto cada etapa representa (mapa de blocos) ---------- */
+  function drawWeight(el, t) {
+    var rows = (DATA.rows || []).filter(function (r) { return r.weight > 0; });
+    var chart = init(el);
+    var data = rows.map(function (r) {
+      var k = Math.min(Math.max(r.tasks, 0), 1);
+      return { name: r.label, value: r.weight, row: r,
+        itemStyle: { color: mix(t.tasksSoft, t.tasks, k) },
+        label: { color: k > 0.55 ? t.surface : t.text } };
+    });
+    chart.setOption(Object.assign(base(t), {
+      tooltip: Object.assign(base(t).tooltip, {
+        trigger: "item",
+        formatter: function (p) {
+          var r = p.data && p.data.row;
+          if (!r) return "";
+          return "<strong>" + esc(r.label) + "</strong><br>Peso no projeto: <strong>" + esc(r.weightText) +
+            "</strong><br>" + dot("tasks") + "Progresso: <strong>" + esc(r.tasksText) + "</strong>";
+        },
+      }),
+      series: [{
+        type: "treemap", roam: false, nodeClick: false, breadcrumb: { show: false },
+        left: 0, right: 0, top: 0, bottom: 0, squareRatio: 1.2,
+        itemStyle: { borderColor: t.surface, borderWidth: 3, gapWidth: 3, borderRadius: 8 },
+        label: { show: true, position: "insideTopLeft", padding: [8, 10], fontSize: AXIS_FONT, fontWeight: 600, overflow: "truncate",
+          formatter: function (p) { var r = p.data && p.data.row; return r ? p.name.replace(/^\d+\.\s*/, "") + "\n" + r.weightText : ""; } },
+        emphasis: { itemStyle: { shadowBlur: 0 } },
+        data: data,
+      }],
+    }));
+    chart.on("click", function (p) { go(p.data && p.data.row && p.data.row.href); });
+  }
+
+  /* ---------- 5. Horas (trabalhadas × faltam), colunas empilhadas por etapa ---------- */
   function drawHours(el, t) {
     var rows = DATA.rows || [];
-    el.style.height = rowsHeight(rows.length, 36) + "px";
+    el.style.height = narrow() ? "260px" : "320px";
     var chart = init(el);
     chart.setOption(Object.assign(base(t), {
-      grid: { left: 8, right: 24, top: 8, bottom: 8, containLabel: true },
-      xAxis: valueAxis(t, { axisLabel: { color: t.subtle, fontSize: AXIS_FONT, formatter: axisNum(" h") } }),
-      yAxis: categoryAxis(t, rows.map(function (r) { return r.label; })),
+      grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },
+      xAxis: { type: "category", data: rows.map(function (r) { return r.n != null ? String(r.n) : r.label; }), axisTick: { show: false },
+        axisLine: { lineStyle: { color: t.axis } }, axisLabel: { color: t.muted, fontSize: AXIS_FONT } },
+      yAxis: valueAxis(t, { splitLine: { lineStyle: { color: t.grid, width: 1, type: "dashed" } },
+        axisLabel: { color: t.subtle, fontSize: AXIS_FONT, formatter: axisNum(" h") } }),
       tooltip: Object.assign(base(t).tooltip, {
         trigger: "axis",
-        axisPointer: { type: "shadow", shadowStyle: { color: t.grid, opacity: 0.4 } },
+        axisPointer: { type: "shadow", shadowStyle: { color: t.grid, opacity: 0.35 } },
         formatter: function (ps) {
           var r = rows[ps[0].dataIndex];
           return "<strong>" + esc(r.label) + "</strong><br>" + dot("worked") + "Trabalhadas: <strong>" + esc(r.workedText) +
@@ -218,9 +264,9 @@
         },
       }),
       series: [
-        { name: "Trabalhadas", type: "bar", stack: "h", barWidth: 20, itemStyle: { color: t.tasks, borderColor: t.surface, borderWidth: 1 },
+        { name: "Trabalhadas", type: "bar", stack: "h", barMaxWidth: 36, itemStyle: { color: t.tasks, borderColor: t.surface, borderWidth: 1 },
           data: rows.map(function (r) { return r.worked; }) },
-        { name: "Faltam", type: "bar", stack: "h", barWidth: 20, itemStyle: { color: t.todo, borderColor: t.surface, borderWidth: 1, borderRadius: [0, 3, 3, 0] },
+        { name: "Faltam", type: "bar", stack: "h", barMaxWidth: 36, itemStyle: { color: t.tasksSoft, borderColor: t.surface, borderWidth: 1, borderRadius: [8, 8, 0, 0] },
           data: rows.map(function (r) { return r.left; }) },
       ],
     }));
@@ -230,7 +276,7 @@
   /* ---------- 6. Equipe × prazo (um projeto) ---------- */
   function drawTeam(el, t) {
     var team = DATA.team || { rows: [] };
-    el.style.height = "240px";
+    el.style.height = narrow() ? "240px" : "280px";
     var rows = team.rows;
     var chart = init(el);
     // A linha do prazo só entra quando cabe na escala sem achatar as colunas (até 1,5× a maior).
@@ -243,10 +289,11 @@
       data: [{ yAxis: team.due }],
     };
     chart.setOption(Object.assign(base(t), {
-      grid: { left: 8, right: 16, top: 24, bottom: 8, containLabel: true },
+      grid: { left: 8, right: 16, top: 28, bottom: 8, containLabel: true },
       xAxis: { type: "category", data: rows.map(function (r) { return narrow() ? String(r.people) : r.label; }), axisTick: { show: false },
         axisLine: { lineStyle: { color: t.axis } }, axisLabel: { color: t.muted, fontSize: AXIS_FONT } },
-      yAxis: valueAxis(t, { axisLabel: { color: t.subtle, fontSize: AXIS_FONT, formatter: axisNum(" d") } }),
+      yAxis: valueAxis(t, { splitLine: { lineStyle: { color: t.grid, width: 1, type: "dashed" } },
+        axisLabel: { color: t.subtle, fontSize: AXIS_FONT, formatter: axisNum(" d") } }),
       tooltip: Object.assign(base(t).tooltip, {
         trigger: "item",
         formatter: function (p) {
@@ -255,11 +302,11 @@
         },
       }),
       series: [{
-        type: "bar", barMaxWidth: 40, barCategoryGap: "30%",
+        type: "bar", barMaxWidth: 44, barCategoryGap: "35%",
         data: rows.map(function (r) {
-          return { value: r.days == null ? 0 : r.days, itemStyle: { color: r.current ? t.tasks : t.tasksSoft, borderRadius: [3, 3, 0, 0] } };
+          return { value: r.days == null ? 0 : r.days, itemStyle: { color: r.current ? t.done : t.tasksSoft, borderRadius: [8, 8, 0, 0] } };
         }),
-        label: { show: true, position: "top", color: t.text, fontSize: LABEL_FONT, formatter: function (p) { return rows[p.dataIndex].daysText; } },
+        label: { show: true, position: "top", color: t.text, fontSize: LABEL_FONT, fontWeight: 600, formatter: function (p) { return rows[p.dataIndex].daysText; } },
         markLine: markLine,
       }],
     }));
@@ -295,14 +342,15 @@
     chart.on("click", function (p) { go(rows[p.dataIndex] && rows[p.dataIndex].href); });
   }
 
-  var DRAW = { tasks: drawTasks, status: drawStatus, hours: drawHours, team: drawTeam, deadline: drawDeadline };
+  var DRAW = { tasks: drawTasks, status: drawStatus, weight: drawWeight, hours: drawHours, team: drawTeam, deadline: drawDeadline };
 
   function drawAll() {
     var t = tokens();
     var boxes = document.querySelectorAll("[data-chart]");
     for (var i = 0; i < boxes.length; i++) {
       var fn = DRAW[boxes[i].getAttribute("data-chart")];
-      if (fn) fn(boxes[i], t);
+      // Um gráfico com problema não pode deixar os outros em branco.
+      if (fn) { try { fn(boxes[i], t); } catch (e) { if (window.console) console.error("painel: gráfico", boxes[i].getAttribute("data-chart"), e); } }
     }
   }
 

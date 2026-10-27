@@ -31,7 +31,7 @@
     <form class="stack" method="post" action="{{ url_for('account.profile_email') }}" novalidate>
       {{ email_form.csrf_token }}
       {{ field(email_form.email, hint="Enviamos um link para o novo endereço; o e-mail só muda depois de confirmar.", attrs={"autocomplete": "email", "inputmode": "email", "required": true}) }}
-      {{ field(email_form.current_password, attrs={"autocomplete": "current-password", "required": true}) }}
+      {{ field(email_form.current_password, attrs={"autocomplete": "current-password", "required": true}, id="email-senha-atual") }}
       <div>{{ button("Trocar e-mail", "secondary") }}</div>
     </form>
   </section>

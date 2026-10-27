@@ -53,7 +53,7 @@ def _painel(client, tenant, query=""):
 
 
 def test_painel_mostra_kpis_graficos_e_tabela(client, app, tenants):
-    """R2: cabeçalho com frase-resumo, faixa de 5 indicadores, esteira, gráficos e Tabelas 1/2."""
+    """R2: cabeçalho com frase-resumo, faixa de 5 indicadores, gráficos e Tabelas 1/2."""
     a, _ = tenants
     _projeto_rico(app, a)
     login(client, app, a.operator_email)
@@ -68,8 +68,8 @@ def test_painel_mostra_kpis_graficos_e_tabela(client, app, tenants):
         "Etapas concluídas",
         "Horas que faltam",
         "Dias úteis até o prazo",
-        "Esteira de etapas",
         "Tarefas × unidades por etapa",
+        "Quanto cada etapa representa",
         "Situação das etapas",
         "Atrasadas e aguardando peça",
         "Horas por etapa",
@@ -94,11 +94,14 @@ def test_painel_mostra_kpis_graficos_e_tabela(client, app, tenants):
     assert [row["label"] for row in dados["rows"]][:2] == ["1. Etapa 1", "2. Pintura"]
     assert dados["rows"][0]["tasks"] == pytest.approx(r.etapas[0].progresso)
     assert sum(s["value"] for s in dados["status"]) == 5
+    # mapa de blocos "quanto cada etapa representa": peso e situação vêm prontos do servidor
+    assert dados["rows"][0]["weight"] == pytest.approx(r.etapas[0].peso_no_projeto, abs=1e-4)
+    assert [row["n"] for row in dados["rows"]] == [1, 2, 3, 4, 5]
     assert len(dados["team"]["rows"]) == 6
     assert "/static/" in html and re.search(r"echarts(-5\.5\.1/echarts\.min|\.[0-9a-f]{10})\.js", html)
 
 
-def test_painel_sem_estilo_inline_sem_cdn_e_esteira_acessivel(client, app, tenants):
+def test_painel_sem_estilo_inline_sem_cdn_e_sem_esteira(client, app, tenants):
     a, _ = tenants
     _projeto_rico(app, a)
     login(client, app, a.operator_email)
@@ -108,13 +111,11 @@ def test_painel_sem_estilo_inline_sem_cdn_e_esteira_acessivel(client, app, tenan
     # o único <script> no corpo é o bloco de dados JSON (não executa)
     assert re.findall(r"<script\b[^>]*>", corpo.split("</main>")[0]) == ['<script type="application/json" id="painel-dados">']
     assert "http://" not in corpo and "https://cdn" not in corpo
-    # esteira: um bloco (link com nome) por etapa, cor só por classe
-    blocos = re.findall(r'<a href="([^"]+)" aria-label="([^"]+)"><rect class="esteira__bloco esteira__bloco--(\w+)"', corpo)
-    assert len(blocos) == 5
-    assert all(" — " in label for _, label, _ in blocos)
+    # nem todo processo é linear: o painel não tem mais a esteira de etapas
+    assert "esteira" not in corpo.lower()
     assert not re.search(r'(fill|stroke)="#', corpo) and "rgb(" not in corpo
     # gráficos do ECharts têm nome acessível
-    for chart in ("tasks", "status", "hours", "team"):
+    for chart in ("tasks", "status", "weight", "hours", "team"):
         assert re.search(rf'data-chart="{chart}" role="img" aria-label="[^"]+"', corpo), chart
 
 
@@ -209,14 +210,7 @@ def test_painel_projeto_usa_so_numeros_do_calc():
     assert d["contagem"] == {"done": 1, "doing": 1, "waiting": 0, "late": 0, "todo": 3}
     assert sum(s["value"] for s in d["grafico"]["status"]) == 5
     assert d["sem_tempo"] == 1
-    # esteira: largura ∝ tempo total da etapa (calc.fatias_da_esteira), blocos lado a lado
-    blocos = d["esteira"]["blocos"]
-    total = sum(e["r"].tempo_total_min for e in d["etapas"])
-    for b, e in zip(blocos, d["etapas"]):
-        assert b["w"] == pytest.approx(e["r"].tempo_total_min / total * 1000, abs=1e-2)
-        assert b["href"] == f"/etapa/{e['id']}"
-    assert blocos[-1]["w"] == 0 and sum(b["w"] for b in blocos) == pytest.approx(1000, abs=1e-2)
-    assert d["esteira"]["hoje"] is None  # sem prazo: sem marca de hoje
+    assert "esteira" not in d
     # horas = trabalhadas + faltam de cada etapa
     for row, e in zip(d["grafico"]["rows"], d["etapas"]):
         assert row["worked"] + row["left"] == pytest.approx(e["total_h"], abs=0.02)
@@ -239,7 +233,6 @@ def test_painel_projeto_atraso_e_aguardando_peca():
         assert e["atrasada"] == atrasada
     assert d["etapas"][0]["visual"] == "done"
     assert d["etapas"][2]["visual"] == "waiting"  # aguardando peça vence "atrasada"
-    assert d["esteira"]["hoje"] == pytest.approx(500)
     assert [p["etapa"]["visual"] for p in d["pendencias"]][-1] == "waiting"
     assert d["frase"].startswith("Lote 10: termina 10/11, folga de 3 dias úteis")
     assert "aguardando peça" in d["frase"]
@@ -278,7 +271,8 @@ def test_painel_operacao_soma_os_projetos():
     assert [row["label"] for row in d["grafico"]["rows"]] == ["Lote 0", "Lote 1"]
     assert d["proximo"] is None
     assert d["frase"].startswith("2 projetos ativos")
-    assert d["projetos"][1]["esteira"]["blocos"][0]["href"] == "/p1/1"
+    assert d["projetos"][1]["href"] == "/p1"
+    assert "esteira" not in d["projetos"][1]
 
 
 def test_dashboard_e_puro():

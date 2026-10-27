@@ -94,12 +94,20 @@ def test_marca_so_no_site_publico():
         assert "color-brand" not in path.read_text(encoding="utf-8"), path.name
 
 
-def test_dados_nao_usam_a_cor_da_marca():
-    """O anel e a esteira do painel de exemplo usam só cores de status."""
+def test_pagina_inicial_mostra_telas_reais_e_nao_desenhos(client):
+    """A página inicial e “Como funciona” mostram capturas reais do produto (dados de exemplo), com texto
+    alternativo, servidas pelo próprio site, em vez de maquetes geométricas (barras, esteira, interruptores)."""
+    for url, imagens in (("/", ("painel-claro.webp", "painel-escuro.webp", "passo-planilha.webp", "passo-painel.webp", "passo-celular.webp")),
+                         ("/como-funciona", ("passo-planilha.webp", "importar-colunas.webp", "importar-previa.webp"))):
+        html = client.get(url).get_data(as_text=True)
+        for nome in imagens:
+            assert f"/static/img/vitrine/{nome}" in html, (url, nome)
+            assert (STATIC / "img" / "vitrine" / nome).is_file(), nome
+        for antigo in ("pub-seg", "pub-art__", "pub-switch", "pub-float", "pub-block", "Esteira de etapas"):
+            assert antigo not in html, (url, antigo)
+        assert re.search(r'<img class="pub-device__shot"[^>]+alt="[^"]{20,}"', html) or url != "/"
     css = (STATIC / "css" / "publico.css").read_text(encoding="utf-8")
-    for selector in (".pub-ring__fg", ".pub-seg--done", ".pub-seg--doing", ".pub-seg--todo", ".pub-dot--done", ".pub-dot--doing", ".pub-dot--todo"):
-        rule = re.search(re.escape(selector) + r"\s*\{([^}]*)\}", css).group(1)
-        assert "color-status" in rule and "color-brand" not in rule, selector
+    assert "pub-switch" not in css and "pub-float" not in css
 
 
 def test_animacoes_respeitam_movimento_reduzido():

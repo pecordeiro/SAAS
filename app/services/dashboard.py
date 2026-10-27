@@ -6,7 +6,7 @@ prontos para o template e para o JSON dos gráficos (ECharts lê esse JSON e só
 Números do negócio vêm do calc; aqui só se organiza, rotula e formata (ADR-0009).
 
 Duas visões:
-- ``painel_projeto``: um projeto (cabeçalho, 5 indicadores, esteira, gráficos por etapa, tabelas);
+- ``painel_projeto``: um projeto (cabeçalho, 5 indicadores, gráficos por etapa, tabelas);
 - ``painel_operacao``: todos os projetos ativos (as mesmas seções, com um projeto por linha).
 """
 
@@ -27,7 +27,6 @@ NOMES_VISUAIS = {
     calc.VISUAL_NAO_INICIADA: "Não iniciada",
 }
 
-ESTEIRA_LARGURA = 1000.0  # unidades do viewBox da esteira (a altura é fixa no CSS)
 
 _NUMERO_NO_INICIO = re.compile(r"^\s*\d+\s*[.)\-–—:]\s*")
 
@@ -124,12 +123,11 @@ def frase_operacao(projetos: Sequence[dict], contagem: dict[str, int]) -> str:
 def etapas_do_painel(
     stages: Sequence[Any], result: calc.ResultadoProjeto, fracao_decorrida: float | None, aguardando_ativo: bool = True
 ) -> list[dict]:
-    """Uma linha por etapa: números do calc + situação visual + fatia da esteira.
+    """Uma linha por etapa: números do calc + situação visual.
     ``aguardando_ativo=False`` (R6: módulo “aguardando peça” desligado) ignora a marca."""
     atrasos = calc.etapas_atrasadas(result.etapas, fracao_decorrida)
-    fatias = calc.fatias_da_esteira(result.etapas)
     etapas = []
-    for i, (stage, r, atrasada, (ini, larg)) in enumerate(zip(stages, result.etapas, atrasos, fatias), start=1):
+    for i, (stage, r, atrasada) in enumerate(zip(stages, result.etapas, atrasos), start=1):
         aguardando = aguardando_ativo and bool(getattr(stage, "waiting_part", False))
         visual = calc.status_visual(r.status, aguardando, atrasada)
         etapas.append(
@@ -144,8 +142,6 @@ def etapas_do_painel(
                 "atrasada": atrasada,
                 "visual": visual,
                 "visual_nome": NOMES_VISUAIS[visual],
-                "inicio": ini,
-                "largura": larg,
                 "pct_unidades": calc.razao(r.unidades, r.previstas),
                 "trabalhado_h": (r.tempo_total_min - r.tempo_restante_min) / 60,
                 "falta_h": r.tempo_restante_min / 60,
@@ -153,27 +149,6 @@ def etapas_do_painel(
             }
         )
     return etapas
-
-
-def esteira(etapas: Sequence[dict], fracao_decorrida: float | None, href: Callable[[Any], str]) -> dict:
-    """Blocos da esteira (x e largura no viewBox de 1000) e a marca de “hoje”."""
-    blocos = []
-    for e in etapas:
-        detalhe = f"{e['visual_nome']}; tarefas {br_pct(e['r'].progresso, 0)}; faltam {br_hours(e['falta_h'])}"
-        if e["waiting_part"] and e["part_expected_on"]:
-            detalhe += f"; peça prevista {br_date_short(e['part_expected_on'])}"
-        blocos.append(
-            {
-                "x": round(e["inicio"] * ESTEIRA_LARGURA, 3),
-                "w": round(e["largura"] * ESTEIRA_LARGURA, 3),
-                "visual": e["visual"],
-                "title": f"{e['label']} — {detalhe}",
-                "href": href(e["id"]),
-            }
-        )
-    hoje = None if fracao_decorrida is None else round(min(max(fracao_decorrida, 0), 1) * ESTEIRA_LARGURA, 3)
-    atual = next((e for e in etapas if e["visual"] != calc.VISUAL_CONCLUIDA), None)
-    return {"blocos": blocos, "hoje": hoje, "atual": atual}
 
 
 def _rosca(contagem: dict[str, int], aguardando_ativo: bool = True) -> list[dict]:
@@ -236,7 +211,11 @@ def painel_projeto(
     equipe = _equipe(result.tempo_restante_h, hours_per_day, people)
     linhas = [
         {
+            "n": e["n"],
             "label": e["label"],
+            "visual": e["visual"],
+            "weight": round(max(e["r"].peso_no_projeto, 0), 4),
+            "weightText": br_pct(e["r"].peso_no_projeto, 1),
             "tasks": round(min(max(e["r"].progresso, 0), 1), 4),
             "tasksText": br_pct(e["r"].progresso, 0),
             "units": round(min(max(e["pct_unidades"], 0), 1), 4),
@@ -260,7 +239,6 @@ def painel_projeto(
         "medidor": charts.medidor(result.progresso_geral),
         "unidades_pct": calc.razao(result.unidades_concluidas, quantity),
         "unidades_etapas_pct": calc.razao(result.unidades_etapas, result.unidades_etapas_previstas),
-        "esteira": esteira(etapas, fracao_decorrida, href_etapa),
         "contagem": contagem,
         "pendencias": [dict(x, href=href_etapa(x["etapa"]["id"])) for x in _pendencias(etapas)],
         "equipe": equipe,
@@ -297,7 +275,6 @@ def painel_operacao(itens: Sequence[dict], href_etapa: Callable[[Any, Any], str]
                 "prazo": prazo_txt,
                 "deadline": it["deadline"],
                 "contagem": calc.contagem_visual(e["visual"] for e in etapas),
-                "esteira": esteira(etapas, it["fracao"], lambda sid, pid=p.id: href_etapa(pid, sid)),
                 "unidades_pct": calc.razao(r.unidades_concluidas, p.quantity),
                 "href": href_projeto(p.id),
                 "pendencias": [dict(x, projeto=p.name, href=href_etapa(p.id, x["etapa"]["id"])) for x in _pendencias(etapas)],

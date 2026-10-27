@@ -164,7 +164,10 @@ migrations no PostgreSQL só rodam com `TEST_DATABASE_URL`; no SQLite aparecem c
 - Menu: Painel, Preencher etapas, Meta e equipe, Como funciona; depois Projetos e Histórico;
   Configurações no rodapé. Celular: as 4 telas + “Mais”.
 - `/app` abre o **Painel da operação** (todos os projetos ativos); `/app/projetos/<id>/painel` é o
-  painel de um projeto. Frase-resumo, 5 indicadores, esteira de etapas, gráficos e Tabelas 1/2.
+  painel de um projeto. Frase-resumo, 5 indicadores, gráficos (tarefas × unidades, situação, quanto cada etapa representa,
+  horas e equipe × prazo) e Tabelas 1/2.
+- Ícones de linha do Lucide 0.460.0 no sprite `app/templates/components/_icons.html` (ISC, licença em
+  `app/static/vendor/lucide-0.460.0/LICENSE`), todos com traço de 2 px.
 - Gráficos com ECharts 5.5.1 vendorizado (`app/static/vendor/echarts-5.5.1/`, Apache-2.0), desenhados
   por `app/static/js/painel.js` a partir do JSON que o servidor gera (`app/services/dashboard.py` →
   `calc.py`). Nenhuma conta no navegador.

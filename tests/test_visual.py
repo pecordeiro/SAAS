@@ -256,11 +256,11 @@ def test_tokens_semanticos_valem_a_identidade_oliva():
 
 
 def test_oliva_nunca_em_dado():
-    """Barras, anel, esteira e selo de andamento usam status/série, nunca primary/action/brand."""
+    """Barras, anel e selo de andamento usam status/série, nunca primary/action/brand."""
     components = (CSS / "components.css").read_text(encoding="utf-8")
     pages = (CSS / "pages.css").read_text(encoding="utf-8")
     for css, selector in ((components, ".progress__bar::-webkit-progress-value"), (components, ".chart__bar"),
-                          (components, ".badge--progress"), (pages, "  .gauge__fill"), (pages, ".esteira__bloco--doing")):
+                          (components, ".badge--progress"), (pages, "  .gauge__fill")):
         rule = re.search(re.escape(selector) + r"\s*\{([^}]*)\}", css).group(1)
         assert ("color-status" in rule or "color-doing" in rule) and "color-primary" not in rule, selector
     # a cor de foco e de link é a da marca, nunca o azul de status

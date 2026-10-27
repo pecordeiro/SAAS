@@ -582,35 +582,14 @@
   .legend__swatch--waiting { background: var(--color-status-waiting); }
   .legend__swatch--late { background: var(--color-status-late); }
   .legend__swatch--todo { background: var(--color-status-todo); }
-  .legend__swatch--tasks, .legend__swatch--worked, .legend__swatch--current, .legend__swatch--need { background: var(--color-series-tasks); }
+  .legend__swatch--tasks, .legend__swatch--worked, .legend__swatch--need { background: var(--color-series-tasks); }
+  .legend__swatch--current { background: var(--color-status-done); }
   .legend__swatch--units { background: var(--color-series-units); }
-  .legend__swatch--left { background: var(--color-status-todo); }
+  .legend__swatch--left { background: var(--color-series-tasks-soft); }
   .legend__swatch--other { background: var(--color-series-tasks-soft); }
   .legend__swatch--until { background: var(--color-text-subtle); }
   .legend__today { flex: none; width: calc(2 * var(--border-width)); height: var(--space-3); background: var(--color-text); }
   .legend__count { margin-left: var(--space-1); color: var(--color-text); font-weight: var(--font-weight-semibold); font-variant-numeric: var(--font-numeric); }
-
-  /* 3. Esteira de etapas: SVG com um <rect> por etapa (largura ∝ tempo) e a marca de hoje. */
-  .esteiras { display: flex; flex-direction: column; gap: var(--space-4); }
-  .esteira { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
-  .esteira__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-3); min-width: 0; }
-  .esteira__name { display: inline-flex; align-items: center; min-height: var(--touch-min); font-weight: var(--font-weight-semibold); color: var(--color-text); text-decoration: none; overflow-wrap: anywhere; }
-  a.esteira__name:hover { text-decoration: underline; }
-  .esteira__prazo { font-size: var(--font-size-sm); color: var(--color-text-muted); font-variant-numeric: var(--font-numeric); }
-  .esteira__prazo--danger { color: var(--color-danger); }
-  .esteira__prazo--success { color: var(--color-success); }
-  .esteira__bar { display: block; width: 100%; height: max(var(--space-7), var(--touch-min)); border-radius: var(--radius-sm); overflow: visible; }
-  .esteira__bloco { stroke: var(--color-surface); stroke-width: calc(2 * var(--border-width)); vector-effect: non-scaling-stroke; cursor: pointer; }
-  .esteira__bloco--done { fill: var(--color-status-done); }
-  .esteira__bloco--doing { fill: var(--color-status-doing); }
-  .esteira__bloco--waiting { fill: var(--color-status-waiting); }
-  .esteira__bloco--late { fill: var(--color-status-late); }
-  .esteira__bloco--todo { fill: var(--color-status-todo); }
-  .esteira__bar a:hover .esteira__bloco { opacity: 0.8; }
-  .esteira__bar a:focus-visible { outline: none; }
-  .esteira__bar a:focus-visible .esteira__bloco { stroke: var(--color-focus); stroke-width: var(--focus-width); }
-  .esteira__hoje { stroke: var(--color-text); stroke-width: calc(2 * var(--border-width)); vector-effect: non-scaling-stroke; pointer-events: none; }
-  .esteira__foot { font-size: var(--font-size-sm); color: var(--color-text-muted); }
 
   /* 4–6. Grade dos gráficos: principal (7/12) e lateral (5/12) no desktop largo. */
   .painel-grid { display: grid; gap: var(--space-4); margin-top: var(--space-4); }
@@ -625,6 +604,9 @@
 
   /* Área de desenho do ECharts. Altura das barras por etapa: o JS ajusta pelo nº de linhas. */
   .chart-box { width: 100%; min-height: calc(2.5 * var(--space-12)); }
+  .painel-stack { display: grid; gap: var(--space-4); align-content: start; }
+  .painel-stack > * { min-width: 0; }
+  .chart-box--weight { height: calc(6 * var(--space-12)); }
   .chart-box--status { width: calc(2 * var(--ring-size)); min-height: calc(2 * var(--ring-size)); height: calc(2 * var(--ring-size)); flex: none; }
   .no-js .chart-box { display: none; }
 
@@ -713,7 +695,8 @@
   .chart-tip__dot { display: inline-block; width: var(--space-2); height: var(--space-2); margin-right: var(--space-2); border-radius: var(--radius-pill); }
   .chart-tip__dot--tasks, .chart-tip__dot--worked, .chart-tip__dot--need, .chart-tip__dot--doing { background: var(--color-series-tasks); }
   .chart-tip__dot--units { background: var(--color-series-units); }
-  .chart-tip__dot--left, .chart-tip__dot--todo { background: var(--color-status-todo); }
+  .chart-tip__dot--todo { background: var(--color-status-todo); }
+  .chart-tip__dot--left { background: var(--color-series-tasks-soft); }
   .chart-tip__dot--until { background: var(--color-text-subtle); }
   .chart-tip__dot--done { background: var(--color-status-done); }
   .chart-tip__dot--waiting { background: var(--color-status-waiting); }
@@ -721,47 +704,57 @@
   .chart__data summary { font-size: var(--font-size-sm); color: var(--color-text-muted); font-weight: var(--font-weight-regular); }
 
   /* =================== Preencher etapas, Meta e equipe, Como funciona (R3–R5) =================== */
-  /* Topo: um botão por projeto (painel do dono), ✎ renomear, ✕ apagar e “+” novo projeto. */
-  .project-tabs { position: relative; margin-bottom: var(--space-4); overflow-x: auto; }
-  .project-tabs__list { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; margin: 0; padding: 0; list-style: none; }
-  .project-tabs__item {
+  /* Topo: abas de projeto numa barra segmentada (como o seletor de tabelas): projeto atual em
+     superfície clara com contorno; lápis (renomear) e X (apagar) só na aba atual; "+" cria projeto. */
+  .project-tabs { margin-bottom: var(--space-4); max-width: 100%; }
+  .project-tabs__list {
     display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
     align-items: center;
-    border: var(--border-width) solid var(--color-border-subtle);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
+    max-width: 100%;
+    margin: 0;
+    padding: var(--space-1);
+    list-style: none;
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-2);
   }
-  .project-tabs__item.is-current { border-color: var(--color-text); }
+  .project-tabs__item { display: inline-flex; align-items: center; min-width: 0; border-radius: var(--radius-md); }
+  .project-tabs__item.is-current { background: var(--color-surface); box-shadow: 0 0 0 var(--border-width) var(--color-border-subtle); }
   .project-tabs__link {
     display: inline-flex;
     align-items: center;
+    min-width: 0;
     min-height: max(var(--space-9), var(--touch-min));
     padding: 0 var(--space-3);
     color: var(--color-text-muted);
-    font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-medium);
     text-decoration: none;
     white-space: nowrap;
     cursor: pointer;
   }
-  .project-tabs__item.is-current .project-tabs__link { color: var(--color-text); }
+  .project-tabs__item.is-current .project-tabs__link { color: var(--color-text); font-weight: var(--font-weight-semibold); }
   .project-tabs__link:hover { color: var(--color-text); }
   .project-tabs__action {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: max(var(--space-8), var(--touch-min));
+    min-width: var(--touch-min);
     min-height: max(var(--space-9), var(--touch-min));
     color: var(--color-text-subtle);
     text-decoration: none;
+    border-radius: var(--radius-md);
   }
-  .project-tabs__action:hover { color: var(--color-text); }
+  .project-tabs__action:hover { color: var(--color-text); background: var(--color-surface-2); }
   .project-tabs__action--danger:hover { color: var(--color-danger); }
-  .project-tabs__plus { list-style: none; justify-content: center; min-width: var(--touch-min); color: var(--color-primary); font-size: var(--font-size-lg); }
+  .project-tabs__plus { list-style: none; justify-content: center; min-width: var(--touch-min); color: var(--color-primary); }
   .project-tabs__plus::-webkit-details-marker { display: none; }
-  .project-tabs__item--new { border-style: dashed; }
   .project-new[open] .project-tabs__plus { color: var(--color-text); }
-  .project-new__form { display: flex; gap: var(--space-2); align-items: center; padding: 0 var(--space-2) var(--space-2); }
-  .project-new__form .field__input { width: 14rem; max-width: 60vw; }
+  /* Aberto, o formulário ocupa a linha inteira da barra (nunca vaza no celular). */
+  .project-tabs__item--new:has(.project-new[open]) { flex: 1 1 100%; }
+  .project-new[open] { width: 100%; }
+  .project-new__form { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; padding: var(--space-1) var(--space-2) var(--space-2); }
+  .project-new__form .field__input { flex: 1 1 12rem; min-width: 0; width: auto; }
 
   .fill-header { margin-bottom: var(--space-3); }
   .fill-header__project a { display: inline-flex; align-items: center; min-height: var(--touch-min); }
@@ -913,8 +906,12 @@
   .box__label { margin: 0; font-size: var(--font-size-sm); color: var(--color-text-muted); }
   .box__big { margin: var(--space-1) 0 0; font-size: var(--font-size-2xl); font-weight: var(--font-weight-semibold); line-height: var(--line-height-tight); letter-spacing: var(--letter-spacing-tight); }
   .box__sub { margin: var(--space-1) 0 0; font-size: var(--font-size-sm); color: var(--color-text-muted); }
-  .box--tasks { border-left: var(--border-width-strong) solid var(--color-series-tasks); }
-  .box--units { border-left: var(--border-width-strong) solid var(--color-series-units); }
+  /* A cor da série aparece como marca de legenda no rótulo (a mesma dos gráficos), não como faixa lateral. */
+  .box--tasks .box__label::before, .box--units .box__label::before {
+    content: ""; display: inline-block; width: var(--space-2); height: var(--space-2); margin-right: var(--space-2);
+    border-radius: var(--radius-pill); vertical-align: middle; background: var(--color-series-tasks);
+  }
+  .box--units .box__label::before { background: var(--color-series-units); }
 
   /* Meta e equipe */
   .card-title { margin: 0; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); }

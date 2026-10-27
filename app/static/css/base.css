@@ -44,6 +44,15 @@
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     background: var(--color-bg);
+    /* Partes do navegador seguem a marca: caixas de marcar, cursor de texto, seleção e barras de rolagem. */
+    accent-color: var(--color-primary);
+    caret-color: var(--color-primary);
+    scrollbar-color: var(--color-border-strong) transparent;
+  }
+
+  ::selection {
+    background: var(--color-primary-subtle);
+    color: var(--color-text);
   }
 
   body {

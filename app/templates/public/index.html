@@ -1,10 +1,11 @@
 {% extends "base_publica.html" %}
 {% from "components/plan_card.html" import plan_card %}
+{% from "components/icon.html" import icon %}
 {% set marca = true %}
 {% block title %}Controle de Produção · saiba em que etapa está cada lote{% endblock %}
 {% block description %}Acompanhe a produção etapa por etapa: progresso, unidades prontas, horas que faltam e prazo em dias úteis. Importe a sua planilha e comece com {{ trial_days }} dias grátis, sem cartão.{% endblock %}
 {% block main %}
-{# R10 (ADR-0016): título → painel no aparelho → faixa de produtos → 3 passos → sua planilha → opcionais → planos → dúvidas → chamada final. Preços e limites vêm da tabela plans. #}
+{# R10 (ADR-0016): título → tela real do painel no aparelho → faixa de produtos → 3 passos → sua planilha → opcionais → planos → dúvidas → chamada final. Preços e limites vêm da tabela plans. #}
 <div class="pub-hero">
   <div class="pub-in pub-hero__top">
     <span class="pub-tag"><i aria-hidden="true"></i>Para quem monta sob encomenda</span>
@@ -18,37 +19,18 @@
   </div>
 
   <div class="pub-showcase">
-    <div class="pub-block" aria-hidden="true"></div>
     <div class="pub-in pub-stage">
-      <div class="pub-float pub-float--1" aria-hidden="true"><span class="pub-float__ic">+3</span><span>Operador A lançou 3 peças<br><small>Montagem mecânica</small></span></div>
-      <figure class="pub-device" aria-label="Exemplo do painel, com dados fictícios">
-        <div class="pub-panel">
-          <div class="pub-panel__head"><b>Lote 2026-014 <small>· 10 equipamentos</small></b><span class="pub-chip">&#10003; no prazo</span></div>
-          <div class="pub-kpis">
-            <div class="pub-k pub-k--ring">
-              <svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><circle class="pub-ring__bg" cx="50" cy="50" r="42" fill="none" stroke-width="12"/><circle class="pub-ring__fg" cx="50" cy="50" r="42" fill="none" stroke-width="12"/></svg>
-              <div><span class="pub-k__label">Progresso</span><strong><span data-count="47">47</span>%</strong></div>
-            </div>
-            <div class="pub-k"><span class="pub-k__label">Unidades prontas</span><strong><span data-count="2">2</span><small>de 10</small></strong></div>
-            <div class="pub-k"><span class="pub-k__label">Faltam</span><strong><span data-count="96">96</span><small>h</small></strong></div>
-            <div class="pub-k"><span class="pub-k__label">Prazo</span><strong><span data-count="4.8" data-dec="1">4,8</span><small>dias úteis</small></strong></div>
-          </div>
-          <div class="pub-belt">
-            <div class="pub-belt__lbl"><span>Esteira de etapas</span><span>Hoje: Montagem mecânica</span></div>
-            <div class="pub-track" aria-hidden="true">
-              <i class="pub-seg pub-seg--done"></i><i class="pub-seg pub-seg--doing"></i><i class="pub-seg pub-seg--doing"></i><i class="pub-seg pub-seg--todo"></i><i class="pub-seg pub-seg--todo"></i>
-              <span class="pub-now"></span>
-            </div>
-          </div>
-          <div class="pub-rows">
-            <div class="pub-row"><i class="pub-dot pub-dot--done" aria-hidden="true"></i><span>Preparação do chassi</span><em>Concluída · 0 h</em></div>
-            <div class="pub-row"><i class="pub-dot pub-dot--doing" aria-hidden="true"></i><span>Montagem mecânica</span><em>Em andamento · 22 h</em></div>
-            <div class="pub-row"><i class="pub-dot pub-dot--doing" aria-hidden="true"></i><span>Instalação elétrica</span><em>Em andamento · 38 h</em></div>
-            <div class="pub-row"><i class="pub-dot pub-dot--todo" aria-hidden="true"></i><span>Testes funcionais</span><em>Não iniciada · 28 h</em></div>
-          </div>
+      <figure class="pub-shot">
+        <div class="pub-device">
+        <picture>
+          <source srcset="{{ url_for('static', filename='img/vitrine/painel-celular-escuro.webp') }}" media="(max-width: 35em) and (prefers-color-scheme: dark)" width="600" height="1169" type="image/webp">
+          <source srcset="{{ url_for('static', filename='img/vitrine/painel-celular-claro.webp') }}" media="(max-width: 35em)" width="600" height="1169" type="image/webp">
+          <source srcset="{{ url_for('static', filename='img/vitrine/painel-escuro.webp') }}" media="(prefers-color-scheme: dark)" width="1600" height="1000" type="image/webp">
+          <img class="pub-device__shot" src="{{ url_for('static', filename='img/vitrine/painel-claro.webp') }}" width="1600" height="1000" alt="Painel de um lote no Teroz: progresso geral de 39%, horas que faltam, dias úteis até o prazo, barras de tarefas e unidades por etapa e a situação das etapas." fetchpriority="high">
+        </picture>
         </div>
+        <figcaption class="pub-device__cap">Tela real do Teroz, com dados de exemplo.</figcaption>
       </figure>
-      <div class="pub-float pub-float--2" aria-hidden="true"><span class="pub-float__ic pub-float__ic--ok">&#10003;</span><span>Preparação do chassi concluída</span></div>
     </div>
   </div>
 
@@ -68,9 +50,9 @@
       <h2 id="como-titulo">Três passos, sem treinamento longo.</h2>
       <p class="pub-sub">Quem monta lotes já conhece as etapas. O sistema só faz a conta.</p></div>
     <ol class="pub-steps" data-steps>
-      <li class="pub-step is-on rv" data-delay="1"><div class="pub-art pub-art--1" aria-hidden="true"><div class="pub-art__l pub-art__l--y"></div><div class="pub-art__l"></div><div class="pub-art__l pub-art__l--y"></div></div><span class="pub-step__n" aria-hidden="true">1</span><h3>Traga sua planilha</h3><p>Envie o arquivo e diga qual coluna é a etapa, qual é a atividade e qual é o tempo. Se preferir, monte as etapas direto na tela.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
-      <li class="pub-step rv" data-delay="2"><div class="pub-art pub-art--2" aria-hidden="true"><div class="pub-art__belt"><b class="pub-seg pub-seg--done"></b><b class="pub-seg pub-seg--doing"></b><b class="pub-seg pub-seg--doing"></b><b class="pub-seg pub-seg--todo"></b></div></div><span class="pub-step__n" aria-hidden="true">2</span><h3>Veja o painel</h3><p>Cada etapa vira um bloco na esteira, com a cor da situação. Você vê o progresso, as unidades prontas, as horas que faltam e o prazo em dias úteis.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
-      <li class="pub-step rv" data-delay="3"><div class="pub-art pub-art--3" aria-hidden="true"><div class="pub-art__keys"><b></b><b></b><b class="is-press"></b><b></b></div></div><span class="pub-step__n" aria-hidden="true">3</span><h3>Lance o progresso</h3><p>Quem está na bancada registra as peças concluídas pelo celular. As horas que faltam e o prazo se recalculam na hora.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
+      <li class="pub-step is-on rv" data-delay="1"><div class="pub-art pub-art--1"><img src="{{ url_for('static', filename='img/vitrine/passo-planilha.webp') }}" width="900" height="484" alt="Tela Importar planilha, no passo Enviar arquivo." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">1</span><h3>Traga sua planilha</h3><p>Envie o arquivo e diga qual coluna é a etapa, qual é a atividade e qual é o tempo. Se preferir, monte as etapas direto na tela.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
+      <li class="pub-step rv" data-delay="2"><div class="pub-art pub-art--2"><img src="{{ url_for('static', filename='img/vitrine/passo-painel.webp') }}" width="900" height="1207" alt="Gráfico Tarefas × unidades por etapa, do painel do projeto." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">2</span><h3>Veja o painel</h3><p>Cada etapa mostra o progresso pelas tarefas e as unidades prontas. Você vê também as horas que faltam e o prazo em dias úteis.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
+      <li class="pub-step rv" data-delay="3"><div class="pub-art pub-art--3 pub-art--phone"><img src="{{ url_for('static', filename='img/vitrine/passo-celular.webp') }}" width="600" height="723" alt="Preencher etapas no celular: lista de etapas com o progresso de cada uma." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">3</span><h3>Lance o progresso</h3><p>Quem está na bancada registra as peças concluídas pelo celular. As horas que faltam e o prazo se recalculam na hora.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
     </ol>
   </div>
 </section>
@@ -104,9 +86,9 @@
       <h2 id="opcionais-titulo">O começo é simples. O resto você liga se quiser.</h2>
       <p class="pub-sub">Etapas, atividades e peças vêm prontas. O que está abaixo fica desligado até você ativar em Configurações.</p></div>
     <div class="pub-opts">
-      {%- for title, text in [("Fotos e comentários", "Anexe fotos e observações ao registro de uma atividade."), ("Checklist de inspeção", "Uma lista de itens para conferir antes de dar a atividade como pronta."), ("Alertas por e-mail", "Aviso de etapa atrasada e um resumo semanal na caixa de entrada."), ("Equipe", "Atribua atividades a pessoas e veja o progresso de cada uma.")] %}
+      {%- for ic, title, text in [("camera", "Fotos e comentários", "Anexe fotos e observações ao registro de uma atividade."), ("clipboard-check", "Checklist de inspeção", "Uma lista de itens para conferir antes de dar a atividade como pronta."), ("bell", "Alertas por e-mail", "Aviso de etapa atrasada e um resumo semanal na caixa de entrada."), ("team", "Equipe", "Atribua atividades a pessoas e veja o progresso de cada uma.")] %}
       <div class="pub-opt rv" data-delay="{{ loop.index0 }}">
-        <span class="pub-switch" aria-hidden="true"><i></i></span>
+        <span class="pub-opt__ic">{{ icon(ic, "lg") }}</span>
         <h3>{{ title }} <em>Opcional</em></h3>
         <p>{{ text }}</p>
       </div>

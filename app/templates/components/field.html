@@ -3,23 +3,26 @@
   Campo de formulário — design-system §2. Recebe um campo WTForms.
   Rótulo acima → campo → dica → erro (aria-invalid + aria-describedby).
   `optional=True` mostra “(opcional)”; `required=True` mostra “(obrigatório)”.
+  `id` troca o id do campo quando dois formulários da mesma página têm campos com o mesmo nome
+  (ex.: “Senha atual” em Trocar e-mail e em Trocar senha): o rótulo continua ligado ao campo certo.
 #}
-{% macro field(f, hint=None, required=False, optional=False, attrs={}, label=None, class_="") -%}
-{%- set err_id = f.id ~ "-erro" -%}
-{%- set hint_id = f.id ~ "-dica" -%}
+{% macro field(f, hint=None, required=False, optional=False, attrs={}, label=None, class_="", id=None) -%}
+{%- set fid = id or f.id -%}
+{%- set err_id = fid ~ "-erro" -%}
+{%- set hint_id = fid ~ "-dica" -%}
 {%- set described = [] -%}
 {%- if hint %}{% set _ = described.append(hint_id) %}{% endif -%}
 {%- if f.errors %}{% set _ = described.append(err_id) %}{% endif -%}
-{%- set kw = {"class": "field__input"} -%}
+{%- set kw = {"class": "field__input", "id": fid} -%}
 {%- set _ = kw.update(attrs) -%}
 {%- if required %}{% set _ = kw.update({"required": True}) %}{% endif -%}
 {%- if described %}{% set _ = kw.update({"aria-describedby": described|join(" ")}) %}{% endif -%}
 {%- if f.errors %}{% set _ = kw.update({"aria-invalid": "true"}) %}{% endif -%}
 <div class="field{% if f.errors %} field--error{% endif %}{% if class_ %} {{ class_ }}{% endif %}">
   <div class="field__label-row">
-    <label class="field__label" for="{{ f.id }}">{{ label or f.label.text }}{% if required %} <span class="field__req">(obrigatório)</span>{% elif optional %} <span class="field__req">(opcional)</span>{% endif %}</label>
+    <label class="field__label" for="{{ fid }}">{{ label or f.label.text }}{% if required %} <span class="field__req">(obrigatório)</span>{% elif optional %} <span class="field__req">(opcional)</span>{% endif %}</label>
     {%- if f.type == "PasswordField" %}
-    <button type="button" class="field__toggle js-only" data-password-toggle="{{ f.id }}" aria-controls="{{ f.id }}" aria-pressed="false">Mostrar</button>
+    <button type="button" class="field__toggle js-only" data-password-toggle="{{ fid }}" aria-controls="{{ fid }}" aria-pressed="false">Mostrar</button>
     {%- endif %}
   </div>
   {{ f(**kw) }}

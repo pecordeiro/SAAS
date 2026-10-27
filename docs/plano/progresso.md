@@ -1454,3 +1454,11 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
   macro `components/brand.html`, símbolo pequeno e centralizado no menu lateral. Fontes do site inalteradas.
 - Pendente do plano: abas de projeto no estilo da imagem 2 e o quadro de tarefas (será a ADR-0021).
 - Suíte completa: 1118 passed, 84 skipped, 3 xfailed (antes dos novos testes); `test_marca_teroz.py`: 6 passed.
+
+## Painel com os gráficos do painel antigo e auditoria de design (2026-10-27) — aguardando aprovação do commit
+- **Painel do projeto** na ordem do painel antigo: barras tarefas × unidades, rosca de situação, mapa de blocos
+  "Quanto cada etapa representa" (novo), horas em colunas empilhadas e equipe × prazo com a equipe de hoje em verde.
+  **Esteira de etapas removida** dos dois painéis (nem todo processo é linear).
+- **Auditoria** em `docs/design/auditoria-2026-10-27.md`: ícones Lucide, abas de projeto em barra segmentada,
+  ids duplicados corrigidos, faixas laterais removidas, partes do navegador na cor da marca.
+- **Página inicial e "Como funciona"** com capturas reais do produto (dados de exemplo) em `app/static/img/vitrine/`.

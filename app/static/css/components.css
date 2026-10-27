@@ -105,6 +105,8 @@
     line-height: var(--line-height-normal);
     color: var(--color-text);
   }
+  /* Campo do tamanho do conteúdo, para ficar na mesma linha do botão (ex.: papel na tabela de usuários). */
+  .field__input--inline { width: auto; min-width: 9rem; flex: 0 1 auto; }
   textarea.field__input { min-height: calc(3 * var(--control-height)); resize: vertical; }
   .field__input:hover { border-color: var(--color-text-muted); }
   .field__input:focus-visible { border-color: var(--color-primary); box-shadow: 0 0 0 calc(4 * var(--border-width)) var(--color-primary-subtle); outline-offset: 0; }
@@ -470,7 +472,7 @@
     align-items: start;
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
-    border-left: var(--space-1) solid var(--color-primary);
+    border: var(--border-width) solid var(--color-border-subtle);
     border-radius: var(--radius-md);
     background: var(--color-primary-subtle);
     color: var(--color-text);
