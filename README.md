@@ -233,6 +233,17 @@ migrations no PostgreSQL só rodam com `TEST_DATABASE_URL`; no SQLite aparecem c
   amarelo/vermelho. Animação reduzida à transição curta, realce da linha salva, menus/diálogos, gráfico uma vez
   e spinner. E-mails com a mesma paleta via atributos HTML. Capturas: `python scripts/capturar_telas.py <pasta>`.
 
+### Redesign das telas e auditoria do sistema (2026-10-28)
+
+- Preencher etapas separa **Registrar produção** (padrão, para quem lança peças) de **Configurar etapas** (supervisor+,
+  `?modo=configurar`, decidido no servidor). O Painel da operação mostra 4 indicadores, "Precisa de atenção" e a
+  lista de projetos, sem gráficos que repetiam a lista; Meta e equipe põe a previsão ao lado do formulário.
+- Auditoria do sistema em [`docs/plano/system-audit.md`](docs/plano/system-audit.md) e achados com gravidade em
+  [`docs/plano/system-findings.md`](docs/plano/system-findings.md): pedido do HTMX com a sessão encerrada vira 401 +
+  `HX-Redirect` (nada de "salvo" falso), Pillow 13.0.0, Painel da operação com número fixo de consultas, mensagens de
+  falha ao salvar e trava contra clique duplo.
+- Telas, fluxo e decisão de cada gráfico: [`docs/design/redesign-2026-10-28.md`](docs/design/redesign-2026-10-28.md).
+
 ### Site público na identidade oliva (R10, ADR-0016)
 
 - Páginas: `/`, `/precos`, `/como-funciona` (como funciona com a sua planilha), `/termos`, `/privacidade`,

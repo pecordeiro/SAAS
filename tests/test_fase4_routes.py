@@ -3,9 +3,8 @@ novo projeto a partir de modelo, edição, desfazer, importar e exportar."""
 
 from __future__ import annotations
 
-import re
-
 import io
+import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -333,7 +332,7 @@ def test_atraso_previsto_mostra_dias_uteis(client, app, tenants):
         db.session.commit()
     login(client, app, a.operator_email)
     page = text_of(client.get("/app/projetos"))
-    assert "Atraso previsto · " in page and "d.u." in page
+    assert re.search(r"Atraso previsto · \d+ (dia útil|dias úteis)", page)  # por extenso, sem “d.u.” (redesign 2026-10-28)
     assert "dias úteis" in text_of(client.get(f"/app/projetos/{a.project_id}"))
 
 

@@ -8,6 +8,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 
 from sqlalchemy import func, or_, select, update
+from sqlalchemy.orm import selectinload
 
 from app.extensions import db
 from app.models import (
@@ -1093,10 +1094,13 @@ def _like(term: str) -> str:
     return "%" + term + "%"
 
 
-def list_projects(status: str = "todos", q: str | None = None) -> list[Project]:
+def list_projects(status: str = "todos", q: str | None = None, with_stages: bool = False) -> list[Project]:
     """Projetos não arquivados da empresa. ``status``: ativos | concluidos | todos;
-    ``q`` busca (sem diferenciar maiúsculas) no nome e no produto."""
+    ``q`` busca (sem diferenciar maiúsculas) no nome e no produto. ``with_stages`` já traz etapas e
+    subatividades em duas consultas (telas que somam todos os projetos, sem uma consulta por etapa)."""
     stmt = scoped(Project).where(Project.archived_at.is_(None))
+    if with_stages:
+        stmt = stmt.options(selectinload(Project.stages).selectinload(Stage.activities))
     if status == "ativos":
         stmt = stmt.where(Project.status == PROJECT_ACTIVE)
     elif status == "concluidos":

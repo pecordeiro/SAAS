@@ -14,8 +14,9 @@
 {% block content %}
 {#
   Meta e equipe (R5, aba Equipe da planilha): meta, pessoas, horas por dia e prazo salvam ao
-  sair do campo (supervisor+; operador só vê); dias úteis restantes e para a meta inteira; e
-  “E se mudar o tamanho da equipe?” de 1 a 6 pessoas, com a equipe atual destacada. O modo de
+  sair do campo (supervisor+; operador só vê). Ao lado do formulário, a previsão com a equipe
+  atual (término, folga ou atraso, dias úteis até o prazo) e os dias de trabalho; a simulação
+  de 1 a 6 pessoas fica recolhida (“Simular o tamanho da equipe”). O modo de
   progresso (R4) também mora aqui. Números de calc.resumo_equipe (ADR-0009).
 #}
 {%- set page_title, page_endpoint = "Meta e equipe", "preencher.goal_team" %}
@@ -26,8 +27,8 @@
 
 <div class="team-grid">
   <section class="card stack team-card" aria-labelledby="meta-titulo">
-    <h2 class="card-title" id="meta-titulo">Meta e equipe</h2>
-    <p class="fill__hint">A meta vira as “previstas” de todas as etapas.</p>
+    <h2 class="card-title" id="meta-titulo">Meta, equipe e prazo</h2>
+    <p class="fill__hint">A meta vale para todas as etapas: cada uma precisa chegar a esse número de unidades.</p>
     {%- if can_edit %}
     <form id="f-equipe" class="team-form" method="post" action="{{ url_for('preencher.goal_team_save', project_id=project.id) }}" novalidate>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -52,14 +53,20 @@
     </dl>
     <p class="fill__hint">Só supervisores mudam a meta e a equipe.</p>
     {%- endif %}
-    {{ eq.team_boxes(team, forecast, project) }}
   </section>
 
-  <section class="card stack" aria-labelledby="equipe-titulo">
-    <h2 class="card-title" id="equipe-titulo">E se mudar o tamanho da equipe?</h2>
-    <p class="fill__hint">Dias úteis = tempo que falta ÷ (pessoas × horas por dia). Considera que as pessoas trabalham em paralelo.</p>
-    {{ eq.team_table(team) }}
+  <div class="team-side">
+  <section class="card stack" aria-labelledby="previsao-titulo">
+    <h2 class="card-title" id="previsao-titulo">Previsão</h2>
+    {{ eq.team_boxes(team, forecast, project, prazo) }}
   </section>
+
+  <details class="card stack team-sim">
+    <summary class="team-sim__summary"><span class="card-title" id="equipe-titulo">Simular o tamanho da equipe</span><span class="team-sim__hint">De 1 a 6 pessoas</span></summary>
+    <p class="fill__hint">Dias de trabalho = horas que faltam ÷ (pessoas × horas por dia). Considera que as pessoas trabalham em paralelo, sem mudar a meta nem o prazo.</p>
+    {{ eq.team_table(team) }}
+  </details>
+  </div>
 
   <section class="card stack team-mode" aria-labelledby="modo-titulo">
     <h2 class="card-title" id="modo-titulo">Modo de lançar o progresso</h2>

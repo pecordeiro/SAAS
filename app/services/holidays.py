@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+from flask import g, has_app_context
 from sqlalchemy import or_, select
 
 from app.extensions import db
@@ -73,9 +74,18 @@ def seed_national_holidays(first_year: int, last_year: int) -> int:
 
 
 def holidays_for(company_id) -> list[date]:
-    """Dias de feriado que valem para a empresa: os nacionais + os dela."""
-    return list(
+    """Dias de feriado que valem para a empresa: os nacionais + os dela.
+
+    Telas que somam muitos projetos (Painel da operação) ligam ``g.holidays_cache = {}`` para ler a
+    lista uma vez por requisição em vez de uma vez por conta; fora delas, sempre consulta o banco."""
+    cache = getattr(g, "holidays_cache", None) if has_app_context() else None
+    if cache is not None and company_id in cache:
+        return list(cache[company_id])
+    days = list(
         db.session.execute(
             select(Holiday.day).where(or_(Holiday.company_id.is_(None), Holiday.company_id == company_id))
         ).scalars()
     )
+    if cache is not None:
+        cache[company_id] = tuple(days)
+    return days

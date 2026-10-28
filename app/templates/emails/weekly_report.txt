@@ -3,7 +3,7 @@
 A planilha completa (projetos e pessoas) vai em anexo.
 
 PROJETOS
-{% for p in projects %}- {{ p["Projeto"] }}{% if p["Etapas aguardando peça"] %} (aguardando peça){% endif %}: {{ p["Progresso"]|pct(0) }}, {{ p["Unidades concluídas"] }}/{{ p["Quantidade"] }} unidades, {{ p["Peças na semana"] }} peças na semana, prazo {{ p["Prazo"]|data if p["Prazo"] else "—" }}, término previsto {{ p["Término previsto"]|data if p["Término previsto"] else "—" }}{% if p["Atraso previsto (dias úteis)"] %} (atraso de {{ p["Atraso previsto (dias úteis)"] }} d.u.){% endif %}
+{% for p in projects %}- {{ p["Projeto"] }}{% if p["Etapas aguardando peça"] %} (aguardando peça){% endif %}: {{ p["Progresso"]|pct(0) }}, {{ p["Unidades concluídas"] }}/{{ p["Quantidade"] }} unidades, {{ p["Peças na semana"] }} peças na semana, prazo {{ p["Prazo"]|data if p["Prazo"] else "—" }}, término previsto {{ p["Término previsto"]|data if p["Término previsto"] else "—" }}{% if p["Atraso previsto (dias úteis)"] %} (atraso de {{ p["Atraso previsto (dias úteis)"] }} {{ "dia útil" if p["Atraso previsto (dias úteis)"] == 1 else "dias úteis" }}){% endif %}
 {% else %}Nenhum projeto ativo.
 {% endfor %}
 PESSOAS

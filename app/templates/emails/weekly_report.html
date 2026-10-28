@@ -13,7 +13,7 @@
         <td>{{ p["Unidades concluídas"] }}/{{ p["Quantidade"] }}</td>
         <td>{{ p["Peças na semana"] }}</td>
         <td>{{ p["Prazo"]|data if p["Prazo"] else "—" }}</td>
-        <td>{{ p["Término previsto"]|data if p["Término previsto"] else "—" }}{% if p["Atraso previsto (dias úteis)"] %} — atraso de {{ p["Atraso previsto (dias úteis)"] }} d.u.{% endif %}</td>
+        <td>{{ p["Término previsto"]|data if p["Término previsto"] else "—" }}{% if p["Atraso previsto (dias úteis)"] %} — atraso de {{ p["Atraso previsto (dias úteis)"] }} {{ "dia útil" if p["Atraso previsto (dias úteis)"] == 1 else "dias úteis" }}{% endif %}</td>
       </tr>
     {%- endfor %}
     </tbody>

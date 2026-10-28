@@ -44,6 +44,27 @@
     window.htmx.ajax("POST", form.getAttribute("action"), { source: input, values: values, swap: "none" });
   }
 
+  // Falha sem explicação do servidor (sem internet, página expirada, erro interno): a linha de
+  // status diz que NÃO salvou e o que fazer. Erros de validação já chegam do servidor com a
+  // mensagem certa (trazem o #salvo-status); aqui não se decide regra nenhuma (ADR-0009).
+  var TRANSPORT_MSG = {
+    0: "Sem conexão: não salvou. Confira a internet e saia do campo de novo.",
+    400: "A página expirou: não salvou. Recarregue a página e digite de novo.",
+    429: "Muitas tentativas seguidas: não salvou. Espere um pouco e saia do campo de novo.",
+    500: "Erro no servidor: não salvou. Tente de novo em instantes."
+  };
+
+  function explainFailure(xhr) {
+    var code = xhr ? xhr.status : 0;
+    if (code === 401 && xhr.getResponseHeader("HX-Redirect")) return; // sessão caiu: o htmx leva ao login
+    if (xhr && /id="salvo-status"/.test(xhr.responseText || "")) return;
+    var status = document.getElementById("salvo-status");
+    if (!status) return;
+    status.textContent = TRANSPORT_MSG[code] || (code >= 500 ? TRANSPORT_MSG[500] : "Não salvou. Recarregue a página e tente de novo.");
+    status.classList.add("save-status--error");
+    status.setAttribute("role", "alert");
+  }
+
   document.addEventListener("htmx:afterRequest", function (event) {
     var input = event.target;
     if (!isCell(input)) return;
@@ -51,6 +72,7 @@
     var ok = !!(xhr && xhr.status >= 200 && xhr.status < 300);
     if (ok) input.setAttribute("data-orig", input.value);
     mark(input, ok);
+    if (!ok) explainFailure(xhr);
   });
 
   document.addEventListener("focusin", function (event) {

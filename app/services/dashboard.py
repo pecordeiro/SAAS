@@ -49,8 +49,8 @@ def _dias(n: float | int | None) -> str:
 
 
 def _du(n) -> str:
-    """Forma curta para o rodapé do indicador: “16 d.u.” (dias úteis)."""
-    return f"{br_number(n, 0) if float(n).is_integer() else br_number(n, 1)} d.u."
+    """Rodapé do indicador: “16 dias úteis” por extenso (a abreviação “d.u.” confundia)."""
+    return _dias(n)
 
 
 # ---------------------------------------------------------------- prazo e frase-resumo

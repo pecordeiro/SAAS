@@ -174,7 +174,9 @@ def _to_fill() -> bool:
 
 def _back(project_id, stage_id=None):
     if _to_fill():
-        return redirect(url_for("preencher.fill", projeto=project_id, etapa=stage_id), 303)
+        # Volta ao mesmo modo de “Preencher etapas” (registrar ou configurar).
+        modo = "configurar" if request.form.get("modo") == "configurar" else None
+        return redirect(url_for("preencher.fill", projeto=project_id, etapa=stage_id, modo=modo), 303)
     return redirect(url_for("edicao.project_edit", project_id=project_id), 303)
 
 

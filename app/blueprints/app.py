@@ -97,7 +97,8 @@ def _stage_fill_href(project_id, stage_id) -> str:
 def home():
     """Primeira tela (R2): Painel da operação com todos os projetos ativos. Números do calc.py
     (somados por calc.resumo_operacao); o template e o JS só exibem (ADR-0009)."""
-    projects = svc.list_projects("ativos")
+    g.holidays_cache = {}  # feriados lidos uma vez, não uma vez por projeto
+    projects = svc.list_projects("ativos", with_stages=True)
     total_active = len(projects)
     projects = projects[:OVERVIEW_MAX_PROJECTS]
     itens = []

@@ -12,14 +12,18 @@
 - Rate limit dos webhooks: qualquer blueprint cujo nome tenha "webhook" recebe
   ``WEBHOOK_RATE_LIMIT`` por IP (a Fase 8 só registra o blueprint).
 - Chaves de assinatura com rotação (``SECRET_KEY_FALLBACKS``).
+- Sessão que caiu no meio de um pedido do HTMX: o 302 para o login vira 401 + ``HX-Redirect``
+  (sem isso o XHR segue o redirecionamento, recebe a página de login com 200 e a tela marca
+  “salvo” sem ter salvo).
 """
 
 from __future__ import annotations
 
 import io
 import secrets
+from urllib.parse import urlsplit
 
-from flask import Flask, Request, current_app, g, request
+from flask import Flask, Request, current_app, g, request, url_for
 
 NONCE_BYTES = 18
 
@@ -150,10 +154,36 @@ def _limit_webhook_blueprints(app: Flask) -> None:
             _WEBHOOK_BLUEPRINTS_LIMITED.add(name)
 
 
+REDIRECT_CODES = (301, 302, 303, 307, 308)
+
+
+def _htmx_login_redirect(response):
+    """Pedido do HTMX com a sessão já encerrada (senha trocada em outro aparelho, conta desativada,
+    tempo esgotado): o Flask-Login responde 302 para o login, o XHR segue sozinho e recebe a página
+    de login com 200, e a tela trataria como sucesso. Aqui o 302 vira 401 com ``HX-Redirect``: o
+    htmx leva o navegador ao login, que depois volta para a página em que a pessoa estava."""
+    if request.headers.get("HX-Request") != "true" or response.status_code not in REDIRECT_CODES:
+        return response
+    login_path = url_for("auth.login")
+    if urlsplit(response.headers.get("Location", "")).path != login_path:
+        return response
+    from app.blueprints.auth import safe_next
+
+    current = urlsplit(request.headers.get("HX-Current-URL", ""))
+    same_host = not current.netloc or current.netloc == request.host
+    back = safe_next(current.path + (f"?{current.query}" if current.query else "")) if same_host and current.path else None
+    response.status_code = 401
+    response.headers["HX-Redirect"] = url_for("auth.login", next=back) if back else login_path
+    del response.headers["Location"]
+    response.set_data(b"")
+    return response
+
+
 def init_app(app: Flask) -> None:
     """Chamar depois de registrar os blueprints."""
     _check_cookie_config(app)
     app.request_class = InMemoryUploadRequest
     app.after_request(_apply_headers)
+    app.after_request(_htmx_login_redirect)
     app.jinja_env.globals["csp_nonce"] = csp_nonce
     _limit_webhook_blueprints(app)

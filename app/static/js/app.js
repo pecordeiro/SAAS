@@ -217,6 +217,26 @@
     }
   });
 
+  /* ---------- Envio duplo ----------
+     Clique duplo em “Incluir”/“Salvar” de um formulário POST comum mandaria dois pedidos (duas
+     etapas iguais, por exemplo). O 2º envio em menos de 3 s é ignorado. Os formulários do htmx já
+     descartam o 2º pedido enquanto o 1º corre; a trava solta sozinha porque um download não troca
+     de página. A trava só vale se o envio seguiu (outro script pode ter cancelado o 1º). */
+  var RESUBMIT_MS = 3000;
+  document.addEventListener("submit", function (event) {
+    var form = event.target;
+    if (!form || !form.getAttribute || (form.getAttribute("method") || "").toLowerCase() !== "post") return;
+    if (form.hasAttribute("hx-post")) return;
+    var last = parseInt(form.getAttribute("data-sent-at") || "0", 10);
+    if (Date.now() - last < RESUBMIT_MS) {
+      event.preventDefault();
+      return;
+    }
+    setTimeout(function () {
+      if (!event.defaultPrevented) form.setAttribute("data-sent-at", String(Date.now()));
+    }, 0);
+  });
+
   /* ---------- HTMX: registro sem recarregar ----------
      O formulário faz hx-post com hx-swap="none": o servidor devolve só pedaços com
      hx-swap-oob (atividade, resumo da etapa, indicadores, toast). Aqui só cuidamos de

@@ -285,7 +285,7 @@
     var markLine = team.due == null || team.due > maxDays * 1.5 ? undefined : {
       silent: true, symbol: "none",
       lineStyle: { color: t.text, type: "dashed", width: 1.5 },
-      label: { color: t.text, fontSize: LABEL_FONT, formatter: "prazo: " + NUM.format(team.due) + " d", position: "insideEndTop" },
+      label: { color: t.text, fontSize: LABEL_FONT, formatter: "prazo: " + NUM.format(team.due) + (team.due === 1 ? " dia útil" : " dias úteis"), position: "insideEndTop" },
       data: [{ yAxis: team.due }],
     };
     chart.setOption(Object.assign(base(t), {

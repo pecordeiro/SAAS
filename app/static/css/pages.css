@@ -572,7 +572,8 @@
   .chart-card__head .legend { margin: 0; }
   .chart-card__hint { margin: calc(-1 * var(--space-2)) 0 var(--space-3); color: var(--color-text-subtle); font-size: var(--font-size-sm); }
   .chart-card__note { margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--font-size-sm); font-variant-numeric: var(--font-numeric); }
-  .chart-card__link { font-size: var(--font-size-md); }
+  /* Alvo de toque mínimo (WCAG 2.5.8): o link do cabeçalho do cartão tinha ~20 px de altura no celular. */
+  .chart-card__link { display: inline-flex; align-items: center; min-height: var(--touch-min); font-size: var(--font-size-md); }
 
   /* Legenda: a amostra é a própria marca (cor do dado), o texto fica na cor de texto. */
   .legend { gap: var(--space-1) var(--space-3); font-size: var(--font-size-sm); color: var(--color-text-muted); }
@@ -803,6 +804,38 @@
   .stage-item__name { min-width: 0; overflow-wrap: anywhere; font-weight: var(--font-weight-semibold); }
   .stage-item__pct { flex: none; font-weight: var(--font-weight-semibold); }
   .stage-item__menu { flex: none; }
+  .stage-item__meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-1) var(--space-3); align-items: baseline; }
+  .stage-item__units { font-size: var(--font-size-sm); color: var(--color-text-subtle); }
+  .fill__list-legend { margin: var(--space-1) var(--space-2) var(--space-2); font-size: var(--font-size-sm); color: var(--color-text-muted); }
+
+  /* Registrar × Configurar (redesign 2026-10-28): o modo só esconde o que não é da tarefa. */
+  .fill-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin-bottom: var(--space-3); }
+  .fill-bar .save-status { margin: 0; }
+  .fill[data-modo="registrar"] .cfg-only { display: none !important; }
+  .fill[data-modo="configurar"] .reg-only { display: none !important; }
+  /* Uma coluna (abaixo de 80em): a etapa escolhida vem antes da lista, para lançar sem rolar a lista toda. */
+  @media (max-width: 79.99em) { .fill > .fill__panel { order: -1; } }
+  /* Celular, modo registrar: cada subatividade vira um bloco (nome e progresso à esquerda, total à direita). */
+  @media (max-width: 47.99em) {
+    .fill[data-modo="registrar"] .etab, .fill[data-modo="registrar"] .etab tbody { display: block; }
+    .fill[data-modo="registrar"] .etab thead { display: none; }
+    .fill[data-modo="registrar"] .etab tbody tr {
+      display: grid; grid-template-columns: minmax(0, 1fr) 6.5rem; gap: var(--space-2) var(--space-3);
+      align-items: center; padding: var(--space-3) 0; border-bottom: var(--border-width) solid var(--color-border-subtle);
+    }
+    .fill[data-modo="registrar"] .etab td { padding: 0; border: 0; text-align: left; }
+    .fill[data-modo="registrar"] .etab .etab__name { grid-column: 1; grid-row: 1; min-width: 0; }
+    .fill[data-modo="registrar"] .etab .etab__prog { grid-column: 1; grid-row: 2; }
+    .fill[data-modo="registrar"] .etab .etab__units { grid-column: 2; grid-row: 1 / span 2; display: grid; gap: var(--space-1); }
+    .fill[data-modo="registrar"] .etab .etab__units::before { content: attr(data-label); font-size: var(--font-size-xs); color: var(--color-text-muted); }
+    .fill[data-modo="registrar"] .etab td.num .cell { max-width: none; }
+    .fill[data-modo="registrar"] .etab .etab__actions { grid-column: 1 / -1; }
+    /* Com JS o botão "Salvar" da linha some (salva ao sair do campo): a célula de ações não ocupa espaço.
+       O <form> continua no DOM, e os campos ligados a ele por form= seguem funcionando. */
+    html:not(.no-js) .fill[data-modo="registrar"] .etab .etab__actions { display: none; }
+  }
+  .edit-head__eyebrow { margin: 0; font-size: var(--font-size-sm); color: var(--color-text-muted); }
+  .ro__unit { font-size: var(--font-size-sm); font-weight: var(--font-weight-regular); color: var(--color-text-muted); }
 
   /* Mini barras (<progress>): azul = pelas tarefas, laranja = unidades, verde = 100%. */
   .mini {
@@ -852,16 +885,16 @@
   .ro__label { font-size: var(--font-size-sm); color: var(--color-text-muted); }
   .ro__value { font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); }
 
-  /* Células amarelas: campo editável como na planilha. */
+  /* Campo editável da tela (salva ao sair): aparência de campo comum, não de célula de planilha. */
   .cell {
     width: 100%;
     min-width: 0;
     min-height: var(--control-height);
-    padding: 0 var(--space-2);
-    border: var(--border-width) solid var(--color-border-subtle);
-    border-radius: var(--radius-sm);
-    background: var(--color-editable);
-    color: var(--color-editable-text);
+    padding: 0 var(--space-3);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
     font: inherit;
     font-size: var(--font-size-input);
   }
@@ -885,7 +918,10 @@
   .etab td.num .cell { max-width: 5.5rem; margin-left: auto; display: block; }
   .etab tfoot th, .etab tfoot td { font-weight: var(--font-weight-semibold); border-bottom: 0; border-top: var(--border-width) solid var(--color-border-strong); }
   .etab__name { min-width: 9rem; }
+  .fill[data-modo="configurar"] .etab__name { min-width: 10rem; }
+  .fill[data-modo="configurar"] .pct-cell .mini { min-width: 2.5rem; }
   .etab__name-cell { display: flex; align-items: center; gap: var(--space-1); }
+  .etab__name-cell .cell, .etab__name > .cell { flex: 1; width: 100%; min-width: 0; }
   .etab__name-cell .drag-handle { min-width: var(--space-6); }
   .etab__actions { white-space: nowrap; text-align: right; }
   .etab__actions form, .etab__actions details { display: inline-block; vertical-align: middle; }
@@ -900,7 +936,7 @@
   .etab__new td { border-bottom: 0; }
 
   /* Duas caixas: pelas tarefas (azul) e unidades (laranja) */
-  .twobox { display: grid; gap: var(--space-3); margin-top: var(--space-4); }
+  .twobox { display: grid; gap: var(--space-3); margin: 0 0 var(--space-4); }
   @media (min-width: 40em) { .twobox { grid-template-columns: 1fr 1fr; } }
   .box { padding: var(--space-3) var(--space-4); border: var(--border-width) solid var(--color-border-subtle); border-radius: var(--radius-lg); background: var(--color-surface-2); }
   .box__label { margin: 0; font-size: var(--font-size-sm); color: var(--color-text-muted); }
@@ -1189,4 +1225,36 @@
   .slot input { margin: 0; width: var(--icon-size); height: var(--icon-size); accent-color: var(--color-primary); }
   .slot:has(input:checked) { border-color: var(--color-primary); background: var(--color-primary-subtle); }
   .slot:has(input:focus-visible) { box-shadow: var(--focus-ring); }
+}
+
+@layer components {
+  /* Operação (redesign 2026-10-28): 4 indicadores com o progresso em destaque, atenção e lista. */
+  .ops-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4) var(--space-3); }
+  .ops-kpi--lead, .ops-kpi:last-child { grid-column: 1 / -1; }
+  @media (min-width: 48em) {
+    .ops-kpis { grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); }
+    .ops-kpi--lead, .ops-kpi:last-child { grid-column: auto; }
+  }
+  .ops-kpi { display: grid; align-content: start; gap: var(--space-1); min-width: 0; }
+  .ops-kpi + .ops-kpi { padding-top: var(--space-4); border-top: var(--border-width) solid var(--color-border-subtle); }
+  @media (min-width: 48em) { .ops-kpi + .ops-kpi { padding: 0 0 0 var(--space-4); border-top: 0; border-left: var(--border-width) solid var(--color-border-subtle); } }
+  .ops-kpi .progress { margin-block: var(--space-1); }
+  .ops-attention { margin-top: var(--space-4); display: grid; gap: var(--space-3); }
+  .ops-attention .section-title { margin: 0; }
+  .ops-status { margin: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); align-items: center; font-size: var(--font-size-sm); color: var(--color-text-muted); }
+  .ops-status b { color: var(--color-text); }
+}
+
+@layer components {
+  /* Meta e equipe (redesign 2026-10-28): previsão em destaque, simulação recolhida. */
+  .team-side { display: grid; gap: var(--space-4); align-content: start; min-width: 0; }
+  .team-summary { display: grid; gap: var(--space-3); }
+  .team-summary .twobox { margin: 0; }
+  .team-forecast { padding: var(--space-3) var(--space-4); border: var(--border-width) solid var(--color-border-subtle); border-radius: var(--radius-lg); background: var(--color-surface); }
+  .team-forecast__label { margin: 0; font-size: var(--font-size-sm); color: var(--color-text-muted); }
+  .team-forecast__text { margin: var(--space-1) 0 0; font-size: var(--font-size-lg); }
+  .team-forecast--danger { border-color: var(--color-danger); background: var(--color-danger-subtle); }
+  .team-forecast__sub { margin: var(--space-1) 0 0; font-size: var(--font-size-sm); color: var(--color-text-muted); }
+  .team-sim__summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-3); cursor: pointer; list-style-position: inside; }
+  .team-sim__hint { font-size: var(--font-size-sm); color: var(--color-text-muted); }
 }

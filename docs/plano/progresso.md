@@ -1462,3 +1462,18 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
 - **Auditoria** em `docs/design/auditoria-2026-10-27.md`: ícones Lucide, abas de projeto em barra segmentada,
   ids duplicados corrigidos, faixas laterais removidas, partes do navegador na cor da marca.
 - **Página inicial e "Como funciona"** com capturas reais do produto (dados de exemplo) em `app/static/img/vitrine/`.
+
+## Redesign de UX: registrar, acompanhar, configurar (2026-10-28) — aguardando aprovação do commit
+- Preencher etapas com modo **Registrar produção** (padrão) e **Configurar etapas** (supervisor+, decidido no servidor).
+- Operação sem gráficos que repetiam a lista: 4 indicadores, "Precisa de atenção" e projetos ativos.
+- Meta e equipe com a previsão ao lado do formulário e a simulação recolhida.
+- Detalhes, fluxo (Mermaid) e auditoria dos gráficos em `docs/design/redesign-2026-10-28.md`.
+- **Auditoria do sistema** (prompt mestre §14): `docs/plano/system-audit.md` e `docs/plano/system-findings.md`.
+  Corrigidos com teste: F-01 (HTMX com sessão encerrada marcava "salvo" sem salvar → 401 + `HX-Redirect`),
+  F-02 (Pillow 12.3.0 com 39 CVEs → 13.0.0, `pip-audit` limpo), F-03 (Painel da operação: 108 → 16 consultas com
+  10 projetos), F-04 (falha ao salvar agora explica), F-05 (clique duplo não duplica), F-07 (título "Painel da
+  operação"). Pendentes: F-06 (regra de "etapa atrasada" supõe etapas em sequência: decisão do dono), F-08 a F-11.
+- Acessibilidade: axe-core sem violações nas telas redesenhadas (claro/escuro, 375/1280); o link do logotipo ganhou
+  nome no tema escuro; "d.u." virou "dias úteis" em todo lugar.
+- Benchmark, decisões de componentes e inventário de textos em `docs/design/` (`ux-benchmark.md`,
+  `ui-component-decisions.md`, `ux-copy-inventory.md`).

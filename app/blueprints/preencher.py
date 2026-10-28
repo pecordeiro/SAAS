@@ -75,6 +75,13 @@ def _can_edit() -> bool:
     return g.membership.has_role(ROLE_SUPERVISOR)
 
 
+def _modo() -> str:
+    """Modo da tela “Preencher etapas”: ``registrar`` (padrão: lançar peças) ou ``configurar``
+    (nomes, tempos, pesos, ordem, incluir e apagar). Configurar é só de supervisor+; o modo só
+    muda o que aparece (as rotas continuam checando o papel)."""
+    return "configurar" if _can_edit() and request.values.get("modo") == "configurar" else "registrar"
+
+
 def _version(raw) -> int | None:
     try:
         value = int(raw)
@@ -169,11 +176,13 @@ def _fill_ctx(project: Project, stage_id: uuid.UUID | None) -> dict:
         can_edit=_can_edit(),
         project_choices=_project_choices(project),
         quantity=project.quantity,
+        modo=_modo(),
     )
 
 
 def _fill_url(project_id, stage_id=None, anchor=None) -> str:
-    return url_for("preencher.fill", projeto=project_id, etapa=stage_id, _anchor=anchor)
+    modo = "configurar" if _modo() == "configurar" else None
+    return url_for("preencher.fill", projeto=project_id, etapa=stage_id, modo=modo, _anchor=anchor)
 
 
 def _respond(project: Project, stage: Stage | None, *, message: str, error: bool = False, status: int = 200,
@@ -449,14 +458,20 @@ def activity_unarchive(activity_id):
 
 
 def _team_ctx(project: Project) -> dict:
+    # Mesmas contas de prazo do painel (término previsto, folga/atraso e dias úteis até o prazo).
+    from app.blueprints.app import _deadline, _project_status
+
     result = svc.summary(project)
     team = calc.resumo_equipe(result, project.people, float(project.hours_per_day))
     forecast = svc.forecast_end(project, result, g.company, _today())
+    status = _project_status(project, result)
+    prazo = dashboard.situacao_prazo(_deadline(project, result, status), status == calc.STATUS_CONCLUIDA, project.due_date)
     return dict(
         project=project,
         result=result,
         team=team,
         forecast=forecast,
+        prazo=prazo,
         can_edit=_can_edit(),
         project_choices=_project_choices(project),
         simple=svc.is_simple(project),
