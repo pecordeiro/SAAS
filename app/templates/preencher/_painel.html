@@ -132,8 +132,13 @@
     <input type="hidden" name="version" value="">
   </form>
   {{ parts.boxes(sel, False) }}
+  <div class="sub-head">
+    <h3 class="sub-head__title" id="subatividades-titulo">Subatividades</h3>
+    <span class="sub-head__count" aria-label="{{ rows|length }} subatividade{{ '' if rows|length == 1 else 's' }}">{{ rows|length }}</span>
+    <span class="sub-head__help reg-only">Lance o total de peças prontas de cada uma.</span>
+  </div>
   <div class="table-scroll">
-    <table class="etab">
+    <table class="etab" aria-labelledby="subatividades-titulo">
       <caption class="visually-hidden">Subatividades da etapa {{ st.name }}</caption>
       <thead><tr>
         <th scope="col">Subatividade</th>
@@ -143,6 +148,9 @@
         <th scope="col">Progresso</th>
         <th scope="col" class="num cfg-only">Tempo total (min)</th>
         <th scope="col" class="num cfg-only">Tempo que falta (min)</th>
+        {%- if "atribuicao" in modules %}
+        <th scope="col" class="who-col"><span class="visually-hidden">Responsável</span></th>
+        {%- endif %}
         <th scope="col"><span class="visually-hidden">Ações</span></th>
       </tr></thead>
       <tbody class="sort-list" data-sort-list="activities" data-drop-stage="{{ st.id }}">
@@ -150,12 +158,11 @@
       <tr class="sort-item" id="linha-{{ a.id }}" data-sort-id="{{ a.id }}" data-version="{{ a.version }}" data-move-url="{{ url_for('edicao.activity_position', activity_id=a.id) }}">
         <td class="etab__name">
           <div class="etab__who">
-            {%- if "atribuicao" in modules %}{{ parts.who(a, members, can_edit, modo) }}{% endif %}
             <div class="etab__who-body">
               {%- if can_edit %}
               <span class="etab__name-cell cfg-only"><span class="drag-handle js-only" data-drag-handle title="Arraste para reordenar" aria-hidden="true">⠿</span><input class="cell" name="name" form="f-{{ a.id }}" value="{{ a.name }}" maxlength="160" required autocomplete="off" aria-label="Nome da subatividade" aria-describedby="salvo-status"></span>
-              <span class="etab__name-text reg-only">{{ a.name }}</span>
-              {%- else %}<span class="etab__name-text">{{ a.name }}</span>{% endif %}
+              <span class="etab__name-text reg-only">{{ a.name }}{% if ar.pct >= 1 %} <span class="etab__done" title="Concluída">{{ icon("check", "sm") }}<span class="visually-hidden">(concluída)</span></span>{% endif %}</span>
+              {%- else %}<span class="etab__name-text">{{ a.name }}{% if ar.pct >= 1 %} <span class="etab__done" title="Concluída">{{ icon("check", "sm") }}<span class="visually-hidden">(concluída)</span></span>{% endif %}</span>{% endif %}
               {{ parts.last_entry(a, last, None) }}
             </div>
           </div>
@@ -169,6 +176,9 @@
         <td class="etab__prog"><span class="pct-cell" id="pct-{{ a.id }}"><progress class="mini{% if ar.pct >= 1 %} mini--done{% else %} mini--tasks{% endif %}" value="{{ [ar.pct, 1]|min }}" max="1" aria-label="{{ a.name }}: {{ ar.pct|pct(0) }}">{{ ar.pct|pct(0) }}</progress><span class="num">{{ a.units_done }}/{{ quantity }} · {{ ar.pct|pct(0) }}</span></span></td>
         <td class="num cfg-only"><span class="num" id="tt-{{ a.id }}">{{ ar.tempo_total_min|num(0) }}</span></td>
         <td class="num cfg-only"><span class="num" id="tf-{{ a.id }}">{{ ar.tempo_restante_min|num(0) }}</span></td>
+        {%- if "atribuicao" in modules %}
+        <td class="who-col" data-label="Responsável">{{ parts.who(a, members, can_edit, modo) }}</td>
+        {%- endif %}
         <td class="etab__actions">
           <form id="f-{{ a.id }}" class="cell-form" method="post" action="{{ url_for('preencher.activity_cells', activity_id=a.id) }}" data-cell-form>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -208,6 +218,7 @@
         <td></td>
         <td class="num"><input class="cell cell--num cell--new" name="units_done" form="f-nova" inputmode="numeric" placeholder="0" autocomplete="off" aria-label="Peças concluídas da nova subatividade"></td>
         <td colspan="3"></td>
+        {%- if "atribuicao" in modules %}<td></td>{% endif %}
         <td class="etab__actions">
           <form id="f-nova" method="post" action="{{ url_for('preencher.activity_new', stage_id=st.id) }}" hx-post="{{ url_for('preencher.activity_new', stage_id=st.id) }}" hx-swap="none" data-new-form>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -224,6 +235,7 @@
         <td></td><td></td><td></td>
         <td class="num"><span class="num" id="total-tt">{{ sel.r.tempo_total_min|num(0) }}</span></td>
         <td class="num"><span class="num" id="total-tf">{{ sel.r.tempo_restante_min|num(0) }}</span></td>
+        {%- if "atribuicao" in modules %}<td></td>{% endif %}
         <td></td>
       </tr></tfoot>
     </table>

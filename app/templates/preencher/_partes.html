@@ -74,7 +74,7 @@
 {%- if can_edit and members %}
 <details class="who" data-who>
   <summary class="who__avatar{% if not person %} who__avatar--empty{% endif %}" title="{{ ('Responsável: ' ~ person.name ~ ' (trocar)') if person else 'Sem responsável (atribuir)' }}" aria-label="{{ a.name }}: {{ ('responsável ' ~ person.name ~ '. Trocar') if person else 'sem responsável. Atribuir' }}">
-    {%- if person %}<span aria-hidden="true">{{ person.name|iniciais }}</span>{% else %}{{ icon("user-plus") }}{% endif -%}
+    {%- if person %}<span aria-hidden="true">{{ person.name|iniciais }}</span>{% else %}{{ icon("user") }}{% endif -%}
   </summary>
   <div class="who__panel" role="group" aria-label="Atribuir {{ a.name }} a">
     <p class="who__title">Atribuir a</p>

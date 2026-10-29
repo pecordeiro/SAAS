@@ -1486,3 +1486,14 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
   subatividade; clicar abre "Atribuir a" (busca + sugestões). Voltar das telas dos módulos leva a Preencher.
 - `tests/test_modulos_preencher.py`: 12 testes. "Aguardando peça" continua só sinalizando; travar o lançamento depende
   de decisão do dono (ADR).
+
+## Contraste das telas (2026-10-29) — aguardando aprovação do commit
+- Medido: borda de cartão e trilho de barra com 1,3:1 (quase invisíveis), etapa selecionada com 1,24:1 e o laranja
+  dos números das caixas com 2,8:1.
+- Novos tokens (claro e escuro, `tokens.css` e `docs/design/tokens.css`): `--color-edge` (borda de cartão e trilho,
+  ~2:1), `--color-series-tasks-text` e `--color-series-units-text` (azul e laranja dos números, 5,0:1 ou mais).
+- Em Preencher etapas e no Painel da operação: cartões com borda visível, etapa selecionada com fundo e contorno
+  oliva, barras mais altas com trilho legível, cabeçalho da tabela em negrito com linha forte, nome da subatividade em
+  negrito e números das duas caixas em azul (tarefas) e laranja (unidades). axe-core sem violações (claro/escuro).
+- Menu lateral recolhível (faixa de ícones que abre em 0,8 s empurrando o conteúdo; `--sidebar-rail`,
+  `--duration-rail`, `@property --rail-now`).

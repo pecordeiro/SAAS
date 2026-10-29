@@ -7,6 +7,33 @@
   root.classList.remove("no-js");
   root.classList.add("js");
 
+  /* ---------- Menu lateral: continua aberto depois de um clique, até o mouse sair de cima ----------
+     O menu recolhido abre com :hover. Clicar num item carrega a página seguinte, que nasce sem
+     :hover (o navegador só o recalcula quando o mouse se mexe) e o menu fechava. Por isso o clique do
+     mouse deixa um aviso na sessão e a página nova já abre com a classe "sidebar-hold" (aplicada aqui,
+     antes da pintura, então não há piscada); ela sai quando o ponteiro passa para fora do menu.
+     Teclado e toque não deixam aviso. Só estilo: nada de regra de negócio. */
+  var MENU_KEY = "menuAberto";
+  try {
+    if (sessionStorage.getItem(MENU_KEY) === "1") root.classList.add("sidebar-hold");
+  } catch (e) { /* sem armazenamento: o menu só abre com o mouse em cima, como antes */ }
+
+  function releaseMenu() {
+    root.classList.remove("sidebar-hold");
+    try { sessionStorage.removeItem(MENU_KEY); } catch (e) { /* ignora */ }
+  }
+
+  document.addEventListener("pointerdown", function (event) {
+    if (event.pointerType !== "mouse" || !event.target.closest || !event.target.closest(".app-sidebar")) return;
+    root.classList.add("sidebar-hold"); // já no clique: vale também se só um pedaço da tela for trocado (sem recarregar)
+    try { sessionStorage.setItem(MENU_KEY, "1"); } catch (e) { /* ignora */ }
+  });
+
+  document.addEventListener("pointerover", function (event) {
+    if (!root.classList.contains("sidebar-hold")) return;
+    if (!event.target.closest || !event.target.closest(".app-sidebar")) releaseMenu();
+  }, { passive: true });
+
   var THEME_COOKIE = "tema";
   var ONE_YEAR = 60 * 60 * 24 * 365;
 

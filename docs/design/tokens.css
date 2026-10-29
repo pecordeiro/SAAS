@@ -72,6 +72,9 @@
   --color-doing-subtle: #EAF2FC;    /* fundo do selo “em andamento” */
   --color-series-tasks: #2A78D6;    /* pelas tarefas */
   --color-series-units: #EB6834;    /* unidades */
+  --color-series-tasks-text: #1D5FB5; /* número azul sobre o quadro (5,5:1); o azul do dado fica em --color-series-tasks */
+  --color-series-units-text: #B53F0A; /* número laranja sobre o quadro (5,0:1) */
+  --color-edge: #AEB397;            /* borda de cartão e trilho de barra: visível (≥ 2:1), mais suave que --color-border */
   --color-series-neutral: #6B6A66;  /* referência (ex.: “até o prazo”): cinza puro, sem matiz da marca */
   --color-series-tasks-soft: #CDE2FB; /* outras colunas de "equipe × prazo" */
   --color-chart-grid: #E1E3D3;
@@ -224,6 +227,8 @@
   --content-brand: 75rem;            /* páginas públicas: largura útil (1200 px) */
   --content-brand-device: 48.75rem;  /* aparelho do início */
   --sidebar-width: 220px;
+  --sidebar-rail: 3.5rem;     /* menu recolhido (só ícones); ao passar o mouse abre e empurra o conteúdo */
+  --rail-now: var(--sidebar-rail);
   --topbar-height: 52px;
   --bottom-nav-height: 60px;
   --chart-height: 280px;             /* altura padrão de gráfico */
@@ -240,6 +245,7 @@
   /* ---------- Movimento ---------- */
   --duration-fast: 100ms;    /* hover e foco */
   --duration-normal: 150ms;  /* abrir/fechar menus e diálogos: teto da área logada */
+  --duration-rail: 800ms;      /* menu lateral abrindo e recolhendo (suave, de propósito) */
   --easing-standard: cubic-bezier(0.2, 0, 0, 1);
   --easing-brand: cubic-bezier(0.2, 0.7, 0.2, 1);  /* entradas das páginas públicas */
   --duration-brand: 700ms;
@@ -297,6 +303,9 @@
     --color-doing-subtle: #1F3A5C;
     --color-series-tasks: #3987E5;
     --color-series-units: #E0703F;
+    --color-series-tasks-text: #6AA5F0;
+    --color-series-units-text: #F08A5C;
+    --color-edge: #4F5A40;
     --color-series-neutral: #9A998F;
     --color-series-tasks-soft: #1F3A5C;
     --color-chart-grid: #2E3524;
@@ -372,6 +381,9 @@
   --color-doing-subtle: #1F3A5C;
   --color-series-tasks: #3987E5;
   --color-series-units: #E0703F;
+  --color-series-tasks-text: #6AA5F0;
+  --color-series-units-text: #F08A5C;
+  --color-edge: #4F5A40;
   --color-series-neutral: #9A998F;
   --color-series-tasks-soft: #1F3A5C;
   --color-chart-grid: #2E3524;
@@ -431,5 +443,14 @@
   :root {
     --duration-fast: 0ms;
     --duration-normal: 0ms;
+    --duration-rail: 0ms;
   }
+}
+
+/* Largura atual do menu lateral (faixa ou aberto). Registrada para a abertura animar (initial-value
+   em px: o registro recusa rem, que não é independente do contexto). */
+@property --rail-now {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 56px;
 }

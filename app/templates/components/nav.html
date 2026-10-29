@@ -50,7 +50,7 @@
       {%- for value, label, ico in [("system", "Sistema", "monitor"), ("light", "Claro", "sun"), ("dark", "Escuro", "moon")] %}
       <label class="theme-switch__option">
         <input type="radio" name="tema" value="{{ value }}" id="{{ prefix }}-{{ value }}"{% if current == value %} checked{% endif %}>
-        <span>{{ icon(ico, "sm") }}{{ label }}</span>
+        <span>{{ icon(ico, "sm") }}<span class="theme-switch__text">{{ label }}</span></span>
       </label>
       {%- endfor %}
     </div>

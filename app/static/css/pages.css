@@ -510,6 +510,8 @@
   .fill__panel > .alert { margin: 0 0 var(--space-3); }
   /* Responsável: bolinha com as iniciais ao lado da subatividade; clicar abre “Atribuir a” (busca + sugestões). */
   .etab__who { display: flex; align-items: flex-start; gap: var(--space-2); }
+  .who-col { width: var(--space-10); text-align: right; }
+  .who-col .who { display: inline-block; }
   .etab__who-body { flex: 1 1 auto; min-width: 0; }
   .who { flex: none; }
   .who > summary { list-style: none; cursor: pointer; }
@@ -521,7 +523,9 @@
     border: var(--border-width) solid var(--color-border-strong);
     font-size: var(--font-size-sm); font-weight: var(--font-weight-bold); line-height: 1;
   }
-  .who__avatar--empty { background: transparent; border: var(--border-width) dashed var(--color-border); color: var(--color-text-muted); }
+  .who__avatar--empty { color: var(--color-text-muted); }
+  .who__avatar--empty .icon { width: var(--space-4); height: var(--space-4); }
+  .who > summary:hover .icon { color: var(--color-primary); }
   .who__avatar--sm { width: var(--space-6); height: var(--space-6); font-size: var(--font-size-xs); }
   .who > summary:hover { border-color: var(--color-border); background: var(--color-primary-subtle); }
   .who > summary:focus-visible { outline: var(--focus-width) solid var(--color-focus); outline-offset: var(--focus-offset); }
@@ -826,6 +830,8 @@
   }
   .fill__list { padding: var(--space-2); min-width: 0; }
   .fill__panel { min-width: 0; }
+  /* Contraste (2026-10-29): a borda de cartão tinha 1,3:1 e sumia no fundo; --color-edge dá ~2:1. */
+  .fill__list, .fill__panel, .ops-kpis, .ops-attention, .painel-block { border-color: var(--color-edge); }
   .fill__hint { margin: var(--space-3) 0 0; font-size: var(--font-size-sm); color: var(--color-text-muted); max-width: 72ch; }
   .fill__list-hint { margin: var(--space-2) var(--space-2) 0; font-size: var(--font-size-sm); color: var(--color-text-subtle); }
 
@@ -841,7 +847,8 @@
   }
   .stage-item + .stage-item { border-top-color: var(--color-border-subtle); }
   .stage-item:hover { background: var(--color-surface-2); }
-  .stage-item.is-current { background: var(--color-surface-2); border-color: var(--color-border-subtle); }
+  .stage-item.is-current { background: var(--color-primary-subtle); border-color: var(--color-primary); }
+  .stage-item.is-current .stage-item__units { color: var(--color-text-muted); } /* sobre o fundo selecionado: ≥ 4,5:1 */
   .stage-item .drag-handle { min-width: var(--space-6); }
   .stage-item__link { flex: 1; min-width: 0; padding: var(--space-2); color: var(--color-text); text-decoration: none; }
   .stage-item__info { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); min-width: 0; }
@@ -875,6 +882,8 @@
     .fill[data-modo="registrar"] .etab .etab__units::before { content: attr(data-label); font-size: var(--font-size-xs); color: var(--color-text-muted); }
     .fill[data-modo="registrar"] .etab td.num .cell { max-width: none; }
     .fill[data-modo="registrar"] .etab .etab__actions { grid-column: 1 / -1; }
+    .fill[data-modo="registrar"] .etab .who-col { grid-column: 1 / -1; justify-self: end; text-align: right; width: auto; }
+    .fill[data-modo="registrar"] .etab .who-col:not(:has(.who, .who__avatar)) { display: none; }
     /* Com JS o botão "Salvar" da linha some (salva ao sair do campo): a célula de ações não ocupa espaço.
        O <form> continua no DOM, e os campos ligados a ele por form= seguem funcionando. */
     html:not(.no-js) .fill[data-modo="registrar"] .etab .etab__actions { display: none; }
@@ -886,14 +895,14 @@
   .mini {
     display: block;
     width: 100%;
-    height: var(--space-1);
+    height: calc(var(--space-1) * 1.5);
     border: 0;
     border-radius: var(--radius-pill);
-    background: var(--color-track);
+    background: var(--color-edge);
     color: var(--color-series-tasks);
     appearance: none;
   }
-  .mini::-webkit-progress-bar { background: var(--color-track); border-radius: var(--radius-pill); }
+  .mini::-webkit-progress-bar { background: var(--color-edge); border-radius: var(--radius-pill); }
   .mini::-webkit-progress-value { background: var(--color-series-tasks); border-radius: var(--radius-pill); }
   .mini::-moz-progress-bar { background: var(--color-series-tasks); border-radius: var(--radius-pill); }
   .mini--units { color: var(--color-series-units); }
@@ -957,7 +966,7 @@
   .table-scroll { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .etab { width: 100%; border-collapse: collapse; font-size: var(--font-size-md); font-variant-numeric: var(--font-numeric); }
   .etab th, .etab td { padding: var(--space-1) var(--space-2); border-bottom: var(--border-width) solid var(--color-border-subtle); text-align: left; vertical-align: middle; }
-  .etab thead th { font-size: var(--font-size-sm); font-weight: var(--font-weight-regular); color: var(--color-text-muted); border-bottom-color: var(--color-border-strong); }
+  .etab thead th { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--color-text); border-bottom: var(--border-width-strong) solid var(--color-edge); }
   .etab tbody th { font-weight: var(--font-weight-semibold); }
   .etab .num { text-align: right; }
   .etab td.num .cell { max-width: 5.5rem; margin-left: auto; display: block; }
@@ -965,6 +974,15 @@
   .etab__name { min-width: 9rem; }
   .fill[data-modo="configurar"] .etab__name { min-width: 10rem; }
   .fill[data-modo="configurar"] .pct-cell .mini { min-width: 2.5rem; }
+  .etab__name-text { font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); }
+  .etab__done { display: inline-flex; vertical-align: middle; color: var(--color-status-done); }
+  /* Subatividades: título com a contagem e linhas mais altas e separadas (antes soltas sob as caixas). */
+  .sub-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); margin: var(--space-4) 0 var(--space-1); }
+  .sub-head__title { margin: 0; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); }
+  .sub-head__count { min-width: var(--space-6); padding: 0 var(--space-2); border: var(--border-width) solid var(--color-edge); border-radius: var(--radius-pill); text-align: center; font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); }
+  .sub-head__help { color: var(--color-text-muted); font-size: var(--font-size-sm); }
+  .etab tbody tr:hover { background: var(--color-surface-2); }
+  .etab tbody th, .etab tbody td { padding-block: var(--space-3); border-bottom-color: var(--color-edge); }
   .etab__name-cell { display: flex; align-items: center; gap: var(--space-1); }
   .etab__name-cell .cell, .etab__name > .cell { flex: 1; width: 100%; min-width: 0; }
   .etab__name-cell .drag-handle { min-width: var(--space-6); }
@@ -983,9 +1001,11 @@
   /* Duas caixas: pelas tarefas (azul) e unidades (laranja) */
   .twobox { display: grid; gap: var(--space-3); margin: 0 0 var(--space-4); }
   @media (min-width: 40em) { .twobox { grid-template-columns: 1fr 1fr; } }
-  .box { padding: var(--space-3) var(--space-4); border: var(--border-width) solid var(--color-border-subtle); border-radius: var(--radius-lg); background: var(--color-surface-2); }
+  .box { padding: var(--space-3) var(--space-4); border: var(--border-width) solid var(--color-edge); border-radius: var(--radius-lg); background: var(--color-surface-2); }
   .box__label { margin: 0; font-size: var(--font-size-sm); color: var(--color-text-muted); }
   .box__big { margin: var(--space-1) 0 0; font-size: var(--font-size-2xl); font-weight: var(--font-weight-semibold); line-height: var(--line-height-tight); letter-spacing: var(--letter-spacing-tight); }
+  .box--tasks .box__big { color: var(--color-series-tasks-text); }
+  .box--units .box__big { color: var(--color-series-units-text); }
   .box__sub { margin: var(--space-1) 0 0; font-size: var(--font-size-sm); color: var(--color-text-muted); }
   /* A cor da série aparece como marca de legenda no rótulo (a mesma dos gráficos), não como faixa lateral. */
   .box--tasks .box__label::before, .box--units .box__label::before {

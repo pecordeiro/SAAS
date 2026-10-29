@@ -205,23 +205,32 @@
   @media (min-width: 48em) {
     .app-shell {
       display: grid;
-      grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+      /* Menu recolhido = faixa de ícones; com o mouse ou o foco nele, abre com a largura de sempre e EMPURRA
+         o conteúdo (não fica por cima). --rail-now é a largura atual e anima (@property no fim do arquivo). */
+      grid-template-columns: var(--rail-now) minmax(0, 1fr);
+      transition: --rail-now var(--duration-rail) var(--easing-rail);
       /* R3: o fundo e a borda do menu descem a página inteira (o menu em si é sticky com
          a altura da janela; em páginas longas o fundo dele terminava no meio). */
       background:
         linear-gradient(to right,
-          var(--color-surface) calc(var(--sidebar-width) - var(--border-width)),
-          var(--color-border-subtle) calc(var(--sidebar-width) - var(--border-width)),
-          var(--color-border-subtle) var(--sidebar-width),
-          transparent var(--sidebar-width));
+          var(--color-surface) calc(var(--rail-now) - var(--border-width)),
+          var(--color-border-subtle) calc(var(--rail-now) - var(--border-width)),
+          var(--color-border-subtle) var(--rail-now),
+          transparent var(--rail-now));
     }
+    .app-shell { --easing-rail: cubic-bezier(0.4, 0, 0.2, 1); }
+    .app-shell:has(.app-sidebar:hover),
+    .app-shell:has(.app-sidebar:focus-within),
+    html.sidebar-hold .app-shell { --rail-now: var(--sidebar-width); }
     .app-topbar,
     .bottom-nav { display: none; }
 
     .app-sidebar {
       position: sticky;
       top: 0;
+      width: var(--rail-now);
       height: 100vh;
+      overflow-x: hidden;
       height: 100dvh;
       display: flex;
       flex-direction: column;
@@ -263,6 +272,40 @@
     margin-top: auto;
     padding: var(--space-4) var(--space-3) 0;
     border-top: var(--border-width) solid var(--color-border-subtle);
+  }
+
+  /* Menu recolhido (≥ 48em, sem foco nem mouse sobre ele): só ícones. O texto some visualmente mas continua
+     no leitor de tela (nome do link). Ao passar o mouse ou focar qualquer item, ele abre empurrando o conteúdo. */
+  @media (min-width: 48em) {
+    html:not(.sidebar-hold) .app-sidebar:not(:hover):not(:focus-within) .sidebar__company,
+    html:not(.sidebar-hold) .app-sidebar:not(:hover):not(:focus-within) .sidebar__item > span,
+    html:not(.sidebar-hold) .app-sidebar:not(:hover):not(:focus-within) .sidebar__chevron,
+    html:not(.sidebar-hold) .app-sidebar:not(:hover):not(:focus-within) .theme-switch__legend,
+    html:not(.sidebar-hold) .app-sidebar:not(:hover):not(:focus-within) .theme-switch__text {
+      position: absolute;
+      width: var(--border-width);
+      height: var(--border-width);
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    html:not(.sidebar-hold) .app-sidebar:not(:hover):not(:focus-within) .sidebar__subnav { display: none; }
+    /* Os rótulos não quebram linha enquanto a largura anima (o menu revela o texto aos poucos). */
+    .app-sidebar .sidebar__item > span,
+    .app-sidebar .sidebar__user-name { white-space: nowrap; }
+    html:not(.sidebar-hold) .app-sidebar:not(:hover):not(:focus-within) .sidebar__item,
+    /* Seletor de tema na faixa: só os três ícones (sol, lua, monitor), um embaixo do outro. */
+    html:not(.sidebar-hold) .app-sidebar:not(:hover):not(:focus-within) .theme-form { padding-inline: 0; }
+    html:not(.sidebar-hold) .app-sidebar:not(:hover):not(:focus-within) .theme-switch { padding: 0; border: 0; }
+    html:not(.sidebar-hold) .app-sidebar:not(:hover):not(:focus-within) .theme-switch__options { flex-direction: column; align-items: center; gap: var(--space-1); padding: 0; background: transparent; }
+    html:not(.sidebar-hold) .app-sidebar:not(:hover):not(:focus-within) .theme-switch__option { flex: none; width: var(--space-10); }
+    html:not(.sidebar-hold) .app-sidebar:not(:hover):not(:focus-within) .theme-switch__option > span { flex-direction: row; justify-content: center; min-height: var(--space-10); padding: 0; }
+    html:not(.sidebar-hold) .app-sidebar:not(:hover):not(:focus-within) .sidebar__footer,
+    html:not(.sidebar-hold) .app-sidebar:not(:hover):not(:focus-within) .sidebar__nav--secondary { padding-inline: 0; }
+    html:not(.sidebar-hold) .app-sidebar:not(:hover):not(:focus-within) .sidebar__company { display: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .app-shell { transition: none; }
+    }
   }
 
   /* ---------- Cabeçalho de página ---------- */
