@@ -17,7 +17,7 @@
 #}
 <header class="page-header">
   <div class="page-header__titles">
-    <a class="back-link" href="{{ url_for('app.project_detail', project_id=project.id) }}">{{ icon("chevron-left") }}{{ project.name }}</a>
+    <a class="back-link" href="{{ url_for('preencher.fill', projeto=project.id) }}">{{ icon("chevron-left") }}{{ project.name }}</a>
     <h1>Unidades{{ optional_badge() }}</h1>
     <p class="page-header__subtitle muted"><span class="num">{{ total }}</span> de <span class="num">{{ project.quantity }}</span> equipamentos com número de série.</p>
   </div>

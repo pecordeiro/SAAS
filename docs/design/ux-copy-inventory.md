@@ -32,6 +32,10 @@ nomear pelo que a pessoa reconhece, por extenso, em voz ativa; a mesma ação te
 | `static/js/preencher.js` | Erro no servidor: não salvou. Tente de novo em instantes. | novo (F-04) |
 | servidor (`preencher.py`) | Outra pessoa mudou "…" enquanto você editava: agora … O seu valor ficou no campo: saia dele de novo para salvar por cima. | mantido: já explicava o conflito |
 
+| `preencher/_painel.html` (módulos) | Marcar aguardando peça · Atualizar aguardando peça · Fotos e comentários · Checklist de inspeção · Progresso por pessoa | novo: mesmos nomes da tela antiga, com o selo "Opcional" |
+| `preencher/_partes.html` (bolinha) | Atribuir a · Digite um nome ou um e-mail · Sugestões · Tirar o responsável · Ninguém encontrado. | novo: janelinha do responsável; a bolinha tem o nome da pessoa no rótulo para leitor de tela |
+| `preencher/_cabecalho.html` (módulo) | Unidades | novo: link do projeto, só com o módulo ligado |
+
 ## Painel da operação
 
 | Local | Texto | Decisão |

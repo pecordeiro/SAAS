@@ -17,6 +17,7 @@ Mapa e método em [`system-audit.md`](system-audit.md).
 | F-09 | P3 | Testes | Suíte só em SQLite nesta sessão; RLS não exercitado | Pendente (precisa de PostgreSQL) |
 | F-10 | P3 | Texto | Títulos ainda dizem "Controle de Produção", não "Teroz" | Pendente (decisão do dono) |
 | F-11 | P3 | Feedback | A mensagem de F-04 cobre as células de Preencher etapas e Meta e equipe; o registro pela folha do detalhe do projeto ainda não | Pendente |
+| F-12 | P1 | Produto / módulos | Módulos ligados em Configurações não mudavam nada em Preencher etapas | **Corrigido e testado** |
 
 ---
 
@@ -98,3 +99,21 @@ Mapa e método em [`system-audit.md`](system-audit.md).
 ## F-11 · Mensagem de falha fora de Preencher etapas (P3)
 - O registro pela folha do detalhe do projeto (`register__form`) ainda só marca o formulário. F-01 (sessão) vale para
   ele também, porque a correção é no servidor.
+
+## F-12 · Módulos opcionais sem efeito em "Preencher etapas" (P1)
+- **Local:** `app/templates/preencher/_painel.html` (sem controles), `app/blueprints/app.py::stage_waiting_part`,
+  `app/blueprints/edicao.py::activity_assign` (voltavam para a tela antiga do projeto).
+- **Evidência:** com os 6 módulos ligados em Configurações › Módulos, "Preencher etapas" só mostrava a etiqueta
+  "Aguardando peça" de uma etapa já marcada. Marcar aguardando peça, fotos e comentários, checklist, unidades e
+  responsável só existiam na tela antiga do projeto (`/app/projetos/<id>`, aberta pelo nome na lista de Projetos). O
+  `limpeza-pendente.md` já registrava que o Preencher "não cobre esses módulos"; o redesign tornou isso mais visível
+  porque o Preencher virou a tela de uso diário.
+- **Impacto:** a pessoa liga o módulo, volta à tela que usa e "nada acontece". Os módulos pareciam quebrados.
+- **Correção:** a etapa aberta mostra, só para módulo ligado, "Marcar/Atualizar aguardando peça" (supervisor+, com
+  aviso amarelo quando marcada), "Fotos e comentários" (uma entrada por subatividade, com contagem), "Checklist de inspeção", uma bolinha de responsável ao lado de cada subatividade (iniciais; supervisor+ clica e escolhe em "Atribuir a", com busca por nome ou e-mail) e "Unidades" no topo. As ações voltam para a
+  mesma etapa (`voltar=preencher`); as telas dos módulos agora voltam para Preencher. As rotas não mudaram de
+  regra: módulo desligado continua 404 e o papel continua checado no servidor.
+- **Teste:** `tests/test_modulos_preencher.py` (12) e navegador (marcar peça, atribuir pela bolinha, buscar, tirar o
+  responsável, abrir fotos, checklist e unidades, e voltar).
+- **Pendente (decisão do dono):** "Aguardando peça" **só sinaliza**; nunca trava o lançamento de peças (regra da
+  Etapa F, `services/projects.py::set_waiting_part`). Se a intenção é travar, é mudança de regra e precisa de ADR.

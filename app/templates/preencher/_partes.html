@@ -64,3 +64,43 @@
   {%- if message %}{{ icon("alert" if error else "check", "sm") }}<span>{{ message }}</span>{% endif -%}
 </p>
 {%- endmacro %}
+
+{# Responsável pela subatividade (módulo “Responsáveis”): uma bolinha com as iniciais ao lado do nome.
+   Supervisor+ clica e escolhe na janelinha “Atribuir a” (busca por nome ou e-mail + sugestões); cada pessoa é
+   um botão que envia o formulário, então funciona sem JS (a busca é só conveniência). Os demais papéis só veem
+   a bolinha. O servidor confere a empresa e o papel em edicao.activity_assign (ADR-0009). #}
+{% macro who(a, members, can_edit, modo) -%}
+{%- set person = a.assignee -%}
+{%- if can_edit and members %}
+<details class="who" data-who>
+  <summary class="who__avatar{% if not person %} who__avatar--empty{% endif %}" title="{{ ('Responsável: ' ~ person.name ~ ' (trocar)') if person else 'Sem responsável (atribuir)' }}" aria-label="{{ a.name }}: {{ ('responsável ' ~ person.name ~ '. Trocar') if person else 'sem responsável. Atribuir' }}">
+    {%- if person %}<span aria-hidden="true">{{ person.name|iniciais }}</span>{% else %}{{ icon("user-plus") }}{% endif -%}
+  </summary>
+  <div class="who__panel" role="group" aria-label="Atribuir {{ a.name }} a">
+    <p class="who__title">Atribuir a</p>
+    <input class="who__search js-only" type="search" placeholder="Digite um nome ou um e-mail" aria-label="Buscar pessoa por nome ou e-mail" autocomplete="off" data-who-search>
+    <form method="post" action="{{ url_for('edicao.activity_assign', activity_id=a.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="voltar" value="preencher">
+      {{ modo_input(modo) }}
+      <p class="who__group">Sugestões</p>
+      <ul class="who__list" role="list">
+        {%- if person %}
+        <li><button class="who__item" type="submit" name="assignee_id" value="">{{ icon("x", "sm") }}<span class="who__name">Tirar o responsável</span></button></li>
+        {%- endif %}
+        {%- for m in members %}
+        <li data-who-item data-search="{{ (m.name ~ ' ' ~ m.email)|lower }}">
+          <button class="who__item{% if person and person.id == m.id %} is-current{% endif %}" type="submit" name="assignee_id" value="{{ m.id }}"{% if person and person.id == m.id %} aria-current="true"{% endif %}>
+            <span class="who__avatar who__avatar--sm" aria-hidden="true">{{ m.name|iniciais }}</span><span class="who__name">{{ m.name }}</span>
+          </button>
+        </li>
+        {%- endfor %}
+      </ul>
+      <p class="who__none" hidden>Ninguém encontrado.</p>
+    </form>
+  </div>
+</details>
+{%- elif person %}
+<span class="who__avatar" role="img" title="Responsável: {{ person.name }}" aria-label="{{ a.name }}: responsável {{ person.name }}"><span aria-hidden="true">{{ person.name|iniciais }}</span></span>
+{%- endif %}
+{%- endmacro %}

@@ -138,6 +138,102 @@
     if (event.target && event.target.matches && event.target.matches("[data-new-form]")) refocusNew = true;
   });
 
+  /* ---------- Responsável: janelinha “Atribuir a” ----------
+     Sem JS o <details> abre no lugar e cada pessoa é um botão que envia o formulário. Aqui só se
+     posiciona a janelinha sob a bolinha, se filtra a lista pela busca e se fecha com Esc ou clique
+     fora. Quem pode atribuir e a quem é decidido no servidor (ADR-0009). */
+  var GAP = 8;
+
+  function plain(text) {
+    return String(text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+
+  function openWhos() {
+    return document.querySelectorAll("details.who[open]");
+  }
+
+  function closeWhos(except) {
+    Array.prototype.forEach.call(openWhos(), function (d) {
+      if (d !== except) d.removeAttribute("open");
+    });
+  }
+
+  function placeWho(details) {
+    var summary = details.querySelector("summary");
+    var panel = details.querySelector(".who__panel");
+    if (!summary || !panel) return;
+    var r = summary.getBoundingClientRect();
+    var w = panel.offsetWidth;
+    var h = panel.offsetHeight;
+    var left = Math.max(GAP, Math.min(r.left, window.innerWidth - w - GAP));
+    var top = r.bottom + GAP / 2;
+    if (top + h > window.innerHeight - GAP && r.top - h - GAP / 2 > GAP) top = r.top - h - GAP / 2;
+    panel.style.left = left + "px";
+    panel.style.top = top + "px";
+  }
+
+  document.addEventListener("toggle", function (event) {
+    var d = event.target;
+    if (!d || !d.matches || !d.matches("details.who") || !d.open) return;
+    closeWhos(d);
+    var search = d.querySelector("[data-who-search]");
+    if (search) {
+      search.value = ""; // abre sempre com todas as pessoas, sem a busca da vez anterior
+      filterWho(search);
+    }
+    placeWho(d);
+    if (search) search.focus({ preventScroll: true });
+  }, true);
+
+  function filterWho(box) {
+    var panel = box.closest(".who__panel");
+    var q = plain(box.value);
+    var any = false;
+    Array.prototype.forEach.call(panel.querySelectorAll("[data-who-item]"), function (li) {
+      var hit = !q || plain(li.getAttribute("data-search")).indexOf(q) !== -1;
+      li.hidden = !hit;
+      any = any || hit;
+    });
+    var none = panel.querySelector(".who__none");
+    if (none) none.hidden = any;
+  }
+
+  document.addEventListener("input", function (event) {
+    var box = event.target;
+    if (box && box.matches && box.matches("[data-who-search]")) filterWho(box);
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Enter" && event.target.matches && event.target.matches("[data-who-search]")) {
+      event.preventDefault(); // Enter na busca não atribui ninguém sem querer
+      return;
+    }
+    if (event.key !== "Escape") return;
+    var open = openWhos();
+    if (!open.length) return;
+    var summary = open[0].querySelector("summary");
+    closeWhos(null);
+    if (summary) summary.focus();
+  });
+
+  document.addEventListener("click", function (event) {
+    if (!openWhos().length) return;
+    closeWhos(event.target.closest ? event.target.closest("details.who") : null);
+  });
+
+  // Ao rolar ou redimensionar (no celular, o teclado muda a altura), a janelinha acompanha a bolinha;
+  // só fecha se a bolinha saiu da tela.
+  function followWhos() {
+    Array.prototype.forEach.call(openWhos(), function (d) {
+      var r = d.querySelector("summary").getBoundingClientRect();
+      if (r.bottom < 0 || r.top > window.innerHeight) d.removeAttribute("open");
+      else placeWho(d);
+    });
+  }
+
+  window.addEventListener("scroll", followWhos, { passive: true });
+  window.addEventListener("resize", followWhos);
+
   // Seletor de projeto e modo de progresso: aplica ao escolher (sem JS, botão “Abrir”/“Salvar”).
   document.addEventListener("change", function (event) {
     var form = event.target && event.target.closest ? event.target.closest("form[data-autosubmit]") : null;

@@ -205,6 +205,7 @@ def _register_template_helpers(app: Flask) -> None:
         br_pct,
         br_time,
         br_workdays,
+        iniciais,
     )
     from app.models import ROLE_LABELS
 
@@ -217,6 +218,7 @@ def _register_template_helpers(app: Flask) -> None:
     app.add_template_filter(br_time, "hora")
     app.add_template_filter(br_day_label, "dia_rotulo")
     app.add_template_filter(br_workdays, "dias_semana")
+    app.add_template_filter(iniciais, "iniciais")
 
     @app.context_processor
     def inject():

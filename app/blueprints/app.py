@@ -658,17 +658,31 @@ def activity_create(stage_id):
     return redirect(url_for("app.project_detail", project_id=stage.project_id, _anchor=f"etapa-{stage.id}"), 303)
 
 
+def _from_fill() -> bool:
+    """A ação veio de “Preencher etapas” (campo ``voltar=preencher``) e volta para lá."""
+    return request.form.get("voltar") == "preencher"
+
+
+def _fill_return(project_id, stage_id):
+    modo = "configurar" if request.form.get("modo") == "configurar" else None
+    return redirect(url_for("preencher.fill", projeto=project_id, etapa=stage_id, modo=modo), 303)
+
+
 @bp.post("/etapas/<uuid:stage_id>/aguardando-peca")
 @tenant_required(ROLE_SUPERVISOR)
 def stage_waiting_part(stage_id):
     """Etapa F: marca/desmarca “aguardando peça” (supervisor+, com ``version``). Só sinaliza:
-    nunca bloqueia o registro de peças. Etapa de outra empresa (ou arquivada) → 404."""
+    nunca bloqueia o registro de peças. Etapa de outra empresa (ou arquivada) → 404.
+    Vindo de Preencher etapas (``voltar=preencher``), avisa por mensagem e volta para lá."""
     stage = get_or_404(Stage, stage_id)
     project = stage.project
     form = WaitingPartForm()
     if not form.validate():
-        return _render_detail(project, errors={stage.id: "Confira a previsão (data) e a observação (até 140 caracteres)."},
-                              status=400, open_stage=stage.id)
+        message = "Confira a previsão (data) e a observação (até 140 caracteres)."
+        if _from_fill():
+            flash(message, "erro")
+            return _fill_return(project.id, stage.id)
+        return _render_detail(project, errors={stage.id: message}, status=400, open_stage=stage.id)
     try:
         svc.set_waiting_part(stage, form.waiting.data, form.expected_on.data, form.note.data, form.version.data,
                              current_user.id)
@@ -676,17 +690,21 @@ def stage_waiting_part(stage_id):
         db.session.rollback()
         stage = get_or_404(Stage, stage_id)
         state = "marcada como aguardando peça" if stage.waiting_part else "sem a marca de aguardando peça"
-        return _render_detail(
-            stage.project,
-            errors={stage.id: f"Outra pessoa alterou esta etapa enquanto você editava: agora ela está {state}. Confira e salve de novo."},
-            status=409,
-            open_stage=stage.id,
-        )
+        message = f"Outra pessoa alterou esta etapa enquanto você editava: agora ela está {state}. Confira e salve de novo."
+        if _from_fill():
+            flash(message, "erro")
+            return _fill_return(stage.project_id, stage.id)
+        return _render_detail(stage.project, errors={stage.id: message}, status=409, open_stage=stage.id)
     except svc.EditError as exc:
         db.session.rollback()
+        if _from_fill():
+            flash(str(exc), "erro")
+            return _fill_return(project.id, stage.id)
         return _render_detail(project, errors={stage.id: str(exc)}, status=400, open_stage=stage.id)
     db.session.commit()
     flash("Etapa marcada como aguardando peça." if form.waiting.data else "Marca de aguardando peça retirada.", "sucesso")
+    if _from_fill():
+        return _fill_return(project.id, stage.id)
     return redirect(url_for("app.project_detail", project_id=project.id, etapa=stage.id, _anchor=f"etapa-{stage.id}"), 303)
 
 

@@ -1,5 +1,9 @@
 {% import "preencher/_partes.html" as parts %}
 {% from "components/icon.html" import icon %}
+{% from "components/alert.html" import alert %}
+{% from "components/button.html" import button %}
+{% from "components/field.html" import checkbox %}
+{% from "components/optional.html" import optional_badge %}
 {#
   Lado direito de “Preencher etapas”: a etapa escolhida. Campos (.cell) salvam ao sair; o resto
   é texto calculado no servidor. No modo “registrar” só aparece o que se lança (.reg-only); tempos,
@@ -35,6 +39,55 @@
     <a class="btn btn--danger-ghost btn--sm edit-head__delete cfg-only" href="#excluir-etapa-{{ st.id }}" aria-haspopup="dialog">Apagar etapa</a>
     {%- endif %}
   </div>
+
+  {#- Módulos opcionais (R6): só aparecem se o proprietário ligou em Configurações › Módulos. Tudo
+      recolhido por padrão; as rotas recusam sozinhas quando o módulo está desligado. -#}
+  {%- set waiting_on = "aguardando_peca" in modules %}
+  {%- if waiting_on and st.waiting_part %}
+  {{ alert("warning", "Aguardando peça" ~ (" · previsão " ~ (st.part_expected_on|data) if st.part_expected_on else ""), st.part_note or "O registro de peças continua liberado; a marca só avisa a equipe.") }}
+  {%- endif %}
+  {%- set per_activity = rows and not simple %}
+  {%- if (waiting_on and can_edit) or "checklist" in modules or (per_activity and "fotos" in modules) or (can_edit and "atribuicao" in modules) %}
+  <div class="stage-extras">
+    {%- if waiting_on and can_edit %}
+    <details class="part-toggle">
+      <summary class="btn btn--ghost btn--sm">{{ icon("package") }}<span>{{ "Atualizar aguardando peça" if st.waiting_part else "Marcar aguardando peça" }}</span>{{ optional_badge() }}</summary>
+      <form class="inline-form mt-2" method="post" action="{{ url_for('app.stage_waiting_part', stage_id=st.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="voltar" value="preencher">
+        {{ parts.modo_input(modo) }}
+        <input type="hidden" name="version" value="{{ st.version }}">
+        {{ checkbox("waiting", "Aguardando peça", checked=st.waiting_part, value="y", id="aguardando-" ~ st.id) }}
+        <div class="field inline-form__small">
+          <label class="field__label" for="previsao-{{ st.id }}">Previsão de chegada</label>
+          <input class="field__input" id="previsao-{{ st.id }}" type="date" name="expected_on" value="{{ st.part_expected_on.isoformat() if st.part_expected_on else '' }}">
+        </div>
+        <div class="field">
+          <label class="field__label" for="obs-peca-{{ st.id }}">Observação (opcional)</label>
+          <input class="field__input" id="obs-peca-{{ st.id }}" type="text" name="note" maxlength="140" value="{{ st.part_note or '' }}">
+        </div>
+        {{ button("Salvar", "secondary") }}
+      </form>
+    </details>
+    {%- endif %}
+    {%- if per_activity and "fotos" in modules %}
+    <details class="part-toggle">
+      <summary class="btn btn--ghost btn--sm">{{ icon("folder") }}<span>Fotos e comentários</span>{{ optional_badge() }}</summary>
+      <ul class="evidence-links" role="list">
+        {%- for a, ar in rows %}
+        <li><a class="btn btn--secondary btn--sm" href="{{ url_for('qualidade.evidence', activity_id=a.id) }}">{{ a.name }}<span class="muted num">&nbsp;({{ evidence_counts.get(a.id, 0) }})</span></a></li>
+        {%- endfor %}
+      </ul>
+    </details>
+    {%- endif %}
+    {%- if "checklist" in modules %}
+    <a class="btn btn--ghost btn--sm" href="{{ url_for('qualidade.checklist', stage_id=st.id) }}">{{ icon("check") }}<span>Checklist de inspeção{% if checklist_signal and checklist_signal.items %} ({{ checklist_signal.items }} itens){% endif %}</span>{{ optional_badge() }}</a>
+    {%- endif %}
+    {%- if can_edit and "atribuicao" in modules %}
+    <a class="btn btn--ghost btn--sm" href="{{ url_for('app.project_people', project_id=project.id) }}">{{ icon("team") }}<span>Progresso por pessoa</span>{{ optional_badge() }}</a>
+    {%- endif %}
+  </div>
+  {%- endif %}
 
   {%- if simple %}
   {#- Modo simples (R4): a etapa recebe o % direto; o tempo só pesa a etapa no projeto. #}
@@ -96,11 +149,16 @@
       {%- for a, ar in rows %}
       <tr class="sort-item" id="linha-{{ a.id }}" data-sort-id="{{ a.id }}" data-version="{{ a.version }}" data-move-url="{{ url_for('edicao.activity_position', activity_id=a.id) }}">
         <td class="etab__name">
-          {%- if can_edit %}
-          <span class="etab__name-cell cfg-only"><span class="drag-handle js-only" data-drag-handle title="Arraste para reordenar" aria-hidden="true">⠿</span><input class="cell" name="name" form="f-{{ a.id }}" value="{{ a.name }}" maxlength="160" required autocomplete="off" aria-label="Nome da subatividade" aria-describedby="salvo-status"></span>
-          <span class="etab__name-text reg-only">{{ a.name }}</span>
-          {%- else %}<span class="etab__name-text">{{ a.name }}</span>{% endif %}
-          {{ parts.last_entry(a, last, None) }}
+          <div class="etab__who">
+            {%- if "atribuicao" in modules %}{{ parts.who(a, members, can_edit, modo) }}{% endif %}
+            <div class="etab__who-body">
+              {%- if can_edit %}
+              <span class="etab__name-cell cfg-only"><span class="drag-handle js-only" data-drag-handle title="Arraste para reordenar" aria-hidden="true">⠿</span><input class="cell" name="name" form="f-{{ a.id }}" value="{{ a.name }}" maxlength="160" required autocomplete="off" aria-label="Nome da subatividade" aria-describedby="salvo-status"></span>
+              <span class="etab__name-text reg-only">{{ a.name }}</span>
+              {%- else %}<span class="etab__name-text">{{ a.name }}</span>{% endif %}
+              {{ parts.last_entry(a, last, None) }}
+            </div>
+          </div>
         </td>
         <td class="num cfg-only">
           {%- if can_edit %}<input class="cell cell--num" name="ideal_minutes" form="f-{{ a.id }}" value="{{ a.ideal_minutes|minutos }}" inputmode="decimal" autocomplete="off" aria-label="Tempo ideal de {{ a.name }} (min)" aria-describedby="salvo-status">

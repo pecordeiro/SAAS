@@ -325,6 +325,7 @@ def activity_assign(activity_id):
     except ValueError:
         abort(404)
     project_id = activity.stage.project_id
+    stage_id = activity.stage_id
     try:
         changed = svc.assign_activity(activity, assignee_id, current_user.id)
     except svc.AssignError:
@@ -333,7 +334,7 @@ def activity_assign(activity_id):
     db.session.commit()
     if changed:
         flash("Responsável definido." if assignee_id else "Atividade sem responsável.", "sucesso")
-    return _back(project_id)
+    return _back(project_id, stage_id)
 
 
 @bp.post("/atividades/<uuid:activity_id>/posicionar")

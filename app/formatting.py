@@ -87,3 +87,13 @@ def br_workdays(days) -> str:
     if len(ordered) > 2 and ordered == list(range(ordered[0], ordered[-1] + 1)):
         return f"{WEEKDAY_ABBR[ordered[0]]}–{WEEKDAY_ABBR[ordered[-1]]}"
     return ", ".join(WEEKDAY_ABBR[d] for d in ordered)
+
+
+def iniciais(name: str | None) -> str:
+    """Iniciais para a bolinha de responsável: primeira letra da primeira e da última palavra
+    (“Jandir - Solis Tecnologia” → “JT”, “pedro” → “P”). Sem nome, “?”."""
+    words = [w for w in (name or "").replace("-", " ").split() if any(ch.isalnum() for ch in w)]
+    letters = [next(ch for ch in w if ch.isalnum()).upper() for w in words]
+    if not letters:
+        return "?"
+    return letters[0] if len(letters) == 1 else letters[0] + letters[-1]

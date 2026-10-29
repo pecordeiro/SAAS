@@ -26,6 +26,9 @@ from app.formatting import br_number
 from app.forms import BaseForm
 from app.models import PROGRESS_DETAILED, PROGRESS_SIMPLE, ROLE_OPERATOR, ROLE_SUPERVISOR, Activity, Project, Stage
 from app.services import calc, dashboard, modules
+from app.services import checklists as checklists_svc
+from app.services import comments as comments_svc
+from app.services import photos as photos_svc
 from app.services import projects as svc
 from app.services.holidays import holidays_for
 from app.tenancy import get_or_404, tenant_required
@@ -130,6 +133,27 @@ def _who_when() -> str:
 # ---------------------------------------------------------------- Preencher etapas: contexto
 
 
+def _module_ctx(project: Project, selected: dict | None, rows: list) -> dict:
+    """Dados dos módulos opcionais (R6) só da etapa aberta. Módulo desligado = nada é consultado;
+    esconder aqui é conveniência, a rota de cada módulo recusa sozinha (ADR-0009)."""
+    ctx: dict = {"evidence_counts": {}, "checklist_signal": None, "members": []}
+    if selected is None:
+        return ctx
+    on = modules.enabled_keys(g.company)
+    stage = selected["stage"]
+    ids = [a.id for a, _ in rows]
+    if modules.FOTOS in on and ids:
+        for counts in (photos_svc.counts_by_activity(project.company_id, ids),
+                       comments_svc.counts_by_activity(project.company_id, ids)):
+            for activity_id, n in counts.items():
+                ctx["evidence_counts"][activity_id] = ctx["evidence_counts"].get(activity_id, 0) + n
+    if modules.CHECKLIST in on:
+        ctx["checklist_signal"] = checklists_svc.signals(project.company_id, [stage]).get(stage.id)
+    if modules.ATRIBUICAO in on and _can_edit():
+        ctx["members"] = svc.assignable_members(project.company_id)
+    return ctx
+
+
 def _fill_ctx(project: Project, stage_id: uuid.UUID | None) -> dict:
     """Tudo o que a tela mostra, já calculado (calc.py via svc.summary)."""
     result = svc.summary(project)
@@ -177,6 +201,7 @@ def _fill_ctx(project: Project, stage_id: uuid.UUID | None) -> dict:
         project_choices=_project_choices(project),
         quantity=project.quantity,
         modo=_modo(),
+        **_module_ctx(project, selected, rows),
     )
 
 

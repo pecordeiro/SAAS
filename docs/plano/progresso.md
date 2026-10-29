@@ -1477,3 +1477,12 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
   nome no tema escuro; "d.u." virou "dias úteis" em todo lugar.
 - Benchmark, decisões de componentes e inventário de textos em `docs/design/` (`ux-benchmark.md`,
   `ui-component-decisions.md`, `ux-copy-inventory.md`).
+
+## Módulos opcionais em Preencher etapas (2026-10-28)
+- Relato do dono: ligou "aguardando peça" em Configurações › Módulos e nada mudou; nenhum módulo parecia funcionar.
+  Causa: os controles dos módulos só existiam na tela antiga do projeto (F-12 em `docs/plano/system-findings.md`).
+- Agora, em Preencher etapas, a etapa aberta mostra o que cada módulo ligado oferece (aguardando peça, fotos e
+  comentários, checklist) e o topo mostra Unidades. O responsável é uma bolinha com iniciais ao lado de cada
+  subatividade; clicar abre "Atribuir a" (busca + sugestões). Voltar das telas dos módulos leva a Preencher.
+- `tests/test_modulos_preencher.py`: 12 testes. "Aguardando peça" continua só sinalizando; travar o lançamento depende
+  de decisão do dono (ADR).

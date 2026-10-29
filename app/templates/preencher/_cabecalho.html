@@ -1,6 +1,7 @@
 {% from "components/icon.html" import icon %}
 {% from "components/badge.html" import badge %}
 {% from "components/modal.html" import confirm_dialog %}
+{% from "components/optional.html" import optional_badge %}
 {#
   Cabeçalho comum de Preencher etapas, Meta e equipe e Como funciona (painel do dono): no topo,
   um botão por projeto ATIVO da empresa da sessão (trocar de projeto), e para supervisor+ o lápis
@@ -38,7 +39,8 @@
 <header class="page-header fill-header">
   <div class="page-header__titles">
     <h1>{{ page_title }}</h1>
-    <p class="fill-header__project"><a href="{{ url_for('app.project_dashboard', project_id=project.id) }}">{{ project.name }}</a>{{ badge("Modo simples" if simple else "Modo detalhado", "neutral") }}</p>
+    <p class="fill-header__project"><a href="{{ url_for('app.project_dashboard', project_id=project.id) }}">{{ project.name }}</a>{{ badge("Modo simples" if simple else "Modo detalhado", "neutral") }}
+      {%- if "unidades" in modules %} <a class="btn btn--ghost btn--sm" href="{{ url_for('qualidade.units', project_id=project.id) }}">{{ icon("package", "sm") }}<span>Unidades</span>{{ optional_badge() }}</a>{% endif %}</p>
   </div>
 </header>
 {%- if can_manage %}
