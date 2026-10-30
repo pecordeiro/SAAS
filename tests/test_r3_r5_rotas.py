@@ -263,7 +263,7 @@ def test_como_funciona_mostra_numeros_atuais(client, app, tenants):
     login(client, app, a.owner_email)
     post(client, app, f"/app/atividades/{a.activity_id}/registrar", {"delta": 4})
     html = client.get(f"/app/como-funciona?projeto={a.project_id}").get_data(as_text=True)
-    assert "Como cada conta funciona" in html
+    assert "Todas as contas em uma tabela" in html and "Qual é a sua dúvida?" in html
     assert "Atividade 1: 4 ÷ 10 = 40%" in html
     assert "Atividade 1: 10 min ÷ 40 min = 25%" in html
 

@@ -95,6 +95,8 @@ class User(UUIDPk, Timestamps, UserMixin, db.Model):
     notify_assignment: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
     notify_alerts: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
     notify_weekly: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    # ADR-0021: quando o tour de primeiro acesso começou (nulo = ainda não viu; abre no Painel).
+    tour_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="user")
 

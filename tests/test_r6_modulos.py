@@ -549,10 +549,15 @@ def _seed_old_companies() -> dict:
             from app.models import User
             from app.services.passwords import hash_password
 
-            user = User(email="antiga@exemplo.com", name="Antiga", password_hash=hash_password(PASSWORD))
-            db.session.add(user)
-            db.session.flush()
-            project.stages[0].activities[0].assignee_id = user.id
+            # INSERT só com as colunas informadas (+ padrões do Python): o banco está numa revisão
+            # antiga, sem as colunas que vieram depois (ex.: users.tour_seen_at, ADR-0021).
+            user_id = uuid.uuid4()
+            db.session.execute(
+                User.__table__.insert().values(
+                    id=user_id, email="antiga@exemplo.com", name="Antiga", password_hash=hash_password(PASSWORD)
+                )
+            )
+            project.stages[0].activities[0].assignee_id = user_id
             project.stages[0].waiting_part = True
     db.session.commit()
     return ids

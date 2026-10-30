@@ -1,0 +1,34 @@
+{#
+  Tour de primeiro acesso (ADR-0021). Os passos vêm do servidor (services/tour.py, por papel);
+  o tour.js só mostra um por vez, destaca o item do menu ([data-tour]) e grava “visto” pelo
+  formulário abaixo quando o tour começa. Sem JS nada aparece: o tour é um extra, não um bloqueio.
+#}
+<div class="tour" data-tour-root hidden>
+  <div class="tour__spot" aria-hidden="true"></div>
+  <section class="tour__card" role="dialog" aria-modal="true" aria-labelledby="tour-titulo" aria-describedby="tour-texto" tabindex="-1">
+    <p class="tour__count"><span data-tour-n>1</span> de {{ tour_steps | length }}</p>
+    <h2 class="tour__title" id="tour-titulo" data-tour-title>{{ tour_steps[0].titulo }}</h2>
+    <p class="tour__text" id="tour-texto" data-tour-text>{{ tour_steps[0].texto }}</p>
+    <div class="tour__dots" aria-hidden="true">
+      {%- for _ in tour_steps %}<span class="tour__dot"></span>{% endfor %}
+    </div>
+    <div class="tour__actions">
+      <button class="btn btn--ghost" type="button" data-tour-skip><span class="btn__label">Pular tour</span></button>
+      <span class="tour__nav">
+        <button class="btn btn--secondary" type="button" data-tour-prev><span class="btn__label">Voltar</span></button>
+        <button class="btn btn--primary" type="button" data-tour-next><span class="btn__label">Próximo</span></button>
+      </span>
+    </div>
+  </section>
+  <ol class="tour__steps" hidden>
+    {%- for p in tour_steps %}
+    <li data-alvo="{{ p.alvo }}" data-reserva="{{ p.reserva }}" data-reserva-texto="{{ p.dica_reserva }}"><strong>{{ p.titulo }}</strong><span>{{ p.texto }}</span></li>
+    {%- endfor %}
+  </ol>
+  <form method="post" action="{{ url_for('app.tour_seen') }}" data-tour-seen hidden>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  </form>
+</div>
+{%- for src in asset_urls("tour.js") %}
+<script src="{{ src }}" defer></script>
+{%- endfor %}

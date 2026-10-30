@@ -24,6 +24,7 @@ from app.services import comments as comments_svc
 from app.services import photos as photos_svc
 from app.services import projects as svc
 from app.services import templates as tsvc
+from app.services import tour
 from app.services.holidays import holidays_for
 from app.services.projects import ConflictError, NewActivity, ProgressError
 from app.tenancy import get_or_404, tenant_required
@@ -130,7 +131,19 @@ def home():
         can_edit=g.membership.has_role(ROLE_SUPERVISOR),
         table=_table_arg(),
         table_tabs=DASHBOARD_TABLES,
+        # ADR-0021: tour de primeiro acesso (abre até ser visto; ?tutorial=1 = rever)
+        tour_steps=tour.passos(g.membership) if tour.deve_abrir(current_user, request.args.get("tutorial") == "1") else (),
     )
+
+
+@bp.post("/tutorial/visto")
+@tenant_required(ROLE_OPERATOR, allow_read_only=True)
+def tour_seen():
+    """Marca o tour de primeiro acesso como visto (preferência da conta, não dado da empresa;
+    por isso vale também em modo leitura). Chamado pelo tour.js quando o tour começa."""
+    if tour.marcar_visto(current_user):
+        db.session.commit()
+    return ("", 204)
 
 
 def _project_status(project: Project, result: calc.ResultadoProjeto) -> str:

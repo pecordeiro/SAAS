@@ -24,6 +24,7 @@ SOURCE_FALLBACK = {
     "publico.js": ["js/publico.js"],  # R10: animações do site público (ADR-0016)
     "htmx.js": ["js/htmx.min.js"],
     "painel.js": ["js/painel.js"],  # R2: gráficos do Painel (só nas páginas de painel)
+    "tour.js": ["js/tour.js"],  # ADR-0021: tour de primeiro acesso (só quando abre)
     "echarts.js": ["vendor/echarts-5.5.1/echarts.min.js"],  # Apache-2.0 (LICENSE e NOTICE na mesma pasta)
 }
 

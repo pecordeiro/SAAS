@@ -637,11 +637,34 @@ def how():
     stages = svc.active_stages(project)
     names = [s.name for s in stages]
     acts = [[a.name for a in svc.active_activities(s)] for s in stages]
+    etapas, simples = svc.to_calc(project), svc.is_simple(project)
     rows = calc.como_funciona(
-        svc.to_calc(project), names, acts, project.quantity, project.people, float(project.hours_per_day),
-        simples=svc.is_simple(project),
+        etapas, names, acts, project.quantity, project.people, float(project.hours_per_day), simples=simples,
     )
+    # Tópicos: as mesmas contas, uma dúvida por vez, com a previsão e a situação que o painel mostra.
+    result = svc.summary(project)
+    today, holidays, workdays = _today(), holidays_for(g.company.id), g.company.workdays()
+    fracao = calc.fracao_prazo_decorrida(project.start_date, project.due_date, today, holidays, workdays)
+    late = calc.etapas_atrasadas(result.etapas, fracao) if stages else ()
+    waiting_on = modules.is_enabled(g.company, modules.AGUARDANDO_PECA)
+    situacoes = [
+        dashboard.NOMES_VISUAIS[calc.status_visual(sr.status, waiting_on and st.waiting_part, late[k])]
+        for k, (st, sr) in enumerate(zip(stages, result.etapas))
+    ]
+    topics = calc.topicos_como_funciona(
+        etapas, names, acts, project.quantity, project.people, float(project.hours_per_day), simples,
+        inicio_contagem=max(today, project.start_date) if project.start_date else today,
+        termino=svc.forecast_end(project, result, g.company, today),
+        prazo=project.due_date,
+        feriados=holidays,
+        dias_semana=workdays,
+        fracao_decorrida=fracao,
+        situacoes=situacoes,
+        aguardando_ativo=waiting_on,
+    )
+    key = request.args.get("topico", "")
+    topic = next((t for t in topics if t.chave == key), topics[0])
     return render_template(
-        "preencher/how.html", project=project, rows=rows, simple=svc.is_simple(project),
+        "preencher/how.html", project=project, rows=rows, simple=simples, topics=topics, topic=topic,
         project_choices=_project_choices(project),
     )

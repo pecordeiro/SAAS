@@ -244,6 +244,14 @@ migrations no PostgreSQL só rodam com `TEST_DATABASE_URL`; no SQLite aparecem c
   falha ao salvar e trava contra clique duplo.
 - Telas, fluxo e decisão de cada gráfico: [`docs/design/redesign-2026-10-28.md`](docs/design/redesign-2026-10-28.md).
 
+### Tour de primeiro acesso e Como funciona por tópicos (ADR-0021)
+
+- Na primeira entrada, o Painel abre um tour opcional pelas telas (Voltar, Próximo, Pular), com passos por papel.
+  Fica marcado na conta (`users.tour_seen_at`); para rever, Como funciona › "Rever o tour pelas telas".
+- Como funciona virou uma lista de dúvidas: cada uma mostra a resposta, a regra e a conta passo a passo com os
+  números do projeto (`calc.topicos_como_funciona`). A tabela com todas as contas continua no fim da página.
+- Testes em `tests/test_tour.py`. Migration `d7b2f4a9c1e3`.
+
 ### Textos da Teroz (auditoria de copy, 2026-10-29)
 
 - Vocabulário único em [`docs/teroz-terminologia.md`](docs/teroz-terminologia.md) (Teroz, subatividade, peças e

@@ -9,14 +9,69 @@
 {% endblock %}
 {% block content %}
 {#
-  Como funciona (R5, aba “Como funciona” da planilha): cada conta, como é feita e um exemplo
-  com os números de agora do projeto. O texto vem pronto de calc.como_funciona (ADR-0009).
+  Como funciona (R5, aba “Como funciona” da planilha), por tópicos: a pessoa escolhe a dúvida e
+  vê a resposta e a conta montada passo a passo com os números de agora do projeto. Textos e
+  contas vêm prontos de calc.topicos_como_funciona e calc.como_funciona (ADR-0009). Cada dúvida é
+  um link (?topico=…#resposta): funciona sem JS e dá para mandar o endereço para alguém.
 #}
 {%- set page_title, page_endpoint = "Como funciona", "preencher.how" %}
 {% include "preencher/_cabecalho.html" %}
 
-<section class="card stack" aria-labelledby="contas-titulo">
-  <h2 class="card-title" id="contas-titulo">Como cada conta funciona</h2>
+<div class="how-topics">
+  <section class="card stack how-topics__menu" aria-labelledby="duvidas-titulo">
+    <div>
+      <h2 class="card-title" id="duvidas-titulo">Qual é a sua dúvida?</h2>
+      <p class="fill__hint">Escolha um tópico para ver a explicação e a conta feita com os números de agora do projeto.</p>
+    </div>
+    <nav aria-label="Dúvidas">
+      <ul class="how-list">
+        {%- for t in topics %}
+        <li><a class="how-list__item" href="{{ url_for('preencher.how', projeto=project.id, topico=t.chave, _anchor='resposta') }}"{% if t.chave == topic.chave %} aria-current="true"{% endif %}><span class="how-list__n" aria-hidden="true">{{ loop.index }}</span><span>{{ t.pergunta }}</span></a></li>
+        {%- endfor %}
+      </ul>
+    </nav>
+    <p class="how-topics__tour"><a href="{{ url_for('app.home', tutorial=1) }}">Rever o tour pelas telas</a></p>
+  </section>
+
+  <article class="card stack how-answer" id="resposta" aria-labelledby="resposta-titulo">
+    <h2 class="how-answer__title" id="resposta-titulo">{{ topic.pergunta }}</h2>
+    <p class="how-answer__lead">{{ topic.resposta }}</p>
+    {%- if topic.regras %}
+    <ol class="how-rules">
+      {%- for regra in topic.regras %}<li>{{ regra }}</li>{% endfor %}
+    </ol>
+    {%- endif %}
+    {%- if topic.passos %}
+    <h3 class="how-answer__sub">Passo a passo com os números de {{ project.name }}</h3>
+    <ol class="how-steps">
+      {%- for p in topic.passos %}
+      <li class="how-steps__item">
+        <p class="how-steps__text">{{ p.texto }}</p>
+        {%- if p.conta %}
+        <ul class="how-steps__calc">
+          {%- for linha in p.conta %}<li>{{ linha }}</li>{% endfor %}
+        </ul>
+        {%- endif %}
+      </li>
+      {%- endfor %}
+    </ol>
+    {%- elif not topic.regras %}
+    <p class="how-answer__empty">Inclua etapas e subatividades em Preencher etapas para ver esta conta com os números do projeto.</p>
+    {%- endif %}
+    {%- if topic.conclusao %}
+    <p class="how-answer__result">{{ topic.conclusao }}</p>
+    {%- endif %}
+    <p class="how-answer__where"><span>Onde aparece:</span> {{ topic.onde }}</p>
+    {%- set idx = (topics | map(attribute="chave") | list).index(topic.chave) %}
+    {%- if idx + 1 < topics | length %}
+    {%- set prox = topics[idx + 1] %}
+    <p class="how-answer__next"><a href="{{ url_for('preencher.how', projeto=project.id, topico=prox.chave, _anchor='resposta') }}">Próxima dúvida: {{ prox.pergunta }}</a></p>
+    {%- endif %}
+  </article>
+</div>
+
+<details class="card how-all">
+  <summary class="how-all__summary">Todas as contas em uma tabela</summary>
   <p class="fill__hint">A coluna “Exemplo” usa os números que estão agora no projeto e muda junto com eles.</p>
   <div class="table-scroll">
     <table class="etab how-table">
@@ -28,5 +83,5 @@
       </tbody>
     </table>
   </div>
-</section>
+</details>
 {% endblock %}

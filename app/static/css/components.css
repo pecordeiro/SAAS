@@ -693,4 +693,37 @@
   .meta-list dt { font-size: var(--font-size-sm); color: var(--color-text-muted); }
   .meta-list dd { font-variant-numeric: var(--font-numeric); }
   .meta-list > div { display: flex; justify-content: space-between; gap: var(--space-3); }
+
+  /* Tour de primeiro acesso (ADR-0021): fundo escurecido com um recorte no item do menu e o balão ao lado. */
+  .tour { position: fixed; inset: 0; z-index: var(--z-modal); }
+  .tour[hidden] { display: none; }
+  .tour__spot {
+    position: fixed; pointer-events: none; border-radius: var(--radius-md);
+    box-shadow: 0 0 0 200vmax var(--color-overlay);
+    outline: var(--focus-width) solid var(--color-focus); outline-offset: 0;
+    transition: top var(--duration-normal) var(--easing-standard), left var(--duration-normal) var(--easing-standard),
+      width var(--duration-normal) var(--easing-standard), height var(--duration-normal) var(--easing-standard);
+  }
+  .tour--center .tour__spot { outline: 0; }
+  .tour__card {
+    position: fixed; display: grid; gap: var(--space-3);
+    width: min(24rem, calc(100vw - 2 * var(--space-4)));
+    padding: var(--space-5); border-radius: var(--radius-lg);
+    background: var(--color-surface); color: var(--color-text);
+    border: var(--border-width) solid var(--color-border-subtle); box-shadow: var(--shadow-3);
+    transition: top var(--duration-normal) var(--easing-standard), left var(--duration-normal) var(--easing-standard);
+  }
+  .tour__card:focus { outline: none; } /* o foco vai para o balão inteiro; os botões têm o anel próprio */
+  .tour__count { margin: 0; font-size: var(--font-size-xs); color: var(--color-text-muted); font-variant-numeric: var(--font-numeric); }
+  .tour__title { margin: 0; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); line-height: var(--line-height-tight); }
+  .tour__text { margin: 0; line-height: var(--line-height-normal); }
+  .tour__dots { display: flex; gap: var(--space-1); }
+  .tour__dot { width: var(--space-2); height: var(--space-2); border-radius: var(--radius-pill); background: var(--color-border-strong); }
+  .tour__dot.is-on { width: var(--space-5); background: var(--color-primary); }
+  .tour__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+  .tour__nav { display: flex; gap: var(--space-2); margin-left: auto; }
+  .tour__actions [hidden] { display: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .tour__spot, .tour__card { transition: none; }
+  }
 }

@@ -82,7 +82,7 @@
     <div class="sidebar__footer">
       {%- if nav_settings %}
       <details class="sidebar__settings"{% if settings_current %} open{% endif %}>
-        <summary class="sidebar__item">{{ icon("settings") }}<span>Configurações</span>{{ icon("chevron-down", class_="sidebar__chevron") }}</summary>
+        <summary class="sidebar__item" data-tour="settings">{{ icon("settings") }}<span>Configurações</span>{{ icon("chevron-down", class_="sidebar__chevron") }}</summary>
         <nav class="sidebar__subnav" aria-label="Configurações">
           {%- for item in nav_settings %}
           <a class="sidebar__subitem" href="{{ item.href }}"{% if item.key == nav_current | default("") %} aria-current="page"{% endif %}>{{ item.label }}{% if item.optional %}{{ optional_badge() }}{% endif %}</a>
@@ -90,7 +90,7 @@
         </nav>
       </details>
       {%- endif %}
-      <a class="sidebar__item" href="{{ url_for('account.profile') }}"{% if nav_current | default("") == "profile" %} aria-current="page"{% endif %}>{{ icon("user") }}<span class="sidebar__user-name">{{ current_user.name }}</span></a>
+      <a class="sidebar__item" href="{{ url_for('account.profile') }}" data-tour="account"{% if nav_current | default("") == "profile" %} aria-current="page"{% endif %}>{{ icon("user") }}<span class="sidebar__user-name">{{ current_user.name }}</span></a>
       {%- if company_count and company_count > 1 %}
       <a class="sidebar__item" href="{{ url_for('account.companies') }}">{{ icon("building") }}<span>Trocar empresa</span></a>
       {%- endif %}
@@ -121,6 +121,10 @@
 </div>
 
 {{ bottom_nav(nav_items, nav_current | default("")) }}
+
+{%- if tour_steps | default(()) %}
+{% include "components/tour.html" %}
+{%- endif %}
 
 <div class="sheet" id="mais" role="dialog" aria-modal="true" aria-labelledby="mais-titulo" data-dialog>
   <a class="sheet__backdrop" href="#fechar" tabindex="-1" aria-hidden="true"></a>

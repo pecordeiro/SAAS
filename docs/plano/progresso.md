@@ -1498,7 +1498,7 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
 - Menu lateral recolhível (faixa de ícones que abre em 0,8 s empurrando o conteúdo; `--sidebar-rail`,
   `--duration-rail`, `@property --rail-now`).
 
-## Auditoria e reescrita dos textos (2026-10-29) — aguardando aprovação do commit
+## Auditoria e reescrita dos textos (2026-10-29)
 - Inventário automático de todos os textos que a pessoa lê (templates, e-mails e mensagens do backend): 3.331 textos.
   Comparação com o estado anterior em `docs/ux-copy-inventory.md` (arquivo:linha, antes → depois, motivo, status).
 - Glossário em `docs/teroz-terminologia.md` e voz em `docs/teroz-voice-and-tone.md`. Marca "Teroz" (feminino) no lugar
@@ -1511,3 +1511,18 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
 - Pendentes de decisão: remetente `MAIL_FROM` com o nome antigo (configuração de produção), "Quantidade de
   equipamentos" no formulário antigo de novo projeto, F-06, revisão linha a linha de Identidade visual, Painel interno
   e API (só passaram pela troca automática de termos).
+
+## Tour de primeiro acesso e Como funciona por tópicos (2026-10-30) — aguardando aprovação do commit
+
+Pedido do dono: tutorial opcional na primeira entrada e Como funciona por tópicos, com as contas (ADR-0021).
+
+- **Tour:** abre no Painel na primeira entrada, destaca cada item do menu com um balão (Voltar, Próximo, Pular,
+  Esc), passos por papel decididos no servidor (`services/tour.py`). No celular aponta para o menu Mais quando o
+  item fica lá. Marcado em `users.tour_seen_at` quando começa; quem já tinha entrado antes fica como "já viu".
+  Rever em Como funciona.
+- **Como funciona:** lista de dúvidas (progresso, unidades prontas, peso, horas que faltam, dias de trabalho,
+  término e prazo, situação da etapa, tamanho da equipe; modo simples ganha mais uma). Cada uma traz a resposta, a
+  regra e a conta passo a passo com os números do projeto (`calc.topicos_como_funciona`, puro). Tabela antiga
+  recolhida no fim.
+- **Verificação:** `tests/test_tour.py` (9 testes); suíte completa; `build_assets --check`; telas em 375 e 1280 px,
+  claro e escuro, como Proprietário e Operador, sem erro de JavaScript e sem rolagem lateral.

@@ -1039,6 +1039,61 @@
   .how-table th[scope="row"] { min-width: 12rem; }
   .how-table td { min-width: 14rem; }
   .how-table__example { font-variant-numeric: var(--font-numeric); color: var(--color-text); }
+  /* Como funciona por tópicos: lista de dúvidas + resposta com a conta passo a passo */
+  .how-topics { display: grid; gap: var(--space-4); margin-bottom: var(--space-4); }
+  @media (min-width: 64em) {
+    .how-topics { grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr); align-items: start; }
+    .how-topics__menu { position: sticky; top: var(--space-4); }
+  }
+  .how-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+  .how-list__item {
+    display: flex; gap: var(--space-3); align-items: flex-start; min-height: var(--touch-min);
+    padding: var(--space-2) var(--space-3); border-radius: var(--radius-md);
+    color: var(--color-text); text-decoration: none; line-height: var(--line-height-snug);
+  }
+  .how-list__item:hover { background: var(--color-surface-2); }
+  .how-list__item[aria-current="true"] { background: var(--color-primary-subtle); font-weight: var(--font-weight-semibold); }
+  .how-list__n {
+    flex: none; display: inline-grid; place-items: center; width: var(--space-6); height: var(--space-6);
+    border-radius: var(--radius-pill); background: var(--color-surface-2); color: var(--color-text-muted);
+    font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); font-variant-numeric: var(--font-numeric);
+  }
+  .how-list__item[aria-current="true"] .how-list__n { background: var(--color-primary); color: var(--color-primary-contrast); }
+  .how-topics__tour { margin: 0; font-size: var(--font-size-sm); }
+  /* grid + gap: os filhos zeram a margem, então o espaço vem daqui e não do .stack */
+  .how-answer, .how-topics__menu { display: grid; gap: var(--space-4); align-content: start; }
+  .how-answer > *, .how-topics__menu > * { margin-top: 0; }
+  .how-answer { scroll-margin-top: var(--space-4); }
+  .how-answer__title { margin: 0; font-size: var(--font-size-xl); line-height: var(--line-height-tight); }
+  .how-answer__lead { margin: 0; max-width: 68ch; color: var(--color-text); }
+  .how-rules { margin: 0; padding-left: var(--space-6); display: grid; gap: var(--space-2); max-width: 68ch; }
+  .how-rules li::marker { font-weight: var(--font-weight-semibold); color: var(--color-text-muted); }
+  .how-answer__sub { margin: 0; font-size: var(--font-size-md); font-weight: var(--font-weight-semibold); }
+  .how-steps { margin: 0; padding: 0; list-style: none; counter-reset: passo; display: grid; gap: var(--space-3); }
+  .how-steps__item {
+    counter-increment: passo; position: relative; padding-left: var(--space-8);
+  }
+  .how-steps__item::before {
+    content: counter(passo); position: absolute; left: 0; top: 0;
+    display: grid; place-items: center; width: var(--space-6); height: var(--space-6);
+    border-radius: var(--radius-pill); border: var(--border-width) solid var(--color-border-strong);
+    font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); color: var(--color-text-muted);
+  }
+  .how-steps__text { margin: 0; max-width: 68ch; }
+  .how-steps__calc {
+    list-style: none; margin: var(--space-2) 0 0; padding: var(--space-2) var(--space-3);
+    display: grid; gap: var(--space-1); background: var(--color-surface-2); border-radius: var(--radius-md);
+    font-variant-numeric: var(--font-numeric); font-weight: var(--font-weight-medium); overflow-wrap: anywhere;
+  }
+  .how-answer__empty { margin: 0; color: var(--color-text-muted); }
+  .how-answer__result {
+    margin: 0; padding: var(--space-3); border-left: var(--border-width-strong) solid var(--color-primary);
+    background: var(--color-primary-subtle); border-radius: var(--radius-sm); font-weight: var(--font-weight-semibold);
+  }
+  .how-answer__where { margin: 0; font-size: var(--font-size-sm); color: var(--color-text-muted); }
+  .how-answer__where span { font-weight: var(--font-weight-semibold); }
+  .how-answer__next { margin: 0; font-size: var(--font-size-sm); }
+  .how-all__summary { cursor: pointer; font-weight: var(--font-weight-semibold); min-height: var(--touch-min); display: flex; align-items: center; }
   /* =================== R7 · Importar planilha (passos, envio, colunas, prévia) =================== */
   .wizard {
     display: grid;

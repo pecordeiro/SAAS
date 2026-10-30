@@ -997,3 +997,384 @@ def como_funciona(
         ),
     )
     return tuple(linhas)
+
+
+# ---------------------------------------------------------------------------
+# Como funciona por tópicos: cada dúvida com a conta montada passo a passo
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PassoConta:
+    texto: str  # o que a conta faz, em linguagem simples
+    conta: tuple[str, ...] | str = ()  # linhas da conta com os números do projeto (vazio = só texto)
+
+    def __post_init__(self) -> None:
+        if isinstance(self.conta, str):
+            object.__setattr__(self, "conta", (self.conta,) if self.conta else ())
+
+
+@dataclass(frozen=True)
+class TopicoComoFunciona:
+    chave: str
+    pergunta: str
+    resposta: str
+    passos: tuple[PassoConta, ...]
+    conclusao: str
+    onde: str
+    regras: tuple[str, ...] = ()  # regra em lista, na ordem (antes do passo a passo)
+
+
+MAX_ITENS_TOPICO = 12  # subatividades/etapas listadas por passo; o resto vira “e mais N”
+
+
+def _data_br(d: date) -> str:
+    return d.strftime("%d/%m/%Y")
+
+
+def _dias(n: int) -> str:
+    return _plural(n, "dia útil", "dias úteis")
+
+
+def _limita(itens: Sequence[str]) -> tuple[str, ...]:
+    mostrados = list(itens[:MAX_ITENS_TOPICO])
+    resto = len(itens) - len(mostrados)
+    if resto > 0:
+        mostrados.append(f"e mais {resto}")
+    return tuple(mostrados)
+
+
+def topicos_como_funciona(
+    etapas: Sequence[Etapa],
+    nomes_etapas: Sequence[str],
+    nomes_atividades: Sequence[Sequence[str]],
+    quantidade: int,
+    pessoas: int,
+    horas_dia: float,
+    simples: bool = False,
+    *,
+    inicio_contagem: date | None = None,
+    termino: date | None = None,
+    prazo: date | None = None,
+    feriados: Iterable[date] = (),
+    dias_semana: Iterable[int] = DIAS_SEMANA_PADRAO,
+    fracao_decorrida: float | None = None,
+    situacoes: Sequence[str] = (),
+    aguardando_ativo: bool = False,
+) -> tuple[TopicoComoFunciona, ...]:
+    """Como funciona por tópicos: cada dúvida comum, a resposta em linguagem simples e a conta
+    montada passo a passo com os números ATUAIS do projeto (mesmas funções do resto do calc).
+
+    ``inicio_contagem`` e ``termino`` vêm da previsão já calculada (svc.forecast_end);
+    ``situacoes`` são os nomes da situação de cada etapa, na ordem, como o painel mostra.
+    Sem etapa com subatividade, os passos ficam vazios e a resposta explica só a regra."""
+    r = resumo_projeto(etapas, quantidade, pessoas, horas_dia)
+    feriados, dias_semana = tuple(feriados), tuple(dias_semana)
+    tem_dados = any(e.atividades for e in etapas)
+    i = next((k for k, e in enumerate(etapas) if e.atividades), None)
+    capacidade = (pessoas or 0) * (horas_dia or 0)
+    topicos: list[TopicoComoFunciona] = []
+
+    def topico(chave, pergunta, resposta, passos, conclusao, onde) -> None:
+        topicos.append(
+            TopicoComoFunciona(chave, pergunta, resposta, tuple(passos) if tem_dados else (), conclusao if tem_dados else "", onde)
+        )
+
+    pct_geral = _br_pct(r.progresso_geral, 1)
+
+    # 1. Progresso pelas tarefas
+    passos = []
+    if tem_dados:
+        passos = [
+            PassoConta(
+                "Tempo total: some o tempo ideal × a meta de todas as subatividades."
+                if not simples
+                else "Tempo total: some o tempo de cada etapa × a meta.",
+                f"{_br(r.tempo_total_h)} h",
+            ),
+            PassoConta(
+                "Horas que faltam: a mesma soma, só com as peças que ainda faltam (meta − peças prontas).",
+                f"{_br(r.tempo_restante_h)} h",
+            ),
+            PassoConta(
+                "Progresso = 1 − horas que faltam ÷ tempo total.",
+                f"1 − {_br(r.tempo_restante_h)} h ÷ {_br(r.tempo_total_h)} h = {pct_geral}"
+                if r.tempo_total_min
+                else "(informe o tempo das etapas)",
+            ),
+        ]
+    topico(
+        "progresso",
+        "O que é o progresso pelas tarefas?",
+        "É quanto do trabalho previsto já foi feito, contando as peças parciais. Cada parte pesa pelo "
+        "tempo que leva: uma peça de 30 min conta mais que uma de 5 min.",
+        passos,
+        f"O projeto está em {pct_geral} pelas tarefas.",
+        "Painel, painel do projeto e Preencher etapas.",
+    )
+
+    # 2. Unidades prontas
+    passos = []
+    if tem_dados:
+        if not simples and i is not None:
+            e, re_ = etapas[i], r.etapas[i]
+            pecas = [f"{nomes_atividades[i][k]}: {min(a.pecas, quantidade)}" for k, a in enumerate(e.atividades)]
+            passos.append(PassoConta(f"Peças prontas de cada subatividade da etapa {nomes_etapas[i]}:", _limita(pecas)))
+            passos.append(
+                PassoConta(
+                    "A etapa só tem uma unidade pronta quando todas as subatividades fizeram aquela peça: vale a menor contagem.",
+                    f"{nomes_etapas[i]}: {_plural(re_.unidades, 'unidade pronta', 'unidades prontas')}",
+                )
+            )
+        por_etapa = [f"{nomes_etapas[k]}: {re_.unidades}" for k, re_ in enumerate(r.etapas)]
+        passos.append(PassoConta("Unidades prontas de cada etapa:", _limita(por_etapa)))
+        passos.append(
+            PassoConta(
+                "O projeto conta a menor entre as etapas: uma unidade só está pronta quando passou por todas.",
+                f"menor valor = {r.unidades_concluidas} de {quantidade}",
+            )
+        )
+    topico(
+        "unidades",
+        "Por que as unidades prontas ficam abaixo do progresso?",
+        "Porque uma unidade só fica pronta quando passou por todas as etapas. O progresso conta as peças "
+        "parciais; as unidades prontas contam só o que terminou de ponta a ponta.",
+        passos,
+        f"{r.unidades_concluidas} de {_plural(quantidade, 'unidade pronta', 'unidades prontas')}, com o progresso pelas tarefas em {pct_geral}.",
+        "Painel e painel do projeto (gráfico Tarefas × unidades).",
+    )
+
+    # 3. Peso
+    passos = []
+    if tem_dados:
+        if not simples and i is not None:
+            e, re_ = etapas[i], r.etapas[i]
+            pesos = [
+                f"{nomes_atividades[i][k]}: {_br_min(a.ideal_min)} min ÷ {_br_min(re_.tempo_unidade_min)} min = {_br_pct(ra.peso)}"
+                for k, (a, ra) in enumerate(zip(e.atividades, re_.atividades))
+            ]
+            passos.append(
+                PassoConta(
+                    f"Peso de cada subatividade na etapa {nomes_etapas[i]}: tempo ideal ÷ soma dos tempos da etapa.",
+                    _limita(pesos),
+                )
+            )
+        pesos_etapa = [
+            f"{nomes_etapas[k]}: {_br_pct(re_.peso_no_projeto)}" for k, re_ in enumerate(r.etapas)
+        ]
+        passos.append(
+            PassoConta(
+                f"Peso de cada etapa no projeto: tempo da etapa ÷ tempo de 1 unidade ({_br_min(r.tempo_unidade_min)} min)."
+                + (" Etapa sem tempo informado vale 60 min." if simples else ""),
+                _limita(pesos_etapa),
+            )
+        )
+    topico(
+        "peso",
+        "O que é o peso e por que ele importa?",
+        "O peso diz quanto cada parte vale no progresso. Ele vem do tempo ideal: o que leva mais tempo pesa mais.",
+        passos,
+        "Para mudar um peso, ajuste o tempo ideal no modo Configurar de Preencher etapas.",
+        "Modo Configurar de Preencher etapas.",
+    )
+
+    # 4. Horas que faltam
+    passos = []
+    if tem_dados:
+        if not simples and i is not None:
+            e, re_ = etapas[i], r.etapas[i]
+            restos = [
+                f"{nomes_atividades[i][k]}: {_br_min(a.ideal_min)} min × ({quantidade} − {min(a.pecas, quantidade)}) = {_br_min(ra.tempo_restante_min)} min"
+                for k, (a, ra) in enumerate(zip(e.atividades, re_.atividades))
+            ]
+            passos.append(
+                PassoConta(
+                    f"Em cada subatividade da etapa {nomes_etapas[i]}: tempo ideal × peças que faltam.",
+                    _limita(restos),
+                )
+            )
+        else:
+            restos = [
+                f"{nomes_etapas[k]}: {_br_min(re_.tempo_unidade_min)} min × ({quantidade} − {min(re_.unidades, quantidade)}) = {_br_min(re_.tempo_restante_min)} min"
+                for k, re_ in enumerate(r.etapas)
+            ]
+            passos.append(PassoConta("Em cada etapa: tempo da etapa × unidades que faltam.", _limita(restos)))
+        passos.append(
+            PassoConta(
+                "Some todas as etapas e divida por 60 para ter horas.",
+                f"{_br_min(r.tempo_restante_min)} min ÷ 60 = {_br(r.tempo_restante_h)} h",
+            )
+        )
+    topico(
+        "horas",
+        "Como sai o número de horas que faltam?",
+        "Para cada parte do trabalho: tempo ideal × peças que ainda faltam. Depois soma tudo. "
+        "São horas de trabalho de uma pessoa, não horas de relógio.",
+        passos,
+        f"Faltam {_br(r.tempo_restante_h)} h de trabalho.",
+        "Painel, painel do projeto e Meta e equipe.",
+    )
+
+    # 5. Dias de trabalho
+    passos = []
+    if tem_dados and capacidade > 0:
+        dias = r.dias_uteis_restantes or 0
+        passos = [
+            PassoConta(
+                "O que a equipe faz por dia: pessoas × horas por dia.",
+                f"{_plural(pessoas, 'pessoa', 'pessoas')} × {_br_min(horas_dia)} h = {_br_min(capacidade)} h por dia",
+            ),
+            PassoConta(
+                "Dias de trabalho = horas que faltam ÷ o que a equipe faz por dia.",
+                f"{_br(r.tempo_restante_h)} h ÷ {_br_min(capacidade)} h = {_br(dias)} dias de trabalho",
+            ),
+        ]
+    elif tem_dados:
+        passos = [PassoConta("Informe quantas pessoas trabalham e quantas horas por dia em Meta e equipe.", "")]
+    topico(
+        "dias",
+        "Quantos dias de trabalho ainda faltam?",
+        "É o trabalho que falta dividido pelo que a equipe faz em um dia. É trabalho, não calendário: "
+        "fins de semana e feriados entram na previsão de término.",
+        passos,
+        f"Faltam {_br(r.dias_uteis_restantes or 0)} dias de trabalho." if capacidade > 0 else "",
+        "Meta e equipe.",
+    )
+
+    # 6. Término previsto e prazo
+    passos = []
+    conclusao = ""
+    if tem_dados and capacidade > 0 and termino is not None and inicio_contagem is not None:
+        dias = r.dias_uteis_restantes or 0
+        inteiros = math.ceil(dias - 1e-9) if dias > 0 else 0
+        passos = [
+            PassoConta(
+                "Dias de trabalho que faltam, arredondados para cima (um pedaço de dia ocupa o dia).",
+                f"{_br(dias)} → {_dias(inteiros)}",
+            ),
+            PassoConta(
+                f"Conte esses dias no calendário da empresa a partir de {_data_br(inicio_contagem)}, "
+                "pulando fins de semana e feriados.",
+                f"término previsto: {_data_br(termino)}",
+            ),
+        ]
+        if prazo is None:
+            passos.append(PassoConta("Sem prazo informado, só a data prevista aparece.", ""))
+            conclusao = f"Término previsto em {_data_br(termino)}."
+        elif termino > prazo:
+            atraso = dias_uteis_entre(prazo, termino, feriados, dias_semana)
+            passos.append(
+                PassoConta(
+                    "Compare com o prazo: dias úteis do prazo até o término previsto.",
+                    f"prazo {_data_br(prazo)} → atraso de {_dias(atraso)}",
+                )
+            )
+            conclusao = f"No ritmo de hoje, termina {_dias(atraso)} depois do prazo."
+        else:
+            folga = dias_uteis_entre(termino, prazo, feriados, dias_semana)
+            passos.append(
+                PassoConta(
+                    "Compare com o prazo: dias úteis do término previsto até o prazo.",
+                    f"prazo {_data_br(prazo)} → folga de {_dias(folga)}",
+                )
+            )
+            conclusao = (
+                f"No ritmo de hoje, termina com folga de {_dias(folga)}." if folga else "No ritmo de hoje, termina no dia do prazo."
+            )
+    elif tem_dados:
+        passos = [PassoConta("Informe pessoas e horas por dia em Meta e equipe para ver a previsão.", "")]
+    topicos.append(
+        TopicoComoFunciona(
+            "termino",
+            "Quando o projeto termina? Vai dar no prazo?",
+            "A previsão conta os dias de trabalho que faltam no calendário da empresa. É uma estimativa no "
+            "ritmo da equipe de agora, não uma garantia: muda quando as peças são lançadas ou a equipe muda.",
+            tuple(passos),
+            conclusao,
+            "Painel, painel do projeto e Meta e equipe.",
+        )
+    )
+
+    # 7. Situação da etapa
+    regras = ["Concluída: as unidades prontas da etapa chegaram à meta."]
+    if aguardando_ativo:
+        regras.append("Aguardando peça: alguém marcou que a etapa parou por falta de peça.")
+    regras += [
+        "Atrasada: o prazo é dividido entre as etapas, na ordem, pelo tempo de cada uma. "
+        "Se a faixa da etapa já passou e ela não terminou, fica atrasada.",
+        "Em andamento: já tem peça lançada.",
+        "Não iniciada: nada lançado ainda.",
+    ]
+    passos = []
+    if tem_dados:
+        if fracao_decorrida is None:
+            passos.append(PassoConta("Sem data de início ou sem prazo, nenhuma etapa fica atrasada.", ""))
+        else:
+            passos.append(
+                PassoConta(
+                    "Quanto do prazo já passou: dias úteis desde o início ÷ dias úteis do início ao prazo.",
+                    _br_pct(fracao_decorrida),
+                )
+            )
+            faixas = [
+                f"{nomes_etapas[k]}: {_br_pct(ini)} a {_br_pct(ini + larg)}"
+                + (f" → {situacoes[k]}" if k < len(situacoes) else "")
+                for k, (ini, larg) in enumerate(fatias_da_esteira(r.etapas))
+            ]
+            passos.append(PassoConta("Faixa de cada etapa no prazo e a situação de agora:", _limita(faixas)))
+    topicos.append(
+        TopicoComoFunciona(
+            "situacao",
+            "Como a situação de cada etapa é decidida?",
+            "Cada etapa recebe uma situação. Quando mais de uma vale, ganha a primeira desta lista.",
+            tuple(passos),
+            "",
+            "Painel (esteira e rosca) e Preencher etapas.",
+            tuple(regras),
+        )
+    )
+
+    # 8. Tamanho da equipe
+    passos = []
+    if tem_dados and (horas_dia or 0) > 0:
+        linhas = [
+            f"{_plural(p, 'pessoa', 'pessoas')}: {_br(d or 0)} dias" + (" (agora)" if p == pessoas else "")
+            for p, d in equipe_x_prazo(r.tempo_restante_h, horas_dia)
+        ]
+        passos = [
+            PassoConta(
+                f"As mesmas {_br(r.tempo_restante_h)} h divididas por (pessoas × {_br_min(horas_dia)} h por dia):",
+                tuple(linhas),
+            )
+        ]
+    topico(
+        "equipe",
+        "E se eu mudar o tamanho da equipe?",
+        "Mais gente divide as mesmas horas. A conta supõe que todos rendem igual e que o trabalho pode ser "
+        "dividido; na prática, nem toda etapa aceita mais gente ao mesmo tempo.",
+        passos,
+        "",
+        "Meta e equipe (gráfico Equipe × prazo).",
+    )
+
+    # 9. Modo simples
+    if simples:
+        passos = []
+        if i is not None:
+            a, ra = etapas[i].atividades[0], r.etapas[i].atividades[0]
+            passos = [
+                PassoConta(
+                    "Você digita o % da etapa. A Teroz guarda como unidades prontas: % × meta, arredondado.",
+                    f"{nomes_etapas[i]}: {_br_pct(ra.pct)} × {quantidade} = {_plural(a.pecas, 'unidade', 'unidades')}",
+                )
+            ]
+        topico(
+            "simples",
+            "No modo simples, como o % vira unidades?",
+            "No modo simples você lança o % de cada etapa, sem subatividades. As contas seguem as mesmas, "
+            "com a etapa no lugar da subatividade.",
+            passos,
+            "",
+            "Preencher etapas.",
+        )
+    return tuple(topicos)
