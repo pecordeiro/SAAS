@@ -1,0 +1,81 @@
+{% extends "base_app.html" %}
+{% from "components/optional.html" import optional_badge %}
+{% from "components/button.html" import button %}
+{% from "components/field.html" import field, checkbox %}
+{% from "components/table.html" import data_table %}
+{% from "components/badge.html" import badge %}
+{% from "components/alert.html" import alert %}
+{% from "components/empty_state.html" import empty_state %}
+{% set nav_current = "api" %}
+{% block title %}API · Teroz{% endblock %}
+{% block content %}
+{# Fase 9: tokens da API pública (só proprietário; atrás de FEATURE_PUBLIC_API). O token puro aparece uma única vez. #}
+<header class="page-header">
+  <div class="page-header__titles">
+    <h1>API{{ optional_badge() }}</h1>
+    <p class="page-header__subtitle">Tokens para integrar outros sistemas. Contrato em docs/api/openapi.yaml.</p>
+  </div>
+</header>
+
+{%- if new_token %}
+<div class="mb-4">
+  {% call alert("success", "Token criado — copie agora") %}
+    <p>Ele não será mostrado de novo. Guarde em local seguro.</p>
+    <p><code class="num" id="token-novo">{{ new_token }}</code></p>
+  {% endcall %}
+</div>
+{%- endif %}
+{%- if error %}
+<div class="mb-4">{{ alert("danger", error) }}</div>
+{%- endif %}
+{%- if not has_api %}
+<div class="mb-4">{{ alert("warning", "API indisponível no plano " ~ plan.name, "A API faz parte do plano Empresa. Mude de plano para criar tokens.") }}</div>
+{%- endif %}
+
+{%- if has_api %}
+<section class="card stack mb-4" aria-labelledby="novo-titulo">
+  <h2 class="section-title" id="novo-titulo">Novo token</h2>
+  <form method="post" action="{{ url_for('api_tokens_ui.tokens_create') }}" class="stack" novalidate>
+    {{ form.csrf_token }}
+    {{ field(form.name, required=True) }}
+    <fieldset class="stack--sm">
+      <legend class="field__label">Permissões</legend>
+      {%- for key, label in scopes.items() %}
+      {{ checkbox("scopes", key ~ " — " ~ label, checked=(key in (form.scopes.data or [])), value=key, id="escopo-" ~ loop.index) }}
+      {%- endfor %}
+    </fieldset>
+    {{ field(form.expires) }}
+    {{ button("Criar token", "primary", icon="plus") }}
+  </form>
+</section>
+{%- endif %}
+
+{%- if items %}
+{% call data_table([("Integração", ""), ("Prefixo", ""), ("Permissões", ""), ("Validade", ""), ("Último uso", ""), ("Situação", ""), ("", "")], caption="Tokens da API") %}
+  <tbody>
+  {%- for t, state in items %}
+    <tr>
+      <td class="is-plain">{{ t.client.name }}</td>
+      <td data-label="Prefixo"><code class="num">{{ t.token_prefix }}…</code></td>
+      <td data-label="Permissões">{{ (t.scopes or [])|join(", ") }}</td>
+      <td data-label="Validade">{{ t.expires_at|datahora if t.expires_at else "Sem expiração" }}</td>
+      <td data-label="Último uso">{{ t.last_used_at|datahora if t.last_used_at else "Nunca" }}</td>
+      <td data-label="Situação">{{ badge({"active": "Ativo", "revoked": "Revogado", "expired": "Expirado"}[state], "success" if state == "active" else "neutral") }}</td>
+      <td class="is-plain">
+        {%- if state == "active" %}
+        <form method="post" action="{{ url_for('api_tokens_ui.tokens_revoke', token_id=t.id) }}">
+          {{ revoke_form.csrf_token }}
+          {{ button("Revogar", "danger") }}
+        </form>
+        {%- endif %}
+      </td>
+    </tr>
+  {%- endfor %}
+  </tbody>
+{% endcall %}
+{%- elif has_api %}
+<div class="card">
+  {{ empty_state("Nenhum token ainda", "Crie um token acima para integrar outro sistema.", icon="chart") }}
+</div>
+{%- endif %}
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "base_publica.html" %}
+{% from "components/field.html" import field, form_errors %}
+{% from "components/button.html" import button %}
+{% from "components/icon.html" import icon %}
+{% block title %}Cadastrar empresa · Teroz{% endblock %}
+{% block content %}
+{# telas.md §4: dados mínimos → Criar conta → o que acontece depois. Lista lateral só no desktop. #}
+<div class="auth auth--with-aside">
+  <div class="stack">
+    <div class="card auth__card stack">
+      <div>
+        <h1>Comece o teste grátis</h1>
+        <p class="muted">14 dias no Profissional · sem cartão</p>
+      </div>
+      {{ form_errors(form) }}
+      <form class="stack" method="post" action="{{ url_for('auth.signup') }}" novalidate>
+        {{ form.csrf_token }}
+        {{ field(form.company_name, attrs={"autocomplete": "organization", "required": true}) }}
+        {{ field(form.name, attrs={"autocomplete": "name", "required": true}) }}
+        {{ field(form.email, label="E-mail de trabalho", attrs={"autocomplete": "email", "required": true, "inputmode": "email"}) }}
+        {{ field(form.password, hint="Mín. 10 caracteres.", attrs={"autocomplete": "new-password", "required": true, "minlength": 10}) }}
+        {{ field(form.password_confirm, attrs={"autocomplete": "new-password", "required": true}) }}
+        {{ button("Criar conta", "primary", size="lg", block=True) }}
+      </form>
+    </div>
+    <p class="auth__switch">Já tem conta? <a href="{{ url_for('auth.login') }}">Entrar</a></p>
+  </div>
+  <aside class="auth__aside" aria-labelledby="ganha-titulo">
+    <h2 class="section-title" id="ganha-titulo">O que você ganha no teste</h2>
+    <ul class="benefits">
+      <li>{{ icon("check") }}<span><strong>Unidades e horas que faltam</strong> por lote, calculadas a cada registro.</span></li>
+      <li>{{ icon("check") }}<span><strong>Prazo em dias úteis</strong> com feriados e a jornada da equipe.</span></li>
+      <li>{{ icon("check") }}<span><strong>Registro pelo celular</strong>: digite o total de peças prontas e pronto, direto do chão de fábrica.</span></li>
+    </ul>
+  </aside>
+</div>
+{% endblock %}

@@ -1,0 +1,5 @@
+{% extends "emails/_base.txt" %}
+{% block body %}Olá, {{ name }}.
+
+O e-mail de acesso da sua conta foi trocado para {{ new_email }}.
+Se não foi você, peça uma nova senha agora e escreva para o contato indicado no site.{% endblock %}

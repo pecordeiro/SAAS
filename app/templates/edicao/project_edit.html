@@ -1,0 +1,159 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/field.html" import field, form_errors %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/modal.html" import confirm_dialog %}
+{% from "components/optional.html" import optional_badge %}
+{% set nav_current = "team" %}
+{% set nav_project = project %}
+{% block title %}Editar · {{ project.name }}{% endblock %}
+{% block head_extra %}
+  {%- for src in asset_urls("arrastar.js") %}
+  <script src="{{ src }}" defer></script>
+  {%- endfor %}
+{% endblock %}
+{% block content %}
+{#
+  Edição do projeto (Fase 4, supervisor+): dados, etapas e atividades (renomear, ↑/↓,
+  arquivar — nunca apagar: o histórico continua), duplicar, arquivar e modelo de origem.
+  Cada ação é um formulário POST pequeno com CSRF (funciona sem JS).
+#}
+{%- macro move_buttons(action) -%}
+<span class="cluster">
+  <form method="post" action="{{ action }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="direction" value="up">{{ button("Subir", "ghost") }}</form>
+  <form method="post" action="{{ action }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="direction" value="down">{{ button("Descer", "ghost", icon="chevron-down") }}</form>
+</span>
+{%- endmacro -%}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('app.project_detail', project_id=project.id) }}">{{ icon("chevron-left") }}{{ project.name }}</a>
+    <h1>Editar projeto</h1>
+  </div>
+  <div class="page-header__actions">
+    <form method="post" action="{{ url_for('edicao.project_duplicate', project_id=project.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {{ button("Duplicar", "secondary", icon="plus") }}
+    </form>
+    {{ button("Arquivar", "ghost", href="#arquivar-projeto") }}
+  </div>
+</header>
+
+{%- if error %}<div class="mb-4">{{ alert("danger", error, role="alert") }}</div>{% endif %}
+{%- if comparison and not comparison.up_to_date %}
+<div class="mb-4">{{ alert("info", "O modelo “" ~ comparison.template.name ~ "” tem uma versão nova (v" ~ comparison.current_version.number ~ ").", "Compare antes de aplicar: nada muda sem a sua confirmação.", action=("Comparar com o modelo", url_for('edicao.project_compare', project_id=project.id))) }}</div>
+{%- endif %}
+
+<div class="stack--lg">
+  <form class="card stack" method="post" action="{{ url_for('edicao.project_edit', project_id=project.id) }}" novalidate>
+    {{ form_errors(form) }}
+    {{ form.csrf_token }}
+    <h2 class="section-title">Dados do projeto</h2>
+    {{ field(form.name, attrs={"required": true}) }}
+    {{ field(form.product, optional=True) }}
+    <div class="form-row form-row--2">
+      {{ field(form.quantity, attrs={"min": 1, "inputmode": "numeric", "required": true}) }}
+      {{ field(form.people, attrs={"min": 1, "inputmode": "numeric", "required": true}) }}
+    </div>
+    <div class="form-row form-row--2">
+      {{ field(form.start_date, optional=True) }}
+      {{ field(form.due_date, optional=True) }}
+    </div>
+    {{ field(form.hours_per_day, hint="Por pessoa.", attrs={"inputmode": "decimal", "required": true}) }}
+    <div class="form-actions">{{ button("Salvar dados", "primary") }}</div>
+  </form>
+
+  <section class="stack" aria-labelledby="estrutura-titulo">
+    <h2 class="section-title" id="estrutura-titulo"><span>Etapas e subatividades</span><span class="num">{{ stages|length }}</span></h2>
+    <p class="muted text-sm">Arquivar tira da tela e dos cálculos, mas os registros continuam no histórico e na exportação.</p>
+    <p class="muted text-sm js-only">Arraste pela alça ⠿ para reordenar etapas ou levar uma subatividade para outra etapa; os botões Subir/Descer e “Mover” fazem o mesmo sem arrastar.</p>
+    {#- Etapa D: o arrastar só preenche e envia estes formulários; o servidor valida e decide. #}
+    <form id="ordem-etapas" method="post" action="{{ url_for('edicao.stages_reorder', project_id=project.id) }}" hidden>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
+    <form id="mover-atividade" method="post" action="" hidden>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="stage_id" value="">
+      <input type="hidden" name="position" value="">
+      <input type="hidden" name="version" value="">
+    </form>
+    <div class="stack sort-list" data-sort-list="stages" data-sort-form="ordem-etapas">
+    {%- for stage, activities in stages %}
+    {%- set sc = conflict if conflict and conflict.id == stage.id else none %}
+    <article class="card stack sort-item" id="etapa-{{ stage.id }}" data-sort-id="{{ stage.id }}">
+      {%- if sc %}{{ alert("warning", sc.message, role="alert") }}{% endif %}
+      <div class="cluster">
+        <span class="drag-handle js-only" data-drag-handle title="Arrastar a etapa" aria-hidden="true">⠿</span>
+        <form class="cluster" method="post" action="{{ url_for('edicao.stage_rename', stage_id=stage.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="version" value="{{ stage.version }}">
+          <label class="visually-hidden" for="etapa-nome-{{ stage.id }}">Nome da etapa</label>
+          <input class="field__input" id="etapa-nome-{{ stage.id }}" name="name" value="{{ sc.mine.name if sc else stage.name }}" maxlength="160" required>
+          {{ button("Confirmar e salvar" if sc else "Renomear", "primary" if sc else "secondary") }}
+        </form>
+        {{ move_buttons(url_for('edicao.stage_move', stage_id=stage.id)) }}
+        <form method="post" action="{{ url_for('edicao.stage_archive', stage_id=stage.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {{ button("Arquivar etapa", "ghost") }}
+        </form>
+      </div>
+      <div class="stack sort-list" data-sort-list="activities" data-drop-stage="{{ stage.id }}">
+      {%- for activity in activities %}
+      {%- set ac = conflict if conflict and conflict.id == activity.id else none %}
+      {%- if ac %}{{ alert("warning", ac.message, role="alert") }}{% endif %}
+      <div class="cluster sort-item" id="atividade-{{ activity.id }}" data-sort-id="{{ activity.id }}" data-version="{{ activity.version }}" data-move-url="{{ url_for('edicao.activity_position', activity_id=activity.id) }}">
+        <span class="drag-handle js-only" data-drag-handle title="Arrastar a subatividade" aria-hidden="true">⠿</span>
+        <form class="cluster" method="post" action="{{ url_for('edicao.activity_edit', activity_id=activity.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="version" value="{{ activity.version }}">
+          <label class="visually-hidden" for="atv-nome-{{ activity.id }}">Subatividade</label>
+          <input class="field__input" id="atv-nome-{{ activity.id }}" name="name" value="{{ ac.mine.name if ac else activity.name }}" maxlength="160" required>
+          <label class="visually-hidden" for="atv-min-{{ activity.id }}">Tempo ideal (min)</label>
+          <input class="field__input" id="atv-min-{{ activity.id }}" name="ideal_minutes" value="{{ ac.mine.ideal_minutes if ac else activity.ideal_minutes }}" inputmode="decimal" required>
+          <span class="muted text-sm">min · {{ activity.units_done }}/{{ project.quantity }}</span>
+          {{ button("Confirmar e salvar" if ac else "Salvar", "primary" if ac else "secondary") }}
+        </form>
+        {%- if "atribuicao" in modules %}
+        <form class="cluster" method="post" action="{{ url_for('edicao.activity_assign', activity_id=activity.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="visually-hidden" for="atv-resp-{{ activity.id }}">Responsável por {{ activity.name }}</label>
+          <select class="field__input" id="atv-resp-{{ activity.id }}" name="assignee_id">
+            <option value="">Sem responsável</option>
+            {%- for m in members %}<option value="{{ m.id }}"{% if activity.assignee_id == m.id %} selected{% endif %}>{{ m.name }}</option>{% endfor %}
+          </select>
+          {{ button("Atribuir", "secondary") }}
+          {{ optional_badge() }}
+        </form>
+        {%- endif %}
+        {{ move_buttons(url_for('edicao.activity_move', activity_id=activity.id)) }}
+        {%- if stages|length > 1 %}
+        <form class="cluster" method="post" action="{{ url_for('edicao.activity_position', activity_id=activity.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="version" value="{{ activity.version }}">
+          <input type="hidden" name="position" value="100000">
+          <label class="visually-hidden" for="atv-etapa-{{ activity.id }}">Mover {{ activity.name }} para a etapa</label>
+          <select class="field__input" id="atv-etapa-{{ activity.id }}" name="stage_id">
+            {%- for other, _acts in stages %}<option value="{{ other.id }}"{% if other.id == stage.id %} selected{% endif %}>{{ other.name }}</option>{% endfor %}
+          </select>
+          {{ button("Mover", "ghost") }}
+        </form>
+        {%- endif %}
+        <form method="post" action="{{ url_for('edicao.activity_archive', activity_id=activity.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {{ button("Arquivar", "ghost") }}
+        </form>
+      </div>
+      {%- else %}
+      <p class="muted text-sm">Sem subatividades. Inclua pela tela do projeto.</p>
+      {%- endfor %}
+      </div>
+    </article>
+    {%- endfor %}
+    </div>
+  </section>
+</div>
+
+{% call confirm_dialog("arquivar-projeto", "Arquivar o projeto?", "Ele sai da lista de projetos e libera o limite do plano. O histórico continua guardado.", "Arquivar", url_for('edicao.project_archive', project_id=project.id)) %}
+<input type="hidden" name="confirm" value="y">
+{% endcall %}
+{% endblock %}

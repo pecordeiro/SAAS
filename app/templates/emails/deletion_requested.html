@@ -1,0 +1,7 @@
+{% extends "emails/_base.html" %}
+{% block body %}
+  <p>Olá, {{ name }}.</p>
+  <p>Foi pedida a exclusão da empresa {{ company_name }} na Teroz. Todos os dados serão apagados definitivamente em <strong>{{ purge_at|data }}</strong>.</p>
+  <p>Até lá tudo continua funcionando e qualquer proprietário pode cancelar em Privacidade e dados.</p>
+  <p>Se você não reconhece este pedido, entre e cancele agora e troque a sua senha.</p>
+{% endblock %}

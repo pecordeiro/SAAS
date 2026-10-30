@@ -1,0 +1,45 @@
+/* Utilitários: poucos e de propósito único. Só tokens. */
+@layer utilities {
+  .visually-hidden {
+    position: absolute !important;
+    width: var(--border-width) !important;
+    height: var(--border-width) !important;
+    margin: calc(-1 * var(--border-width)) !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    clip: rect(0 0 0 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+  }
+
+  /* Sem JS a página funciona com formulários comuns; estes só aparecem com JS. */
+  .no-js .js-only { display: none !important; }
+  .js .no-js-only { display: none !important; }
+
+  .muted { color: var(--color-text-muted); }
+  .num { font-variant-numeric: var(--font-numeric); }
+  .text-sm { font-size: var(--font-size-sm); }
+  .text-strong { font-weight: var(--font-weight-semibold); }
+  .text-success { color: var(--color-success); }
+  .text-danger { color: var(--color-danger); }
+  .mt-2 { margin-top: var(--space-2); }
+  .mt-4 { margin-top: var(--space-4); }
+  .mt-6 { margin-top: var(--space-6); }
+  .mt-8 { margin-top: var(--space-8); }
+  .mb-4 { margin-bottom: var(--space-4); }
+
+  @media (max-width: 47.99em) {
+    .only-desktop { display: none !important; }
+  }
+  @media (min-width: 48em) {
+    .only-mobile { display: none !important; }
+  }
+  /* Conteúdo denso (tabelas, registrador inline): no tablet o menu lateral já ocupa
+     espaço, então o modo compacto vale até 1024 px. */
+  @media (max-width: 63.99em) {
+    .wide-only { display: none !important; }
+  }
+  @media (min-width: 64em) {
+    .compact-only { display: none !important; }
+  }
+}

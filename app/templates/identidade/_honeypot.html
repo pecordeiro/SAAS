@@ -1,0 +1,10 @@
+{#
+  Campo armadilha (ADR-0019, anti-spam): invisível para pessoas e fora da ordem do Tab. Robô que
+  preenche todo campo manda um valor → o servidor responde 400 e não grava nada.
+#}
+{% macro honeypot(name, id) -%}
+<div class="visually-hidden" aria-hidden="true">
+  <label for="{{ id }}">Não preencha este campo</label>
+  <input id="{{ id }}" type="text" name="{{ name }}" value="" tabindex="-1" autocomplete="off">
+</div>
+{%- endmacro %}

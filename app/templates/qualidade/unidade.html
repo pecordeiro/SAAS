@@ -1,0 +1,101 @@
+{% extends "base_app.html" %}
+{% from "components/optional.html" import optional_badge %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/badge.html" import badge %}
+{% from "components/table.html" import data_table %}
+{% set nav_current = "projects" %}
+{% set nav_project = project %}
+{% block title %}Unidade {{ unit.serial }} · Teroz{% endblock %}
+{% block content %}
+{#
+  Etapa G — histórico completo da unidade: lançamentos ligados a ela (com desfazeres),
+  inspeções e mudanças de status (auditoria). Registrar aqui soma +1 na atividade escolhida
+  (mesmas regras do registro normal; uma vez por atividade+unidade).
+#}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('qualidade.units', project_id=project.id) }}">{{ icon("chevron-left") }}Unidades · {{ project.name }}</a>
+    <h1>{{ unit.serial }}{{ optional_badge() }}</h1>
+    <p class="page-header__subtitle">{{ badge(labels.get(unit.status, unit.status)) }} <span class="muted">cadastrada em <span class="num">{{ unit.created_at|datahora }}</span></span></p>
+  </div>
+</header>
+
+{%- if error %}<div class="mb-4">{{ alert("danger", error, role="alert") }}</div>{% endif %}
+
+<div class="split">
+  <section class="stack">
+    <div class="card">
+      <h2 class="card__title">Lançamentos</h2>
+      {%- if h.entries %}
+      <ul class="comment-list" role="list">
+        {%- for e in h.entries %}
+        <li class="comment">
+          <p class="comment__meta text-sm"><span class="text-strong">{{ "%+d"|format(e.delta) }}</span> · {{ e.activity.stage.name }} › {{ e.activity.name }}{% if e.id in h.undone %} · <span class="muted">desfeito</span>{% endif %}</p>
+          <p class="muted text-sm">{{ e.user.name if e.user else "Pessoa removida" }} · <span class="num">{{ e.at|datahora }}</span></p>
+        </li>
+        {%- endfor %}
+      </ul>
+      {%- else %}<p class="muted">Nenhum lançamento ligado a esta unidade.</p>{% endif %}
+    </div>
+    {%- if "checklist" in modules %}
+    <div class="card">
+      <h2 class="card__title">Inspeções</h2>
+      {%- if h.inspections %}
+      <ul class="comment-list" role="list">
+        {%- for i in h.inspections %}
+        <li class="comment">
+          <p><a href="{{ url_for('qualidade.inspection', inspection_id=i.id) }}">{{ i.stage.name }}</a> · {% if i.status == "signed" %}{{ badge("Assinada", "success", "check") }}{% else %}{{ badge("Rascunho", "neutral", "circle") }}{% endif %}</p>
+          {%- if i.signed_at %}<p class="muted text-sm">{{ i.signed_by.name if i.signed_by else "Pessoa removida" }} · <span class="num">{{ i.signed_at|datahora }}</span></p>{% endif %}
+        </li>
+        {%- endfor %}
+      </ul>
+      {%- else %}<p class="muted">Nenhuma inspeção desta unidade.</p>{% endif %}
+    </div>
+    {%- endif %}
+    <div class="card">
+      <h2 class="card__title">Alterações</h2>
+      {%- if h.changes %}
+      <ul class="comment-list" role="list">
+        {%- for c in h.changes %}
+        <li class="comment"><p class="text-sm">{{ action_labels.get(c.action, c.action) }}{% if c.details and c.details.get("para") %}: {{ labels.get(c.details.get("de"), c.details.get("de")) }} → {{ labels.get(c.details.get("para"), c.details.get("para")) }}{% endif %} · <span class="muted num">{{ c.at|datahora }}</span></p></li>
+        {%- endfor %}
+      </ul>
+      {%- else %}<p class="muted">Sem alterações de situação.</p>{% endif %}
+    </div>
+  </section>
+
+  <aside class="split__aside stack">
+    {%- if not project.archived_at %}
+    <form class="card stack" method="post" action="{{ url_for('qualidade.unit_register', unit_id=unit.id) }}">
+      <h2 class="card__title">Registrar nesta unidade</h2>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="field">
+        <label class="field__label" for="unidade-atividade">Subatividade concluída</label>
+        <select class="field__input" id="unidade-atividade" name="activity_id" required>
+          {%- for stage, a in activities %}
+          <option value="{{ a.id }}"{% if a.id in h.done_activities %} disabled{% endif %}>{{ stage.name }} › {{ a.name }}{% if a.id in h.done_activities %} (já registrada){% endif %}</option>
+          {%- endfor %}
+        </select>
+      </div>
+      <div>{{ button("Registrar +1", "primary", icon="plus") }}</div>
+    </form>
+    {%- if can_manage %}
+    <form class="card stack" method="post" action="{{ url_for('qualidade.unit_status', unit_id=unit.id) }}">
+      <h2 class="card__title">Situação</h2>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="version" value="{{ unit.version }}">
+      <div class="field">
+        <label class="field__label" for="unidade-status">Situação da unidade</label>
+        <select class="field__input" id="unidade-status" name="status">
+          {%- for value, label in labels.items() %}<option value="{{ value }}"{% if value == unit.status %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>{{ button("Salvar situação", "secondary") }}</div>
+    </form>
+    {%- endif %}
+    {%- endif %}
+  </aside>
+</div>
+{% endblock %}

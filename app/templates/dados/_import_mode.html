@@ -1,0 +1,40 @@
+{% from "components/icon.html" import icon %}
+{#
+  R7 — aviso do modo que a escolha de colunas produz. Quem decide é o servidor
+  (import_mapping.mode_of / mapping_from_columns); a tela troca este trecho por HTMX.
+#}
+<div class="import-mode" id="modo-aviso" role="status" aria-live="polite">
+  {%- if map_errors %}
+  <div class="alert alert--danger" role="alert">
+    {{ icon("alert", class_="alert__icon") }}
+    <div class="alert__content">
+      <p class="alert__title">Confira as colunas</p>
+      <ul class="alert__body">{% for m in map_errors %}<li>{{ m }}</li>{% endfor %}</ul>
+    </div>
+  </div>
+  {%- elif not has_stage %}
+  <div class="alert alert--warning">
+    {{ icon("alert", class_="alert__icon") }}
+    <div class="alert__content">
+      <p class="alert__title">Falta a coluna da Etapa</p>
+      <p class="alert__body">Marque qual coluna traz o nome da etapa. É a única obrigatória.</p>
+    </div>
+  </div>
+  {%- elif mode == "simples" %}
+  <div class="alert alert--info">
+    {{ icon("info", class_="alert__icon") }}
+    <div class="alert__content">
+      <p class="alert__title">Vai entrar no modo simples</p>
+      <p class="alert__body">Uma linha por etapa, com o % concluído (ou as concluídas). Para lançar por subatividade, marque uma coluna como Subatividade.</p>
+    </div>
+  </div>
+  {%- else %}
+  <div class="alert alert--info">
+    {{ icon("info", class_="alert__icon") }}
+    <div class="alert__content">
+      <p class="alert__title">Vai entrar no modo detalhado</p>
+      <p class="alert__body">Cada linha vira uma subatividade dentro da etapa. Etapa vazia numa linha usa a etapa da linha de cima.</p>
+    </div>
+  </div>
+  {%- endif %}
+</div>

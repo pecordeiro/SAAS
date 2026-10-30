@@ -1,0 +1,4 @@
+{% extends "emails/_base.txt" %}
+{% block body %}Olá, {{ name }}.
+
+A exclusão da empresa {{ company_name }} foi cancelada. Nenhum dado foi apagado.{% endblock %}

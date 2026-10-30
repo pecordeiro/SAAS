@@ -1,0 +1,143 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/field.html" import field, file_upload %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/table.html" import data_table %}
+{% from "components/badge.html" import badge %}
+{% from "components/steps.html" import steps %}
+{% set nav_current = "spreadsheet" %}
+{%- set step = 3 if result else 1 %}
+{% block title %}{{ "Prévia" if step == 3 else "Enviar arquivo" }} · Importar planilha · Teroz{% endblock %}
+{% block content %}
+{#
+  R7 — importar planilha em 3 passos: 1 enviar (aqui) → 2 escolher colunas (import_map.html,
+  pulado quando o formato é reconhecido sozinho) → 3 prévia com erros por linha → confirmar.
+  Tudo o que aparece (modo, erros, contagens, limite do plano) vem do servidor.
+#}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('app.projects') }}">{{ icon("chevron-left") }}Projetos</a>
+    <h1>Importar planilha</h1>
+    <p class="page-header__subtitle">Traga etapas e subatividades de uma planilha .xlsx ou .csv. Nada é gravado antes da sua confirmação.</p>
+  </div>
+</header>
+
+{{ steps([("Enviar arquivo", None), ("Escolher colunas", "automático" if step == 3 and not back else None), ("Prévia e confirmar", None)], step, label="Passos da importação") }}
+
+{%- if upload_error %}<div class="mb-4">{{ alert("danger", "Não deu para ler o arquivo", upload_error, role="alert") }}</div>{% endif %}
+
+{%- if back %}
+{#- Volta ao passo 2 com a mesma planilha (assinada) e a mesma escolha de colunas. -#}
+<form id="voltar-colunas" method="post" action="{{ url_for('dados.import_columns') }}" hidden>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="grid" value="{{ back.grid }}">
+  <input type="hidden" name="current_sheet" value="{{ back.sheet }}">
+  <input type="hidden" name="sheet" value="{{ back.sheet }}">
+  <input type="hidden" name="header_row" value="{{ back.header_row }}">
+  {%- if back.quantity %}<input type="hidden" name="quantity" value="{{ back.quantity }}">{% endif %}
+  {%- if back.name %}<input type="hidden" name="name" value="{{ back.name }}">{% endif %}
+  {%- if back.time_unit %}<input type="hidden" name="time_unit" value="{{ back.time_unit }}">{% endif %}
+  {%- for idx, key in back.columns.items() %}<input type="hidden" name="col_{{ idx }}" value="{{ key }}">{% endfor %}
+  <input type="hidden" name="action" value="ver">
+</form>
+{%- endif %}
+
+{%- if result and result.errors %}
+{# ---------- Passo 3 com problemas: erros por linha, nada gravado ---------- #}
+<section class="card stack" aria-labelledby="erros-titulo">
+  <div class="import-head">
+    <h2 class="section-title" id="erros-titulo">{{ result.errors|length }} {{ "problema" if result.errors|length == 1 else "problemas" }} na planilha</h2>
+    <p class="muted text-sm">Nada foi gravado. Corrija as linhas abaixo na planilha e envie de novo{% if back %}, ou volte e mude as colunas{% endif %}.</p>
+  </div>
+  {% call data_table([("Linha", "is-nowrap"), ("Coluna", ""), ("Problema", "")], caption="Problemas por linha", class_="import-errors") %}
+  <tbody>
+    {%- for e in result.errors[:50] %}
+    <tr>
+      <td class="is-nowrap is-plain num">{% if e.line %}Linha {{ e.line }}{% else %}Arquivo{% endif %}</td>
+      <td data-label="Coluna">{{ e.column }}</td>
+      <td data-label="Problema">{{ e.message }}</td>
+    </tr>
+    {%- endfor %}
+  </tbody>
+  {% endcall %}
+  {%- if result.errors|length > 50 %}<p class="muted text-sm">Mostrando 50 de {{ result.errors|length }} problemas.</p>{% endif %}
+  <div class="form-actions">
+    {%- if back %}{{ button("Voltar às colunas", "secondary", icon="chevron-left", attrs={"form": "voltar-colunas"}) }}{% endif %}
+    {{ button("Enviar outro arquivo", "primary" if not back else "ghost", href=url_for('dados.import_upload')) }}
+  </div>
+</section>
+
+{%- elif result and result.ok and confirm %}
+{# ---------- Passo 3: prévia e confirmar ---------- #}
+<section class="card stack" aria-labelledby="previa-titulo">
+  <div class="import-head">
+    <h2 class="section-title" id="previa-titulo">Prévia</h2>
+    <p class="import-summary">
+      {%- if result.mode == "simples" %}{{ badge("Modo simples", "neutral") }}{% else %}{{ badge("Modo detalhado", "info") }}{% endif %}
+      <span class="num">{{ result.stages|length }} {{ "etapa" if result.stages|length == 1 else "etapas" }}</span>
+      <span class="num">{{ result.activity_count }} {{ "subatividade" if result.activity_count == 1 else "subatividades" }}</span>
+      <span class="num">meta {{ result.quantity }} {{ "unidade" if result.quantity == 1 else "unidades" }}</span>
+      {%- if result.due_date %}<span class="num">prazo {{ result.due_date.strftime("%d/%m/%Y") }}</span>{% endif %}
+    </p>
+    <p class="muted text-sm">
+      {%- if result.mode == "simples" %}Uma linha por etapa, com o % concluído.
+      {%- else %}Cada linha vira uma subatividade dentro da etapa, com tempo ideal e peças prontas.{% endif %}
+      {%- if result.source == "planilha" %} Formato da planilha de acompanhamento reconhecido.{% elif not back %} Formato do site reconhecido.{% endif %}
+    </p>
+  </div>
+  {%- for note in result.notes %}{{ alert("info", note) }}{% endfor %}
+  {%- for warning in result.warnings %}{{ alert("warning", "Confira a unidade do tempo", warning) }}{% endfor %}
+  {%- if result.time_unit %}
+  <p class="import-time" id="tempo-convertido">
+    <span class="import-time__label">Tempo ideal somado (por unidade)</span>
+    <strong class="num">{{ result.total_minutes|num(2) }} min</strong>
+    <span class="muted">· unidade da planilha: {{ "horas (convertidas para minutos)" if result.time_unit == "horas" else "minutos" }}</span>
+  </p>
+  {%- endif %}
+  {%- if usage and usage.max_projects is not none and usage.projects >= usage.max_projects %}
+  {{ alert("warning", "Limite do plano atingido", "Seu plano " ~ usage.plan.name ~ " permite " ~ usage.max_projects ~ " projetos ativos. Arquive um projeto ou mude de plano para importar.") }}
+  {%- endif %}
+  {% call data_table([("Etapa › subatividade", ""), ("Tempo ideal (min)", "is-num"), ("Peças prontas", "is-num")], caption="Etapas e subatividades lidas", class_="import-preview") %}
+    {%- for stage in result.stages %}
+  <tbody>
+    <tr class="table__group"><th scope="rowgroup" colspan="3">{{ stage.name }}{% if stage.archived %} {{ badge("arquivada", "neutral") }}{% endif %} <span class="import-preview__count num">{{ stage.activities|length }} {{ "subatividade" if stage.activities|length == 1 else "subatividades" }}</span></th></tr>
+    {%- for a in stage.activities %}
+    <tr>
+      <td class="is-plain import-preview__name">{{ a.name }}{% if a.archived %} {{ badge("arquivada", "neutral") }}{% endif %}</td>
+      <td class="is-num" data-label="Tempo ideal (min)">{{ a.ideal_minutes|num(2 if result.time_unit else 0) }}</td>
+      <td class="is-num" data-label="Peças prontas">{{ a.units_done }} <span class="muted">de {{ result.quantity }}</span></td>
+    </tr>
+    {%- else %}
+    <tr><td class="is-plain muted" colspan="3">Sem subatividades</td></tr>
+    {%- endfor %}
+  </tbody>
+    {%- endfor %}
+  {% endcall %}
+  <form class="stack import-confirm" method="post" action="{{ url_for('dados.import_confirm') }}">
+    {{ confirm.csrf_token }}
+    {{ confirm.payload }}
+    {{ field(confirm.name, attrs={"required": true, "autocomplete": "off"}) }}
+    <div class="form-actions">
+      {{ button("Importar projeto", "primary") }}
+      {%- if back %}{{ button("Voltar às colunas", "secondary", attrs={"form": "voltar-colunas"}) }}{% endif %}
+      {{ button("Cancelar", "ghost", href=url_for('dados.import_upload')) }}
+    </div>
+  </form>
+</section>
+
+{%- else %}
+{# ---------- Passo 1: enviar o arquivo ---------- #}
+<form class="card stack import-upload" method="post" action="{{ url_for('dados.import_upload') }}" enctype="multipart/form-data">
+  {{ form.csrf_token }}
+  <h2 class="section-title">Enviar arquivo</h2>
+  {{ file_upload(form.file, ".xlsx,.csv", label="Planilha", hint="Planilha .xlsx ou .csv, até " ~ limit_mb ~ " MB e 5.000 linhas. O formato do site e a planilha de acompanhamento são reconhecidos sozinhos; nas outras, você escolhe as colunas.") }}
+  {{ field(form.name, optional=True, hint="Se ficar vazio, usamos o nome do arquivo.", attrs={"autocomplete": "off"}) }}
+  <label class="check"><input type="checkbox" name="{{ form.map_columns.name }}" id="{{ form.map_columns.id }}" value="y"{% if form.map_columns.data %} checked{% endif %}><span>Quero escolher as colunas mesmo assim</span></label>
+  <div class="form-actions">
+    {{ button("Ler a planilha", "primary") }}
+    {{ button("Baixar modelo .csv", "ghost", icon="download", href=url_for('dados.import_template')) }}
+  </div>
+</form>
+{%- endif %}
+{% endblock %}

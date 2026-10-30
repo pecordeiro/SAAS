@@ -1,0 +1,19 @@
+{% from "components/toast.html" import toast_region %}
+{#
+  Resposta HTMX do detalhe (hx-swap="none" no gatilho): tudo aqui é “fora de banda” —
+  cada elemento troca o de mesmo id na página. Usado no registro de peças (só a atividade
+  registrada) e na atualização a cada 30 s (todas as atividades). `oob` = True.
+#}
+{% include "app/detail/_kpis.html" %}
+{% include "app/detail/_meta.html" %}
+{%- for stage, sr, activities in rows %}
+{% include "app/detail/_stage_summary.html" %}
+{%- for activity, ar in activities %}
+{%- if only_activity is none or only_activity == activity.id %}
+{% include "app/detail/_activity.html" %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+{% include "app/detail/_lateral.html" %}
+{% include "app/detail/_charts.html" %}
+{%- if toast %}{{ toast_region(toast, oob=True) }}{% endif %}

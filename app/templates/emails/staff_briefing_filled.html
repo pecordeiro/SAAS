@@ -1,0 +1,6 @@
+{% extends "emails/_base.html" %}
+{% block body %}
+  <p>A empresa {{ company_name }} preencheu o briefing de identidade visual. A requisição está em “Briefing preenchido” no painel interno.</p>
+  <p><a href="{{ url }}">Abrir o painel interno</a></p>
+  <p><small>Se o botão não abrir, copie o endereço: {{ url }}</small></p>
+{% endblock %}

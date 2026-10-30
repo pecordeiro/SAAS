@@ -1,0 +1,120 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/badge.html" import badge %}
+{% from "components/steps.html" import steps %}
+{% set nav_current = "spreadsheet" %}
+{% block title %}{{ "Escolher projetos" if step == 2 else "Prévia" }} · Importar planilha · Teroz{% endblock %}
+{% block content %}
+{#
+  R7 — arquivo com VÁRIOS projetos (abas “Acompanhamento/Equipe/Como funciona” e
+  “<Nome> - Acompanhamento/Equipe/Como funciona”). Passo 2: escolher quais importar (todos
+  marcados); passo 3: prévia e confirmar (um projeto por item). Lista assinada no formulário;
+  o limite do plano é conferido no servidor na confirmação.
+#}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('dados.import_upload') }}">{{ icon("chevron-left") }}Enviar outro arquivo</a>
+    <h1>Importar planilha</h1>
+    <p class="page-header__subtitle">{% if step == 2 %}Este arquivo tem vários projetos. Escolha quais importar.{% else %}Confira os projetos escolhidos e confirme.{% endif %}</p>
+  </div>
+</header>
+
+{{ steps([("Enviar arquivo", None), ("Escolher projetos", None), ("Prévia e confirmar", None)], step, label="Passos da importação") }}
+
+{%- if error %}<div class="mb-4">{{ alert("danger", error, role="alert") }}</div>{% endif %}
+{%- if limit_message %}<div class="mb-4">{{ alert("warning", "Passa do limite do plano", limit_message, role="alert" if blocked else None) }}</div>{% endif %}
+
+{%- if step == 2 %}
+<form class="stack" method="post" action="{{ url_for('dados.import_projects') }}">
+  {%- if form %}{{ form.csrf_token }}{{ form.payload }}{% endif %}
+  <fieldset class="card stack import-projects">
+    <legend class="section-title import-projects__legend">Projetos encontrados <span class="num muted">{{ rows|length }}</span></legend>
+    <p class="muted text-sm">Cada projeto tem as abas Acompanhamento, Equipe e Como funciona. Todos vêm marcados; desmarque o que não quiser trazer.</p>
+    <ul class="import-projects__list">
+      {%- for project, result, idx in rows %}
+      <li class="import-projects__item{% if idx is none %} has-errors{% endif %}">
+        {%- if idx is not none %}
+        <label class="check import-projects__check">
+          <input type="checkbox" name="pick" value="{{ idx }}"{% if idx in picked %} checked{% endif %}>
+          <span class="import-projects__name">{{ result.name }}</span>
+        </label>
+        {%- else %}
+        <p class="import-projects__name import-projects__name--off">{{ icon("alert", "sm") }} {{ result.name }}</p>
+        {%- endif %}
+        <p class="import-projects__meta num">
+          <span>{{ result.stages|length }} {{ "etapa" if result.stages|length == 1 else "etapas" }}</span>
+          <span>{{ result.activity_count }} {{ "subatividade" if result.activity_count == 1 else "subatividades" }}</span>
+          {%- if result.quantity %}<span>meta {{ result.quantity }}</span>{% endif %}
+          {%- if project and project.key %}<span class="muted">abas “{{ project.key }} - …”</span>{% elif project %}<span class="muted">abas sem prefixo</span>{% endif %}
+        </p>
+        {%- if idx is none %}
+        <ul class="import-projects__errors text-sm">
+          {%- for e in result.errors[:5] %}<li>{% if e.line %}Linha {{ e.line }}, {% endif %}{{ e.column }}: {{ e.message }}</li>{% endfor %}
+          {%- if result.errors|length > 5 %}<li>… e mais {{ result.errors|length - 5 }}.</li>{% endif %}
+        </ul>
+        <p class="muted text-sm">Este não pode ser importado como está. Corrija a aba e envie o arquivo de novo.</p>
+        {%- endif %}
+      </li>
+      {%- endfor %}
+    </ul>
+    {%- if usage.max_projects is not none %}
+    <p class="muted text-sm num">Seu plano {{ usage.plan.name }}: {{ usage.projects }} de {{ usage.max_projects }} projetos ativos em uso.</p>
+    {%- endif %}
+  </fieldset>
+  <div class="form-actions">
+    {%- if ok_count %}{{ button("Ver prévia", "primary") }}{% endif %}
+    {{ button("Cancelar", "ghost", href=url_for('dados.import_upload')) }}
+  </div>
+</form>
+
+{%- else %}
+<section class="card stack" aria-labelledby="previa-titulo">
+  <div class="import-head">
+    <h2 class="section-title" id="previa-titulo">{{ chosen|length }} {{ "projeto" if chosen|length == 1 else "projetos" }} para importar</h2>
+    <p class="muted text-sm">Um projeto novo para cada item. Nada é gravado antes de você confirmar.</p>
+  </div>
+  <ul class="import-projects__list">
+    {%- for r in chosen %}
+    <li class="import-projects__item">
+      <details class="import-projects__details">
+        <summary>
+          <span class="import-projects__name">{{ r.name }}</span>
+          <span class="import-projects__meta num">
+            <span>{{ r.stages|length }} {{ "etapa" if r.stages|length == 1 else "etapas" }}</span>
+            <span>{{ r.activity_count }} {{ "subatividade" if r.activity_count == 1 else "subatividades" }}</span>
+            <span>meta {{ r.quantity }}</span>
+            <span>{{ r.people }} {{ "pessoa" if r.people == 1 else "pessoas" }} × {{ r.hours_per_day|num(1) }} h</span>
+          </span>
+          <span class="import-projects__toggle">{{ icon("chevron-down", "sm") }}Ver as etapas</span>
+        </summary>
+        <ul class="import-projects__stages">
+          {%- for stage in r.stages %}
+          <li><span>{{ stage.name }}</span> <span class="muted num">{{ stage.activities|length }} {{ "subatividade" if stage.activities|length == 1 else "subatividades" }}</span></li>
+          {%- endfor %}
+        </ul>
+      </details>
+    </li>
+    {%- endfor %}
+  </ul>
+  <div class="form-actions">
+    {%- if not blocked %}
+    <form method="post" action="{{ url_for('dados.import_confirm_many') }}" class="import-projects__confirm">
+      {{ form.csrf_token }}{{ form.payload }}
+      {{ button("Importar " ~ chosen|length ~ (" projeto" if chosen|length == 1 else " projetos"), "primary") }}
+    </form>
+    {%- endif %}
+    {%- if back_payload %}
+    <form method="post" action="{{ url_for('dados.import_projects') }}" class="import-projects__confirm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="payload" value="{{ back_payload }}">
+      {%- for i in picks %}<input type="hidden" name="pick" value="{{ i }}">{% endfor %}
+      {{ button("Voltar e mudar a escolha", "secondary", attrs={"name": "action", "value": "voltar"}) }}
+    </form>
+    {%- endif %}
+    {{ button("Cancelar", "ghost", href=url_for('dados.import_upload')) }}
+  </div>
+</section>
+{%- endif %}
+{% endblock %}

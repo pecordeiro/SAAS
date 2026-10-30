@@ -1,0 +1,359 @@
+/* Controle de Produção — melhorias progressivas (a página funciona sem este arquivo).
+   Carregado no <head> sem defer: só marca a classe "js" agora; o resto espera o DOM.
+   Sem eval, sem estilo inline, sem dependências (CSP default-src 'self'). */
+(function () {
+  "use strict";
+  var root = document.documentElement;
+  root.classList.remove("no-js");
+  root.classList.add("js");
+
+  /* ---------- Menu lateral: continua aberto depois de um clique, até o mouse sair de cima ----------
+     O menu recolhido abre com :hover. Clicar num item carrega a página seguinte, que nasce sem
+     :hover (o navegador só o recalcula quando o mouse se mexe) e o menu fechava. Por isso o clique do
+     mouse deixa um aviso na sessão e a página nova já abre com a classe "sidebar-hold" (aplicada aqui,
+     antes da pintura, então não há piscada); ela sai quando o ponteiro passa para fora do menu.
+     Teclado e toque não deixam aviso. Só estilo: nada de regra de negócio. */
+  var MENU_KEY = "menuAberto";
+  try {
+    if (sessionStorage.getItem(MENU_KEY) === "1") root.classList.add("sidebar-hold");
+  } catch (e) { /* sem armazenamento: o menu só abre com o mouse em cima, como antes */ }
+
+  function releaseMenu() {
+    root.classList.remove("sidebar-hold");
+    try { sessionStorage.removeItem(MENU_KEY); } catch (e) { /* ignora */ }
+  }
+
+  document.addEventListener("pointerdown", function (event) {
+    if (event.pointerType !== "mouse" || !event.target.closest || !event.target.closest(".app-sidebar")) return;
+    root.classList.add("sidebar-hold"); // já no clique: vale também se só um pedaço da tela for trocado (sem recarregar)
+    try { sessionStorage.setItem(MENU_KEY, "1"); } catch (e) { /* ignora */ }
+  });
+
+  document.addEventListener("pointerover", function (event) {
+    if (!root.classList.contains("sidebar-hold")) return;
+    if (!event.target.closest || !event.target.closest(".app-sidebar")) releaseMenu();
+  }, { passive: true });
+
+  var THEME_COOKIE = "tema";
+  var ONE_YEAR = 60 * 60 * 24 * 365;
+
+  /* ---------- Tema: aplica na hora e grava o mesmo cookie da rota /tema ---------- */
+  function applyTheme(value) {
+    if (value === "light" || value === "dark") {
+      root.setAttribute("data-theme", value);
+    } else {
+      root.removeAttribute("data-theme");
+    }
+    var secure = location.protocol === "https:" ? "; Secure" : "";
+    if (value === "light" || value === "dark") {
+      document.cookie = THEME_COOKIE + "=" + value + "; Path=/; Max-Age=" + ONE_YEAR + "; SameSite=Lax" + secure;
+    } else {
+      document.cookie = THEME_COOKIE + "=; Path=/; Max-Age=0; SameSite=Lax" + secure;
+    }
+    // Mantém os outros seletores de tema da página em sincronia.
+    var radios = document.querySelectorAll('[data-theme-form] input[name="tema"]');
+    for (var i = 0; i < radios.length; i++) radios[i].checked = radios[i].value === (value || "system");
+  }
+
+  // Botão claro/escuro do site público: o site abre claro, então só "dark" conta como escuro.
+  document.addEventListener("click", function (event) {
+    var btn = event.target.closest && event.target.closest("[data-theme-toggle]");
+    if (!btn) return;
+    event.preventDefault();
+    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    applyTheme(next);
+    btn.setAttribute("aria-pressed", next === "dark" ? "true" : "false");
+    var hidden = btn.form && btn.form.querySelector("[data-theme-next]");
+    if (hidden) hidden.value = next === "dark" ? "light" : "dark";
+  });
+
+  document.addEventListener("change", function (event) {
+    var input = event.target;
+    if (input && input.name === "tema" && input.closest("[data-theme-form]")) applyTheme(input.value);
+    // Envio de arquivo (R7): mostra o nome escolhido ao lado do botão (só apresentação).
+    if (input && input.type === "file" && input.closest("[data-upload]")) {
+      var label = input.closest("[data-upload]").querySelector("[data-upload-name]");
+      var file = input.files && input.files[0];
+      if (label) {
+        label.textContent = file ? file.name : "Nenhum arquivo escolhido";
+        label.classList.toggle("has-file", !!file);
+      }
+    }
+  });
+
+  /* ---------- Stepper (− / +): só mexe no campo; min/max são dica visual.
+     O texto “+N (→ X de Y)” e qualquer limite vêm do servidor (HTMX), nunca do navegador. ---------- */
+  function clampInput(input) {
+    var min = parseInt(input.min || "1", 10);
+    var max = input.max ? parseInt(input.max, 10) : Infinity;
+    var value = parseInt(input.value, 10);
+    if (isNaN(value)) return null;
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function syncStepper(group) {
+    var input = group.querySelector(".stepper__input");
+    if (!input) return;
+    var min = parseInt(input.min || "1", 10);
+    var max = input.max ? parseInt(input.max, 10) : Infinity;
+    var value = parseInt(input.value, 10);
+    var dec = group.querySelector('[data-step="-1"]');
+    var inc = group.querySelector('[data-step="1"]');
+    if (dec) dec.disabled = !(value > min);
+    if (inc) inc.disabled = !(value < max);
+  }
+
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest && event.target.closest("[data-step]");
+    if (button) {
+      var group = button.closest("[data-stepper]");
+      var input = group && group.querySelector(".stepper__input");
+      if (!input) return;
+      var step = parseInt(button.getAttribute("data-step"), 10);
+      var current = parseInt(input.value, 10);
+      if (isNaN(current)) current = parseInt(input.min || "1", 10) - step;
+      input.value = String(current + step);
+      var clamped = clampInput(input);
+      if (clamped !== null) input.value = String(clamped);
+      syncStepper(group);
+      input.dispatchEvent(new Event("input", { bubbles: true })); // o servidor refaz o rótulo
+      return;
+    }
+    var toggle = event.target.closest && event.target.closest("[data-password-toggle]");
+    if (toggle) {
+      var field = document.getElementById(toggle.getAttribute("data-password-toggle"));
+      if (!field) return;
+      var show = field.type === "password";
+      field.type = show ? "text" : "password";
+      toggle.textContent = show ? "Ocultar" : "Mostrar";
+      toggle.setAttribute("aria-pressed", show ? "true" : "false");
+      return;
+    }
+    var closeToast = event.target.closest && event.target.closest("[data-toast-close]");
+    if (closeToast) {
+      var toast = closeToast.closest("[data-toast]");
+      if (toast) toast.classList.add("is-dismissed");
+      return;
+    }
+    // Faixa fina de aviso: fecha e lembra nesta sessão do navegador (só apresentação).
+    var closeBanner = event.target.closest && event.target.closest("[data-banner-close]");
+    if (closeBanner) {
+      var banner = closeBanner.closest("[data-banner]");
+      if (!banner) return;
+      banner.classList.add("is-dismissed");
+      try { sessionStorage.setItem("aviso-fechado:" + banner.getAttribute("data-banner"), "1"); } catch (e) { /* sem storage */ }
+    }
+  });
+
+  function hideDismissedBanners(scope) {
+    var banners = scope.querySelectorAll("[data-banner]");
+    for (var i = 0; i < banners.length; i++) {
+      try {
+        if (sessionStorage.getItem("aviso-fechado:" + banners[i].getAttribute("data-banner"))) banners[i].classList.add("is-dismissed");
+      } catch (e) { return; }
+    }
+  }
+
+  document.addEventListener("input", function (event) {
+    var input = event.target;
+    if (input && input.classList && input.classList.contains("stepper__input")) {
+      syncStepper(input.closest("[data-stepper]"));
+    }
+  });
+
+  // Tocar no número seleciona o conteúdo (digitar substitui o 1).
+  document.addEventListener("focusin", function (event) {
+    var input = event.target;
+    if (input && input.classList && input.classList.contains("stepper__input") && input.select) {
+      setTimeout(function () { input.select(); }, 0);
+    }
+  });
+
+  /* ---------- Folhas (:target): foco, Esc, devolver o foco ---------- */
+  var lastTrigger = null;
+
+  document.addEventListener("click", function (event) {
+    var link = event.target.closest && event.target.closest('a[href^="#"]');
+    if (!link) return;
+    var id = link.getAttribute("href").slice(1);
+    var target = id && document.getElementById(id);
+    if (target && target.classList.contains("sheet")) lastTrigger = link;
+  });
+
+  // Fechar/backdrop de uma folha aberta pelo servidor (.is-open, ex.: erro de registro).
+  document.addEventListener("click", function (event) {
+    var closer = event.target.closest && event.target.closest(".sheet__close, .sheet__backdrop, [data-dialog-cancel]");
+    if (!closer) return;
+    var sheet = closer.closest(".sheet");
+    if (sheet) sheet.classList.remove("is-open");
+    if (lastTrigger && document.contains(lastTrigger)) {
+      var trigger = lastTrigger;
+      setTimeout(function () { trigger.focus(); }, 0);
+    }
+  });
+
+  function openSheet() {
+    var id = location.hash.slice(1);
+    if (!id) return null;
+    var el = document.getElementById(id);
+    return el && el.classList.contains("sheet") ? el : null;
+  }
+
+  function isOverlayVisible(sheet) {
+    // A folha de registro é inline no desktop: lá ela não “abre” nem prende o foco.
+    var backdrop = sheet.querySelector(".sheet__backdrop");
+    return !!backdrop && backdrop.offsetParent !== null;
+  }
+
+  function focusSheet() {
+    var sheet = openSheet();
+    if (!sheet) return;
+    if (!isOverlayVisible(sheet)) {
+      var inline = sheet.querySelector(".stepper__input");
+      if (inline) inline.focus();
+      return;
+    }
+    var first = sheet.querySelector(".register__submit, [data-dialog-cancel], .sheet__panel button, .sheet__panel input:not([type=hidden]), .sheet__panel a");
+    if (first) first.focus();
+  }
+
+  function closeSheet(sheet) {
+    var back = sheet.getAttribute("data-return") || "#fechar";
+    sheet.classList.remove("is-open");
+    location.replace(back);
+    if (lastTrigger && document.contains(lastTrigger)) lastTrigger.focus();
+  }
+
+  window.addEventListener("hashchange", focusSheet);
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") return;
+    var sheet = openSheet() || document.querySelector(".sheet.is-open");
+    if (sheet && isOverlayVisible(sheet)) {
+      event.preventDefault();
+      closeSheet(sheet);
+    }
+  });
+
+  // Foco preso dentro da folha aberta (Tab / Shift+Tab).
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Tab") return;
+    var sheet = openSheet() || document.querySelector(".sheet.is-open");
+    if (!sheet || !isOverlayVisible(sheet)) return;
+    var focusables = Array.prototype.filter.call(
+      sheet.querySelectorAll(".sheet__panel a[href], .sheet__panel button:not([disabled]), .sheet__panel input:not([type=hidden]):not([disabled])"),
+      function (el) { return el.offsetParent !== null; }
+    );
+    if (!focusables.length) return;
+    var first = focusables[0];
+    var last = focusables[focusables.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+
+  /* ---------- Envio duplo ----------
+     Clique duplo em “Incluir”/“Salvar” de um formulário POST comum mandaria dois pedidos (duas
+     etapas iguais, por exemplo). O 2º envio em menos de 3 s é ignorado. Os formulários do htmx já
+     descartam o 2º pedido enquanto o 1º corre; a trava solta sozinha porque um download não troca
+     de página. A trava só vale se o envio seguiu (outro script pode ter cancelado o 1º). */
+  var RESUBMIT_MS = 3000;
+  document.addEventListener("submit", function (event) {
+    var form = event.target;
+    if (!form || !form.getAttribute || (form.getAttribute("method") || "").toLowerCase() !== "post") return;
+    if (form.hasAttribute("hx-post")) return;
+    var last = parseInt(form.getAttribute("data-sent-at") || "0", 10);
+    if (Date.now() - last < RESUBMIT_MS) {
+      event.preventDefault();
+      return;
+    }
+    setTimeout(function () {
+      if (!event.defaultPrevented) form.setAttribute("data-sent-at", String(Date.now()));
+    }, 0);
+  });
+
+  /* ---------- HTMX: registro sem recarregar ----------
+     O formulário faz hx-post com hx-swap="none": o servidor devolve só pedaços com
+     hx-swap-oob (atividade, resumo da etapa, indicadores, toast). Aqui só cuidamos de
+     fechar a folha (hash da âncora), do estado de “ocupado” e do foco. */
+  document.addEventListener("htmx:beforeRequest", function (event) {
+    var form = event.target;
+    if (form && form.classList && form.classList.contains("register__form")) form.setAttribute("aria-busy", "true");
+  });
+
+  // beforeSwap: o formulário ainda está no DOM (depois do swap oob ele sai e o evento não chega ao document).
+  document.addEventListener("htmx:beforeSwap", function (event) {
+    var form = event.target;
+    if (!form || !form.classList || !form.classList.contains("register__form")) return;
+    form.removeAttribute("aria-busy");
+    var xhr = event.detail && event.detail.xhr;
+    if (xhr && xhr.status >= 200 && xhr.status < 400) {
+      // Sucesso: tira o #registrar-<id> da URL (a folha nova já vem fechada) e destaca a linha.
+      var sheet = form.closest("[data-register]");
+      var back = sheet ? sheet.getAttribute("data-return") : null;
+      if (back) location.replace(back);
+    }
+  });
+
+  document.addEventListener("htmx:afterSettle", function () {
+    init(document);
+  });
+
+  /* ---------- Atualização leve do detalhe a cada 30 s (só com a aba visível) ---------- */
+  function startAutoRefresh() {
+    var panel = document.getElementById("painel");
+    var url = panel && panel.getAttribute("data-refresh-url");
+    if (!url) return;
+    var seconds = parseInt(panel.getAttribute("data-refresh-seconds") || "30", 10);
+    var last = Date.now();
+
+    function busy() {
+      // Não mexe na tela enquanto alguém registra: folha aberta ou foco dentro de um registrador.
+      if (document.querySelector(".sheet.is-open") || openSheet()) return true;
+      var active = document.activeElement;
+      return !!(active && active.closest && active.closest(".register__form"));
+    }
+
+    function refresh() {
+      if (document.visibilityState !== "visible" || !window.htmx || busy()) return;
+      last = Date.now();
+      window.htmx.ajax("GET", url, { source: panel, swap: "none" });
+    }
+
+    setInterval(refresh, seconds * 1000);
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible" && Date.now() - last >= seconds * 1000) refresh();
+    });
+  }
+
+  /* ---------- Ao carregar ---------- */
+  function init(scope) {
+    var groups = scope.querySelectorAll("[data-stepper]");
+    for (var i = 0; i < groups.length; i++) syncStepper(groups[i]);
+    var alert = scope.querySelector("[data-autofocus]");
+    if (alert) alert.focus();
+    var open = scope.querySelector(".sheet.is-open");
+    if (open && isOverlayVisible(open)) {
+      var input = open.querySelector(".stepper__input");
+      if (input) input.focus();
+    } else {
+      focusSheet();
+    }
+  }
+
+  function boot() {
+    hideDismissedBanners(document);
+    init(document);
+    startAutoRefresh();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+})();

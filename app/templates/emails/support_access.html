@@ -1,0 +1,12 @@
+{% extends "emails/_base.html" %}
+{% block body %}
+  <p>Olá, {{ name }}.</p>
+  <p>A equipe de suporte da Teroz recebeu acesso temporário à empresa {{ company_name }}.</p>
+  <ul>
+    <li>Pessoa: {{ support_name }}</li>
+    <li>Papel: {{ role_label }}</li>
+    <li>Motivo: {{ reason }}</li>
+    <li>Válido até: {{ expires_at|datahora }}</li>
+  </ul>
+  <p>O acesso expira sozinho e fica registrado na auditoria. Se não reconhece este pedido, desative a pessoa em Usuários e fale com o suporte.</p>
+{% endblock %}

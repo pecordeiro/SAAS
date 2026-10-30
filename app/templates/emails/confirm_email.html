@@ -1,0 +1,8 @@
+{% extends "emails/_base.html" %}
+{% block body %}
+  <p>Olá, {{ name }}.</p>
+  <p>{% if change %}Para trocar o e-mail da sua conta para este endereço, confirme pelo link abaixo.{% else %}Confirme seu e-mail para manter o acesso à Teroz.{% endif %}<br>
+  O link vale 24 horas e só pode ser usado uma vez.</p>
+  <p><a href="{{ url }}">Confirmar e-mail</a></p>
+  <p><small>Se o botão não abrir, copie o endereço: {{ url }}</small></p>
+{% endblock %}

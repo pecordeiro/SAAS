@@ -1,0 +1,47 @@
+{% extends "base_app.html" %}
+{% from "components/field.html" import field %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% set nav_current = "privacy" %}
+{% block title %}Privacidade e dados · Teroz{% endblock %}
+{% block content %}
+{# Fase 7 (LGPD): exportar dados da empresa e excluir com carência. Layout final na Fase 6. #}
+<header class="page-header">
+  <div class="page-header__titles">
+    <h1>Privacidade e dados</h1>
+    <p class="page-header__subtitle muted">Direitos da empresa sobre os dados guardados aqui (LGPD).</p>
+  </div>
+</header>
+
+{%- if error %}
+<div class="alert-focus mb-4" tabindex="-1" data-autofocus>{{ alert("danger", error, role="alert") }}</div>
+{%- endif %}
+
+<section class="card stack mb-4" aria-labelledby="exportar-titulo">
+  <h2 class="section-title" id="exportar-titulo">Exportar todos os dados</h2>
+  <p>Baixe um arquivo ZIP com uma planilha CSV para cada tipo de dado da empresa: projetos, etapas, subatividades, registros de peças, modelos, usuários, convites, assinatura, auditoria e integrações. Senhas e chaves não são incluídas.</p>
+  <form method="post" action="{{ url_for('lgpd.export') }}">
+    {{ action_form.csrf_token }}
+    {{ button("Baixar ZIP", "secondary") }}
+  </form>
+</section>
+
+<section class="card stack" aria-labelledby="excluir-titulo">
+  <h2 class="section-title" id="excluir-titulo">Excluir a empresa</h2>
+  {%- if deletion_requested_at %}
+  {{ alert("warning", "Exclusão agendada", "Todos os dados da empresa serão apagados definitivamente em " ~ (purge_at|data) ~ ". Até lá tudo continua funcionando e você pode cancelar.") }}
+  <form method="post" action="{{ url_for('lgpd.cancel_deletion') }}">
+    {{ action_form.csrf_token }}
+    {{ button("Cancelar a exclusão", "primary") }}
+  </form>
+  {%- else %}
+  <p>A exclusão apaga projetos, histórico, modelos, usuários sem outra empresa, assinatura e auditoria. Há uma carência de {{ grace_days }} dias para você mudar de ideia; depois disso não há como recuperar. Exporte os dados antes.</p>
+  <form method="post" action="{{ url_for('lgpd.request_deletion') }}" class="stack" novalidate>
+    {{ form.csrf_token }}
+    {{ field(form.company_name, required=True, attrs={"autocomplete": "off"}) }}
+    {{ field(form.password, required=True, attrs={"autocomplete": "current-password"}) }}
+    {{ button("Pedir exclusão da empresa", "danger") }}
+  </form>
+  {%- endif %}
+</section>
+{% endblock %}

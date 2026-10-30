@@ -1,0 +1,98 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/field.html" import field, checkbox, form_errors %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/table.html" import data_table %}
+{% from "components/empty_state.html" import empty_state %}
+{% from "components/optional.html" import optional_badge %}
+{% set nav_current = "company" %}
+{% block title %}Empresa · Teroz{% endblock %}
+{% block content %}
+{# telas.md §13 (proprietário): dados da empresa, calendário (jornada, dias de trabalho, feriados). #}
+<header class="page-header">
+  <div class="page-header__titles">
+    <h1>Empresa</h1>
+    <p class="page-header__subtitle muted">{{ current_company.name }}</p>
+  </div>
+</header>
+
+<div class="settings">
+  <nav class="section-nav" aria-label="Seções da empresa">
+    <a class="section-nav__item" href="#dados">Dados</a>
+    <a class="section-nav__item" href="#calendario">Calendário</a>
+    <a class="section-nav__item" href="#feriados">Feriados</a>
+    {%- if "alertas" in modules %}
+    <a class="section-nav__item" href="#alertas">Alertas</a>
+    {%- endif %}
+    <a class="section-nav__item" href="{{ url_for('empresa.modules') }}">Módulos</a>
+  </nav>
+
+  <div class="settings__body stack--lg">
+    <form class="card stack" method="post" action="{{ url_for('empresa.settings') }}" novalidate>
+      {{ form_errors(form) }}
+      {{ form.csrf_token }}
+      {%- if error %}<div class="alert-focus" tabindex="-1" data-autofocus>{{ alert("danger", error, role="alert") }}</div>{% endif %}
+      <h2 class="section-title" id="dados">Dados da empresa</h2>
+      {{ field(form.name, attrs={"required": true, "autocomplete": "organization"}) }}
+      {{ field(form.cnpj, optional=True, hint="14 dígitos; conferimos o dígito verificador.", attrs={"inputmode": "numeric", "placeholder": "00.000.000/0000-00"}) }}
+      <h2 class="section-title" id="calendario">Calendário</h2>
+      {{ field(form.daily_hours, hint="Sugerida nos novos projetos. Cada projeto tem a sua.", attrs={"inputmode": "decimal", "required": true}) }}
+      <fieldset class="fieldset stack--sm"{% if form.workdays.errors %} aria-invalid="true"{% endif %}>
+        <legend class="field__label">Dias de trabalho</legend>
+        <div class="weekday-grid">
+          {%- for number, short, long in weekdays %}
+          {{ checkbox("workdays", short, checked=number in selected_days, value=number, id="dia-" ~ number) }}
+          {%- endfor %}
+        </div>
+        <p class="field__hint">Fins de semana e feriados não contam nos dias úteis.</p>
+      </fieldset>
+      {%- if "alertas" in modules %}
+      <h2 class="section-title" id="alertas"><span>Alertas</span>{{ optional_badge() }}</h2>
+      {{ field(form.stalled_days, hint="Etapa em andamento sem nenhum lançamento por este número de dias úteis gera o alerta “etapa parada”. De 1 a 60; padrão 3.", attrs={"inputmode": "numeric", "min": 1, "max": 60, "required": true}) }}
+      {%- endif %}
+      <div class="form-actions">{{ button("Salvar", "primary") }}</div>
+    </form>
+
+    <section class="card stack" aria-labelledby="feriados">
+      <h2 class="section-title" id="feriados">Feriados da empresa</h2>
+      <p class="muted text-sm">Os feriados nacionais já entram automaticamente. Inclua aqui recessos e feriados municipais.</p>
+      {%- if holiday_error %}<div class="alert-focus" tabindex="-1" data-autofocus>{{ alert("danger", holiday_error, role="alert") }}</div>{% endif %}
+      <form class="inline-form" method="post" action="{{ url_for('empresa.holiday_add') }}" novalidate>
+        {{ holiday_form.csrf_token }}
+        {{ field(holiday_form.day, attrs={"required": true}) }}
+        {{ field(holiday_form.name, attrs={"required": true, "placeholder": "Recesso de fim de ano"}, id="feriado-nome") }}
+        {{ button("Incluir feriado", "secondary", icon="plus") }}
+      </form>
+      {%- if holidays %}
+      {% call data_table([("Data", ""), ("Feriado", ""), ("", "")], caption="Feriados da empresa") %}
+        <tbody>
+        {%- for h in holidays %}
+          <tr>
+            <td class="is-plain num">{{ h.day|data }}</td>
+            <td class="is-plain">{{ h.name }}</td>
+            <td class="is-plain">
+              <form method="post" action="{{ url_for('empresa.holiday_remove', holiday_id=h.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn--ghost" type="submit" aria-label="Remover feriado {{ h.name }} de {{ h.day|data }}">{{ icon("trash") }}<span>Remover</span></button>
+              </form>
+            </td>
+          </tr>
+        {%- endfor %}
+        </tbody>
+      {% endcall %}
+      {%- else %}
+      <p class="muted">Nenhum feriado próprio ainda.</p>
+      {%- endif %}
+      {%- if national %}
+      <details class="faq__item">
+        <summary>Próximos feriados nacionais (automáticos)</summary>
+        <ul class="stack--sm faq__list">
+          {%- for h in national %}<li><span class="num muted">{{ h.day|data }}</span> · {{ h.name }}</li>{% endfor %}
+        </ul>
+      </details>
+      {%- endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

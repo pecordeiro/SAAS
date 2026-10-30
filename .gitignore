@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Ambiente e segredos
+.env
+.env.*
+!.env.example
+
+# Bancos locais
+*.db
+*.sqlite
+*.sqlite3
+instance/
+
+# Editores / SO
+.DS_Store
+.idea/
+.vscode/
+
+# Worktrees temporários dos agentes do Claude Code
+.claude/worktrees/

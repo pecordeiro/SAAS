@@ -1,0 +1,24 @@
+{% extends "base_app.html" %}
+{% from "components/field.html" import field %}
+{% from "components/button.html" import button %}
+{% set nav_current = "profile" %}
+{% block title %}Ativar verificação em duas etapas · Teroz{% endblock %}
+{% block content %}
+{# QR code em SVG gerado no servidor (sem serviço de terceiros); segredo também em texto. #}
+<header class="page-header">
+  <div class="page-header__titles"><h1>Verificação em duas etapas</h1></div>
+</header>
+<div class="card stack">
+  <ol class="stack">
+    <li>Abra o aplicativo autenticador no celular e leia o QR code.</li>
+    <li>Ou digite a chave: <code class="num">{{ secret }}</code></li>
+    <li>Digite o código de 6 dígitos que aparece no aplicativo.</li>
+  </ol>
+  <p><img src="{{ url_for('account.mfa_qr') }}" alt="QR code para o aplicativo autenticador" width="240" height="240"></p>
+  <form class="stack" method="post" action="{{ url_for('account.mfa_enable') }}" novalidate>
+    {{ form.csrf_token }}
+    {{ field(form.code, attrs={"autocomplete": "one-time-code", "inputmode": "numeric", "required": true}) }}
+    <div>{{ button("Ativar", "primary") }}</div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,262 @@
+{% import "preencher/_partes.html" as parts %}
+{% from "components/icon.html" import icon %}
+{% from "components/alert.html" import alert %}
+{% from "components/button.html" import button %}
+{% from "components/field.html" import checkbox %}
+{% from "components/optional.html" import optional_badge %}
+{#
+  Lado direito de “Preencher etapas”: a etapa escolhida. Campos (.cell) salvam ao sair; o resto
+  é texto calculado no servidor. No modo “registrar” só aparece o que se lança (.reg-only); tempos,
+  pesos, nomes editáveis e ações ficam em “configurar” (.cfg-only), sem sair do DOM (as trocas
+  fora de banda continuam achando os ids). Cada linha tem o próprio <form> (id f-<atividade>), ao
+  qual os campos se ligam pelo atributo form=; o JS manda um campo por vez ao sair dele, e sem
+  JS o botão “Salvar” da linha manda todos. `oob`: resposta HTMX que troca o painel inteiro
+  (depois de incluir uma subatividade).
+#}
+{%- set st = sel.stage -%}
+<section class="card fill__panel" id="painel-etapa" aria-labelledby="painel-etapa-titulo"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <form id="f-etapa" class="cell-form" method="post" action="{{ url_for('preencher.stage_cells', stage_id=st.id) }}" data-cell-form>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {{ parts.modo_input(modo) }}
+  </form>
+  {{ parts.version_input("v-etapa", "version", "f-etapa", st.version) }}
+  {%- if simple and simple_activity %}{{ parts.version_input("va-etapa", "activity_version", "f-etapa", simple_activity.version) }}{% endif %}
+
+  <div class="edit-head">
+    {%- if can_edit and modo == "configurar" %}
+    <div class="edit-head__name">
+      <label class="field__label" for="nome-etapa" id="painel-etapa-titulo">Nome da etapa</label>
+      <input class="cell cell--title" id="nome-etapa" name="name" form="f-etapa" value="{{ st.name }}" maxlength="160" required autocomplete="off" spellcheck="false" aria-describedby="salvo-status">
+    </div>
+    {%- else %}
+    <div class="edit-head__name">
+      <p class="edit-head__eyebrow">Etapa {{ sel.n }} de {{ items|length }} · {{ sel.visual_label }}</p>
+      <h2 class="edit-head__title" id="painel-etapa-titulo">{{ st.name }}</h2>
+    </div>
+    {%- endif %}
+    {{ parts.head_values(sel, quantity) }}
+    {%- if can_edit %}
+    <a class="btn btn--danger-ghost btn--sm edit-head__delete cfg-only" href="#excluir-etapa-{{ st.id }}" aria-haspopup="dialog">Apagar etapa</a>
+    {%- endif %}
+  </div>
+
+  {#- Módulos opcionais (R6): só aparecem se o proprietário ligou em Configurações › Módulos. Tudo
+      recolhido por padrão; as rotas recusam sozinhas quando o módulo está desligado. -#}
+  {%- set waiting_on = "aguardando_peca" in modules %}
+  {%- if waiting_on and st.waiting_part %}
+  {{ alert("warning", "Aguardando peça" ~ (" · previsão " ~ (st.part_expected_on|data) if st.part_expected_on else ""), st.part_note or "O registro de peças continua liberado; a marca só avisa a equipe.") }}
+  {%- endif %}
+  {%- set per_activity = rows and not simple %}
+  {%- if (waiting_on and can_edit) or "checklist" in modules or (per_activity and "fotos" in modules) or (can_edit and "atribuicao" in modules) %}
+  <div class="stage-extras">
+    {%- if waiting_on and can_edit %}
+    <details class="part-toggle">
+      <summary class="btn btn--ghost btn--sm">{{ icon("package") }}<span>{{ "Atualizar aguardando peça" if st.waiting_part else "Marcar aguardando peça" }}</span>{{ optional_badge() }}</summary>
+      <form class="inline-form mt-2" method="post" action="{{ url_for('app.stage_waiting_part', stage_id=st.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="voltar" value="preencher">
+        {{ parts.modo_input(modo) }}
+        <input type="hidden" name="version" value="{{ st.version }}">
+        {{ checkbox("waiting", "Aguardando peça", checked=st.waiting_part, value="y", id="aguardando-" ~ st.id) }}
+        <div class="field inline-form__small">
+          <label class="field__label" for="previsao-{{ st.id }}">Previsão de chegada</label>
+          <input class="field__input" id="previsao-{{ st.id }}" type="date" name="expected_on" value="{{ st.part_expected_on.isoformat() if st.part_expected_on else '' }}">
+        </div>
+        <div class="field">
+          <label class="field__label" for="obs-peca-{{ st.id }}">Observação (opcional)</label>
+          <input class="field__input" id="obs-peca-{{ st.id }}" type="text" name="note" maxlength="140" value="{{ st.part_note or '' }}">
+        </div>
+        {{ button("Salvar", "secondary") }}
+      </form>
+    </details>
+    {%- endif %}
+    {%- if per_activity and "fotos" in modules %}
+    <details class="part-toggle">
+      <summary class="btn btn--ghost btn--sm">{{ icon("folder") }}<span>Fotos e comentários</span>{{ optional_badge() }}</summary>
+      <ul class="evidence-links" role="list">
+        {%- for a, ar in rows %}
+        <li><a class="btn btn--secondary btn--sm" href="{{ url_for('qualidade.evidence', activity_id=a.id) }}">{{ a.name }}<span class="muted num">&nbsp;({{ evidence_counts.get(a.id, 0) }})</span></a></li>
+        {%- endfor %}
+      </ul>
+    </details>
+    {%- endif %}
+    {%- if "checklist" in modules %}
+    <a class="btn btn--ghost btn--sm" href="{{ url_for('qualidade.checklist', stage_id=st.id) }}">{{ icon("check") }}<span>Checklist de inspeção{% if checklist_signal and checklist_signal.items %} ({{ checklist_signal.items }} itens){% endif %}</span>{{ optional_badge() }}</a>
+    {%- endif %}
+    {%- if can_edit and "atribuicao" in modules %}
+    <a class="btn btn--ghost btn--sm" href="{{ url_for('app.project_people', project_id=project.id) }}">{{ icon("team") }}<span>Progresso por pessoa</span>{{ optional_badge() }}</a>
+    {%- endif %}
+  </div>
+  {%- endif %}
+
+  {%- if simple %}
+  {#- Modo simples (R4): a etapa recebe o % direto; o tempo só pesa a etapa no projeto. #}
+  {{ parts.boxes(sel, True) }}
+  <div class="table-scroll">
+    <table class="etab etab--simple">
+      <caption class="visually-hidden">Progresso da etapa {{ st.name }}</caption>
+      <thead><tr>
+        <th scope="col" class="num">% concluído da etapa</th>
+        <th scope="col" class="num cfg-only">Tempo da etapa (min por unidade)</th>
+        <th scope="col">Unidades prontas</th>
+        <th scope="col" class="num cfg-only">Tempo total (min)</th>
+        <th scope="col" class="num cfg-only">Tempo que falta (min)</th>
+        <th scope="col"><span class="visually-hidden">Salvar</span></th>
+      </tr></thead>
+      <tbody>
+      {%- if simple_activity %}
+      {%- set a, ar = simple_activity, simple_result %}
+      <tr>
+        <td class="num"><input class="cell cell--num" id="pct-etapa" name="percent" form="f-etapa" value="{{ (ar.pct * 100)|num(1)|replace(',0', '') }}" inputmode="decimal" autocomplete="off" aria-label="% concluído da etapa {{ st.name }}" aria-describedby="salvo-status"></td>
+        <td class="num cfg-only">
+          {%- if can_edit %}<input class="cell cell--num" id="tempo-etapa" name="ideal_minutes" form="f-etapa" value="{{ a.ideal_minutes|minutos }}" inputmode="decimal" autocomplete="off" aria-label="Tempo da etapa em minutos por unidade" aria-describedby="salvo-status">
+          {%- else %}<span class="num">{{ a.ideal_minutes|minutos }}</span>{% endif -%}
+        </td>
+        <td><span class="pct-cell" id="pct-{{ a.id }}"><progress class="mini mini--units" value="{{ [ar.pct, 1]|min }}" max="1" aria-label="Unidades prontas">{{ ar.pct|pct(0) }}</progress><span class="num">{{ a.units_done }}/{{ quantity }}</span></span></td>
+        <td class="num cfg-only"><span class="num" id="tt-{{ a.id }}">{{ ar.tempo_total_min|num(0) }}</span></td>
+        <td class="num cfg-only"><span class="num" id="tf-{{ a.id }}">{{ ar.tempo_restante_min|num(0) }}</span></td>
+        <td class="etab__actions"><button class="btn btn--secondary btn--sm no-js-only" type="submit" form="f-etapa">Salvar</button></td>
+      </tr>
+      {%- endif %}
+      </tbody>
+    </table>
+  </div>
+  <p class="fill__hint">Digite o % concluído da etapa (0 a 100, inteiro ou com 1 casa). Ele vira unidades prontas: % × meta, arredondado. Salva ao sair do campo (Tab ou Enter); Esc desfaz.</p>
+  {%- else %}
+
+  <form id="mover-atividade" method="post" action="" hidden>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="voltar" value="preencher">
+    <input type="hidden" name="stage_id" value="">
+    <input type="hidden" name="position" value="">
+    <input type="hidden" name="version" value="">
+  </form>
+  {{ parts.boxes(sel, False) }}
+  <div class="sub-head">
+    <h3 class="sub-head__title" id="subatividades-titulo">Subatividades</h3>
+    <span class="sub-head__count" aria-label="{{ rows|length }} subatividade{{ '' if rows|length == 1 else 's' }}">{{ rows|length }}</span>
+    <span class="sub-head__help reg-only">Lance o total de peças prontas de cada uma.</span>
+  </div>
+  <div class="table-scroll">
+    <table class="etab" aria-labelledby="subatividades-titulo">
+      <caption class="visually-hidden">Subatividades da etapa {{ st.name }}</caption>
+      <thead><tr>
+        <th scope="col">Subatividade</th>
+        <th scope="col" class="num cfg-only">Tempo ideal (min por unidade)</th>
+        <th scope="col" class="num cfg-only">Peso na etapa</th>
+        <th scope="col" class="num">Peças prontas (total)</th>
+        <th scope="col">Progresso</th>
+        <th scope="col" class="num cfg-only">Tempo total (min)</th>
+        <th scope="col" class="num cfg-only">Tempo que falta (min)</th>
+        {%- if "atribuicao" in modules %}
+        <th scope="col" class="who-col"><span class="visually-hidden">Responsável</span></th>
+        {%- endif %}
+        <th scope="col"><span class="visually-hidden">Ações</span></th>
+      </tr></thead>
+      <tbody class="sort-list" data-sort-list="activities" data-drop-stage="{{ st.id }}">
+      {%- for a, ar in rows %}
+      <tr class="sort-item" id="linha-{{ a.id }}" data-sort-id="{{ a.id }}" data-version="{{ a.version }}" data-move-url="{{ url_for('edicao.activity_position', activity_id=a.id) }}">
+        <td class="etab__name">
+          <div class="etab__who">
+            <div class="etab__who-body">
+              {%- if can_edit %}
+              <span class="etab__name-cell cfg-only"><span class="drag-handle js-only" data-drag-handle title="Arraste para reordenar" aria-hidden="true">⠿</span><input class="cell" name="name" form="f-{{ a.id }}" value="{{ a.name }}" maxlength="160" required autocomplete="off" aria-label="Nome da subatividade" aria-describedby="salvo-status"></span>
+              <span class="etab__name-text reg-only">{{ a.name }}{% if ar.pct >= 1 %} <span class="etab__done" title="Concluída">{{ icon("check", "sm") }}<span class="visually-hidden">(concluída)</span></span>{% endif %}</span>
+              {%- else %}<span class="etab__name-text">{{ a.name }}{% if ar.pct >= 1 %} <span class="etab__done" title="Concluída">{{ icon("check", "sm") }}<span class="visually-hidden">(concluída)</span></span>{% endif %}</span>{% endif %}
+              {{ parts.last_entry(a, last, None) }}
+            </div>
+          </div>
+        </td>
+        <td class="num cfg-only">
+          {%- if can_edit %}<input class="cell cell--num" name="ideal_minutes" form="f-{{ a.id }}" value="{{ a.ideal_minutes|minutos }}" inputmode="decimal" autocomplete="off" aria-label="Tempo ideal de {{ a.name }} (min)" aria-describedby="salvo-status">
+          {%- else %}{{ a.ideal_minutes|minutos }}{% endif -%}
+        </td>
+        <td class="num cfg-only"><span class="num" id="peso-{{ a.id }}">{{ ar.peso|pct(0) }}</span></td>
+        <td class="num etab__units" data-label="Peças prontas (total)"><input class="cell cell--num" name="units_done" form="f-{{ a.id }}" value="{{ a.units_done }}" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="Total de peças prontas de {{ a.name }} (0 a {{ quantity }})" aria-describedby="salvo-status"></td>
+        <td class="etab__prog"><span class="pct-cell" id="pct-{{ a.id }}"><progress class="mini{% if ar.pct >= 1 %} mini--done{% else %} mini--tasks{% endif %}" value="{{ [ar.pct, 1]|min }}" max="1" aria-label="{{ a.name }}: {{ ar.pct|pct(0) }}">{{ ar.pct|pct(0) }}</progress><span class="num">{{ a.units_done }}/{{ quantity }} · {{ ar.pct|pct(0) }}</span></span></td>
+        <td class="num cfg-only"><span class="num" id="tt-{{ a.id }}">{{ ar.tempo_total_min|num(0) }}</span></td>
+        <td class="num cfg-only"><span class="num" id="tf-{{ a.id }}">{{ ar.tempo_restante_min|num(0) }}</span></td>
+        {%- if "atribuicao" in modules %}
+        <td class="who-col" data-label="Responsável">{{ parts.who(a, members, can_edit, modo) }}</td>
+        {%- endif %}
+        <td class="etab__actions">
+          <form id="f-{{ a.id }}" class="cell-form" method="post" action="{{ url_for('preencher.activity_cells', activity_id=a.id) }}" data-cell-form>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {{ parts.modo_input(modo) }}
+            <input type="hidden" id="v-{{ a.id }}" name="version" value="{{ a.version }}">
+            <button class="btn btn--secondary btn--sm no-js-only" type="submit">Salvar</button>
+          </form>
+          {%- if can_edit %}
+          <details class="action-menu cfg-only">
+            <summary class="btn btn--ghost btn--sm btn--icon" aria-label="Ações de {{ a.name }}">{{ icon("more") }}</summary>
+            <div class="action-menu__list">
+              {%- if items|length > 1 %}
+              <form class="action-menu__form" method="post" action="{{ url_for('edicao.activity_position', activity_id=a.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="voltar" value="preencher">
+                <input type="hidden" name="modo" value="configurar">
+                <input type="hidden" name="version" value="{{ a.version }}">
+                <input type="hidden" name="position" value="100000">
+                <label class="action-menu__label" for="mover-{{ a.id }}">Mover para a etapa</label>
+                <select class="field__input" id="mover-{{ a.id }}" name="stage_id">
+                  {%- for it in items %}<option value="{{ it.stage.id }}"{% if it.stage.id == st.id %} selected{% endif %}>{{ it.label }}</option>{% endfor %}
+                </select>
+                <button class="btn btn--secondary btn--sm" type="submit">Mover</button>
+              </form>
+              {%- endif %}
+              <a class="action-menu__item action-menu__item--danger" href="#excluir-atv-{{ a.id }}" aria-haspopup="dialog">Apagar subatividade</a>
+            </div>
+          </details>
+          {%- endif %}
+        </td>
+      </tr>
+      {%- endfor %}
+      {%- if can_edit %}
+      <tr class="etab__new cfg-only">
+        <td class="etab__name"><input class="cell cell--new" id="nova-nome" name="name" form="f-nova" maxlength="160" placeholder="Nova subatividade…" autocomplete="off" aria-label="Nome da nova subatividade"></td>
+        <td class="num"><input class="cell cell--num cell--new" name="ideal_minutes" form="f-nova" inputmode="decimal" placeholder="0" autocomplete="off" aria-label="Tempo ideal da nova subatividade (min)"></td>
+        <td></td>
+        <td class="num"><input class="cell cell--num cell--new" name="units_done" form="f-nova" inputmode="numeric" placeholder="0" autocomplete="off" aria-label="Peças prontas da nova subatividade"></td>
+        <td colspan="3"></td>
+        {%- if "atribuicao" in modules %}<td></td>{% endif %}
+        <td class="etab__actions">
+          <form id="f-nova" method="post" action="{{ url_for('preencher.activity_new', stage_id=st.id) }}" hx-post="{{ url_for('preencher.activity_new', stage_id=st.id) }}" hx-swap="none" data-new-form>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="modo" value="configurar">
+            <button class="btn btn--secondary btn--sm" type="submit">Incluir</button>
+          </form>
+        </td>
+      </tr>
+      {%- endif %}
+      </tbody>
+      <tfoot class="cfg-only"><tr>
+        <th scope="row">Total da etapa</th>
+        <td class="num"><span class="num" id="total-tempo">{{ sel.r.tempo_unidade_min|minutos }}</span></td>
+        <td></td><td></td><td></td>
+        <td class="num"><span class="num" id="total-tt">{{ sel.r.tempo_total_min|num(0) }}</span></td>
+        <td class="num"><span class="num" id="total-tf">{{ sel.r.tempo_restante_min|num(0) }}</span></td>
+        {%- if "atribuicao" in modules %}<td></td>{% endif %}
+        <td></td>
+      </tr></tfoot>
+    </table>
+  </div>
+  <p class="fill__hint reg-only">Digite o <strong>total</strong> de peças prontas de cada subatividade, não só as de hoje. Salva ao sair do campo (Tab ou Enter); Esc desfaz.</p>
+  <p class="fill__hint cfg-only">Aqui ficam o nome, o tempo ideal de cada subatividade (min por unidade) e a ordem. O peso na etapa e os tempos total e que falta saem do tempo ideal × meta. Para lançar peças, volte a “Registrar produção”.</p>
+  {%- if can_edit and archived_activities %}
+  <details class="fill__archived cfg-only">
+    <summary>Subatividades apagadas ({{ archived_activities|length }})</summary>
+    <ul class="archived-list">
+      {%- for a in archived_activities %}
+      <li><span>{{ a.name }} <span class="muted">· {{ a.units_done }} peças</span></span>
+        <form method="post" action="{{ url_for('preencher.activity_unarchive', activity_id=a.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="modo" value="configurar">
+          <button class="btn btn--secondary btn--sm" type="submit">Desfazer</button>
+        </form>
+      </li>
+      {%- endfor %}
+    </ul>
+  </details>
+  {%- endif %}
+  {%- endif %}
+</section>

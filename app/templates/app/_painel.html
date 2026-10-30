@@ -1,0 +1,104 @@
+{% from "components/icon.html" import icon %}
+{% from "components/chart.html" import gauge %}
+{#
+  Peças do Painel (reestruturação R2, plano §4.2). Tudo que é número chega pronto do servidor
+  (app/services/dashboard.py → calc.py); aqui só se imprime (ADR-0009). Os gráficos de barras
+  e a rosca são desenhados por static/js/painel.js (ECharts local) a partir do JSON
+  #painel-dados; cada um tem uma tabela de dados equivalente em <details>.
+#}
+
+{# ---------- 1. Cabeçalho: título, frase-resumo, atualização e a ação principal ---------- #}
+{% macro header(title, frase, updated_at, fill_href=None, back=None) -%}
+<header class="page-header painel-header">
+  <div class="page-header__titles">
+    {%- if back %}<a class="back-link" href="{{ back[1] }}">{{ icon("chevron-left", "sm") }}{{ back[0] }}</a>{% endif %}
+    <h1>{{ title }}</h1>
+    <p class="painel-header__frase">{{ frase }}</p>
+    <p class="painel-header__meta">Atualizado às <time datetime="{{ updated_at.isoformat(timespec='minutes') }}">{{ updated_at.strftime("%H:%M") }}</time></p>
+  </div>
+  {%- if fill_href or caller is defined %}
+  <div class="page-header__actions">
+    {%- if caller is defined %}{{ caller() }}{% endif %}
+    {%- if fill_href %}
+    <a class="btn btn--primary" href="{{ fill_href }}">{{ icon("edit", class_="btn__icon") }}<span class="btn__label">Preencher etapas</span></a>
+    {%- endif %}
+  </div>
+  {%- endif %}
+</header>
+{%- endmacro %}
+
+{# ---------- 2. Faixa de 5 indicadores (anel + 4). cells = [(rótulo, valor, unidade, sub, tom)] ---------- #}
+{% macro kpi_strip(medidor, pct_text, lead_sub, cells) -%}
+<section class="card kpi-strip" aria-label="Indicadores">
+  <div class="kpi-strip__lead">
+    <div class="kpi-strip__ring">{{ gauge(medidor) }}</div>
+    <div class="kpi-strip__text">
+      <span class="kpi__label">Progresso pelas tarefas</span>
+      <span class="kpi__value kpi__value--lead">{{ pct_text }}</span>
+      <span class="kpi__sub">{{ lead_sub }}</span>
+    </div>
+  </div>
+  {%- for cell in cells %}
+  {%- set label, value, unit, sub, tone = cell[:5] %}
+  {%- set detail = cell[5] if cell|length > 5 else None %}
+  <div class="kpi-strip__cell"{% if detail %} title="{{ detail }}"{% endif %}>
+    <span class="kpi__label">{{ label }}</span>
+    <span class="kpi__value">{% if value is none %}<span class="kpi__empty">—</span>{% else %}{{ value }}{% if unit %}<span class="kpi__unit">{{ unit }}</span>{% endif %}{% endif %}</span>
+    {%- if sub %}<span class="kpi__sub{% if tone in ('success', 'danger', 'warning') %} kpi__sub--{{ tone }}{% endif %}">{{ sub }}</span>{% endif %}
+    {%- if detail %}<span class="visually-hidden">{{ detail }}</span>{% endif %}
+  </div>
+  {%- endfor %}
+</section>
+{%- endmacro %}
+
+{# ---------- Legenda das situações (o quadrado é a própria marca da rosca) ---------- #}
+{#- waiting=False: módulo opcional “aguardando peça” desligado (R6) — a situação some da legenda. -#}
+{% macro status_legend(contagem=None, with_today=True, waiting=True) -%}
+<ul class="legend" role="list">
+  {%- for key, label in [("done", "Concluída"), ("doing", "Em andamento"), ("waiting", "Aguardando peça"), ("late", "Atrasada"), ("todo", "Não iniciada")] if waiting or key != "waiting" %}
+  <li class="legend__item"><span class="legend__swatch legend__swatch--{{ key }}" aria-hidden="true"></span>{{ label }}{% if contagem is not none %} <span class="legend__count">{{ contagem[key] }}</span>{% endif %}</li>
+  {%- endfor %}
+  {%- if with_today %}
+  <li class="legend__item"><span class="legend__today" aria-hidden="true"></span>Hoje (pelo prazo)</li>
+  {%- endif %}
+</ul>
+{%- endmacro %}
+
+{# ---------- Cartão de gráfico: título, legenda, área do ECharts e tabela de dados ---------- #}
+{% macro chart_card(id, title, chart, aria, legend=None, class_="") -%}
+<section class="card chart-card{% if class_ %} {{ class_ }}{% endif %}" aria-labelledby="{{ id }}">
+  <div class="chart-card__head">
+    <h2 class="section-title" id="{{ id }}">{{ title }}</h2>
+    {%- if legend %}
+    <ul class="legend" role="list">
+      {%- for key, label in legend %}
+      <li class="legend__item"><span class="legend__swatch legend__swatch--{{ key }}" aria-hidden="true"></span>{{ label }}</li>
+      {%- endfor %}
+    </ul>
+    {%- endif %}
+  </div>
+  <div class="chart-box chart-box--{{ chart }}" data-chart="{{ chart }}" role="img" aria-label="{{ aria }}"></div>
+  {%- if caller is defined %}{{ caller() }}{% endif %}
+</section>
+{%- endmacro %}
+
+{# ---------- Lista "atrasadas / aguardando peça" ---------- #}
+{% macro pendencias(items, show_project=False, waiting=True) -%}
+<div class="pend">
+  <h3 class="pend__title">{{ "Atrasadas e aguardando peça" if waiting else "Etapas atrasadas" }}</h3>
+  {%- if items %}
+  <ul class="pend__list" role="list">
+    {%- for p in items[:8] %}
+    <li class="pend__item">
+      <span class="pend__dot pend__dot--{{ p.etapa.visual }}" aria-hidden="true"></span>
+      <a class="pend__link" href="{{ p.href or '#' }}">{{ p.etapa.label }}</a>
+      <span class="pend__meta">{{ p.etapa.visual_nome }}{% if p.extra %} · {{ p.extra }}{% endif %}{% if show_project and p.projeto %} · {{ p.projeto }}{% endif %}</span>
+    </li>
+    {%- endfor %}
+  </ul>
+  {%- if items|length > 8 %}<p class="pend__more">e mais {{ items|length - 8 }}</p>{% endif %}
+  {%- else %}
+  <p class="pend__empty">{{ "Nenhuma etapa atrasada ou aguardando peça." if waiting else "Nenhuma etapa atrasada." }}</p>
+  {%- endif %}
+</div>
+{%- endmacro %}

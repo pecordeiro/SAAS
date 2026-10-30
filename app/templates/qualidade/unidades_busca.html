@@ -1,0 +1,41 @@
+{% extends "base_app.html" %}
+{% from "components/optional.html" import optional_badge %}
+{% from "components/button.html" import button %}
+{% from "components/badge.html" import badge %}
+{% from "components/empty_state.html" import empty_state %}
+{% from "components/table.html" import data_table %}
+{% set nav_current = "units" %}
+{% block title %}Buscar unidade · Teroz{% endblock %}
+{% block content %}
+{# Etapa G — busca por número de série em todos os projetos ativos da empresa da sessão. #}
+<header class="page-header">
+  <div class="page-header__titles">
+    <h1>Buscar unidade{{ optional_badge() }}</h1>
+    <p class="page-header__subtitle muted">Encontre o equipamento pelo número de série e veja o histórico completo.</p>
+  </div>
+</header>
+
+<form class="inline-form mb-4" method="get" action="{{ url_for('qualidade.units_search') }}" role="search">
+  <div class="field">
+    <label class="field__label" for="busca-global">Número de série</label>
+    <input class="field__input" id="busca-global" type="search" name="q" value="{{ q }}" maxlength="60" required>
+  </div>
+  {{ button("Buscar", "primary") }}
+</form>
+
+{%- if units %}
+{% call data_table([("Número de série", ""), ("Projeto", ""), ("Situação", "")], caption="Unidades encontradas") %}
+  <tbody>
+  {%- for u in units %}
+    <tr>
+      <td class="text-strong" data-label="Número de série"><a class="row-link" href="{{ url_for('qualidade.unit_detail', unit_id=u.id) }}">{{ u.serial }}</a></td>
+      <td data-label="Projeto">{{ u.project.name }}</td>
+      <td data-label="Situação">{{ badge(labels.get(u.status, u.status)) }}</td>
+    </tr>
+  {%- endfor %}
+  </tbody>
+{% endcall %}
+{%- elif q %}
+<div class="card">{{ empty_state("Nada encontrado", "Nenhum número de série com “" ~ q ~ "” nos projetos ativos.", icon="folder") }}</div>
+{%- endif %}
+{% endblock %}

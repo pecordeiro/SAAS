@@ -1,0 +1,41 @@
+{% extends "emails/_base.html" %}
+{% block body %}
+  <p>Olá, {{ name }}. Resumo da produção da empresa {{ company_name }} de {{ period }}. A planilha completa (projetos e pessoas) vai em anexo.</p>
+  <h2>Projetos</h2>
+  {%- if projects %}
+  <table>
+    <thead><tr><th scope="col">Projeto</th><th scope="col">Progresso</th><th scope="col">Unidades</th><th scope="col">Peças na semana</th><th scope="col">Prazo</th><th scope="col">Término previsto</th></tr></thead>
+    <tbody>
+    {%- for p in projects %}
+      <tr>
+        <td>{{ p["Projeto"] }}{% if p["Etapas aguardando peça"] %} (aguardando peça){% endif %}</td>
+        <td>{{ p["Progresso"]|pct(0) }}</td>
+        <td>{{ p["Unidades concluídas"] }}/{{ p["Quantidade"] }}</td>
+        <td>{{ p["Peças na semana"] }}</td>
+        <td>{{ p["Prazo"]|data if p["Prazo"] else "—" }}</td>
+        <td>{{ p["Término previsto"]|data if p["Término previsto"] else "—" }}{% if p["Atraso previsto (dias úteis)"] %} — atraso de {{ p["Atraso previsto (dias úteis)"] }} {{ "dia útil" if p["Atraso previsto (dias úteis)"] == 1 else "dias úteis" }}{% endif %}</td>
+      </tr>
+    {%- endfor %}
+    </tbody>
+  </table>
+  {%- else %}
+  <p>Nenhum projeto ativo.</p>
+  {%- endif %}
+  <h2>Pessoas</h2>
+  {%- if people %}
+  <ul>
+  {%- for r in people %}
+    <li>{{ r["Pessoa"] }}: {{ r["Peças (saldo)"] }} peças em {{ r["Registros"] }} registros ({{ r["Horas-padrão"]|num(1) }} h-padrão)</li>
+  {%- endfor %}
+  </ul>
+  {%- if more_people %}<p>E mais {{ more_people }} pessoas na planilha.</p>{% endif %}
+  {%- else %}
+  <p>Nenhum lançamento na semana.</p>
+  {%- endif %}
+  <p><a href="{{ projects_url }}">Abrir os projetos</a></p>
+{% endblock %}
+{% block footer %}
+  <p><small>Você recebe este relatório porque é supervisor ou proprietário na empresa {{ company_name }}.
+  Para não receber mais, desligue “Relatório semanal” em <a href="{{ prefs_url }}">{{ prefs_url }}</a>.
+  Não responda: esta caixa não é lida.</small></p>
+{% endblock %}

@@ -1,0 +1,100 @@
+{% from "components/icon.html" import icon %}
+{#
+  Campo de formulário — design-system §2. Recebe um campo WTForms.
+  Rótulo acima → campo → dica → erro (aria-invalid + aria-describedby).
+  `optional=True` mostra “(opcional)”; `required=True` mostra “(obrigatório)”.
+  `id` troca o id do campo quando dois formulários da mesma página têm campos com o mesmo nome
+  (ex.: “Senha atual” em Trocar e-mail e em Trocar senha): o rótulo continua ligado ao campo certo.
+#}
+{% macro field(f, hint=None, required=False, optional=False, attrs={}, label=None, class_="", id=None) -%}
+{%- set fid = id or f.id -%}
+{%- set err_id = fid ~ "-erro" -%}
+{%- set hint_id = fid ~ "-dica" -%}
+{%- set described = [] -%}
+{%- if hint %}{% set _ = described.append(hint_id) %}{% endif -%}
+{%- if f.errors %}{% set _ = described.append(err_id) %}{% endif -%}
+{%- set kw = {"class": "field__input", "id": fid} -%}
+{%- set _ = kw.update(attrs) -%}
+{%- if required %}{% set _ = kw.update({"required": True}) %}{% endif -%}
+{%- if described %}{% set _ = kw.update({"aria-describedby": described|join(" ")}) %}{% endif -%}
+{%- if f.errors %}{% set _ = kw.update({"aria-invalid": "true"}) %}{% endif -%}
+<div class="field{% if f.errors %} field--error{% endif %}{% if class_ %} {{ class_ }}{% endif %}">
+  <div class="field__label-row">
+    <label class="field__label" for="{{ fid }}">{{ label or f.label.text }}{% if required %} <span class="field__req">(obrigatório)</span>{% elif optional %} <span class="field__req">(opcional)</span>{% endif %}</label>
+    {%- if f.type == "PasswordField" %}
+    <button type="button" class="field__toggle js-only" data-password-toggle="{{ fid }}" aria-controls="{{ fid }}" aria-pressed="false">Mostrar</button>
+    {%- endif %}
+  </div>
+  {{ f(**kw) }}
+  {%- if hint %}
+  <p class="field__hint" id="{{ hint_id }}">{{ hint }}</p>
+  {%- endif %}
+  {%- if f.errors %}
+  <p class="field__error" id="{{ err_id }}">{{ icon("alert", "sm") }}<span>{{ f.errors|select("string")|join(" ") }}</span></p>
+  {%- endif %}
+</div>
+{%- endmacro %}
+
+{# Caixa de seleção com alvo de 44 px incluindo o rótulo. #}
+{% macro checkbox(name, label, checked=False, value="1", id=None) -%}
+<label class="check"><input type="checkbox" name="{{ name }}" value="{{ value }}"{% if id %} id="{{ id }}"{% endif %}{% if checked %} checked{% endif %}><span>{{ label }}</span></label>
+{%- endmacro %}
+
+{#
+  Resumo de erros no topo do formulário: links que focam cada campo; o JS move o foco para
+  o alerta ao carregar (sem JS, o alerta continua visível no topo).
+#}
+{% macro form_errors(form, title="Confira os campos destacados", list_label="Item") -%}
+{%- set items = [] -%}
+{%- for f in form if f.type not in ("CSRFTokenField", "HiddenField") -%}
+  {%- if f.type == "FieldList" -%}
+    {%- for entry in f -%}
+      {%- set outer = loop.index -%}
+      {%- for sf in entry.form if sf.errors -%}
+        {%- set part = "nome" if sf.short_name == "name" else sf.label.text.split(" (")[0]|lower -%}
+        {%- set _ = items.append((sf.id, list_label ~ " " ~ outer ~ " · " ~ part)) -%}
+      {%- endfor -%}
+    {%- endfor -%}
+    {%- for e in f.errors if e is string -%}{%- set _ = items.append((f.id, e)) -%}{%- endfor -%}
+  {%- elif f.errors -%}
+    {%- set _ = items.append((f.id, f.label.text)) -%}
+  {%- endif -%}
+{%- endfor -%}
+{%- if items -%}
+<div class="alert alert--danger" role="alert" tabindex="-1" data-autofocus>
+  {{ icon("alert", class_="alert__icon") }}
+  <div class="alert__content">
+    <p class="alert__title">{{ title }}</p>
+    <ul class="alert__body">
+      {%- for fid, text in items %}
+      <li><a href="#{{ fid }}">{{ text }}</a></li>
+      {%- endfor %}
+    </ul>
+  </div>
+</div>
+{%- endif -%}
+{%- endmacro %}
+
+{#
+  Envio de arquivo (R7). O <input type="file"> nativo mostra “Choose File” no idioma do
+  navegador; aqui ele fica visualmente escondido (mas focável) e o rótulo vira o botão em
+  pt-BR. O foco do teclado aparece no botão (.upload__input:focus-visible + .upload__button).
+  Com JS, o nome do arquivo escolhido aparece ao lado (só apresentação).
+#}
+{% macro file_upload(f, accept, button_label="Escolher arquivo", hint=None, required=True, label=None) -%}
+{%- set hint_id = f.id ~ "-dica" -%}
+{%- set err_id = f.id ~ "-erro" -%}
+{%- set described = [] -%}
+{%- if hint %}{% set _ = described.append(hint_id) %}{% endif -%}
+{%- if f.errors %}{% set _ = described.append(err_id) %}{% endif -%}
+<div class="field upload{% if f.errors %} field--error{% endif %}" data-upload>
+  <p class="field__label" id="{{ f.id }}-rotulo">{{ label or f.label.text }}</p>
+  <div class="upload__zone">
+    <input class="upload__input visually-hidden" type="file" id="{{ f.id }}" name="{{ f.name }}" accept="{{ accept }}"{% if required %} required{% endif %} aria-labelledby="{{ f.id }}-rotulo {{ f.id }}-botao"{% if described %} aria-describedby="{{ described|join(' ') }}"{% endif %}{% if f.errors %} aria-invalid="true"{% endif %}>
+    <label class="btn btn--secondary upload__button" for="{{ f.id }}" id="{{ f.id }}-botao">{{ icon("arrow-up", class_="btn__icon") }}<span class="btn__label">{{ button_label }}</span></label>
+    <span class="upload__name js-only" data-upload-name aria-live="polite">Nenhum arquivo escolhido</span>
+  </div>
+  {%- if hint %}<p class="field__hint" id="{{ hint_id }}">{{ hint }}</p>{% endif %}
+  {%- if f.errors %}<p class="field__error" id="{{ err_id }}">{{ icon("alert", "sm") }}<span>{{ f.errors|select("string")|join(" ") }}</span></p>{% endif %}
+</div>
+{%- endmacro %}

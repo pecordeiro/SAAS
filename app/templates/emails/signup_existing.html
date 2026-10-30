@@ -1,0 +1,9 @@
+{% extends "emails/_base.html" %}
+{% block body %}
+  <p>Olá, {{ name }}.</p>
+  <p>Alguém tentou criar uma conta nova com este e-mail, que já está cadastrado.<br>
+  Se foi você, entre na sua conta. Se esqueceu a senha, peça uma nova:</p>
+  <p><a href="{{ login_url }}">Entrar</a></p>
+  <p><small>Se o botão não abrir, copie o endereço: {{ login_url }}</small></p>
+  <p><a href="{{ reset_url }}">Esqueci a senha</a></p>
+{% endblock %}

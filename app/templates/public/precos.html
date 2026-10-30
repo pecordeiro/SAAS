@@ -1,0 +1,82 @@
+{% extends "base_publica.html" %}
+{% from "components/plan_card.html" import plan_card %}
+{% from "components/table.html" import data_table %}
+{% from "components/icon.html" import icon %}
+{% set marca = true %}
+{% block title %}Preços · Teroz{% endblock %}
+{% block description %}{%- set first = plans|selectattr("price")|first %}Planos por empresa{% if first %}, a partir de R$ {{ first.price|num(0) if first.price == first.price|int else first.price|num(2) }} por mês{% endif %}. {{ trial_days }} dias grátis, sem cartão, no Essencial e no Profissional. Projetos, pessoas, histórico e exportação.{% endblock %}
+{% block main %}
+{# R10 (ADR-0016): preço e limites da tabela plans; tabela comparativa; perguntas; chamada final. #}
+<section class="pub-sec pub-sec--first" aria-labelledby="precos-titulo">
+  <div class="pub-in">
+    <div class="pub-head">
+      <span class="pub-eyebrow">Preços</span>
+      <h1 id="precos-titulo" class="pub-h1">Preço por empresa, não por pessoa.</h1>
+      <p class="pub-sub">{{ trial_days }} dias grátis, sem cartão, no Essencial e no Profissional. O plano Empresa cobra ao contratar e a Implantação é sob orçamento, online ou presencial. Você troca de plano quando quiser.</p>
+    </div>
+    <div class="plans">
+      {%- for plan in plans %}
+      {{ plan_card(plan, url_for('auth.signup'), trial_days, "h2", loop.index0) }}
+      {%- endfor %}
+    </div>
+    <p class="pub-note">Pagamento por Pix, boleto ou cartão. O preço é mensal e vale para a empresa toda.</p>
+  </div>
+</section>
+
+<section class="pub-sec pub-sec--band" aria-labelledby="comparar-titulo">
+  <div class="pub-in">
+    <h2 id="comparar-titulo" class="rv">Compare os planos</h2>
+    {%- set cols = [("Recurso", "")] %}
+    {%- for plan in plans %}{% set _ = cols.append((plan.name, "is-num")) %}{% endfor %}
+    <div class="pub-table rv">
+    {% call data_table(cols, caption="Comparação dos planos", cards=False) %}
+    <tbody>
+      <tr><th scope="row">Projetos ativos</th>{% for plan in plans %}<td class="is-num">{{ plan.projects.replace(" projetos ativos", "") }}</td>{% endfor %}</tr>
+      <tr><th scope="row">Pessoas</th>{% for plan in plans %}<td class="is-num">{{ plan.users.replace(" pessoas", "") }}</td>{% endfor %}</tr>
+      <tr><th scope="row">Preço por mês</th>{% for plan in plans %}<td class="is-num">{% if plan.price is none %}Sob orçamento{% else %}R$ {{ plan.price|num(0) if plan.price == plan.price|int else plan.price|num(2) }}{% endif %}</td>{% endfor %}</tr>
+      <tr><th scope="row">Teste grátis de {{ trial_days }} dias, sem cartão</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.trial else "—" }}</td>{% endfor %}</tr>
+      <tr><th scope="row">Verificação em duas etapas obrigatória para proprietários</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.mfa_required else "—" }}</td>{% endfor %}</tr>
+      <tr><th scope="row">API para ligar a outros sistemas</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.api else "—" }}</td>{% endfor %}</tr>
+      <tr><th scope="row">Identidade visual da sua empresa</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.visual_custom else "—" }}</td>{% endfor %}</tr>
+      <tr><th scope="row">{{ services[0] }}</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.implantacao else "—" }}</td>{% endfor %}</tr>
+      <tr><th scope="row">{{ services[1] }}</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.implantacao else "—" }}</td>{% endfor %}</tr>
+      <tr><th scope="row">{{ services[2] }}</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.implantacao else "—" }}</td>{% endfor %}</tr>
+      <tr><th scope="row">Modelos de etapas, histórico e exportação em planilha</th>{% for plan in plans %}<td class="is-num">Sim</td>{% endfor %}</tr>
+    </tbody>
+    {% endcall %}
+    </div>
+  </div>
+</section>
+
+<section class="pub-sec" aria-labelledby="inclui-titulo">
+  <div class="pub-in">
+    <h2 id="inclui-titulo" class="rv">Todos os planos incluem</h2>
+    <ul class="pub-benefits">
+      <li class="rv" data-delay="0">{{ icon("check") }}<span>Modelos de etapas com versões: os projetos antigos não mudam quando você edita o modelo.</span></li>
+      <li class="rv" data-delay="1">{{ icon("check") }}<span>Histórico completo de cada registro, com quem registrou e quando.</span></li>
+      <li class="rv" data-delay="2">{{ icon("check") }}<span>Exportação em planilha (CSV e XLSX), sempre disponível, até com a assinatura atrasada.</span></li>
+      <li class="rv" data-delay="3">{{ icon("check") }}<span>Pagamento por Pix, boleto ou cartão.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section class="pub-sec pub-sec--band" aria-labelledby="faq-titulo">
+  <div class="pub-in">
+    <h2 id="faq-titulo" class="rv">Perguntas frequentes</h2>
+    <div class="pub-faq">
+      <details class="rv"><summary>Como pago?</summary><p>Depois do teste (Essencial ou Profissional), você escolhe o plano e paga por Pix, boleto ou cartão. A cobrança é mensal e por empresa, não por usuário.</p></details>
+      <details class="rv"><summary>E se eu atrasar o pagamento?</summary><p>Você tem 7 dias de carência com tudo funcionando. Depois, a empresa fica só para leitura: dá para ver e exportar tudo, mas não registrar. Seus dados nunca são apagados por atraso.</p></details>
+      <details class="rv"><summary>Posso cancelar quando quiser?</summary><p>Sim. Você cancela na tela de assinatura, sem multa, e continua com acesso até o fim do período pago.</p></details>
+      <details class="rv"><summary>Emitem nota fiscal?</summary><p>A nota fiscal de serviço segue a regra do seu município e do seu cadastro. Fale com a gente em <a href="{{ url_for('public.contact') }}">contato</a> para combinar.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="pub-sec pub-sec--end" aria-labelledby="final-titulo">
+  <div class="pub-in"><div class="pub-cta-end rv">
+    <h2 id="final-titulo">Comece pelo teste grátis.</h2>
+    <p>{{ trial_days }} dias, sem cartão, nos planos Essencial e Profissional.</p>
+    <a class="btn btn--primary btn--lg" href="{{ url_for('auth.signup') }}"><span class="btn__label">Começar teste grátis</span></a>
+  </div></div>
+</section>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% from "components/icon.html" import icon %}
+{% from "components/badge.html" import badge %}
+{% from "components/modal.html" import confirm_dialog %}
+{% from "components/optional.html" import optional_badge %}
+{#
+  Cabeçalho comum de Preencher etapas, Meta e equipe e Como funciona (painel do dono): no topo,
+  um botão por projeto ATIVO da empresa da sessão (trocar de projeto), e para supervisor+ o lápis
+  (renomear, campo em Meta e equipe), o X apagar (= arquivar, com confirmação; o histórico fica) e
+  “+ Novo projeto” (só o nome; nasce no modo simples com 5 etapas). Depois, o título da tela
+  (page_title) e projeto + modo. page_endpoint = rota da tela atual (os botões levam a ela).
+#}
+{%- set can_manage = current_membership and current_membership.has_role("supervisor") %}
+<nav class="project-tabs" aria-label="Projetos">
+  <ul class="project-tabs__list">
+    {%- for pid, pname in project_choices %}
+    <li class="project-tabs__item{% if pid == project.id %} is-current{% endif %}">
+      <a class="project-tabs__link" href="{{ url_for(page_endpoint, projeto=pid) }}"{% if pid == project.id %} aria-current="page"{% endif %}>{{ pname }}</a>
+      {%- if pid == project.id and can_manage %}
+      <a class="project-tabs__action" href="{{ url_for('preencher.goal_team', projeto=pid, _anchor='meta-nome') }}" title="Renomear projeto" aria-label="Renomear o projeto {{ pname }}">{{ icon("edit", "sm") }}</a>
+      <a class="project-tabs__action project-tabs__action--danger" href="#apagar-projeto" aria-haspopup="dialog" title="Apagar projeto" aria-label="Apagar o projeto {{ pname }}">{{ icon("x", "sm") }}</a>
+      {%- endif %}
+    </li>
+    {%- endfor %}
+    {%- if can_manage %}
+    <li class="project-tabs__item project-tabs__item--new">
+      <details class="project-new">
+        <summary class="project-tabs__link project-tabs__plus" title="Novo projeto (nasce com 5 etapas, modo simples)">{{ icon("plus", "sm") }}<span class="visually-hidden">Novo projeto</span></summary>
+        <form class="project-new__form" method="post" action="{{ url_for('preencher.project_quick_new') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="visually-hidden" for="projeto-novo-nome">Nome do novo projeto</label>
+          <input class="field__input" id="projeto-novo-nome" name="name" maxlength="160" required autocomplete="off" placeholder="Ex.: Lote 2026-015">
+          <button class="btn btn--primary btn--sm" type="submit">Criar</button>
+        </form>
+      </details>
+    </li>
+    {%- endif %}
+  </ul>
+</nav>
+<header class="page-header fill-header">
+  <div class="page-header__titles">
+    <h1>{{ page_title }}</h1>
+    <p class="fill-header__project"><a href="{{ url_for('app.project_dashboard', project_id=project.id) }}">{{ project.name }}</a>{{ badge("Modo simples" if simple else "Modo detalhado", "neutral") }}
+      {%- if "unidades" in modules %} <a class="btn btn--ghost btn--sm" href="{{ url_for('qualidade.units', project_id=project.id) }}">{{ icon("package", "sm") }}<span>Unidades</span>{{ optional_badge() }}</a>{% endif %}</p>
+  </div>
+</header>
+{%- if can_manage %}
+{% call confirm_dialog("apagar-projeto", "Apagar o projeto “" ~ project.name ~ "”?", "Ele sai das telas e libera o limite do plano. As peças lançadas e o histórico continuam guardados.", "Apagar projeto", url_for('edicao.project_archive', project_id=project.id)) %}
+<input type="hidden" name="confirm" value="y">
+<input type="hidden" name="voltar" value="preencher">
+{% endcall %}
+{%- endif %}

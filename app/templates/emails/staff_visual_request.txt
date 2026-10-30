@@ -1,0 +1,4 @@
+{% extends "emails/_base.txt" %}
+{% block body %}Uma empresa passou a ter direito à identidade visual{% if plan %} (plano {{ plan }}){% endif %}. A requisição já está no painel interno.
+
+Abrir o painel interno: {{ url }}{% endblock %}

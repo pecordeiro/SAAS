@@ -1,0 +1,367 @@
+openapi: 3.1.0
+info:
+  title: API de publicação — Controle de Produção
+  version: 1.0.0
+  summary: Leitura de projetos e registro de progresso por integrações.
+  description: |
+    API reservada (Fase 9), disponível só com a feature `api` do plano Empresa e com
+    `FEATURE_PUBLIC_API` ligada no servidor (desligada, todo `/api/v1/*` responde 404).
+
+    **Implementado hoje:** `GET /projects` e `GET /projects/{id}/summary`. As demais rotas
+    estão no contrato mas respondem `501` (problem+json) até serem construídas.
+
+    Convenções:
+    - Autenticação: `Authorization: Bearer cp_...` (token criado pelo proprietário em
+      *API* no menu). Cookie de sessão não autentica. Sem CSRF.
+    - Escopos: `read:projects`, `write:progress`.
+    - Datas e horas em ISO 8601 UTC (`2026-10-13T14:30:00.000Z`); datas de calendário
+      (início, prazo) em `YYYY-MM-DD`.
+    - Paginação por cursor opaco (`next_cursor`; `null` na última página).
+    - Erros em `application/problem+json` (RFC 9457) com a extensão `code`.
+    - Limite de requisições por token (padrão 120/min); excedido, 429.
+    - Recurso de outra empresa responde 404 (nunca 403).
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Projetos
+  - name: Progresso
+paths:
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [Projetos]
+      summary: Lista os projetos ativos da empresa do token
+      description: Projetos não arquivados, do mais novo para o mais antigo.
+      security:
+        - bearerAuth: [read:projects]
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Página de projetos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectPage'
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /projects/{projectId}:
+    get:
+      operationId: getProject
+      tags: [Projetos]
+      summary: Detalhe de um projeto (reservado, responde 501)
+      security:
+        - bearerAuth: [read:projects]
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: O projeto.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+  /projects/{projectId}/summary:
+    get:
+      operationId: getProjectSummary
+      tags: [Projetos]
+      summary: Resumo calculado do projeto (saída de app/services/calc.py)
+      description: >
+        Progresso, unidades concluídas, tempo restante e dias úteis restantes, por projeto,
+        etapa e atividade. Os números são os mesmos da tela do projeto.
+      security:
+        - bearerAuth: [read:projects]
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Resumo do projeto.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectSummary'
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /projects/{projectId}/events:
+    get:
+      operationId: listProjectEvents
+      tags: [Projetos]
+      summary: Eventos de domínio do projeto (reservado, responde 501)
+      description: Linha do tempo (`activity.progress_updated`, `stage.completed`, `project.completed`), mais recentes primeiro.
+      security:
+        - bearerAuth: [read:projects]
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Página de eventos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventPage'
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+  /activities/{activityId}/progress:
+    post:
+      operationId: registerProgress
+      tags: [Progresso]
+      summary: Soma peças a uma atividade (reservado, responde 501)
+      description: >
+        Controle otimista: envie `If-Match` com a `version` da atividade (vista no resumo).
+        Versão diferente, 412; peças além do previsto, 422. Escrita em empresa com
+        assinatura em modo leitura, 402.
+      security:
+        - bearerAuth: [write:progress]
+      parameters:
+        - name: activityId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+        - name: If-Match
+          in: header
+          required: true
+          description: Versão atual da atividade, entre aspas (`"3"`).
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProgressInput'
+      responses:
+        '201':
+          description: Registro criado.
+          headers:
+            ETag:
+              description: Nova versão da atividade.
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressResult'
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '402': {$ref: '#/components/responses/PaymentRequired'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: cp_ + 43 caracteres
+      description: >
+        Token por empresa criado pelo proprietário (mostrado uma única vez; o servidor guarda
+        só o SHA-256). Escopos: `read:projects` (ler) e `write:progress` (registrar peças).
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    Limit:
+      name: limit
+      in: query
+      description: Itens por página.
+      schema: {type: integer, minimum: 1, maximum: 100, default: 25}
+    Cursor:
+      name: cursor
+      in: query
+      description: Valor de `next_cursor` da página anterior (opaco).
+      schema: {type: string}
+  schemas:
+    Problem:
+      type: object
+      description: Erro no formato RFC 9457.
+      required: [type, title, status, code]
+      properties:
+        type: {type: string, examples: ['urn:controle-producao:problem:insufficient-scope']}
+        title: {type: string}
+        status: {type: integer}
+        code:
+          type: string
+          description: Código estável para tratar no cliente.
+          examples: [missing_token, invalid_token, token_revoked, token_expired, plan_feature_unavailable, insufficient_scope, not_found, rate_limited, not_implemented]
+        detail: {type: string}
+        instance: {type: string}
+    Project:
+      type: object
+      required: [id, name, status, quantity, people, hours_per_day, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        status: {type: string, enum: [active, done]}
+        quantity: {type: integer, description: Unidades previstas.}
+        people: {type: integer}
+        hours_per_day: {type: number}
+        start_date: {type: [string, 'null'], format: date}
+        due_date: {type: [string, 'null'], format: date}
+        created_at: {type: string, format: date-time}
+    ProjectPage:
+      type: object
+      required: [data, next_cursor]
+      properties:
+        data:
+          type: array
+          items: {$ref: '#/components/schemas/Project'}
+        next_cursor: {type: [string, 'null']}
+    WorkStatus:
+      type: string
+      enum: [not_started, in_progress, done]
+    Activity:
+      type: object
+      required: [id, name, units_completed, units_remaining, progress, version]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        units_completed: {type: integer}
+        units_remaining: {type: integer}
+        progress: {type: number, minimum: 0, maximum: 1}
+        version: {type: integer, description: Use em `If-Match` ao registrar progresso.}
+    Stage:
+      type: object
+      required: [id, name, status, progress, units_completed, units_planned, tasks, tasks_completed, total_minutes, remaining_minutes, activities]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        status: {$ref: '#/components/schemas/WorkStatus'}
+        progress: {type: number, minimum: 0, maximum: 1}
+        units_completed: {type: integer}
+        units_planned: {type: integer}
+        tasks: {type: integer}
+        tasks_completed: {type: integer}
+        total_minutes: {type: number}
+        remaining_minutes: {type: number}
+        activities:
+          type: array
+          items: {$ref: '#/components/schemas/Activity'}
+    ProjectSummary:
+      type: object
+      required: [project_id, status, units_completed, units_planned, progress, stages_completed, stages_total, tasks, tasks_completed, unit_minutes, total_minutes, remaining_minutes, remaining_workdays, forecast_end, due_date, stages]
+      properties:
+        project_id: {type: string, format: uuid}
+        status: {$ref: '#/components/schemas/WorkStatus'}
+        units_completed: {type: integer, description: Equipamentos prontos.}
+        units_planned: {type: integer}
+        progress: {type: number, minimum: 0, maximum: 1}
+        stages_completed: {type: integer}
+        stages_total: {type: integer}
+        tasks: {type: integer}
+        tasks_completed: {type: integer}
+        unit_minutes: {type: number}
+        total_minutes: {type: number}
+        remaining_minutes: {type: number}
+        remaining_workdays: {type: [number, 'null']}
+        forecast_end: {type: [string, 'null'], format: date}
+        due_date: {type: [string, 'null'], format: date}
+        stages:
+          type: array
+          items: {$ref: '#/components/schemas/Stage'}
+    DomainEvent:
+      type: object
+      required: [id, type, payload, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        type: {type: string, examples: [activity.progress_updated]}
+        payload: {type: object, additionalProperties: true}
+        created_at: {type: string, format: date-time}
+    EventPage:
+      type: object
+      required: [data, next_cursor]
+      properties:
+        data:
+          type: array
+          items: {$ref: '#/components/schemas/DomainEvent'}
+        next_cursor: {type: [string, 'null']}
+    ProgressInput:
+      type: object
+      required: [delta]
+      additionalProperties: false
+      properties:
+        delta: {type: integer, minimum: 1, description: Peças a somar.}
+    ProgressResult:
+      type: object
+      required: [entry_id, activity_id, units_completed, version, created_at]
+      properties:
+        entry_id: {type: string, format: uuid}
+        activity_id: {type: string, format: uuid}
+        units_completed: {type: integer}
+        version: {type: integer}
+        created_at: {type: string, format: date-time}
+  responses:
+    BadRequest:
+      description: Parâmetro ou corpo inválido.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Unauthorized:
+      description: Sem token, token inválido, revogado ou expirado.
+      headers:
+        WWW-Authenticate:
+          schema: {type: string}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    PaymentRequired:
+      description: Assinatura em modo leitura ou limite do plano.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Forbidden:
+      description: Plano sem a feature `api` (`plan_feature_unavailable`) ou token sem o escopo (`insufficient_scope`).
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    NotFound:
+      description: Inexistente ou de outra empresa.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    PreconditionFailed:
+      description: '`If-Match` não confere com a versão atual da atividade.'
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    PreconditionRequired:
+      description: Falta o cabeçalho `If-Match`.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Unprocessable:
+      description: 'Regra de negócio violada (por exemplo, peças além do previsto).'
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    TooManyRequests:
+      description: Limite de requisições do token excedido.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    NotImplemented:
+      description: Rota reservada no contrato, ainda não construída.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}

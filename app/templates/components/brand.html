@@ -1,0 +1,16 @@
+{# Marca Teroz (ADR-0020). Duas imagens por variante: o CSS mostra a do tema claro ou a do escuro (layout.css),
+   assim o logotipo troca junto com o tema, sem JavaScript. A palavra "Teroz" já está desenhada no SVG.
+   As duas têm o mesmo alt: a escondida (display:none) sai da árvore de acessibilidade, e a visível dá nome ao link
+   em qualquer tema (no escuro o link ficava sem nome). #}
+{% macro logo(height) -%}
+{%- set w = (height * 3.876)|round|int -%}
+<img class="brand__logo brand__logo--claro" src="{{ url_for('static', filename='img/logo.svg') }}" alt="Teroz" width="{{ w }}" height="{{ height }}">
+<img class="brand__logo brand__logo--escuro" src="{{ url_for('static', filename='img/logo-escuro.svg') }}" alt="Teroz" width="{{ w }}" height="{{ height }}">
+{%- endmacro %}
+
+{# Só o símbolo (barra superior do celular e páginas de erro). #}
+{% macro symbol(height, label="Teroz") -%}
+{%- set w = (height * 1.696)|round|int -%}
+<img class="brand__logo brand__logo--claro" src="{{ url_for('static', filename='img/simbolo.svg') }}" alt="{{ label }}" width="{{ w }}" height="{{ height }}">
+<img class="brand__logo brand__logo--escuro" src="{{ url_for('static', filename='img/simbolo-escuro.svg') }}" alt="{{ label }}" width="{{ w }}" height="{{ height }}">
+{%- endmacro %}

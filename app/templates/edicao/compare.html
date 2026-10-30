@@ -1,0 +1,46 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/badge.html" import badge %}
+{% from "components/alert.html" import alert %}
+{% from "components/field.html" import checkbox %}
+{% set nav_current = "projects" %}
+{% set nav_project = project %}
+{% block title %}Comparar com o modelo · {{ project.name }}{% endblock %}
+{% block content %}
+{# F4-1: diferenças entre o projeto e a versão atual do modelo; aplicar só com confirmação. #}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('app.project_detail', project_id=project.id) }}">{{ icon("chevron-left") }}{{ project.name }}</a>
+    <h1>Comparar com o modelo</h1>
+    <p class="cluster page-header__meta">
+      <span class="text-strong">{{ comparison.template.name }}</span>
+      {{ badge("projeto: v" ~ (comparison.project_version.number if comparison.project_version else "?"), "neutral") }}
+      {{ badge("atual: v" ~ comparison.current_version.number, "info") }}
+    </p>
+  </div>
+</header>
+
+{%- if not comparison.changes %}
+{{ alert("success", "Nada a aplicar", "O projeto já tem as mesmas etapas, subatividades e tempos da versão atual.") }}
+{%- else %}
+<section class="card stack" aria-labelledby="dif-titulo">
+  <h2 class="section-title" id="dif-titulo">O que muda no projeto</h2>
+  <ul class="stack--sm">
+    {%- for change in comparison.changes %}
+    <li>{{ change.label }}</li>
+    {%- endfor %}
+  </ul>
+  <p class="muted text-sm">Peças já registradas e o histórico não mudam. Etapas e subatividades que saem ficam arquivadas.</p>
+  <form class="stack" method="post" action="{{ url_for('edicao.project_apply_template', project_id=project.id) }}">
+    {{ confirm_form.csrf_token }}
+    <input type="hidden" name="version_id" value="{{ comparison.current_version.id }}">
+    {{ checkbox("confirm", "Confirmo: aplicar a versão " ~ comparison.current_version.number ~ " a este projeto", value="y") }}
+    <div class="form-actions">
+      {{ button("Aplicar versão " ~ comparison.current_version.number, "primary", size="lg") }}
+      {{ button("Cancelar", "secondary", size="lg", href=url_for('app.project_detail', project_id=project.id)) }}
+    </div>
+  </form>
+</section>
+{%- endif %}
+{% endblock %}

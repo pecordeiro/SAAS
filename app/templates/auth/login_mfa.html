@@ -1,0 +1,23 @@
+{% extends "base_publica.html" %}
+{% from "components/field.html" import field %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% block title %}Verificação em duas etapas · Teroz{% endblock %}
+{% block content %}
+{# telas.md §3: etapa extra quando o MFA está ativo. Aceita também código de recuperação. #}
+<div class="auth">
+  <div class="card auth__card stack">
+    <h1>Verificação em duas etapas</h1>
+    <p class="muted">Digite o código de 6 dígitos do aplicativo autenticador ou um código de recuperação.</p>
+    {%- if error %}
+    <div class="alert-focus" tabindex="-1" data-autofocus>{{ alert("danger", error, role="alert") }}</div>
+    {%- endif %}
+    <form class="stack" method="post" action="{{ url_for('auth.login_mfa') }}" novalidate>
+      {{ form.csrf_token }}
+      {{ field(form.code, attrs={"autocomplete": "one-time-code", "inputmode": "numeric", "required": true, "autofocus": true}) }}
+      {{ button("Confirmar", "primary", size="lg", block=True) }}
+    </form>
+  </div>
+  <p class="auth__switch"><a href="{{ url_for('auth.login') }}">Voltar para Entrar</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,6 @@
+{% extends "emails/_base.html" %}
+{% block body %}
+  <p>Uma empresa passou a ter direito à identidade visual{% if plan %} (plano {{ plan }}){% endif %}. A requisição já está no painel interno.</p>
+  <p><a href="{{ url }}">Abrir o painel interno</a></p>
+  <p><small>Se o botão não abrir, copie o endereço: {{ url }}</small></p>
+{% endblock %}

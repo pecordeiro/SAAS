@@ -1,0 +1,98 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/badge.html" import badge %}
+{% from "components/empty_state.html" import empty_state %}
+{% from "identidade/_honeypot.html" import honeypot as hp %}
+{% set nav_current = "visual" %}
+{% set dias = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"] %}
+{% block title %}Ligação · Identidade visual · Teroz{% endblock %}
+{% block content %}
+{#
+  ADR-0019 §3 — agendamento da ligação. A lista mostra só horários livres e futuros (servidor);
+  a reserva é conferida e feita no servidor, que recusa horário ocupado mesmo com a tela antiga.
+  Horários em America/Sao_Paulo. Cancelar ou remarcar: o cliente pede, a equipe decide.
+#}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('identidade.briefing') }}">{{ icon("chevron-left") }}Identidade visual</a>
+    <h1>Ligação com a equipe</h1>
+    <p class="page-header__subtitle muted">Uma conversa para entender a sua marca. Horários de Brasília.</p>
+  </div>
+</header>
+
+<div class="stack--lg call-page">
+  {%- if error %}<div tabindex="-1" data-autofocus>{{ alert("danger", error, role="alert") }}</div>{% endif %}
+
+  {%- if booking %}
+  {%- set when = local(booking.slot.starts_at) %}
+  <section class="card stack" aria-labelledby="reserva-titulo">
+    <h2 class="card__title" id="reserva-titulo">Sua ligação</h2>
+    <p class="call-when"><span class="num">{{ when.strftime("%d/%m/%Y") }}</span>, {{ dias[when.weekday()] }}, às <span class="num">{{ when.strftime("%H:%M") }}</span></p>
+    <dl class="briefing-summary">
+      <div><dt>Duração</dt><dd class="num">{{ booking.slot.duration_minutes }} min</dd></div>
+      <div><dt>Contato</dt><dd>{{ booking.contact_name }} · <span class="num">{{ booking.contact_phone }}</span></dd></div>
+    </dl>
+    {%- if booking.change_request %}
+    {{ alert("warning", "Pedido enviado: " ~ change_labels[booking.change_request]|lower, "A equipe vai responder por e-mail. Até lá, o horário continua reservado.") }}
+    {%- else %}
+    <form class="stack" method="post" action="{{ url_for('identidade.call_change', booking_id=booking.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {{ hp(honeypot, "hp-pedido") }}
+      <fieldset class="fieldset field">
+        <legend class="field__label">Precisa mudar?</legend>
+        <p class="field__hint">A equipe recebe o pedido e responde por e-mail. Nada muda até ela responder.</p>
+        <div class="choice-row">
+          <label class="check"><input type="radio" name="tipo" value="remarcar" required><span>Remarcar</span></label>
+          <label class="check"><input type="radio" name="tipo" value="cancelar"><span>Cancelar</span></label>
+        </div>
+      </fieldset>
+      <div>{{ button("Enviar pedido", "secondary") }}</div>
+    </form>
+    {%- endif %}
+  </section>
+  {%- elif groups %}
+  <form class="card stack" method="post" action="{{ url_for('identidade.call') }}" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {{ hp(honeypot, "hp-ligacao") }}
+    <fieldset class="fieldset stack">
+      <legend class="section-title">Escolha um horário</legend>
+      {%- for day, items in groups %}
+      <div class="slot-day">
+        <p class="slot-day__label text-strong"><span class="num">{{ day.strftime("%d/%m") }}</span>, {{ dias[day.weekday()] }}</p>
+        <div class="slot-list" role="list">
+          {%- for slot in items %}
+          {%- set t = local(slot.starts_at) %}
+          <label class="slot" role="listitem">
+            <input type="radio" name="slot_id" value="{{ slot.id }}"{% if selected == slot.id|string %} checked{% endif %} required>
+            <span class="num">{{ t.strftime("%H:%M") }}</span>
+            <span class="muted text-sm num">{{ slot.duration_minutes }} min</span>
+          </label>
+          {%- endfor %}
+        </div>
+      </div>
+      {%- endfor %}
+    </fieldset>
+    <fieldset class="fieldset stack">
+      <legend class="section-title">Quem atende</legend>
+      <div class="form-row form-row--2">
+        <div class="field">
+          <label class="field__label" for="contato-nome">Nome <span class="field__req">(obrigatório)</span></label>
+          <input class="field__input" id="contato-nome" type="text" name="contact_name" value="{{ contact_name }}" maxlength="120" autocomplete="name" required>
+        </div>
+        <div class="field">
+          <label class="field__label" for="contato-telefone">Telefone com DDD <span class="field__req">(obrigatório)</span></label>
+          <input class="field__input" id="contato-telefone" type="tel" name="contact_phone" value="{{ contact_phone }}" maxlength="30" autocomplete="tel" inputmode="tel" required>
+        </div>
+      </div>
+    </fieldset>
+    <div class="form-actions">{{ button("Reservar horário", "primary") }}</div>
+  </form>
+  {%- else %}
+  <section class="card">
+    {{ empty_state("Nenhum horário livre agora", "A equipe abre novos horários toda semana. Volte em alguns dias ou responda o briefing enquanto isso.", icon="history", action=("Ir para o briefing", url_for("identidade.briefing"))) }}
+  </section>
+  {%- endif %}
+</div>
+{% endblock %}

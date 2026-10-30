@@ -1,0 +1,105 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/progress.html" import progress %}
+{% from "components/table.html" import data_table %}
+{% from "components/empty_state.html" import empty_state %}
+{% import "app/_painel.html" as p %}
+{% set nav_current = "dashboard" %}
+{% block title %}Painel da operação · Teroz{% endblock %}
+{% block content %}
+{#
+  Painel da operação (redesign 2026-10-28): responde em segundos o que está acontecendo, o que
+  precisa de atenção e onde está cada projeto. Cabeçalho com frase-resumo, 4 indicadores somados
+  (calc.resumo_operacao) com o progresso em destaque, “Precisa de atenção” (etapas atrasadas e
+  aguardando peça) e a lista de projetos ativos. Sem gráficos: cada um repetia uma coluna da
+  lista (progresso, unidades, horas, prazo). Só exibe (ADR-0009).
+#}
+{%- set s = d.resumo -%}
+{{ p.header("Painel da operação", d.frase, updated_at, url_for('preencher.fill') if d.projetos else None) }}
+
+{%- if not d.projetos %}
+<div class="card">
+  {%- if can_create %}
+  {{ empty_state("Nenhum projeto ativo", "Crie um projeto com as etapas da produção para ver o painel aqui.", action=("Novo projeto", url_for('app.project_new')), icon="chart") }}
+  {%- else %}
+  {{ empty_state("Nenhum projeto ativo", "Quando houver um projeto em andamento, o painel aparece aqui.", ghost_action=("Ver projetos", url_for('app.projects', status='todos')), icon="chart") }}
+  {%- endif %}
+</div>
+{%- else %}
+
+{%- set prox = d.proximo %}
+<section class="card ops-kpis" aria-label="Resumo da operação">
+  <div class="ops-kpi ops-kpi--lead">
+    <span class="kpi__label">Progresso pelas tarefas</span>
+    <span class="kpi__value kpi__value--lead">{{ s.progresso_geral|pct(0) }}</span>
+    {{ progress(s.progresso_geral, 1, label="Progresso pelas tarefas, somando os projetos ativos", size="sm", show_text=False) }}
+    <span class="kpi__sub">{{ s.tempo_trabalhado_h|num(1) }}&nbsp;h trabalhadas de {{ s.tempo_total_h|num(1) }}&nbsp;h previstas</span>
+  </div>
+  <div class="ops-kpi">
+    <span class="kpi__label">Unidades prontas</span>
+    <span class="kpi__value">{{ s.unidades_concluidas }}<span class="kpi__unit">de {{ s.previstas }}</span></span>
+    <span class="kpi__sub">unidades com todas as etapas prontas</span>
+  </div>
+  <div class="ops-kpi">
+    <span class="kpi__label">Horas que faltam</span>
+    <span class="kpi__value">{{ s.tempo_restante_h|num(1) }}<span class="kpi__unit">h</span></span>
+    <span class="kpi__sub">trabalho estimado em {{ s.projetos }} {{ "projeto" if s.projetos == 1 else "projetos" }}</span>
+  </div>
+  <div class="ops-kpi"{% if prox %} title="{{ prox.project.name }}: {{ prox.prazo.text }}"{% endif %}>
+    <span class="kpi__label">Próximo prazo</span>
+    {%- if prox %}
+    <span class="kpi__value">{{ prox.prazo.until }}<span class="kpi__unit">{{ "dia útil" if prox.prazo.until == 1 else "dias úteis" }}</span></span>
+    <span class="kpi__sub{% if prox.prazo.tone in ('success', 'danger', 'warning') %} kpi__sub--{{ prox.prazo.tone }}{% endif %}">{{ prox.project.name }} · {{ prox.prazo.short }}</span>
+    {%- else %}
+    <span class="kpi__value"><span class="kpi__empty">—</span></span>
+    <span class="kpi__sub">nenhum projeto com prazo definido</span>
+    {%- endif %}
+  </div>
+</section>
+
+<section class="card ops-attention" aria-labelledby="ops-atencao">
+  <h2 class="section-title" id="ops-atencao">Precisa de atenção</h2>
+  {%- if d.pendencias %}
+  <ul class="pend__list" role="list">
+    {%- for x in d.pendencias[:8] %}
+    <li class="pend__item">
+      <span class="pend__dot pend__dot--{{ x.etapa.visual }}" aria-hidden="true"></span>
+      <a class="pend__link" href="{{ x.href or '#' }}">{{ x.etapa.label }}</a>
+      <span class="pend__meta">{{ x.etapa.visual_nome }}{% if x.extra %} · {{ x.extra }}{% endif %}{% if x.projeto %} · {{ x.projeto }}{% endif %}</span>
+    </li>
+    {%- endfor %}
+  </ul>
+  {%- if d.pendencias|length > 8 %}<p class="pend__more">e mais {{ d.pendencias|length - 8 }}</p>{% endif %}
+  {%- else %}
+  <p class="pend__empty">Nada precisa de atenção agora: nenhuma etapa atrasada{{ " ou aguardando peça" if d.aguardando_ativo else "" }}.</p>
+  {%- endif %}
+  <p class="ops-status">Etapas dos projetos ativos:
+    {%- for key, label in [("done", "concluídas"), ("doing", "em andamento"), ("waiting", "aguardando peça"), ("late", "atrasadas"), ("todo", "não iniciadas")] if d.aguardando_ativo or key != "waiting" %}
+    <span class="status-tag status-tag--{{ key }}"><b class="num">{{ d.contagem[key] }}</b> {{ label }}</span>
+    {%- endfor %}
+  </p>
+</section>
+
+<section class="card painel-block" aria-labelledby="g-tabela">
+  <div class="chart-card__head">
+    <h2 class="section-title" id="g-tabela">Projetos ativos</h2>
+    <a class="chart-card__link" href="{{ url_for('app.projects') }}">Lista completa</a>
+  </div>
+  <p class="chart-card__hint">Clique num projeto para abrir o painel dele.{% if total_active > d.projetos|length %} Mostrando {{ d.projetos|length }} de {{ total_active }} projetos ativos.{% endif %}</p>
+  {% call data_table([("Projeto", ""), ("Progresso pelas tarefas", "col-progress"), ("Unidades prontas", "is-num"), ("Etapas concluídas", "is-num"), ("Horas que faltam (h)", "is-num"), ("Prazo", "")], caption="Projetos ativos", class_="table-wrap--flat") %}
+  <tbody>
+    {%- for proj in d.projetos %}
+    <tr>
+      <td data-label="Projeto"><a class="row-link" href="{{ proj.href }}">{{ proj.project.name }}</a></td>
+      <td data-label="Progresso pelas tarefas">{{ progress(proj.result.progresso_geral, 1, label="Progresso pelas tarefas de " ~ proj.project.name, size="sm", value_text=proj.result.progresso_geral|pct(0)) }}</td>
+      <td class="is-num" data-label="Unidades prontas">{{ proj.result.unidades_concluidas }} <span class="muted">de {{ proj.project.quantity }}</span></td>
+      <td class="is-num" data-label="Etapas concluídas">{{ proj.result.etapas_concluidas }} <span class="muted">de {{ proj.etapas|length }}</span></td>
+      <td class="is-num" data-label="Horas que faltam (h)">{{ proj.result.tempo_restante_h|num(1) }}</td>
+      <td data-label="Prazo"><span class="prazo-text prazo-text--{{ proj.prazo.tone }}">{{ proj.prazo.text }}</span></td>
+    </tr>
+    {%- endfor %}
+  </tbody>
+  {% endcall %}
+</section>
+{%- endif %}
+{% endblock %}

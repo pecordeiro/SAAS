@@ -1,0 +1,121 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/field.html" import field %}
+{% from "components/button.html" import button %}
+{% from "components/steps.html" import steps %}
+{% set nav_current = "spreadsheet" %}
+{% block title %}Escolher colunas · Importar planilha · Teroz{% endblock %}
+{% block content %}
+{#
+  R7 — passo 2: escolher aba, linha do cabeçalho e o que cada coluna é (“Isto é…”). A sugestão
+  vem preenchida pelo servidor (import_mapping.suggest). A planilha lida vai assinada em
+  `form.grid` (empresa + usuário + 1 h); o servidor revalida tudo. O aviso do modo é trocado
+  por HTMX a cada escolha (GET /importar/colunas/modo), sem JS decidir nada.
+#}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('dados.import_upload') }}">{{ icon("chevron-left") }}Enviar outro arquivo</a>
+    <h1>Importar planilha</h1>
+    <p class="page-header__subtitle">Diga o que cada coluna é. Só a Etapa é obrigatória.</p>
+  </div>
+</header>
+
+{{ steps([("Enviar arquivo", None), ("Escolher colunas", None), ("Prévia e confirmar", None)], 2, label="Passos da importação") }}
+
+<form class="stack" method="post" action="{{ url_for('dados.import_columns') }}" id="mapa-colunas">
+  {{ form.csrf_token }}
+  {{ form.grid }}
+  {{ form.current_sheet }}
+
+  <section class="card stack" aria-labelledby="onde-titulo">
+    <h2 class="section-title" id="onde-titulo">Onde estão os dados</h2>
+    <div class="import-where">
+      {{ field(form.sheet, hint=(inspection.sheets|length ~ " abas no arquivo") if inspection.sheets|length > 1 else "Arquivo com uma aba") }}
+      {{ field(form.header_row, hint="A linha com os nomes das colunas.", attrs={"inputmode": "numeric", "min": 1, "autocomplete": "off"}) }}
+      <div class="import-where__action">{{ button("Reler a aba", "secondary", attrs={"name": "action", "value": "ver"}) }}</div>
+    </div>
+    <p class="muted text-sm num">
+      {%- if inspection.rows %}{{ inspection.rows }} {{ "linha" if inspection.rows == 1 else "linhas" }} com dados abaixo da linha {{ inspection.header_row }}.
+      {%- else %}Esta aba não tem dados abaixo da linha {{ inspection.header_row }}. Escolha outra aba ou outra linha de cabeçalho e clique em “Reler a aba”.{% endif %}
+    </p>
+  </section>
+
+  <section class="card stack" aria-labelledby="colunas-titulo">
+    <div class="import-head">
+      <h2 class="section-title" id="colunas-titulo">O que cada coluna é <span class="num muted">{{ inspection.columns|length }}</span></h2>
+      <p class="muted text-sm">Já deixamos uma sugestão pelo nome das colunas. Confira e ajuste; colunas sem uso ficam em “Não usar”.</p>
+    </div>
+
+    {% include "dados/_import_mode.html" %}
+
+    <details class="import-help" open>
+      <summary class="import-help__title">Como preencher cada campo</summary>
+      <dl class="import-help__list">
+        {%- for key, label, required in fields %}
+        <div class="import-help__item">
+          <dt>{{ label }}{% if required %} <span class="muted">(obrigatório)</span>{% endif %}</dt>
+          <dd class="muted">{{ field_help[key] }}</dd>
+        </div>
+        {%- endfor %}
+      </dl>
+    </details>
+
+    {%- if inspection.columns %}
+    <div class="table-wrap">
+      <table class="table table--cards import-map">
+        <caption class="visually-hidden">Colunas da aba {{ inspection.sheet }}</caption>
+        <thead><tr><th scope="col">Coluna</th><th scope="col">Exemplos</th><th scope="col" class="import-map__choice-head">Isto é…</th></tr></thead>
+        <tbody>
+          {%- for c in inspection.columns %}
+          {%- set current = column_field.get(c.index, "") %}
+          <tr{% if current %} class="is-mapped"{% endif %}>
+            <td class="is-plain import-map__col">
+              <span class="import-map__letter num" aria-hidden="true">{{ c.letter }}</span>
+              <span class="import-map__name">{% if c.header %}{{ c.header }}{% else %}<span class="muted">Sem nome</span>{% endif %}<span class="visually-hidden"> (coluna {{ c.letter }})</span></span>
+            </td>
+            <td class="import-map__samples" data-label="Exemplos">
+              {%- if c.samples %}{% for v in c.samples[:3] %}<span class="import-map__sample">{{ v }}</span>{% endfor %}
+              {%- else %}<span class="muted">vazia</span>{% endif %}
+            </td>
+            <td class="import-map__choice is-plain">
+              <label class="visually-hidden" for="col_{{ c.index }}">Coluna {{ c.letter }}{% if c.header %} ({{ c.header }}){% endif %}: isto é…</label>
+              <select class="field__input import-map__select" id="col_{{ c.index }}" name="col_{{ c.index }}" data-map-select
+                      hx-get="{{ url_for('dados.import_columns_mode') }}" hx-trigger="change" hx-include="[data-map-select]"
+                      hx-target="#modo-aviso" hx-swap="outerHTML">
+                <option value=""{% if not current %} selected{% endif %}>Não usar</option>
+                {%- for key, label in column_choices %}
+                <option value="{{ key }}"{% if current == key %} selected{% endif %}>{{ label }}</option>
+                {%- endfor %}
+              </select>
+            </td>
+          </tr>
+          {%- endfor %}
+        </tbody>
+      </table>
+    </div>
+    {%- else %}
+    <p class="muted">Nenhuma coluna com dados nesta aba.</p>
+    {%- endif %}
+  </section>
+
+  <section class="card stack" aria-labelledby="unidade-titulo">
+    <h2 class="section-title" id="unidade-titulo">Unidade do tempo</h2>
+    <div class="import-where">
+      {{ field(form.time_unit, hint="Em que unidade está a coluna de tempo ideal. Se escolher horas, convertemos para minutos e mostramos o total na prévia.") }}
+    </div>
+  </section>
+
+  <section class="card stack" aria-labelledby="projeto-titulo">
+    <h2 class="section-title" id="projeto-titulo">Projeto</h2>
+    <div class="import-where">
+      {{ field(form.quantity, optional=True, hint="Use se a planilha não tem a coluna de meta (previstas).", attrs={"inputmode": "numeric", "min": 1, "autocomplete": "off"}) }}
+      {{ field(form.name, optional=True, hint="Se ficar vazio, usamos o nome do arquivo.", attrs={"autocomplete": "off"}) }}
+    </div>
+  </section>
+
+  <div class="form-actions">
+    {{ button("Ver prévia", "primary", attrs={"name": "action", "value": "previa"}) }}
+    {{ button("Cancelar", "ghost", href=url_for('dados.import_upload')) }}
+  </div>
+</form>
+{% endblock %}

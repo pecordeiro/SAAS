@@ -1,0 +1,456 @@
+/* =========================================================================
+   Controle de Produção — tokens do design system
+   Direção visual: identidade verde-oliva em todo o sistema (ADR-0018, aprovada pelo dono em
+   2026-10-23; supera a ADR-0015 só em fonte, cor e formas — densidade e foco em eficiência ficam).
+   Fonte da verdade: docs/design/tokens.css  →  cópia idêntica em
+   app/static/css/tokens.css. NÃO renomeie variáveis: templates, macros e o
+   teste de "nenhuma cor solta" dependem destes nomes (só os valores mudaram;
+   tokens de status, séries de gráfico e campo editável foram acrescentados).
+   Contraste dos pares: docs/design/contraste.md (WCAG 2.1).
+   Regra: nenhuma cor, fonte ou espaçamento fora deste arquivo.
+   ========================================================================= */
+
+/* -------------------------------------------------------------------------
+   Breakpoints (documentação — CSS custom properties não funcionam dentro de
+   @media; use os valores literais abaixo SOMENTE nos arquivos de layout):
+     --bp-sm  480px   celular grande / celular deitado
+     --bp-md  768px   tablet; acima disso a navegação inferior vira menu lateral
+     --bp-lg  1024px  desktop compacto; tabela densa mostra todas as colunas
+     --bp-xl  1280px  desktop de referência das telas
+   Abordagem mobile-first: estilos base = 375 px; @media (min-width: …).
+   ------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  /* ---------- Cores: tema claro (padrão) — paleta do painel antigo ---------- */
+  --color-bg: #FBFBF6;              /* fundo da página (off-white da marca) */
+  --color-surface: #FFFFFF;         /* cards, tabelas, modais, menu lateral */
+  --color-surface-2: #F0F1E6;       /* hover de linha, trilhos (cinza-oliva claro) */
+  --color-text: #14170D;            /* tinta */
+  --color-text-muted: #5E6354;      /* texto secundário, rótulos */
+  --color-text-subtle: #6A6F5E;     /* metadados, eixos, unidade dos números (≥ 4,5:1) */
+  --color-border: #7C846A;          /* borda de componente (campo, botão secundário) ≥ 3:1 */
+  --color-border-subtle: #E1E3D3;   /* borda de card e separador de linha */
+  --color-border-strong: #CDD0BA;   /* separador sob o cabeçalho da tabela */
+
+  /* Marca oliva (ADR-0018): links, foco, botão principal e item ativo do menu. NUNCA em dado
+     (barras, rosca, esteira, etiquetas de situação): dado usa só --color-status-* e --color-series-*. */
+  --color-primary: #455A0F;         /* oliva escuro: links, foco, texto de destaque (≥ 4,5:1) */
+  --color-primary-hover: #2E3D08;
+  --color-primary-contrast: #FFFFFF;
+  --color-primary-subtle: #E4EAD0;  /* destaque leve: item ativo do menu, linha atual */
+
+  /* Botão principal: oliva escuro, sem brilho. */
+  --color-action: #455A0F;
+  --color-action-hover: #2E3D08;
+  --color-action-contrast: #FFFFFF;
+
+  --color-accent: #EB6834;          /* laranja: série "unidades". Nunca como texto. */
+  --color-accent-contrast: #0B0B0B;
+
+  --color-success: #18792F;         /* texto verde (≥ 4,5:1) */
+  --color-success-subtle: #E4F3E7;
+  --color-warning: #8A5A00;
+  --color-warning-subtle: #FFF6DA;
+  --color-danger: #B42F2F;
+  --color-danger-hover: #8F2424;
+  --color-danger-contrast: #FFFFFF;
+  --color-danger-subtle: #FBE9E9;
+  --color-neutral: #5E6354;
+  --color-neutral-subtle: #F0F1E6;
+
+  /* Status das etapas: cor do dado (barra, bloco, fatia). Sempre com rótulo/ícone. */
+  --color-status-done: #1F8A3B;     /* concluída */
+  --color-status-doing: #2A78D6;    /* em andamento */
+  --color-status-todo: #C9C7C1;     /* não iniciada */
+  --color-status-waiting: #FAB219;  /* aguardando peça */
+  --color-status-late: #D03B3B;     /* atrasada */
+
+  /* Séries de gráfico: sempre o mesmo significado. */
+  --color-doing-text: #1F66BD;      /* texto do selo “em andamento” (azul do dado, ≥ 4,5:1); nunca link ou foco */
+  --color-doing-subtle: #EAF2FC;    /* fundo do selo “em andamento” */
+  --color-series-tasks: #2A78D6;    /* pelas tarefas */
+  --color-series-units: #EB6834;    /* unidades */
+  --color-series-tasks-text: #1D5FB5; /* número azul sobre o quadro (5,5:1); o azul do dado fica em --color-series-tasks */
+  --color-series-units-text: #B53F0A; /* número laranja sobre o quadro (5,0:1) */
+  --color-edge: #AEB397;            /* borda de cartão e trilho de barra: visível (≥ 2:1), mais suave que --color-border */
+  --color-series-neutral: #6B6A66;  /* referência (ex.: “até o prazo”): cinza puro, sem matiz da marca */
+  --color-series-tasks-soft: #CDE2FB; /* outras colunas de "equipe × prazo" */
+  --color-chart-grid: #E1E3D3;
+  --color-chart-axis: #CDD0BA;
+
+  /* Campo editável (como a célula amarela da planilha). */
+  --color-editable: #FFF9DB;
+  --color-editable-text: #14170D;
+
+  --color-focus: #455A0F;           /* foco: oliva/tinta, nunca o azul de "em andamento" */
+  --color-inverse-surface: #14170D; /* toast */
+  --color-inverse-text: #FBFBF6;
+  --color-track: #E1E3D3;           /* trilho da barra de progresso / anel */
+  --color-overlay: rgb(20 23 13 / 0.45); /* fundo atrás do modal */
+
+  /* ---------- Marca oliva (ADR-0016): SÓ páginas públicas, logotipo e links da marca ----------
+     Nunca em dado: barras, gráficos e etiquetas de situação seguem as cores de status acima.
+     A área logada (/app) não usa estes tokens. Contraste dos pares: docs/design/contraste.md. */
+  --color-brand-bg: #FBFBF6;          /* fundo off-white das páginas públicas */
+  --color-brand-surface: #FFFFFF;     /* cartões e painéis */
+  --color-brand-surface-2: #F0F1E6;   /* cinza-oliva claro: faixas, trilhos, itens */
+  --color-brand-text: #14170D;        /* tinta */
+  --color-brand-muted: #5E6354;       /* texto secundário */
+  --color-brand-subtle: #6A6F5E;      /* metadados, notas */
+  --color-brand-line: #E1E3D3;        /* divisória de card (decorativa) */
+  --color-brand-line-strong: #CDD0BA; /* divisória sob cabeçalho de tabela */
+  --color-brand-border: #7C846A;      /* borda de componente (campo, botão de contorno) ≥ 3:1 */
+  --color-brand: #455A0F;             /* marca oliva escuro: botão, link, foco */
+  --color-brand-hover: #2E3D08;
+  --color-brand-contrast: #FFFFFF;    /* texto sobre --color-brand */
+  --color-brand-soft: #E4EAD0;        /* destaque leve da marca */
+  --color-brand-block: #8F9F78;       /* bloco oliva atrás do aparelho e da chamada final */
+  --color-brand-block-text: #14170D;  /* texto sobre o bloco oliva */
+  --color-brand-frame: #101208;       /* moldura do aparelho */
+  --color-brand-frame-detail: #2B2E22;
+  --color-brand-pulse: #7CF0A0;       /* ponto pulsante do selo (decorativo) */
+
+  /* ---------- Tipografia ---------- */
+  /* Páginas públicas: Newsreader (títulos) e DM Sans (texto), woff2 em app/static/fonts/ (OFL). */
+  --font-brand-display: "Newsreader", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --font-brand-text: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-size-brand-hero: clamp(2.875rem, 8.4vw, 7rem);   /* título da página inicial */
+  --font-size-brand-h1: clamp(2.5rem, 6vw, 4.5rem);       /* título das outras páginas públicas */
+  --font-size-brand-h2: clamp(2.25rem, 5vw, 3.75rem);
+  --font-size-brand-h2-lg: clamp(2.375rem, 5.4vw, 4.25rem);
+  --font-size-brand-h3: 1.625rem;
+  --font-size-brand-h4: 1.375rem;
+  --font-size-brand-kpi: 2rem;
+  --font-size-brand-price: clamp(2.375rem, 3.6vw, 2.875rem);
+  --font-size-brand-lead: 1.125rem;
+  --font-size-brand-body: 1rem;
+  --line-height-brand-display: 0.96;
+  --letter-spacing-brand-display: -0.05em;
+  --letter-spacing-brand-title: -0.035em;
+
+  /* Sistema inteiro (ADR-0018): DM Sans no texto e Newsreader em títulos e números grandes,
+     woff2 em app/static/fonts/ (OFL). DM Sans: 400 (cobre 500) e 700 (cobre 600). */
+  --font-sans: var(--font-brand-text);
+  --font-display: var(--font-brand-display);
+  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
+
+  /* Escala (rem; 1rem = 16px). Corpo 14–16 px; só números grandes em serifa passam de 32 px (ADR-0018). */
+  --font-size-xs: 0.6875rem;  /* 11px — piso dos gráficos */
+  --font-size-sm: 0.75rem;    /* 12px — rótulos, eixos, metadados, cabeçalho de tabela */
+  --font-size-md: 0.875rem;   /* 14px — corpo, tabela, menu */
+  --font-size-lg: 1rem;       /* 16px — título de card */
+  --font-size-xl: 1.5rem;     /* 24px — título de página no celular (Newsreader) */
+  --font-size-2xl: 1.5rem;    /* 24px — título de página, valor de indicador */
+  --font-size-3xl: 2rem;      /* 32px — número de progresso (Newsreader) */
+  --font-size-4xl: 2rem;      /* 32px — teto de título de página */
+  --font-size-kpi: 1.75rem;   /* 28px — valor de indicador do Painel (Newsreader) */
+  --font-size-kpi-lead: 2.5rem; /* 40px — número principal do Painel (Newsreader) */
+  --font-size-card-title: 1.125rem; /* 18px — título de card (Newsreader) */
+  --font-size-page-title: 1.75rem;  /* 28px — título de página no desktop (Newsreader) */
+  --font-size-input: 1rem;    /* 16px no celular (evita zoom no iOS); 14px no desktop */
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;  /* DM Sans 400–500 usa o mesmo arquivo */
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;    /* títulos em Newsreader ficam em 400 (sem negrito sintético) */
+
+  --line-height-tight: 1.15;  /* números, display */
+  --line-height-snug: 1.3;    /* títulos */
+  --line-height-normal: 1.45; /* texto corrido, tabelas */
+
+  --letter-spacing-caps: 0.04em;
+  --letter-spacing-tight: -0.01em; /* títulos e números grandes */
+  --letter-spacing-title: -0.02em; /* títulos em Newsreader */
+
+  /* Dados numéricos: aplicar em tabelas, indicadores, stepper, datas */
+  --font-numeric: tabular-nums;  /* uso: font-variant-numeric: var(--font-numeric); */
+
+  /* ---------- Espaçamento: escala de 4 px ---------- */
+  --space-1: 0.25rem;  /*  4px */
+  --space-2: 0.5rem;   /*  8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px — gutter lateral no celular */
+  --space-5: 1.25rem;  /* 20px */
+  --space-6: 1.5rem;   /* 24px */
+  --space-7: 1.75rem;  /* 28px */
+  --space-8: 2rem;     /* 32px */
+  --space-9: 2.25rem;  /* 36px */
+  --space-10: 2.5rem;  /* 40px */
+  --space-11: 2.75rem; /* 44px */
+  --space-12: 3rem;    /* 48px */
+
+  /* ---------- Raios ---------- */
+  --radius-sm: 6px;     /* selos, barras */
+  --radius-md: 8px;     /* botões, campos (raio 8 px: mais denso que a pílula; ADR-0018) */
+  --radius-lg: 12px;    /* cards, modais */
+  --radius-pill: 999px; /* barra de progresso */
+  --radius-brand-sm: 0.875rem;  /* páginas públicas: painel interno, itens */
+  --radius-brand-md: 1.625rem;  /* cartões, moldura do aparelho */
+  --radius-brand-lg: 2.25rem;   /* bloco oliva, chamada final */
+
+  /* ---------- Bordas ---------- */
+  --border-width: 1px;
+  --border-width-strong: 2px; /* campo com erro, card selecionado */
+
+  /* ---------- Sombras: cards sem sombra; só o que flutua tem sombra ---------- */
+  --shadow-1: none;                                                               /* card */
+  --shadow-2: 0 2px 4px rgb(20 23 13 / 0.06), 0 8px 24px -8px rgb(20 23 13 / 0.18);  /* menu, toast */
+  --shadow-3: 0 24px 48px -16px rgb(20 23 13 / 0.30), 0 2px 6px rgb(20 23 13 / 0.08); /* modal, folha inferior */
+  --shadow-primary: none; /* botão principal sem brilho */
+  --shadow-brand: 0 24px 60px -12px rgb(30 38 10 / 0.18);              /* cartões públicos ao passar o mouse */
+  --shadow-brand-device: 0 40px 80px -16px rgb(16 18 8 / 0.40);       /* aparelho do início */
+
+  /* ---------- Foco visível ---------- */
+  --focus-width: 3px;
+  --focus-offset: 2px;
+  --focus-ring: 0 0 0 var(--focus-offset) var(--color-bg), 0 0 0 calc(var(--focus-offset) + var(--focus-width)) var(--color-focus);
+
+  /* ---------- Alvos de toque e tamanhos de controle ---------- */
+  /* Celular: 44 px. Desktop (≥ 768 px): 36 px (bloco no fim do arquivo). */
+  --touch-min: 44px;
+  --touch-comfortable: 52px;  /* chão de fábrica: stepper, navegação inferior */
+  --control-height: 44px;     /* botões e campos padrão */
+  --control-height-lg: 48px;  /* botões e campos grandes */
+  --icon-size: 18px;
+  --icon-size-lg: 22px;
+  --row-height: 40px;         /* linha de tabela */
+  --banner-height: 36px;      /* faixa fina de aviso */
+
+  /* ---------- Layout ---------- */
+  --gutter: var(--space-4);          /* 16px no celular */
+  --gutter-desktop: var(--space-6);  /* 24px a partir de 768px */
+  --content-max: 1360px;
+  --content-narrow: 440px;           /* formulários de autenticação */
+  --content-text: 720px;             /* termos, privacidade */
+  --content-brand: 75rem;            /* páginas públicas: largura útil (1200 px) */
+  --content-brand-device: 48.75rem;  /* aparelho do início */
+  --sidebar-width: 220px;
+  --sidebar-rail: 3.5rem;     /* menu recolhido (só ícones); ao passar o mouse abre e empurra o conteúdo */
+  --rail-now: var(--sidebar-rail);
+  --topbar-height: 52px;
+  --bottom-nav-height: 60px;
+  --chart-height: 280px;             /* altura padrão de gráfico */
+  --chart-row: 30px;                 /* altura por etapa nos gráficos de barras horizontais */
+  --ring-size: 96px;                 /* anel de progresso */
+
+  /* ---------- Camadas ---------- */
+  --z-sticky: 10;
+  --z-nav: 20;
+  --z-overlay: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+
+  /* ---------- Movimento ---------- */
+  --duration-fast: 100ms;    /* hover e foco */
+  --duration-normal: 150ms;  /* abrir/fechar menus e diálogos: teto da área logada */
+  --duration-rail: 800ms;      /* menu lateral abrindo e recolhendo (suave, de propósito) */
+  --easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --easing-brand: cubic-bezier(0.2, 0.7, 0.2, 1);  /* entradas das páginas públicas */
+  --duration-brand: 700ms;
+}
+
+/* ---------- Desktop: controles mais compactos (32–36 px) ---------- */
+@media (min-width: 48em) {
+  :root {
+    --touch-min: 36px;
+    --touch-comfortable: 44px;
+    --control-height: 36px;
+    --control-height-lg: 40px;
+    --font-size-input: 0.875rem;
+  }
+}
+
+/* ---------- Tema escuro: automático, salvo se o usuário fixou o claro ---------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-bg: #0F120A;
+    --color-surface: #181C10;
+    --color-surface-2: #20261A;
+    --color-text: #F0F3E4;
+    --color-text-muted: #A4AB94;
+    --color-text-subtle: #99A088;
+    --color-border: #6E7459;
+    --color-border-subtle: #2E3524;
+    --color-border-strong: #3B4430;
+    --color-primary: #B7D064;
+    --color-primary-hover: #9DB84A;
+    --color-primary-contrast: #14170D;
+    --color-primary-subtle: #27301A;
+    --color-action: #B7D064;
+    --color-action-hover: #9DB84A;
+    --color-action-contrast: #14170D;
+    --color-accent: #E0703F;
+    --color-accent-contrast: #0D0D0D;
+    --color-success: #5CC985;
+    --color-success-subtle: #15301F;
+    --color-warning: #F2B755;
+    --color-warning-subtle: #33260F;
+    --color-danger: #FF8A7F;
+    --color-danger-hover: #FFA59C;
+    --color-danger-contrast: #0D0D0D;
+    --color-danger-subtle: #3A1A18;
+    --color-neutral: #A4AB94;
+    --color-neutral-subtle: #20261A;
+    --color-status-done: #2FA14F;
+    --color-status-doing: #3987E5;
+    --color-status-todo: #4A4A46;
+    --color-status-waiting: #E9A514;
+    --color-status-late: #E05252;
+    --color-doing-text: #6AA5EE;
+    --color-doing-subtle: #1F3A5C;
+    --color-series-tasks: #3987E5;
+    --color-series-units: #E0703F;
+    --color-series-tasks-text: #6AA5F0;
+    --color-series-units-text: #F08A5C;
+    --color-edge: #4F5A40;
+    --color-series-neutral: #9A998F;
+    --color-series-tasks-soft: #1F3A5C;
+    --color-chart-grid: #2E3524;
+    --color-chart-axis: #3B4430;
+    --color-editable: #2A2716;
+    --color-editable-text: #F0F3E4;
+    --color-focus: #B7D064;
+    --color-inverse-surface: #F0F3E4;
+    --color-inverse-text: #14170D;
+    --color-track: #2E3524;
+    --color-overlay: rgb(5 6 3 / 0.65);
+    --shadow-2: 0 2px 4px rgb(0 0 0 / 0.40), 0 4px 12px rgb(0 0 0 / 0.35);
+    --shadow-3: 0 8px 24px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.40);
+    --color-brand-bg: #0F120A;
+    --color-brand-surface: #181C10;
+    --color-brand-surface-2: #20261A;
+    --color-brand-text: #F0F3E4;
+    --color-brand-muted: #A4AB94;
+    --color-brand-subtle: #99A088;
+    --color-brand-line: #2E3524;
+    --color-brand-line-strong: #3B4430;
+    --color-brand-border: #6E7459;
+    --color-brand: #B7D064;
+    --color-brand-hover: #9DB84A;
+    --color-brand-contrast: #14170D;
+    --color-brand-soft: #27301A;
+    --color-brand-block: #3E4A2C;
+    --color-brand-block-text: #F0F3E4;
+    --color-brand-frame: #050603;
+    --color-brand-frame-detail: #2B2E22;
+    --shadow-brand: 0 24px 60px -12px rgb(0 0 0 / 0.55);
+    --shadow-brand-device: 0 40px 80px -16px rgb(0 0 0 / 0.70);
+  }
+}
+
+/* ---------- Tema escuro fixado pelo usuário ---------- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #0F120A;
+  --color-surface: #181C10;
+  --color-surface-2: #20261A;
+  --color-text: #F0F3E4;
+  --color-text-muted: #A4AB94;
+  --color-text-subtle: #99A088;
+  --color-border: #6E7459;
+  --color-border-subtle: #2E3524;
+  --color-border-strong: #3B4430;
+  --color-primary: #B7D064;
+  --color-primary-hover: #9DB84A;
+  --color-primary-contrast: #14170D;
+  --color-primary-subtle: #27301A;
+  --color-action: #B7D064;
+  --color-action-hover: #9DB84A;
+  --color-action-contrast: #14170D;
+  --color-accent: #E0703F;
+  --color-accent-contrast: #0D0D0D;
+  --color-success: #5CC985;
+  --color-success-subtle: #15301F;
+  --color-warning: #F2B755;
+  --color-warning-subtle: #33260F;
+  --color-danger: #FF8A7F;
+  --color-danger-hover: #FFA59C;
+  --color-danger-contrast: #0D0D0D;
+  --color-danger-subtle: #3A1A18;
+  --color-neutral: #A4AB94;
+  --color-neutral-subtle: #20261A;
+  --color-status-done: #2FA14F;
+  --color-status-doing: #3987E5;
+  --color-status-todo: #4A4A46;
+  --color-status-waiting: #E9A514;
+  --color-status-late: #E05252;
+  --color-doing-text: #6AA5EE;
+  --color-doing-subtle: #1F3A5C;
+  --color-series-tasks: #3987E5;
+  --color-series-units: #E0703F;
+  --color-series-tasks-text: #6AA5F0;
+  --color-series-units-text: #F08A5C;
+  --color-edge: #4F5A40;
+  --color-series-neutral: #9A998F;
+  --color-series-tasks-soft: #1F3A5C;
+  --color-chart-grid: #2E3524;
+  --color-chart-axis: #3B4430;
+  --color-editable: #2A2716;
+  --color-editable-text: #F0F3E4;
+  --color-focus: #B7D064;
+  --color-inverse-surface: #F0F3E4;
+  --color-inverse-text: #14170D;
+  --color-track: #2E3524;
+  --color-overlay: rgb(5 6 3 / 0.65);
+  --shadow-2: 0 2px 4px rgb(0 0 0 / 0.40), 0 4px 12px rgb(0 0 0 / 0.35);
+  --shadow-3: 0 8px 24px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.40);
+  --color-brand-bg: #0F120A;
+  --color-brand-surface: #181C10;
+  --color-brand-surface-2: #20261A;
+  --color-brand-text: #F0F3E4;
+  --color-brand-muted: #A4AB94;
+  --color-brand-subtle: #99A088;
+  --color-brand-line: #2E3524;
+  --color-brand-line-strong: #3B4430;
+  --color-brand-border: #6E7459;
+  --color-brand: #B7D064;
+  --color-brand-hover: #9DB84A;
+  --color-brand-contrast: #14170D;
+  --color-brand-soft: #27301A;
+  --color-brand-block: #3E4A2C;
+  --color-brand-block-text: #F0F3E4;
+  --color-brand-frame: #050603;
+  --color-brand-frame-detail: #2B2E22;
+  --shadow-brand: 0 24px 60px -12px rgb(0 0 0 / 0.55);
+  --shadow-brand-device: 0 40px 80px -16px rgb(0 0 0 / 0.70);
+}
+
+/* ---------- Site público no tema claro por padrão ----------
+   Vale só nas páginas com .site--marca (início, preços, como funciona, termos, privacidade e contato):
+   com o aparelho em modo escuro, elas continuam claras. O modo escuro vale quando a pessoa escolhe “Escuro”
+   (data-theme="dark"). Fica depois do bloco escuro para vencê-lo; os valores são os do tema claro acima. */
+@media (prefers-color-scheme: dark) {
+  :root:has(.site--marca):not([data-theme="dark"]) {
+    color-scheme: light;
+    --color-bg: #FBFBF6; --color-surface: #FFFFFF; --color-surface-2: #F0F1E6;
+    --color-text: #14170D; --color-text-muted: #5E6354; --color-text-subtle: #6A6F5E;
+    --color-border-subtle: #E1E3D3; --color-border-strong: #CDD0BA;
+    --color-brand-bg: #FBFBF6; --color-brand-surface: #FFFFFF; --color-brand-surface-2: #F0F1E6;
+    --color-brand-text: #14170D; --color-brand-muted: #5E6354; --color-brand-subtle: #6A6F5E;
+    --color-brand-line: #E1E3D3; --color-brand-line-strong: #CDD0BA; --color-brand-border: #7C846A;
+    --color-brand: #455A0F; --color-brand-hover: #2E3D08; --color-brand-contrast: #FFFFFF;
+    --color-brand-soft: #E4EAD0; --color-brand-block: #8F9F78; --color-brand-block-text: #14170D;
+    --color-brand-frame: #101208; --color-brand-frame-detail: #2B2E22;
+    --shadow-brand: 0 24px 60px -12px rgb(30 38 10 / 0.18); --shadow-brand-device: 0 40px 80px -16px rgb(16 18 8 / 0.40);
+  }
+}
+
+/* ---------- Movimento reduzido ---------- */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-normal: 0ms;
+    --duration-rail: 0ms;
+  }
+}
+
+/* Largura atual do menu lateral (faixa ou aberto). Registrada para a abertura animar (initial-value
+   em px: o registro recusa rem, que não é independente do contexto). */
+@property --rail-now {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 56px;
+}

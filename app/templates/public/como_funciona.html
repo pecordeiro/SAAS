@@ -1,0 +1,92 @@
+{% extends "base_publica.html" %}
+{% set marca = true %}
+{% block title %}Como funciona com a sua planilha · Teroz{% endblock %}
+{% block description %}Traga a planilha que a sua equipe já usa: você escolhe a aba, diz o que cada coluna significa, confere os erros e importa. Depois exporte no formato da equipe, com fórmulas funcionando.{% endblock %}
+{% block main %}
+{# R10 (ADR-0016): página “como funciona com a sua planilha”. Só descreve o que o sistema faz hoje (R7/R8). #}
+<section class="pub-sec pub-sec--first" aria-labelledby="planilha-titulo">
+  <div class="pub-in pub-split pub-split--top">
+    <div>
+      <span class="pub-eyebrow pub-up" data-delay="0">Como funciona com a sua planilha</span>
+      <h1 id="planilha-titulo" class="pub-h1 pub-up" data-delay="1">Sua planilha entra. A conta sai pronta.</h1>
+      <p class="pub-sub pub-up" data-delay="2">Você não precisa começar do zero nem refazer o que a equipe já montou. Envie o arquivo, diga o que cada coluna significa e o sistema passa a calcular progresso, horas que faltam e prazo em dias úteis.</p>
+      <div class="pub-hero__cta pub-hero__cta--left pub-up" data-delay="3">
+        <a class="btn btn--primary btn--lg" href="{{ url_for('auth.signup') }}"><span class="btn__label">Começar teste grátis de {{ trial_days }} dias</span></a>
+        <a class="btn btn--secondary btn--lg" href="{{ url_for('public.pricing') }}"><span class="btn__label">Ver preços</span></a>
+      </div>
+    </div>
+    <div class="pub-map pub-up" data-delay="2">
+      <h2 class="pub-map__title">Quais colunas são quais?</h2>
+      <div class="pub-mrow"><span class="pub-mrow__src">Fase</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Etapa</span></div>
+      <div class="pub-mrow"><span class="pub-mrow__src">Serviço</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Subatividade</span></div>
+      <div class="pub-mrow"><span class="pub-mrow__src">Tempo</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Tempo ideal</span></div>
+      <div class="pub-mrow"><span class="pub-mrow__src">Feitas</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Peças prontas</span></div>
+      <p class="pub-note">Nomes de colunas de exemplo. Na sua planilha, você escolhe os seus.</p>
+    </div>
+  </div>
+</section>
+
+<section class="pub-sec pub-sec--band" aria-labelledby="importar-titulo">
+  <div class="pub-in">
+    <div class="rv"><span class="pub-eyebrow">Importar</span>
+      <h2 id="importar-titulo">Três passos para trazer o arquivo.</h2>
+      <p class="pub-sub">Aceitamos planilhas em Excel (XLSX) e em CSV, até 2 MB e 2.000 linhas de dados. Nada é salvo até você conferir e confirmar.</p></div>
+    <ol class="pub-steps" data-steps>
+      <li class="pub-step is-on rv" data-delay="1"><div class="pub-art pub-art--1"><img src="{{ url_for('static', filename='img/vitrine/passo-planilha.webp') }}" width="900" height="484" alt="Tela Importar planilha, no passo Enviar arquivo." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">1</span><h3>Envie o arquivo</h3><p>Escolha a planilha no seu computador. Se ela tem várias abas, você diz qual aba tem os dados.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
+      <li class="pub-step rv" data-delay="2"><div class="pub-art pub-art--2"><img src="{{ url_for('static', filename='img/vitrine/importar-colunas.webp') }}" width="900" height="410" alt="Tela Escolher colunas: cada coluna da planilha com exemplos e o significado escolhido, como Etapa, Subatividade e Tempo ideal." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">2</span><h3>Diga o que é cada coluna</h3><p>O sistema sugere o significado pelo nome do cabeçalho. Você corrige o que precisar: etapa, subatividade, tempo ideal, peças previstas e concluídas ou prazo.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
+      <li class="pub-step rv" data-delay="3"><div class="pub-art pub-art--3"><img src="{{ url_for('static', filename='img/vitrine/importar-previa.webp') }}" width="900" height="337" alt="Tela Prévia e confirmar: etapas e subatividades lidas da planilha, com tempo ideal e peças prontas." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">3</span><h3>Confira e confirme</h3><p>Veja uma prévia com as etapas e as subatividades. Se houver erro, o sistema mostra a linha, a coluna e o problema, e você volta às colunas sem enviar o arquivo de novo.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
+    </ol>
+  </div>
+</section>
+
+<section class="pub-sec" aria-labelledby="modos-titulo">
+  <div class="pub-in">
+    <div class="rv"><span class="pub-eyebrow">Do seu jeito</span>
+      <h2 id="modos-titulo">Sua planilha pode ser simples ou detalhada.</h2></div>
+    <div class="pub-opts pub-opts--two">
+      <div class="pub-card rv" data-delay="0"><h3>Só etapa e porcentagem</h3><p>Se a planilha diz apenas quanto cada etapa já avançou, o sistema acompanha por etapa. É o jeito mais rápido de começar.</p></div>
+      <div class="pub-card rv" data-delay="1"><h3>Etapa, subatividade e tempo</h3><p>Se ela detalha as subatividades de cada etapa, com tempo ideal e peças feitas, você ganha as horas que faltam e o prazo em dias úteis com mais precisão.</p></div>
+      <div class="pub-card rv" data-delay="2"><h3>Vários projetos no mesmo arquivo</h3><p>Quando o arquivo tem mais de um projeto, você escolhe quais importar. Cada um vira um projeto separado.</p></div>
+      <div class="pub-card rv" data-delay="3"><h3>Importou errado?</h3><p>Cada mudança fica no histórico, com quem fez e quando. Dá para voltar o projeto a uma data anterior e desfazer a volta.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="pub-sec pub-sec--band" aria-labelledby="exportar-titulo">
+  <div class="pub-in pub-split">
+    <div class="rv">
+      <span class="pub-eyebrow">Exportar</span>
+      <h2 id="exportar-titulo">E a planilha continua útil.</h2>
+      <ul class="pub-checks">
+        <li><div><b>Abas Acompanhamento e Equipe</b><span>A exportação traz as mesmas abas que a equipe já conhece, com indicadores, etapas e cenários de 1 a 6 pessoas.</span></div></li>
+        <li><div><b>Fórmulas funcionando</b><span>Ao abrir no Excel, as contas se recalculam quando você muda um valor.</span></div></li>
+        <li><div><b>Células de entrada em amarelo</b><span>O que se preenche à mão fica destacado, como no modelo que você já usa.</span></div></li>
+      </ul>
+    </div>
+    <div class="pub-card pub-card--note rv" data-delay="1">
+      <h3>Sem ficar preso</h3>
+      <p>Você exporta em planilha quando quiser, em qualquer plano, até com a assinatura atrasada. Seus dados são seus.</p>
+    </div>
+  </div>
+</section>
+
+<section class="pub-sec" aria-labelledby="faq-titulo">
+  <div class="pub-in">
+    <h2 id="faq-titulo" class="rv">Dúvidas sobre a planilha</h2>
+    <div class="pub-faq">
+      <details class="rv"><summary>Minha planilha tem outro formato. Funciona?</summary><p>Funciona. Você diz o que cada coluna significa. Só a coluna da etapa é obrigatória; as outras ajudam a calcular horas e prazo.</p></details>
+      <details class="rv"><summary>A importação apaga o que já tenho no sistema?</summary><p>Não. Cada importação cria projetos novos. Antes de confirmar, você vê a prévia e o limite de projetos do seu plano.</p></details>
+      <details class="rv"><summary>O que acontece se houver erro numa linha?</summary><p>O sistema lista cada erro com a linha, a coluna e o motivo. Você corrige a planilha ou muda a escolha das colunas e tenta de novo.</p></details>
+      <details class="rv"><summary>Meu arquivo é grande. E agora?</summary><p>O limite é de 2 MB e 2.000 linhas de dados. Se passar disso, deixe no arquivo só a aba com os dados do projeto.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="pub-sec pub-sec--end" aria-labelledby="final-titulo">
+  <div class="pub-in"><div class="pub-cta-end rv">
+    <h2 id="final-titulo">Traga sua planilha e veja.</h2>
+    <p>{{ trial_days }} dias grátis, sem cartão, nos planos Essencial e Profissional.</p>
+    <a class="btn btn--primary btn--lg" href="{{ url_for('auth.signup') }}"><span class="btn__label">Começar teste grátis</span></a>
+  </div></div>
+</section>
+{% endblock %}

@@ -1,0 +1,166 @@
+{% extends "_base.html" %}
+{% from "components/icon.html" import icon %}
+{% import "components/brand.html" as brand %}
+{% from "components/nav.html" import sidebar_nav, bottom_nav, theme_switch, banner %}
+{% from "components/toast.html" import toast_region %}
+{% from "components/alert.html" import alert %}
+{% from "components/optional.html" import optional_badge %}
+{#
+  Layout da área logada (reestruturação R1, docs/plano/reestruturacao.md §4.1):
+  - Menu igual à base (Controle de Atividades): Painel, Preencher etapas, Meta e equipe,
+    Como funciona. Depois, Projetos e Histórico; no rodapé, "Configurações" agrupa Empresa,
+    Usuários, Assinatura, Privacidade, Módulos, Modelos, Planilha e — só com o módulo opcional
+    ligado (R6, ``modules``) — Alertas, API e Unidades, com o selo “Opcional”.
+  - < 768 px: barra superior, conteúdo e navegação inferior (as 4 telas + "Mais").
+  - ≥ 768 px: menu lateral claro de 220 px.
+  Páginas definem `nav_current` (dashboard | fill | team | how | projects | history | …) e
+  `nav_project` (projeto aberto: os itens Preencher/Meta/Como passam a apontar para ele).
+  Mostrar ou esconder itens aqui é só conveniência: cada rota recusa por conta própria (ADR-0009).
+#}
+{%- set role_label = role_labels.get(current_membership.role, current_membership.role) if current_membership else "" -%}
+{%- set _proj = nav_project.id if nav_project is defined and nav_project else None -%}
+{%- set nav_items = [
+  {"key": "dashboard", "label": "Painel", "short": "Painel", "href": url_for("app.home"), "icon": "dashboard"},
+  {"key": "fill", "label": "Preencher etapas", "short": "Preencher", "href": url_for("preencher.fill", projeto=_proj), "icon": "edit"},
+  {"key": "team", "label": "Meta e equipe", "short": "Meta e equipe", "href": url_for("preencher.goal_team", projeto=_proj), "icon": "team"},
+  {"key": "how", "label": "Como funciona", "short": "Como funciona", "href": url_for("preencher.how", projeto=_proj), "icon": "help"},
+] -%}
+{%- set nav_records = [
+  {"key": "projects", "label": "Projetos", "href": url_for("app.projects"), "icon": "projects"},
+  {"key": "history", "label": "Histórico", "href": url_for("app.history"), "icon": "history"},
+] -%}
+{%- set nav_settings = [] -%}
+{%- if current_membership and current_membership.has_role("owner") -%}
+  {%- set _ = nav_settings.append({"key": "company", "label": "Empresa", "href": url_for("empresa.settings")}) -%}
+{%- endif -%}
+{%- if current_membership and current_membership.has_role("supervisor") -%}
+  {%- set _ = nav_settings.append({"key": "users", "label": "Usuários", "href": url_for("team.users")}) -%}
+{%- endif -%}
+{%- if current_membership and current_membership.role == "owner" -%}
+  {%- set _ = nav_settings.append({"key": "billing", "label": "Assinatura", "href": url_for("billing.overview")}) -%}
+{%- endif -%}
+{%- if current_membership and current_membership.has_role("owner") -%}
+  {%- set _ = nav_settings.append({"key": "privacy", "label": "Privacidade", "href": url_for("lgpd.index")}) -%}
+  {%- set _ = nav_settings.append({"key": "modules", "label": "Módulos", "href": url_for("empresa.modules")}) -%}
+{%- endif -%}
+{#- ADR-0019: só o proprietário com plano Empresa/Implantação (visual_menu vem do servidor; a rota recusa sozinha). -#}
+{%- if visual_menu | default(false) -%}
+  {%- set _ = nav_settings.append({"key": "visual", "label": "Identidade visual", "href": url_for("identidade.briefing")}) -%}
+{%- endif -%}
+{%- if current_membership and current_membership.has_role("supervisor") -%}
+  {%- set _ = nav_settings.append({"key": "templates", "label": "Modelos", "href": url_for("modelos.index")}) -%}
+  {%- set _ = nav_settings.append({"key": "spreadsheet", "label": "Planilha", "href": url_for("dados.import_upload")}) -%}
+  {%- if "alertas" in modules -%}
+  {%- set _ = nav_settings.append({"key": "alerts", "label": "Alertas", "href": url_for("app.alerts"), "optional": True}) -%}
+  {%- endif -%}
+{%- endif -%}
+{%- if config.get("FEATURE_PUBLIC_API") and "api" in modules and current_membership and current_membership.has_role("owner") -%}
+  {%- set _ = nav_settings.append({"key": "api", "label": "API", "href": url_for("api_tokens_ui.tokens_index"), "optional": True}) -%}
+{%- endif -%}
+{%- if current_membership and "unidades" in modules -%}
+  {%- set _ = nav_settings.append({"key": "units", "label": "Unidades", "href": url_for("qualidade.units_search"), "optional": True}) -%}
+{%- endif -%}
+{%- set settings_current = (nav_current | default("")) in (nav_settings | map(attribute="key") | list) -%}
+{%- set name_parts = (current_user.name or "?").split() -%}
+{%- set initials = (name_parts[0][0] ~ (name_parts[-1][0] if name_parts|length > 1 else ""))|upper -%}
+{%- set here = request.full_path.rstrip("?") -%}
+{% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block canonical %}{% endblock %}
+{% block body_class %}app{% endblock %}
+{% block body %}
+<a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+<div class="app-shell">
+  <aside class="app-sidebar" aria-label="Menu lateral">
+    <a class="brand" href="{{ url_for('app.home') }}">
+      {{ brand.symbol(24, "Teroz — Painel") }}
+    </a>
+    {%- if current_company %}
+    <p class="sidebar__company">{{ current_company.name }}<br><span class="sidebar__role">{{ role_label }}</span></p>
+    {%- endif %}
+    {{ sidebar_nav(nav_items, nav_current | default(""), "Telas") }}
+    {{ sidebar_nav(nav_records, nav_current | default(""), "Registros", secondary=True) }}
+    <div class="sidebar__footer">
+      {%- if nav_settings %}
+      <details class="sidebar__settings"{% if settings_current %} open{% endif %}>
+        <summary class="sidebar__item" data-tour="settings">{{ icon("settings") }}<span>Configurações</span>{{ icon("chevron-down", class_="sidebar__chevron") }}</summary>
+        <nav class="sidebar__subnav" aria-label="Configurações">
+          {%- for item in nav_settings %}
+          <a class="sidebar__subitem" href="{{ item.href }}"{% if item.key == nav_current | default("") %} aria-current="page"{% endif %}>{{ item.label }}{% if item.optional %}{{ optional_badge() }}{% endif %}</a>
+          {%- endfor %}
+        </nav>
+      </details>
+      {%- endif %}
+      <a class="sidebar__item" href="{{ url_for('account.profile') }}" data-tour="account"{% if nav_current | default("") == "profile" %} aria-current="page"{% endif %}>{{ icon("user") }}<span class="sidebar__user-name">{{ current_user.name }}</span></a>
+      {%- if company_count and company_count > 1 %}
+      <a class="sidebar__item" href="{{ url_for('account.companies') }}">{{ icon("building") }}<span>Trocar empresa</span></a>
+      {%- endif %}
+      {{ theme_switch(theme, here, url_for("public.set_theme"), "tema-lateral") }}
+      <form method="post" action="{{ url_for('auth.logout') }}">
+        {{ logout_form.csrf_token }}
+        <button class="sidebar__item sidebar__logout" type="submit">{{ icon("logout") }}<span>Sair</span></button>
+      </form>
+    </div>
+  </aside>
+
+  <header class="app-topbar">
+    <a href="{{ url_for('app.home') }}" class="app-topbar__logo">{{ brand.symbol(28, "Teroz — Painel") }}</a>
+    <span class="app-topbar__company">{{ current_company.name if current_company else "Teroz" }}</span>
+    <a class="avatar" href="#mais" aria-haspopup="dialog" aria-controls="mais" title="{{ current_user.name }}"><span aria-hidden="true">{{ initials }}</span><span class="visually-hidden">Conta e opções de {{ current_user.name }}</span></a>
+  </header>
+
+  <main id="conteudo" class="app-main" tabindex="-1">
+    {%- if email_unconfirmed and request.endpoint not in ("account.confirm_required",) %}
+    {{ banner("email", "info", "Confirme seu e-mail.", "Sem confirmar, o acesso dura 7 dias desde o cadastro.", ("Reenviar", url_for("account.confirm_required"))) }}
+    {%- endif %}
+    {%- if read_only | default(false) %}
+    <div class="mb-4">{{ alert("warning", "Assinatura em modo leitura — registros pausados", "Dá para ver e exportar tudo. Para voltar a gravar, regularize a assinatura.") }}</div>
+    {%- endif %}
+    {% include "app/assinatura_faixa.html" %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+{{ bottom_nav(nav_items, nav_current | default("")) }}
+
+{%- if tour_steps | default(()) %}
+{% include "components/tour.html" %}
+{%- endif %}
+
+<div class="sheet" id="mais" role="dialog" aria-modal="true" aria-labelledby="mais-titulo" data-dialog>
+  <a class="sheet__backdrop" href="#fechar" tabindex="-1" aria-hidden="true"></a>
+  <div class="sheet__panel stack">
+    <div class="sheet__handle" aria-hidden="true"></div>
+    <div class="sheet__head">
+      <div>
+        <p class="sheet__title" id="mais-titulo">{{ current_user.name }}</p>
+        <p class="muted text-sm">{{ role_label }}{% if current_company %} · {{ current_company.name }}{% endif %}</p>
+      </div>
+      <a class="btn btn--ghost btn--icon sheet__close" href="#fechar" aria-label="Fechar" data-dialog-cancel>{{ icon("x") }}</a>
+    </div>
+    <nav class="menu-list" aria-label="Mais">
+      {%- for item in nav_records %}
+      <a class="menu-list__item" href="{{ item.href }}"{% if item.key == nav_current | default("") %} aria-current="page"{% endif %}>{{ item.label }}</a>
+      {%- endfor %}
+      <a class="menu-list__item" href="{{ url_for('account.profile') }}">Perfil</a>
+      {%- if company_count and company_count > 1 %}
+      <a class="menu-list__item" href="{{ url_for('account.companies') }}">Trocar empresa</a>
+      {%- endif %}
+    </nav>
+    {%- if nav_settings %}
+    <nav class="menu-list" aria-labelledby="mais-config">
+      <p class="menu-list__group" id="mais-config">Configurações</p>
+      {%- for item in nav_settings %}
+      <a class="menu-list__item" href="{{ item.href }}"{% if item.key == nav_current | default("") %} aria-current="page"{% endif %}>{{ item.label }}{% if item.optional %}{{ optional_badge() }}{% endif %}</a>
+      {%- endfor %}
+    </nav>
+    {%- endif %}
+    {{ theme_switch(theme, here, url_for("public.set_theme"), "tema-mais") }}
+    <form method="post" action="{{ url_for('auth.logout') }}">
+      {{ logout_form.csrf_token }}
+      <button class="btn btn--secondary btn--lg btn--block" type="submit">{{ icon("logout") }}<span>Sair</span></button>
+    </form>
+  </div>
+</div>
+
+{{ toast_region() }}
+{% endblock %}

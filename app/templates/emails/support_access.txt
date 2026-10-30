@@ -1,0 +1,11 @@
+{% extends "emails/_base.txt" %}
+{% block body %}Olá, {{ name }}.
+
+A equipe de suporte da Teroz recebeu acesso temporário à empresa {{ company_name }}.
+
+Pessoa: {{ support_name }}
+Papel: {{ role_label }}
+Motivo: {{ reason }}
+Válido até: {{ expires_at|datahora }}
+
+O acesso expira sozinho e fica registrado na auditoria. Se não reconhece este pedido, desative a pessoa em Usuários e fale com o suporte.{% endblock %}

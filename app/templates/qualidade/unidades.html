@@ -1,0 +1,92 @@
+{% extends "base_app.html" %}
+{% from "components/optional.html" import optional_badge %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/badge.html" import badge %}
+{% from "components/empty_state.html" import empty_state %}
+{% from "components/table.html" import data_table %}
+{% set nav_current = "projects" %}
+{% set nav_project = project %}
+{% block title %}Unidades · {{ project.name }} · Teroz{% endblock %}
+{% block content %}
+{#
+  Etapa G — números de série do projeto (rastreabilidade; o progresso continua vindo das peças
+  registradas). Supervisor+ cadastra por faixa ou lista; limite = quantidade do projeto
+  (conferido no servidor).
+#}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('preencher.fill', projeto=project.id) }}">{{ icon("chevron-left") }}{{ project.name }}</a>
+    <h1>Unidades{{ optional_badge() }}</h1>
+    <p class="page-header__subtitle muted"><span class="num">{{ total }}</span> de <span class="num">{{ project.quantity }}</span> equipamentos com número de série.</p>
+  </div>
+</header>
+
+{%- if error %}<div class="mb-4">{{ alert("danger", error, role="alert") }}</div>{% endif %}
+
+<form class="inline-form mb-4" method="get" action="{{ url_for('qualidade.units', project_id=project.id) }}" role="search">
+  <div class="field">
+    <label class="field__label" for="busca-serie">Buscar número de série</label>
+    <input class="field__input" id="busca-serie" type="search" name="q" value="{{ q }}" maxlength="60">
+  </div>
+  {{ button("Buscar", "secondary") }}
+</form>
+
+{%- if units %}
+{% call data_table([("Número de série", ""), ("Situação", ""), ("Cadastrada em", "")], caption="Unidades do projeto") %}
+  <tbody>
+  {%- for u in units %}
+    <tr>
+      <td class="text-strong" data-label="Número de série"><a class="row-link" href="{{ url_for('qualidade.unit_detail', unit_id=u.id) }}">{{ u.serial }}</a></td>
+      <td data-label="Situação">{{ badge(labels.get(u.status, u.status), "success" if u.status in ("done", "shipped") else ("danger" if u.status == "scrapped" else "neutral")) }}</td>
+      <td class="num" data-label="Cadastrada em">{{ u.created_at|datahora }}</td>
+    </tr>
+  {%- endfor %}
+  </tbody>
+{% endcall %}
+{%- elif q %}
+<div class="card">{{ empty_state("Nada encontrado", "Nenhum número de série com “" ~ q ~ "” neste projeto.", icon="folder") }}</div>
+{%- else %}
+<div class="card">{{ empty_state("Nenhuma unidade", "Cadastre os números de série para acompanhar cada equipamento.", icon="package") }}</div>
+{%- endif %}
+
+{%- if can_manage and total < project.quantity %}
+<div class="split mt-6">
+  <form class="card stack" method="post" action="{{ url_for('qualidade.units_generate', project_id=project.id) }}">
+    <h2 class="card__title">Gerar faixa</h2>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="field">
+      <label class="field__label" for="faixa-prefixo">Prefixo <span class="field__req">(opcional)</span></label>
+      <input class="field__input" id="faixa-prefixo" type="text" name="prefix" maxlength="40" value="{{ form.get('prefix', '') }}" aria-describedby="faixa-dica">
+      <p class="field__hint" id="faixa-dica">Ex.: prefixo MT-, início 1, 3 dígitos → MT-001, MT-002…</p>
+    </div>
+    <div class="form-row form-row--2">
+      <div class="field">
+        <label class="field__label" for="faixa-inicio">Início</label>
+        <input class="field__input" id="faixa-inicio" type="number" name="start" min="0" value="{{ form.get('start', '1') }}" required>
+      </div>
+      <div class="field">
+        <label class="field__label" for="faixa-qtd">Quantidade</label>
+        <input class="field__input" id="faixa-qtd" type="number" name="count" min="1" max="{{ project.quantity - total }}" value="{{ form.get('count', project.quantity - total) }}" required>
+      </div>
+    </div>
+    <div class="field">
+      <label class="field__label" for="faixa-digitos">Dígitos</label>
+      <input class="field__input" id="faixa-digitos" type="number" name="width" min="1" max="10" value="{{ form.get('width', '3') }}" required>
+    </div>
+    <div>{{ button("Gerar", "primary", icon="plus") }}</div>
+  </form>
+  <form class="card stack" method="post" action="{{ url_for('qualidade.units_import', project_id=project.id) }}">
+    <h2 class="card__title">Colar lista</h2>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="field">
+      <label class="field__label" for="lista-series">Números de série</label>
+      <textarea class="field__input" id="lista-series" name="serials" rows="6" required aria-describedby="lista-dica">{{ form.get('serials', '') }}</textarea>
+      <p class="field__hint" id="lista-dica">Um por linha (ou separados por ; ou ,). Letras, números e . _ / -.</p>
+    </div>
+    <div>{{ button("Cadastrar", "secondary") }}</div>
+  </form>
+</div>
+{%- endif %}
+{% endblock %}

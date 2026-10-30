@@ -1,0 +1,165 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% from "components/empty_state.html" import empty_state %}
+{% from "components/modal.html" import confirm_dialog %}
+{% from "components/field.html" import checkbox %}
+{% from "components/export_menu.html" import export_menu %}
+{% from "components/optional.html" import optional_badge %}
+{% set nav_current = "fill" %}
+{% set nav_project = project %}
+{% block title %}{{ project.name }} · Teroz{% endblock %}
+{% block content %}
+{#
+  telas.md §8 — tela principal. Ordem: indicadores → etapas com registro rápido →
+  equipe e prazo → recente → ações. Registro em 2 toques no celular: toque na atividade abre a
+  folha com +1 (âncora #registrar-<id>, funciona sem JS) → “Registrar +1”. Com HTMX o registro
+  não recarrega: o servidor devolve só os pedaços que mudam (app/detail/_oob.html, hx-swap-oob).
+  O arquivo app.js atualiza o painel a cada 30 s só com a aba visível (data-refresh-url).
+#}
+<div id="painel" data-refresh-url="{{ url_for('app.project_refresh', project_id=project.id) }}">
+<header class="page-header detail-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('app.projects') }}">{{ icon("chevron-left") }}Projetos</a>
+    <h1>{{ project.name }}</h1>
+    {%- if project.product %}<p class="page-header__subtitle muted">{{ project.product }}</p>{% endif %}
+    {% include "app/detail/_meta.html" %}
+  </div>
+  <div class="page-header__actions">
+    {{ button("Painel", "secondary", icon="chart", href=url_for('app.project_dashboard', project_id=project.id)) }}
+    {{ button("Histórico", "secondary", icon="history", href=url_for('app.project_history', project_id=project.id)) }}
+    {%- if "unidades" in modules %}
+    <a class="btn btn--secondary" href="{{ url_for('qualidade.units', project_id=project.id) }}">{{ icon("package") }}<span>Unidades</span>{{ optional_badge() }}</a>
+    {%- endif %}
+    {%- if can_edit %}
+    {{ export_menu(project) }}
+    <details class="action-menu">
+      <summary class="btn btn--secondary" aria-label="Mais ações do projeto">{{ icon("more") }}<span>Ações</span></summary>
+      <div class="action-menu__list">
+        <a class="action-menu__item" href="{{ url_for('edicao.project_edit', project_id=project.id) }}">Editar projeto</a>
+        {%- if project.template_version_id %}<a class="action-menu__item" href="{{ url_for('edicao.project_compare', project_id=project.id) }}">Comparar com o modelo</a>{% endif %}
+        <a class="action-menu__item action-menu__item--danger" href="#arquivar-projeto" aria-haspopup="dialog">Arquivar projeto</a>
+      </div>
+    </details>
+    {%- endif %}
+  </div>
+</header>
+
+{% include "app/detail/_kpis.html" %}
+
+<div class="split detail-split">
+  <section aria-labelledby="etapas-titulo">
+    <h2 class="section-title mt-8" id="etapas-titulo"><span>Etapas</span><span class="num">{{ rows|length }}</span></h2>
+    {%- if errors.get("stage") %}{{ alert("danger", errors.get("stage"), role="alert") }}{% endif %}
+    {%- if not rows %}
+    <div class="card">{{ empty_state("Nenhuma etapa", "Inclua a primeira etapa para começar a registrar peças.") }}</div>
+    {%- endif %}
+    <div class="stages">
+      <div class="stages__head wide-only" aria-hidden="true">
+        <span>Etapa</span><span class="is-num">Unid.</span><span>Progresso</span><span class="is-num">Faltam</span><span>Situação</span>
+      </div>
+      {%- for stage, sr, activities in rows %}
+      {%- set stage_has_error = errors.get(stage.id) or (activities | selectattr("0.id", "in", errors) | list) %}
+      <details class="stage{% if sr.status == 'Concluída' %} stage--done{% endif %}" id="etapa-{{ stage.id }}"{% if stage.id == current_stage or stage_has_error or (not current_stage and loop.first) %} open{% endif %}>
+        {% include "app/detail/_stage_summary.html" %}
+        <div class="stage__body">
+          {%- if errors.get(stage.id) %}{{ alert("danger", errors.get(stage.id), role="alert") }}{% endif %}
+          {%- set waiting_on = "aguardando_peca" in modules %}
+          {%- if waiting_on and stage.waiting_part %}
+          {{ alert("warning", "Aguardando peça" ~ (" · previsão " ~ (stage.part_expected_on|data) if stage.part_expected_on else ""), stage.part_note or "O registro de peças continua liberado; a marca só avisa a equipe.") }}
+          {%- endif %}
+          {%- if can_edit and waiting_on %}
+          <details class="part-toggle">
+            <summary class="btn btn--ghost">{{ icon("package") }}<span>{{ "Atualizar aguardando peça" if stage.waiting_part else "Marcar aguardando peça" }}</span>{{ optional_badge() }}</summary>
+            <form class="inline-form mt-2" method="post" action="{{ url_for('app.stage_waiting_part', stage_id=stage.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="version" value="{{ stage.version }}">
+              {{ checkbox("waiting", "Aguardando peça", checked=stage.waiting_part, value="y", id="aguardando-" ~ stage.id) }}
+              <div class="field inline-form__small">
+                <label class="field__label" for="previsao-{{ stage.id }}">Previsão de chegada</label>
+                <input class="field__input" id="previsao-{{ stage.id }}" type="date" name="expected_on" value="{{ stage.part_expected_on.isoformat() if stage.part_expected_on else '' }}">
+              </div>
+              <div class="field">
+                <label class="field__label" for="obs-peca-{{ stage.id }}">Observação (opcional)</label>
+                <input class="field__input" id="obs-peca-{{ stage.id }}" type="text" name="note" maxlength="140" value="{{ stage.part_note or '' }}">
+              </div>
+              {{ button("Salvar", "secondary") }}
+            </form>
+          </details>
+          {%- endif %}
+          {%- if activities and "fotos" in modules %}
+          <details class="part-toggle evidence-toggle">
+            <summary class="btn btn--ghost">{{ icon("folder") }}<span>Fotos e comentários</span>{{ optional_badge() }}</summary>
+            <ul class="evidence-links" role="list">
+              {%- for activity, ar in activities %}
+              <li><a class="btn btn--secondary" href="{{ url_for('qualidade.evidence', activity_id=activity.id) }}">{{ activity.name }}<span class="muted num">&nbsp;({{ evidence_counts.get(activity.id, 0) }})</span></a></li>
+              {%- endfor %}
+            </ul>
+          </details>
+          {%- endif %}
+          {%- if "checklist" in modules %}
+          {%- set cs = checklist_signals.get(stage.id) %}
+          <div class="stage-quality">
+            <a class="btn btn--ghost" href="{{ url_for('qualidade.checklist', stage_id=stage.id) }}">{{ icon("check") }}<span>Checklist de inspeção{% if cs and cs.items %} ({{ cs.items }} itens){% endif %}</span>{{ optional_badge() }}</a>
+          </div>
+          {%- endif %}
+          <ul class="activities" role="list">
+            {%- for activity, ar in activities %}
+            {% include "app/detail/_activity.html" %}
+            {%- else %}
+            <li class="activity activity--empty muted">Nenhuma subatividade nesta etapa.</li>
+            {%- endfor %}
+          </ul>
+          {%- if can_edit %}
+          <form class="inline-form" method="post" action="{{ url_for('app.activity_create', stage_id=stage.id) }}">
+            {{ activity_form.csrf_token }}
+            <div class="field">
+              <label class="field__label" for="nova-atividade-{{ stage.id }}">Nova subatividade</label>
+              <input class="field__input" id="nova-atividade-{{ stage.id }}" type="text" name="name" maxlength="160" required>
+            </div>
+            <div class="field inline-form__small">
+              <label class="field__label" for="tempo-{{ stage.id }}">Tempo ideal (min)</label>
+              <input class="field__input" id="tempo-{{ stage.id }}" type="number" name="ideal_minutes" min="0" step="0.01" inputmode="decimal" required>
+            </div>
+            {{ button("Incluir subatividade", "secondary", icon="plus") }}
+          </form>
+          {%- endif %}
+        </div>
+      </details>
+      {%- endfor %}
+    </div>
+
+    {%- if rows %}
+    <details class="chart-toggle mt-4">
+      <summary class="btn btn--ghost">{{ icon("chart") }}<span>Ver gráficos por etapa</span></summary>
+      <div class="mt-2">
+        {% include "app/detail/_charts.html" %}
+      </div>
+    </details>
+    {%- endif %}
+
+    {%- if can_edit %}
+    <form class="card inline-form mt-6" method="post" action="{{ url_for('app.stage_create', project_id=project.id) }}">
+      {{ stage_form.csrf_token }}
+      <div class="field">
+        <label class="field__label" for="nova-etapa">Incluir etapa</label>
+        <input class="field__input" id="nova-etapa" type="text" name="name" maxlength="160" required>
+      </div>
+      {{ button("Incluir etapa", "secondary", icon="plus") }}
+    </form>
+    {%- endif %}
+  </section>
+
+  <aside class="split__aside detail-aside" aria-label="Equipe, prazo e registros recentes">
+    {% include "app/detail/_lateral.html" %}
+  </aside>
+</div>
+</div>
+
+{%- if can_edit %}
+{% call confirm_dialog("arquivar-projeto", "Arquivar o projeto?", "Ele sai da lista de projetos e libera o limite do plano. O histórico continua guardado e dá para exportar.", "Arquivar", url_for('edicao.project_archive', project_id=project.id)) %}
+<input type="hidden" name="confirm" value="y">
+{% endcall %}
+{%- endif %}
+{% endblock %}

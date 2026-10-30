@@ -1,0 +1,55 @@
+{#
+  Pedaços de “Meta e equipe” que mudam ao salvar (fora de banda com `oob`): as duas caixas de
+  dias úteis e a tabela “E se mudar o tamanho da equipe?”. Números de calc.resumo_equipe.
+#}
+{#- Previsão primeiro (o que a pessoa quer saber), depois as duas medidas de trabalho. São três
+    números diferentes e cada um diz o que é: dias de trabalho para terminar no ritmo atual, dias de
+    trabalho para a meta inteira e dias úteis do calendário até o prazo. -#}
+{% macro team_boxes(team, forecast, project, prazo=None, oob=False) -%}
+<div class="team-summary" id="equipe-caixas"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <div class="team-forecast{% if prazo and prazo.tone in ('success', 'danger') %} team-forecast--{{ prazo.tone }}{% endif %}">
+    <p class="team-forecast__label">Com a equipe atual: {{ project.people }} {{ "pessoa" if project.people == 1 else "pessoas" }} × {{ project.hours_per_day|minutos }}&nbsp;h por dia</p>
+    {%- if forecast %}
+    <p class="team-forecast__text">Termina em <strong>{{ forecast|data }}</strong>{% if prazo and prazo.tone in ('success', 'danger') %} · {{ prazo.short }}{% endif %}</p>
+    {%- elif team.horas_restantes == 0 %}
+    <p class="team-forecast__text">Nada pendente: todas as etapas estão prontas.</p>
+    {%- else %}
+    <p class="team-forecast__text">Sem previsão: informe as pessoas e as horas por dia.</p>
+    {%- endif %}
+    <p class="team-forecast__sub">
+      {%- if project.due_date %}Prazo {{ project.due_date|data }}{% if prazo and prazo.until %} · faltam {{ prazo.until }} {{ "dia útil" if prazo.until == 1 else "dias úteis" }} no calendário{% endif %}
+      {%- else %}Sem prazo definido: preencha o prazo para ver a folga ou o atraso.{% endif -%}
+    </p>
+  </div>
+  <div class="twobox">
+    <div class="box">
+      <p class="box__label">Dias de trabalho para terminar</p>
+      <p class="box__big num">{% if team.dias_restantes is none %}—{% else %}{{ team.dias_restantes|num(1) }}{% endif %}</p>
+      <p class="box__sub">{{ team.horas_restantes|num(1) }}&nbsp;h que faltam, no ritmo da equipe atual</p>
+    </div>
+    <div class="box">
+      <p class="box__label">Dias de trabalho para a meta inteira</p>
+      <p class="box__big num">{% if team.dias_meta is none %}—{% else %}{{ team.dias_meta|num(1) }}{% endif %}</p>
+      <p class="box__sub">{{ team.horas_meta|num(1) }}&nbsp;h para {{ project.quantity }} unidade{{ "" if project.quantity == 1 else "s" }}, do zero</p>
+    </div>
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro team_table(team, oob=False) -%}
+<div class="table-scroll" id="equipe-tabela"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <table class="etab team-table">
+    <caption class="visually-hidden">Dias úteis restantes conforme o tamanho da equipe</caption>
+    <thead><tr><th scope="col">Pessoas</th><th scope="col" class="num">Horas por dia (equipe)</th><th scope="col" class="num">Dias úteis restantes</th></tr></thead>
+    <tbody>
+      {%- for l in team.linhas %}
+      <tr{% if l.atual %} class="is-current"{% endif %}>
+        <th scope="row">{{ l.pessoas }} {{ "pessoa" if l.pessoas == 1 else "pessoas" }}{% if l.atual %} <span class="badge badge--info">equipe atual</span>{% endif %}</th>
+        <td class="num">{{ l.horas_equipe|minutos }}</td>
+        <td class="num">{% if l.dias is none %}—{% else %}{{ l.dias|num(1) }}{% endif %}</td>
+      </tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+</div>
+{%- endmacro %}

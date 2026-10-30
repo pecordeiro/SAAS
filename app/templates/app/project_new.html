@@ -1,0 +1,139 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/field.html" import field, form_errors %}
+{% from "components/button.html" import button %}
+{% from "components/stepper.html" import stepper %}
+{% from "components/alert.html" import alert %}
+{% set nav_current = "projects" %}
+{% block title %}Novo projeto · Teroz{% endblock %}
+{% block content %}
+{#
+  telas.md §10 (supervisor+): modelo de etapas (cartões de escolha) → nome, produto, quantidade
+  → prazo e equipe → resumo calculado (HTMX; só aparece com JS) → Criar. Sem modelo, as etapas
+  são digitadas nos blocos “Nome; minutos”.
+#}
+{%- set chosen = form.template_id.data if form.is_submitted() else (templates[0][0].id|string if templates else "") %}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('app.projects') }}">{{ icon("chevron-left") }}Projetos</a>
+    <h1>Novo projeto</h1>
+  </div>
+</header>
+
+<div class="split split--form">
+  <form class="stack--lg" id="form-projeto" method="post" action="{{ url_for('app.project_new') }}" novalidate>
+    {{ form_errors(form, list_label="Etapa") }}
+    {{ form.csrf_token }}
+    <section class="card stack" aria-labelledby="modelo-titulo">
+      <h2 class="section-title" id="modelo-titulo">Modelo de etapas</h2>
+      {%- if has_templates %}
+      <div class="radio-cards" role="radiogroup" aria-labelledby="modelo-titulo">
+        {%- for t, version, mpu in templates %}
+        <label class="radio-card">
+          <input type="radio" name="template_id" value="{{ t.id }}"{% if chosen == t.id|string %} checked{% endif %}>
+          <span class="radio-card__body">
+            <span class="radio-card__title">{{ t.name }} <span class="muted">v{{ version.number if version else 1 }}</span></span>
+            <span class="radio-card__meta muted text-sm">{{ version.stages|length if version else 0 }} etapas · {{ (mpu / 60)|horas }} por unidade</span>
+          </span>
+        </label>
+        {%- endfor %}
+        <label class="radio-card">
+          <input type="radio" name="template_id" value=""{% if not chosen %} checked{% endif %}>
+          <span class="radio-card__body">
+            <span class="radio-card__title">Sem modelo</span>
+            <span class="radio-card__meta muted text-sm">Digitar as etapas abaixo</span>
+          </span>
+        </label>
+      </div>
+      <p class="muted text-sm">Com modelo, as etapas são copiadas da versão atual e os blocos de etapas abaixo são ignorados. <a href="{{ url_for('modelos.new') }}">Criar modelo de etapas</a></p>
+      {%- else %}
+      <input type="hidden" name="template_id" value="">
+      <p class="muted text-sm">Nenhum modelo ainda. <a href="{{ url_for('modelos.new') }}">Criar modelo de etapas</a> ou digite as etapas abaixo.</p>
+      {%- endif %}
+    </section>
+    <section class="card stack" aria-labelledby="dados-titulo">
+      <h2 class="section-title" id="dados-titulo">Projeto</h2>
+      {{ field(form.name, attrs={"required": true, "placeholder": "Lote 2026-017"}) }}
+      {{ field(form.product, optional=True, attrs={"placeholder": "Equipamento compacto CX-10"}) }}
+      <div class="field{% if form.quantity.errors %} field--error{% endif %}">
+        <label class="field__label" for="{{ form.quantity.id }}">{{ form.quantity.label.text }}</label>
+        {{ stepper(form.quantity.name, form.quantity.data if form.quantity.data is not none else (form.quantity.raw_data[0] if form.quantity.raw_data else 1), 1, 100000, id=form.quantity.id, label="Quantidade de equipamentos", size="md", describedby=(form.quantity.id ~ "-erro") if form.quantity.errors else None, invalid=form.quantity.errors|length > 0) }}
+        {%- if form.quantity.errors %}<p class="field__error" id="{{ form.quantity.id }}-erro">{{ icon("alert", "sm") }}<span>{{ form.quantity.errors|join(" ") }}</span></p>{% endif %}
+      </div>
+      <div class="form-row form-row--2">
+        {{ field(form.start_date, optional=True) }}
+        {{ field(form.due_date, optional=True) }}
+      </div>
+      <div class="form-row form-row--2">
+        {{ field(form.people, label="Pessoas na equipe", attrs={"min": 1, "inputmode": "numeric", "required": true}) }}
+        {{ field(form.hours_per_day, label="Horas por dia", hint="Por pessoa.", attrs={"inputmode": "decimal", "required": true}) }}
+      </div>
+      <p class="muted text-sm">Dias de trabalho: {{ workdays|dias_semana }} (jornada e feriados da empresa).
+        {%- if current_membership.has_role("owner") %} <a href="{{ url_for('empresa.settings') }}">Ajustar em Empresa</a>.{% endif %}</p>
+    </section>
+
+    <section class="card stack" aria-labelledby="etapas-titulo">
+      <div>
+        <h2 class="section-title" id="etapas-titulo">Etapas (sem modelo)</h2>
+        <p class="muted text-sm">Preencha só as etapas que vai usar.</p>
+      </div>
+      <fieldset class="fieldset stack--sm">
+        <legend class="field__label">{{ form.progress_mode.label.text }}</legend>
+        <div class="radio-cards">
+          {%- for value, label, desc in [("simples", "Simples", "Você lança o % de cada etapa. Subatividades ficam em branco (ou uma linha com o tempo da etapa)."), ("detalhado", "Detalhado", "Subatividades com tempo ideal e peças, igual à planilha: uma por linha, Nome; minutos por unidade.")] %}
+          <label class="radio-card">
+            <input type="radio" name="progress_mode" value="{{ value }}"{% if (form.progress_mode.data or "simples") == value %} checked{% endif %}>
+            <span class="radio-card__body">
+              <span class="radio-card__title">{{ label }}</span>
+              <span class="radio-card__meta muted text-sm">{{ desc }}</span>
+            </span>
+          </label>
+          {%- endfor %}
+        </div>
+        <p class="muted text-sm">Com modelo, o projeto usa o modo detalhado. Dá para trocar depois em Meta e equipe.</p>
+      </fieldset>
+      {%- for error in form.stages.errors if error is string %}<p class="field__error">{{ icon("alert", "sm") }}<span>{{ error }}</span></p>{% endfor %}
+      {%- for slot in form.stages %}
+      {%- if loop.index == 3 %}
+      <details class="more-stages"{% if form.stages.entries[2:]|selectattr("form.name.data")|list or form.stages.entries[2:]|selectattr("form.activities.errors")|list %} open{% endif %}>
+        <summary class="btn btn--ghost">{{ icon("plus") }}<span>Mais etapas (até {{ form.stages|length }})</span></summary>
+        <div class="stack mt-4">
+      {%- endif %}
+      <fieldset class="fieldset stage-slot stack--sm">
+        <legend class="stage-slot__legend">Etapa {{ loop.index }}</legend>
+        {{ field(slot.form.name, label="Nome da etapa", attrs=({"placeholder": "Montagem mecânica"} if loop.first else {})) }}
+        {{ field(slot.form.activities, label="Subatividades", hint="Ex.: Fixação da base; 120", attrs={"rows": 4}) }}
+      </fieldset>
+      {%- if loop.last and loop.length > 2 %}
+        </div>
+      </details>
+      {%- endif %}
+      {%- endfor %}
+    </section>
+
+    <div class="form-actions">
+      {{ button("Criar projeto", "primary", size="lg") }}
+      {{ button("Cancelar", "secondary", size="lg", href=url_for('app.projects')) }}
+    </div>
+  </form>
+
+  <aside class="split__aside stack">
+    <section class="card stack js-only" id="resumo-card" aria-labelledby="resumo-titulo">
+      <h2 class="section-title" id="resumo-titulo">Resumo</h2>
+      <div id="resumo" aria-live="polite"
+           hx-get="{{ url_for('app.project_new_summary') }}"
+           hx-include="#form-projeto [name=template_id]:checked, #form-projeto [name=quantity], #form-projeto [name=start_date], #form-projeto [name=due_date], #form-projeto [name=people], #form-projeto [name=hours_per_day]"
+           hx-trigger="load, input from:#form-projeto delay:300ms, change from:#form-projeto"
+           hx-swap="innerHTML">
+        <p class="muted text-sm">Calculando…</p>
+      </div>
+    </section>
+    <section class="card stack" aria-labelledby="como-titulo">
+      <h2 class="section-title" id="como-titulo">Como o prazo é calculado</h2>
+      <p class="text-sm">Tempo total = soma dos tempos ideais × quantidade.</p>
+      <p class="text-sm">Dias úteis = horas que faltam ÷ (pessoas × horas por dia), pulando fins de semana e feriados da empresa.</p>
+      <p class="text-sm muted">Depois de criar, os números aparecem no painel do projeto e se atualizam a cada peça registrada.</p>
+    </section>
+  </aside>
+</div>
+{% endblock %}

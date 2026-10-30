@@ -1,0 +1,60 @@
+{% from "components/icon.html" import icon %}
+{#
+  Navegação da área logada — design-system §11 (menu lateral, ≥ 768 px) e §12 (navegação
+  inferior, < 768 px). items = lista de dicts {key, label, href, icon}.
+#}
+{% macro sidebar_nav(items, current, label="Principal", secondary=False) -%}
+<nav class="sidebar__nav{% if secondary %} sidebar__nav--secondary{% endif %}" aria-label="{{ label }}">
+  {%- for item in items %}
+  <a class="sidebar__item" href="{{ item.href }}" data-tour="{{ item.key }}"{% if item.key == current %} aria-current="page"{% endif %}>{{ icon(item.icon) }}<span>{{ item.label }}</span></a>
+  {%- endfor %}
+</nav>
+{%- endmacro %}
+
+{#- Celular: as 4 telas da base + "Mais" (Projetos, Histórico, Configurações, conta). -#}
+{% macro bottom_nav(items, current, more_href="#mais", more_label="Mais") -%}
+<nav class="bottom-nav" aria-label="Principal">
+  {%- for item in items[:4] %}
+  <a class="bottom-nav__item" href="{{ item.href }}" data-tour="{{ item.key }}"{% if item.key == current %} aria-current="page"{% endif %}>{{ icon(item.icon, "lg") }}<span>{{ item.short or item.label }}</span></a>
+  {%- endfor %}
+  <a class="bottom-nav__item" href="{{ more_href }}" aria-haspopup="dialog" data-tour="more">{{ icon("more", "lg") }}<span>{{ more_label }}</span></a>
+</nav>
+{%- endmacro %}
+
+{#
+  Faixa fina de aviso (uma linha, ~36 px) que pode ser fechada. Sem JS ela só não fecha;
+  com JS o botão esconde e lembra na sessão do navegador (só apresentação, ADR-0009).
+  key = nome estável do aviso; kind = info | warning | danger; action = (rótulo, href).
+#}
+{% macro banner(key, kind, title, body=None, action=None) -%}
+<div class="banner banner--{{ kind }}" role="status" data-banner="{{ key }}">
+  {{ icon("info" if kind == "info" else "alert", "sm", class_="banner__icon") }}
+  <p class="banner__text"><strong>{{ title }}</strong>{% if body %} <span class="banner__body">{{ body }}</span>{% endif %}</p>
+  {%- if action %}<a class="banner__action" href="{{ action[1] }}">{{ action[0] }}</a>{% endif %}
+  <button class="banner__close js-only" type="button" data-banner-close aria-label="Fechar aviso">{{ icon("x", "sm") }}</button>
+</div>
+{%- endmacro %}
+
+{#
+  Seletor de tema Sistema/Claro/Escuro. Sem JS: POST /tema (cookie) e volta à página.
+  Com JS: aplica na hora (data-theme no <html>) e grava o mesmo cookie.
+#}
+{% macro theme_switch(theme, next_url, action, prefix="tema") -%}
+{%- set current = theme or "system" -%}
+<form class="theme-form" method="post" action="{{ action }}" data-theme-form>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ next_url }}">
+  <fieldset class="theme-switch">
+    <legend class="theme-switch__legend">Tema</legend>
+    <div class="theme-switch__options">
+      {%- for value, label, ico in [("system", "Sistema", "monitor"), ("light", "Claro", "sun"), ("dark", "Escuro", "moon")] %}
+      <label class="theme-switch__option">
+        <input type="radio" name="tema" value="{{ value }}" id="{{ prefix }}-{{ value }}"{% if current == value %} checked{% endif %}>
+        <span>{{ icon(ico, "sm") }}<span class="theme-switch__text">{{ label }}</span></span>
+      </label>
+      {%- endfor %}
+    </div>
+  </fieldset>
+  <button class="btn btn--secondary btn--block theme-switch__apply no-js-only" type="submit">Aplicar tema</button>
+</form>
+{%- endmacro %}

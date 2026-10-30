@@ -1,0 +1,10 @@
+{% extends "errors/_layout.html" %}
+{#- Limite do plano / modo leitura (app/services/entitlements.py): HTTP 402. -#}
+{% block title %}{{ title }} · Teroz{% endblock %}
+{% block code %}402{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+{% block message %}{{ message }}{% endblock %}
+{% block actions %}
+{{ button("Ver planos", "primary", size="lg", block=True, href=url_for('public.index', _anchor='precos')) }}
+{{ button("Ir para Projetos", "ghost", href=url_for('app.projects')) }}
+{% endblock %}

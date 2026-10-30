@@ -1,0 +1,150 @@
+{% extends "base_app.html" %}
+{% import "preencher/_partes.html" as parts %}
+{% from "components/icon.html" import icon %}
+{% from "components/alert.html" import alert %}
+{% from "components/modal.html" import confirm_dialog %}
+{% from "components/empty_state.html" import empty_state %}
+{% set nav_current = "fill" %}
+{% set nav_project = project %}
+{% block title %}Preencher etapas · {{ project.name }} · Teroz{% endblock %}
+{% block head_extra %}
+  {%- for src in asset_urls("preencher.js") %}
+  <script src="{{ src }}" defer></script>
+  {%- endfor %}
+  {%- if can_edit %}
+  {%- for src in asset_urls("arrastar.js") %}
+  <script src="{{ src }}" defer></script>
+  {%- endfor %}
+  {%- endif %}
+{% endblock %}
+{% block content %}
+{#
+  Preencher etapas (R3, plano §4.3; redesign 2026-10-28): dois modos na mesma tela.
+  “Registrar produção” (padrão, todos): à esquerda as etapas com UM indicador (progresso pelas
+  tarefas), situação e unidades prontas; à direita só o que se lança, o total de peças prontas de
+  cada subatividade (ou o %, no modo simples). “Configurar etapas” (supervisor+): nomes, tempos,
+  pesos, ordem, incluir e apagar. O modo só muda o que aparece (.cfg-only / .reg-only); as rotas
+  checam o papel. Excluir = arquivar: nada se perde e dá para desfazer.
+#}
+{%- macro archived_stage_list() %}
+{%- if archived_stages %}
+    <details class="fill__archived">
+      <summary>Etapas apagadas ({{ archived_stages|length }})</summary>
+      <ul class="archived-list">
+        {%- for s in archived_stages %}
+        <li><span>{{ s.name }}</span>
+          <form method="post" action="{{ url_for('preencher.stage_unarchive', stage_id=s.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="modo" value="configurar">
+            <button class="btn btn--secondary btn--sm" type="submit">Desfazer</button>
+          </form>
+        </li>
+        {%- endfor %}
+      </ul>
+    </details>
+    {%- endif %}
+{%- endmacro %}
+{%- set page_title, page_endpoint = "Preencher etapas", "preencher.fill" %}
+{% include "preencher/_cabecalho.html" %}
+
+{%- with errors = get_flashed_messages(category_filter=["erro"]) %}
+{%- if errors %}<div class="mb-4">{{ alert("danger", errors[-1], role="alert") }}</div>{% endif %}
+{%- endwith %}
+
+{%- if not items %}
+<div class="card">
+  {{ empty_state("Nenhuma etapa ainda", "Inclua a primeira etapa para começar a lançar o progresso." if can_edit else "Peça a um supervisor para incluir as etapas do projeto.", icon="edit") }}
+  {%- if can_edit %}
+  <form class="new-stage" method="post" action="{{ url_for('preencher.stage_new', project_id=project.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="field__label" for="nova-etapa-vazia">Nome da etapa</label>
+    <span class="new-stage__row"><input class="field__input" id="nova-etapa-vazia" name="name" maxlength="160" required autocomplete="off"><button class="btn btn--primary" type="submit">Incluir etapa</button></span>
+  </form>
+  {{ archived_stage_list() }}
+  {%- endif %}
+</div>
+{%- else %}
+
+<div class="fill-bar">
+  {%- if can_edit %}
+  <nav class="segmented mode-switch" aria-label="O que fazer nesta tela">
+    <a class="segmented__item" href="{{ url_for('preencher.fill', projeto=project.id, etapa=sel.stage.id) }}"{% if modo == 'registrar' %} aria-current="page"{% endif %}>Registrar produção</a>
+    <a class="segmented__item" href="{{ url_for('preencher.fill', projeto=project.id, etapa=sel.stage.id, modo='configurar') }}"{% if modo == 'configurar' %} aria-current="page"{% endif %}>Configurar etapas</a>
+  </nav>
+  {%- endif %}
+  {{ parts.save_status(None) }}
+</div>
+
+<div class="fill" data-modo="{{ modo }}">
+  <nav class="card fill__list" aria-label="Etapas do projeto">
+    <p class="fill__list-legend">Etapas · progresso pelas tarefas</p>
+    {%- if can_edit %}
+    <form id="ordem-etapas" method="post" action="{{ url_for('edicao.stages_reorder', project_id=project.id) }}" hidden>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="voltar" value="preencher">
+    </form>
+    {%- endif %}
+    <ol class="stage-list sort-list" data-sort-list="stages" data-sort-form="ordem-etapas">
+      {%- for it in items %}
+      {%- set current = it.stage.id == sel.stage.id %}
+      <li class="stage-item sort-item{% if current %} is-current{% endif %}" data-sort-id="{{ it.stage.id }}">
+        {%- if can_edit %}<span class="drag-handle js-only cfg-only" data-drag-handle title="Arraste para reordenar" aria-hidden="true">⠿</span>{% endif %}
+        <a class="stage-item__link" href="{{ url_for('preencher.fill', projeto=project.id, etapa=it.stage.id, modo=('configurar' if modo == 'configurar' else none)) }}"{% if current %} aria-current="true"{% endif %}>{{ parts.stage_info(it) }}</a>
+        {%- if can_edit %}
+        <details class="action-menu stage-item__menu cfg-only">
+          <summary class="btn btn--ghost btn--sm btn--icon" aria-label="Ações da etapa {{ it.stage.name }}">{{ icon("more") }}</summary>
+          <div class="action-menu__list">
+            <a class="action-menu__item" href="{{ url_for('preencher.fill', projeto=project.id, etapa=it.stage.id, modo='configurar', _anchor='nome-etapa') }}">Renomear</a>
+            {%- for direction, label in (("up", "Mover para cima"), ("down", "Mover para baixo")) %}
+            {%- if (direction == "up" and it.n > 1) or (direction == "down" and it.n < items|length) %}
+            <form method="post" action="{{ url_for('edicao.stage_move', stage_id=it.stage.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="voltar" value="preencher">
+              <input type="hidden" name="modo" value="configurar">
+              <input type="hidden" name="direction" value="{{ direction }}">
+              <button class="action-menu__item" type="submit">{{ label }}</button>
+            </form>
+            {%- endif %}
+            {%- endfor %}
+            <a class="action-menu__item action-menu__item--danger" href="#excluir-etapa-{{ it.stage.id }}" aria-haspopup="dialog">Apagar etapa</a>
+          </div>
+        </details>
+        {%- endif %}
+      </li>
+      {%- endfor %}
+    </ol>
+    {%- if can_edit %}
+    <div class="cfg-only">
+    <p class="fill__list-hint js-only">Arraste pela alça ⠿ para mudar a ordem.</p>
+    <form class="new-stage" method="post" action="{{ url_for('preencher.stage_new', project_id=project.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="modo" value="configurar">
+      <label class="field__label" for="nova-etapa">+ Nova etapa</label>
+      <span class="new-stage__row"><input class="field__input" id="nova-etapa" name="name" maxlength="160" required autocomplete="off" placeholder="Nome da etapa"><button class="btn btn--secondary" type="submit">{{ icon("plus", "sm") }}<span>Incluir</span></button></span>
+    </form>
+    {{ archived_stage_list() }}
+    </div>
+    {%- endif %}
+  </nav>
+
+  {% include "preencher/_painel.html" %}
+</div>
+
+{%- if can_edit %}
+{%- for it in items %}
+{% call confirm_dialog("excluir-etapa-" ~ it.stage.id, "Apagar “" ~ it.stage.name ~ "” e todas as suas subatividades?", "Ela sai da tela e das contas. As peças lançadas ficam no histórico, e dá para desfazer em “Etapas apagadas”, no fim da lista.", "Apagar etapa", url_for('edicao.stage_archive', stage_id=it.stage.id)) %}
+<input type="hidden" name="voltar" value="preencher">
+<input type="hidden" name="modo" value="configurar">
+{% endcall %}
+{%- endfor %}
+{%- if not simple %}
+{%- for a, ar in rows %}
+{% call confirm_dialog("excluir-atv-" ~ a.id, "Apagar a subatividade “" ~ a.name ~ "”?", "Ela sai da etapa e das contas. As peças lançadas ficam no histórico, e dá para desfazer em “Subatividades apagadas”, abaixo da tabela.", "Apagar subatividade", url_for('edicao.activity_archive', activity_id=a.id)) %}
+<input type="hidden" name="voltar" value="preencher">
+<input type="hidden" name="modo" value="configurar">
+{% endcall %}
+{%- endfor %}
+{%- endif %}
+{%- endif %}
+{%- endif %}
+{% endblock %}

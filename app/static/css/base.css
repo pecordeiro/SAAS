@@ -1,0 +1,199 @@
+/* Base: ordem das camadas, fontes e elementos HTML. Só tokens (nada de cor ou px literal). */
+@layer base, layout, components, utilities;
+
+/* Identidade oliva (ADR-0016 no site público, ADR-0018 em todo o sistema): Newsreader (títulos e números
+   grandes) e DM Sans (texto), licença OFL, servidas pelo próprio site. A IBM Plex Sans saiu (ADR-0018).
+   DM Sans tem algarismos tabulares pelo recurso OpenType "tnum" (var(--font-numeric)). */
+@font-face {
+  font-family: "Newsreader";
+  src: url("../fonts/newsreader-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Newsreader";
+  src: url("../fonts/newsreader-latin-400-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "DM Sans";
+  src: url("../fonts/dm-sans-latin-400-normal.woff2") format("woff2");
+  font-weight: 400 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "DM Sans";
+  src: url("../fonts/dm-sans-latin-700-normal.woff2") format("woff2");
+  font-weight: 600 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    background: var(--color-bg);
+    /* Partes do navegador seguem a marca: caixas de marcar, cursor de texto, seleção e barras de rolagem. */
+    accent-color: var(--color-primary);
+    caret-color: var(--color-primary);
+    scrollbar-color: var(--color-border-strong) transparent;
+  }
+
+  ::selection {
+    background: var(--color-primary-subtle);
+    color: var(--color-text);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-regular);
+    line-height: var(--line-height-normal);
+    color: var(--color-text);
+    background: var(--color-bg);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-snug);
+    letter-spacing: var(--letter-spacing-tight);
+    color: var(--color-text);
+    text-wrap: balance;
+  }
+
+  /* Títulos de página e de card em Newsreader (só existe o 400: sem negrito sintético); h3/h4 em DM Sans. */
+  h1,
+  h2 {
+    font-family: var(--font-display);
+    font-weight: var(--font-weight-regular);
+    letter-spacing: var(--letter-spacing-title);
+  }
+
+  h1 { font-size: var(--font-size-xl); }
+  h2 { font-size: var(--font-size-card-title); }
+  h3 { font-size: var(--font-size-md); }
+  h1, h2, h3, h4 { overflow-wrap: break-word; }
+
+  p,
+  ul,
+  ol,
+  dl,
+  dd,
+  figure {
+    margin: 0;
+  }
+
+  ul,
+  ol {
+    padding: 0;
+  }
+
+  a {
+    color: var(--color-primary);
+    text-underline-offset: 0.15em;
+  }
+
+  a:hover {
+    color: var(--color-primary-hover);
+  }
+
+  :focus-visible {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: var(--focus-offset);
+  }
+
+  img,
+  svg {
+    max-width: 100%;
+  }
+
+  img {
+    display: block;
+    height: auto;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  a,
+  button,
+  summary,
+  label {
+    touch-action: manipulation;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  th {
+    text-align: left;
+  }
+
+  code,
+  kbd,
+  samp {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+  }
+
+  hr {
+    border: 0;
+    border-top: var(--border-width) solid var(--color-border-subtle);
+    margin: var(--space-6) 0;
+  }
+
+  summary {
+    cursor: pointer;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+
+  @media (min-width: 48em) {
+    h1 { font-size: var(--font-size-page-title); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0s !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0s !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

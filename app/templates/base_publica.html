@@ -1,0 +1,108 @@
+{% extends "_base.html" %}
+{% from "components/icon.html" import icon %}
+{% import "components/brand.html" as brand %}
+{% from "components/button.html" import button %}
+{% from "components/toast.html" import toast_region %}
+{#
+  Layout do site público (telas.md, “Telas públicas”): cabeçalho com logo e links,
+  ☰ no celular abre folha com os links; rodapé. Páginas preenchem `content`
+  (dentro de .container) ou `main` (largura livre).
+  Identidade oliva (ADR-0016): páginas que declaram `{% set marca = true %}` no topo (início, preços,
+  como funciona, termos, privacidade, contato) usam a paleta de marca, Newsreader e DM Sans, e o
+  publico.js (animações). Login, cadastro, convite e erros usam a mesma identidade (ADR-0018), sem animação.
+#}
+{% block body_class %}site{% if marca %} site--marca{% endif %}{% endblock %}
+{% block head_extra %}
+  {%- if marca %}
+  {%- for src in asset_urls("publico.js") %}
+  <script src="{{ src }}"></script>
+  {%- endfor %}
+  {%- endif %}
+{% endblock %}
+{% block body %}
+<a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+<header class="site-header">
+  <div class="container site-header__inner">
+    <a class="brand" href="{{ url_for('public.index') }}">
+      {{ brand.logo(40) }}
+    </a>
+    <nav class="site-nav" aria-label="Site">
+      {%- if marca %}
+      <a class="site-nav__link" href="{{ url_for('public.index') }}#como">Como funciona</a>
+      <a class="site-nav__link" href="{{ url_for('public.how_it_works') }}"{% if request.endpoint == 'public.how_it_works' %} aria-current="page"{% endif %}>Sua planilha</a>
+      {%- endif %}
+      <a class="site-nav__link" href="{{ url_for('public.pricing') }}"{% if request.endpoint == 'public.pricing' %} aria-current="page"{% endif %}>Preços</a>
+      {%- if current_user.is_authenticated %}
+      {{ button("Abrir o painel", "primary", href=url_for('app.home')) }}
+      {%- else %}
+      <a class="site-nav__link site-nav__login" href="{{ url_for('auth.login') }}">Entrar</a>
+      {{ button("Teste grátis", "primary", href=url_for('auth.signup')) }}
+      {%- endif %}
+    </nav>
+    {#- Tema claro/escuro: o site público abre claro; este botão alterna e grava o cookie “tema” (o mesmo do sistema).
+        Sem JS, o formulário envia a escolha à rota /tema e volta para esta página. -#}
+    <form class="theme-toggle" method="post" action="{{ url_for('public.set_theme') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+      <input type="hidden" name="tema" value="{{ 'light' if theme == 'dark' else 'dark' }}" data-theme-next>
+      <button class="btn btn--ghost btn--icon theme-toggle__btn" type="submit" data-theme-toggle aria-pressed="{{ 'true' if theme == 'dark' else 'false' }}" title="Alternar entre tema claro e escuro">
+        {{ icon("moon", class_="theme-toggle__moon") }}{{ icon("sun", class_="theme-toggle__sun") }}
+        <span class="visually-hidden">Tema escuro</span>
+      </button>
+    </form>
+    <a class="btn btn--ghost btn--icon site-header__menu only-mobile" href="#menu" aria-haspopup="dialog" aria-controls="menu">{{ icon("menu") }}<span class="visually-hidden">Abrir menu</span></a>
+  </div>
+</header>
+
+<main id="conteudo" class="site-main" tabindex="-1">
+  {% block main %}<div class="container">{% block content %}{% endblock %}</div>{% endblock %}
+</main>
+
+<footer class="site-footer">
+  <div class="container site-footer__inner">
+    <nav class="cluster" aria-label="Rodapé">
+      <a href="{{ url_for('public.how_it_works') }}">Sua planilha</a>
+      <span aria-hidden="true">·</span>
+      <a href="{{ url_for('public.pricing') }}">Preços</a>
+      <span aria-hidden="true">·</span>
+      <a href="{{ url_for('public.terms') }}">Termos</a>
+      <span aria-hidden="true">·</span>
+      <a href="{{ url_for('public.privacy') }}">Privacidade</a>
+      <span aria-hidden="true">·</span>
+      <a href="{{ url_for('public.contact') }}">Contato</a>
+      <span aria-hidden="true">·</span>
+      <a href="{{ url_for('auth.login') }}">Entrar</a>
+    </nav>
+    <p>© 2026 Teroz</p>
+  </div>
+</footer>
+
+<div class="sheet" id="menu" role="dialog" aria-modal="true" aria-label="Menu" data-dialog>
+  <a class="sheet__backdrop" href="#fechar" tabindex="-1" aria-hidden="true"></a>
+  <div class="sheet__panel">
+    <div class="sheet__handle" aria-hidden="true"></div>
+    <div class="sheet__head">
+      <p class="sheet__title">Menu</p>
+      <a class="btn btn--ghost btn--icon sheet__close" href="#fechar" aria-label="Fechar menu" data-dialog-cancel>{{ icon("x") }}</a>
+    </div>
+    <nav class="menu-list" aria-label="Site">
+      <a class="menu-list__item" href="{{ url_for('public.index') }}#como">Como funciona</a>
+      <a class="menu-list__item" href="{{ url_for('public.how_it_works') }}">Funciona com a sua planilha</a>
+      <a class="menu-list__item" href="{{ url_for('public.pricing') }}">Preços</a>
+      {%- if current_user.is_authenticated %}
+      <a class="menu-list__item" href="{{ url_for('app.home') }}">Painel</a>
+      {%- else %}
+      <a class="menu-list__item" href="{{ url_for('auth.login') }}">Entrar</a>
+      {%- endif %}
+      <a class="menu-list__item" href="{{ url_for('public.terms') }}">Termos de uso</a>
+      <a class="menu-list__item" href="{{ url_for('public.privacy') }}">Privacidade</a>
+      <a class="menu-list__item" href="{{ url_for('public.contact') }}">Contato</a>
+    </nav>
+    {%- if not current_user.is_authenticated %}
+    <div class="mt-4">{{ button("Começar teste grátis", "primary", size="lg", block=True, href=url_for('auth.signup')) }}</div>
+    {%- endif %}
+  </div>
+</div>
+
+{{ toast_region() }}
+{% endblock %}

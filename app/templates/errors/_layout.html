@@ -1,0 +1,24 @@
+{#
+  Telas de erro (telas.md §15): o que houve em linguagem simples + saída.
+  Logado com empresa → mantém o menu (base_app); senão, cabeçalho do site (base_publica).
+  500 sempre usa o layout público (o estado da sessão pode ser a causa do erro).
+#}
+{% extends ("base_app.html" if (not force_public | default(false)) and current_user.is_authenticated and current_company else "base_publica.html") %}
+{% from "components/button.html" import button %}
+{% import "components/brand.html" as brand %}
+{% block content %}
+<div class="error-page">
+  {{ brand.symbol(32, "") }}
+  <p class="error-page__code" aria-hidden="true">{% block code %}{% endblock %}</p>
+  <h1 class="error-page__title">{% block heading %}{% endblock %}</h1>
+  <p class="muted">{% block message %}{% endblock %}</p>
+  <div class="error-page__actions">
+    {%- block actions %}
+    {%- if current_user.is_authenticated %}
+    {{ button("Ir para Projetos", "primary", size="lg", block=True, href=url_for('app.projects')) }}
+    {%- endif %}
+    {{ button("Página inicial", "ghost", href=url_for('public.index')) }}
+    {%- endblock %}
+  </div>
+</div>
+{% endblock %}

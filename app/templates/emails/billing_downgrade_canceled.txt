@@ -1,0 +1,6 @@
+{% extends "emails/_base.txt" %}
+{% block body %}A troca do plano {{ kept_plan }} para o {{ refused_plan }} da empresa {{ company_name }} não foi aplicada: o uso atual não cabe no plano menor.
+
+{{ reason }}
+
+Vocês continuam no plano {{ kept_plan }}, com o mesmo valor. Para rebaixar, ajuste o uso e peça a troca de novo: {{ billing_url }}{% endblock %}

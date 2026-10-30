@@ -1,0 +1,25 @@
+{% extends "base_publica.html" %}
+{% from "components/field.html" import field %}
+{% from "components/button.html" import button %}
+{% from "components/alert.html" import alert %}
+{% block title %}Entrar · Teroz{% endblock %}
+{% block content %}
+{# telas.md §3: e-mail e senha → Entrar → criar conta. Erro genérico em alerta no topo. #}
+<div class="auth">
+  <div class="card auth__card stack">
+    <h1>Entrar</h1>
+    {%- if error %}
+    <div class="alert-focus" tabindex="-1" data-autofocus>{{ alert("danger", error, role="alert") }}</div>
+    {%- endif %}
+    <form class="stack" method="post" action="{{ url_for('auth.login') }}" novalidate>
+      {{ form.csrf_token }}
+      {{ form.next }}
+      {{ field(form.email, attrs={"autocomplete": "email", "required": true, "inputmode": "email", "placeholder": "ana@empresa.com.br"}) }}
+      {{ field(form.password, attrs={"autocomplete": "current-password", "required": true}) }}
+      {{ button("Entrar", "primary", size="lg", block=True) }}
+    </form>
+    <p><a href="{{ url_for('auth.forgot_password') }}">Esqueci a senha</a></p>
+  </div>
+  <p class="auth__switch">Ainda não tem conta? <a href="{{ url_for('auth.signup') }}">Cadastre a empresa</a></p>
+</div>
+{% endblock %}

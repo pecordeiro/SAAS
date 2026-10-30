@@ -1,0 +1,35 @@
+{% extends "public/_legal.html" %}
+{% set doc_title = "Termos de uso" %}
+{% set sections = [("servico", "O serviço"), ("conta", "Conta e acesso"), ("planos", "Planos, pagamento e carência"), ("dados", "Seus dados"), ("uso", "Uso aceitável"), ("responsabilidade", "Responsabilidade"), ("mudancas", "Mudanças e contato")] %}
+{% block title %}Termos de uso · Teroz{% endblock %}
+{% block description %}Termos de uso da Teroz: conta, planos, pagamento, carência, seus dados e responsabilidades. Rascunho para revisão jurídica.{% endblock %}
+{% block legal_body %}
+<section class="legal__section" id="servico">
+  <h2>1. O serviço</h2>
+  <p>A Teroz é um serviço web para acompanhar a produção por etapas e subatividades: progresso, unidades prontas, tempo restante e prazo em dias úteis. Ela é oferecida a empresas, por assinatura.</p>
+</section>
+<section class="legal__section" id="conta">
+  <h2>2. Conta e acesso</h2>
+  <p>Quem cadastra a empresa vira proprietário e responde pelas pessoas que convidar. Cada pessoa usa o próprio acesso e mantém a senha em segredo. Avise-nos se suspeitar de uso indevido da conta.</p>
+</section>
+<section class="legal__section" id="planos">
+  <h2>3. Planos, pagamento e carência</h2>
+  <p>Há um período de teste gratuito, sem cartão. Depois dele, o uso depende de um plano pago, cobrado por empresa. Se o pagamento atrasar, há uma carência de 7 dias com o serviço normal; passada a carência, a empresa fica em modo leitura (ver e exportar, sem registrar). Os dados não são apagados por atraso.</p>
+</section>
+<section class="legal__section" id="dados">
+  <h2>4. Seus dados</h2>
+  <p>Os dados de produção da empresa pertencem à empresa. Você pode exportá-los a qualquer momento. O tratamento de dados pessoais está descrito na <a href="{{ url_for('public.privacy') }}">Política de privacidade</a>.</p>
+</section>
+<section class="legal__section" id="uso">
+  <h2>5. Uso aceitável</h2>
+  <p>Não use o serviço para atividade ilegal, para tentar acessar dados de outra empresa, nem para sobrecarregar o serviço ou testar a segurança dele sem autorização por escrito.</p>
+</section>
+<section class="legal__section" id="responsabilidade">
+  <h2>6. Responsabilidade</h2>
+  <p>Os cálculos de prazo são estimativas a partir dos números que a própria empresa registra. O serviço é entregue como está, e a responsabilidade é limitada ao valor pago nos últimos 12 meses, nos termos da lei.</p>
+</section>
+<section class="legal__section" id="mudancas">
+  <h2>7. Mudanças e contato</h2>
+  <p>Podemos atualizar estes termos; avisaremos por e-mail antes de mudanças relevantes. Dúvidas: <a href="{{ url_for('public.contact') }}">contato</a>.</p>
+</section>
+{% endblock %}

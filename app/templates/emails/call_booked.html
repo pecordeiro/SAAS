@@ -1,0 +1,8 @@
+{% extends "emails/_base.html" %}
+{% block body %}
+  <p>Olá, {{ name }}.</p>
+  <p>A ligação com a equipe para falar da identidade visual da sua empresa está marcada para {{ when }} (horário de Brasília), com duração de {{ duration }} minutos.</p>
+  <p>Precisa remarcar ou cancelar? Peça pela tela da ligação:</p>
+  <p><a href="{{ url }}">Ver a ligação</a></p>
+  <p><small>Se o botão não abrir, copie o endereço: {{ url }}</small></p>
+{% endblock %}

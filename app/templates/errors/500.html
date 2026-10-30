@@ -1,0 +1,10 @@
+{% set force_public = true %}
+{% extends "errors/_layout.html" %}
+{% from "components/button.html" import button %}
+{% block title %}Erro inesperado · Teroz{% endblock %}
+{% block code %}500{% endblock %}
+{% block heading %}Algo deu errado do nosso lado{% endblock %}
+{% block message %}Tente de novo em instantes. Se o erro continuar, escreva para o contato do site.{% endblock %}
+{% block actions %}
+{{ button("Página inicial", "primary", size="lg", block=True, href=url_for('public.index')) }}
+{% endblock %}

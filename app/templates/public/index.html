@@ -1,0 +1,135 @@
+{% extends "base_publica.html" %}
+{% from "components/plan_card.html" import plan_card %}
+{% from "components/icon.html" import icon %}
+{% set marca = true %}
+{% block title %}Teroz · saiba em que etapa está cada lote{% endblock %}
+{% block description %}Acompanhe a produção etapa por etapa: progresso, unidades prontas, horas que faltam e prazo em dias úteis. Importe a sua planilha e comece com {{ trial_days }} dias grátis, sem cartão.{% endblock %}
+{% block main %}
+{# R10 (ADR-0016): título → tela real do painel no aparelho → faixa de produtos → 3 passos → sua planilha → opcionais → planos → dúvidas → chamada final. Preços e limites vêm da tabela plans. #}
+<div class="pub-hero">
+  <div class="pub-in pub-hero__top">
+    <span class="pub-tag"><i aria-hidden="true"></i>Para quem monta sob encomenda</span>
+    <h1 class="pub-hero__title"><span class="w">Saiba</span> <span class="w">em</span> <span class="w">que</span> <span class="w">etapa</span> <span class="w">está</span> <span class="w">cada</span> <span class="w"><em>lote.</em></span></h1>
+    <p class="pub-hero__lead">Acompanhe a produção etapa por etapa: quanto cada uma já avançou, quantas unidades estão prontas, quantas horas faltam e qual é o prazo em dias úteis.</p>
+    <div class="pub-hero__cta">
+      <a class="btn btn--primary btn--lg" href="{{ url_for('auth.signup') }}"><span class="btn__label">Começar teste grátis de {{ trial_days }} dias</span></a>
+      <a class="btn btn--secondary btn--lg" href="#como"><span class="btn__label">Ver como funciona</span></a>
+    </div>
+    <p class="pub-hero__small">Sem cartão. Cancele quando quiser.</p>
+  </div>
+
+  <div class="pub-showcase">
+    <div class="pub-in pub-stage">
+      <figure class="pub-shot">
+        <div class="pub-device">
+        <picture>
+          <source srcset="{{ url_for('static', filename='img/vitrine/painel-celular-escuro.webp') }}" media="(max-width: 35em) and (prefers-color-scheme: dark)" width="600" height="1169" type="image/webp">
+          <source srcset="{{ url_for('static', filename='img/vitrine/painel-celular-claro.webp') }}" media="(max-width: 35em)" width="600" height="1169" type="image/webp">
+          <source srcset="{{ url_for('static', filename='img/vitrine/painel-escuro.webp') }}" media="(prefers-color-scheme: dark)" width="1600" height="1000" type="image/webp">
+          <img class="pub-device__shot" src="{{ url_for('static', filename='img/vitrine/painel-claro.webp') }}" width="1600" height="1000" alt="Painel de um projeto na Teroz: progresso pelas tarefas de 40%, horas que faltam, dias úteis até o prazo, barras de tarefas e unidades por etapa e a situação das etapas." fetchpriority="high">
+        </picture>
+        </div>
+        <figcaption class="pub-device__cap">Tela real da Teroz, com dados de exemplo.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <div class="pub-in pub-trust">
+    <p class="pub-trust__lb">Feito para quem monta:</p>
+    <div class="pub-marq" aria-hidden="true"><div>
+      {%- for _ in range(2) %}
+      <span>Robôs industriais</span><span>Painéis elétricos</span><span>Transformadores</span><span>Máquinas sob encomenda</span><span>Quadros de comando</span><span>Linhas de montagem</span>
+      {%- endfor %}
+    </div></div>
+  </div>
+</div>
+
+<section class="pub-sec" id="como" aria-labelledby="como-titulo">
+  <div class="pub-in">
+    <div class="rv"><span class="pub-eyebrow">Como funciona</span>
+      <h2 id="como-titulo">Três passos, sem treinamento longo.</h2>
+      <p class="pub-sub">Quem monta lotes já conhece as etapas. O sistema só faz a conta.</p></div>
+    <ol class="pub-steps" data-steps>
+      <li class="pub-step is-on rv" data-delay="1"><div class="pub-art pub-art--1"><img src="{{ url_for('static', filename='img/vitrine/passo-planilha.webp') }}" width="900" height="484" alt="Tela Importar planilha, no passo Enviar arquivo." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">1</span><h3>Traga sua planilha</h3><p>Envie o arquivo e diga qual coluna é a etapa, qual é a subatividade e qual é o tempo. Se preferir, monte as etapas direto na tela.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
+      <li class="pub-step rv" data-delay="2"><div class="pub-art pub-art--2"><img src="{{ url_for('static', filename='img/vitrine/passo-painel.webp') }}" width="900" height="1221" alt="Gráfico Tarefas × unidades por etapa, do painel do projeto." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">2</span><h3>Veja o painel</h3><p>Cada etapa mostra o progresso pelas tarefas e as unidades prontas. Você vê também as horas que faltam e o prazo em dias úteis.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
+      <li class="pub-step rv" data-delay="3"><div class="pub-art pub-art--3 pub-art--phone"><img src="{{ url_for('static', filename='img/vitrine/passo-celular.webp') }}" width="600" height="723" alt="Preencher etapas no celular: lista de etapas com o progresso de cada uma." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">3</span><h3>Lance o progresso</h3><p>Quem está na bancada registra as peças prontas pelo celular. As horas que faltam e o prazo se recalculam na hora.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
+    </ol>
+  </div>
+</section>
+
+<section class="pub-sec pub-sec--band" id="planilha" aria-labelledby="planilha-titulo">
+  <div class="pub-in pub-split">
+    <div class="rv">
+      <span class="pub-eyebrow">Sua planilha continua útil</span>
+      <h2 id="planilha-titulo">Funciona com a planilha que você já tem.</h2>
+      <ul class="pub-checks">
+        <li><div><b>Importa qualquer planilha</b><span>Escolha a aba, indique o que cada coluna significa e confira os erros por linha antes de salvar.</span></div></li>
+        <li><div><b>Vários projetos de uma vez</b><span>Se o arquivo tem mais de um projeto, você escolhe quais importar.</span></div></li>
+        <li><div><b>Exporta no formato da equipe</b><span>As abas Acompanhamento e Equipe, com as fórmulas funcionando e as células de entrada em amarelo.</span></div></li>
+      </ul>
+      <p class="pub-more"><a href="{{ url_for('public.how_it_works') }}">Ver o passo a passo da planilha</a></p>
+    </div>
+    <div class="pub-map rv" data-delay="1">
+      <h3 class="pub-map__title">Quais colunas são quais?</h3>
+      <div class="pub-mrow"><span class="pub-mrow__src">Fase</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Etapa</span></div>
+      <div class="pub-mrow"><span class="pub-mrow__src">Serviço</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Subatividade</span></div>
+      <div class="pub-mrow"><span class="pub-mrow__src">Tempo</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Tempo ideal</span></div>
+      <div class="pub-mrow"><span class="pub-mrow__src">Feitas</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Peças prontas</span></div>
+      <p class="pub-note">Nomes de colunas de exemplo. Na sua planilha, você escolhe os seus.</p>
+    </div>
+  </div>
+</section>
+
+<section class="pub-sec" id="opcionais" aria-labelledby="opcionais-titulo">
+  <div class="pub-in">
+    <div class="rv"><span class="pub-eyebrow">Opcional, quando você precisar</span>
+      <h2 id="opcionais-titulo">O começo é simples. O resto você liga se quiser.</h2>
+      <p class="pub-sub">Etapas, subatividades e peças vêm prontas. O que está abaixo fica desligado até você ativar em Configurações.</p></div>
+    <div class="pub-opts">
+      {%- for ic, title, text in [("camera", "Fotos e comentários", "Guarde fotos e observações em cada subatividade, como registro do que foi feito."), ("clipboard-check", "Checklist de inspeção", "Uma lista de conferência por etapa, assinada por quem inspecionou."), ("bell", "Alertas por e-mail", "Aviso quando o prazo entra em risco ou uma etapa para, e um resumo toda segunda-feira."), ("team", "Responsáveis", "Defina quem cuida de cada subatividade e veja quantas peças cada pessoa lançou.")] %}
+      <div class="pub-opt rv" data-delay="{{ loop.index0 }}">
+        <span class="pub-opt__ic">{{ icon(ic, "lg") }}</span>
+        <h3>{{ title }} <em>Opcional</em></h3>
+        <p>{{ text }}</p>
+      </div>
+      {%- endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="pub-sec pub-sec--band" id="precos" aria-labelledby="precos-titulo">
+  <div class="pub-in">
+    <div class="rv"><span class="pub-eyebrow">Preços</span>
+      <h2 id="precos-titulo">Preço por empresa, não por pessoa.</h2>
+      <p class="pub-sub">Teste grátis de {{ trial_days }} dias, sem cartão, nos planos Essencial e Profissional. O plano Empresa cobra ao contratar. A Implantação é sob orçamento, online ou presencial, com acompanhamento de 1 mês e treinamento.</p></div>
+    <div class="plans">
+      {%- for plan in plans %}
+      {{ plan_card(plan, url_for('auth.signup'), trial_days, "h3", loop.index0) }}
+      {%- endfor %}
+    </div>
+    <p class="pub-note rv">Pagamento por Pix, boleto ou cartão. Histórico de cada registro, modelos de etapas e exportação em todos os planos. <a href="{{ url_for('public.pricing') }}">Comparar os planos em detalhe</a></p>
+  </div>
+</section>
+
+<section class="pub-sec" id="duvidas" aria-labelledby="duvidas-titulo">
+  <div class="pub-in">
+    <div class="rv"><span class="pub-eyebrow">Dúvidas</span><h2 id="duvidas-titulo">Perguntas frequentes</h2></div>
+    <div class="pub-faq">
+      <details class="rv"><summary>O que preciso para começar?</summary><p>Um navegador e as etapas do seu produto. Você pode digitar as etapas na tela ou importar a planilha que a equipe já usa.</p></details>
+      <details class="rv"><summary>Preciso abandonar minha planilha?</summary><p>Não. Você importa a planilha para começar e pode exportar no formato da equipe quando quiser.</p></details>
+      <details class="rv"><summary>Como o prazo em dias úteis é calculado?</summary><p>Horas que faltam divididas pelo que a equipe produz por dia: pessoas vezes horas por dia. A tela “Como funciona” mostra cada conta com os números do seu projeto.</p></details>
+      <details class="rv"><summary>Funciona no celular?</summary><p>Sim. Quem está na bancada registra as peças pelo celular, em poucos toques.</p></details>
+      <details class="rv"><summary>O teste grátis pede cartão?</summary><p>Não. São {{ trial_days }} dias nos planos Essencial e Profissional, sem cartão.</p></details>
+      <details class="rv"><summary>Os dados da minha empresa ficam separados dos de outras?</summary><p>Sim. Cada empresa só enxerga os próprios dados.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="pub-sec pub-sec--end" aria-labelledby="final-titulo">
+  <div class="pub-in"><div class="pub-cta-end rv">
+    <h2 id="final-titulo">Descubra onde cada lote está hoje.</h2>
+    <p>{{ trial_days }} dias grátis, sem cartão, nos planos Essencial e Profissional.{% set first = plans|selectattr("price")|first %}{% if first %} Planos a partir de R$ {{ first.price|num(0) if first.price == first.price|int else first.price|num(2) }} por mês.{% endif %}</p>
+    <a class="btn btn--primary btn--lg" href="{{ url_for('auth.signup') }}"><span class="btn__label">Começar teste grátis</span></a>
+  </div></div>
+</section>
+{% endblock %}

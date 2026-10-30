@@ -1,0 +1,5 @@
+{% extends "errors/_layout.html" %}
+{% block title %}Pedido não concluído · Teroz{% endblock %}
+{% block code %}400{% endblock %}
+{% block heading %}Pedido não concluído{% endblock %}
+{% block message %}{{ message or "Algo no envio não veio como esperado. Volte à página anterior e tente de novo." }}{% endblock %}

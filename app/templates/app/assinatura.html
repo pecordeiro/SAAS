@@ -1,0 +1,104 @@
+{% extends "base_app.html" %}
+{% from "components/button.html" import button %}
+{% from "components/badge.html" import badge %}
+{% from "components/kpi.html" import kpi %}
+{% from "components/alert.html" import alert %}
+{% from "components/modal.html" import confirm_dialog %}
+{% from "components/table.html" import data_table %}
+{% set nav_current = "billing" %}
+{% block title %}Assinatura · Teroz{% endblock %}
+{% block content %}
+{# Fase 8 (F8-2..F8-7): assinatura atual, uso × limites, fatura em aberto, ações. Só owner. #}
+<header class="page-header">
+  <div class="page-header__titles">
+    <h1>Assinatura</h1>
+    <p class="page-header__subtitle">Plano {{ sub.plan.name }} · {% if price is none %}sob orçamento{% else %}R$ {{ price|reais }}/mês{% endif %}{% if sub.discount_percent %} ({{ sub.discount_percent }}% de desconto){% endif %}</p>
+    <div class="page-header__meta">{{ badge(status_label, status_tone) }}</div>
+  </div>
+  <div class="page-header__actions">
+    {%- if managed and not checkout %}
+    {{ button("Fale conosco", "secondary", href=url_for('public.contact')) }}
+    {%- else %}
+    {{ button("Trocar plano" if not checkout else "Escolher plano", "primary", href=url_for('billing.plans')) }}
+    {%- endif %}
+    {%- if sub.provider_customer_id %}
+    {{ button("Dados de cobrança", "secondary", href=url_for('billing.billing_info')) }}
+    {%- endif %}
+  </div>
+</header>
+
+{%- for message in get_flashed_messages(category_filter=["erro"]) %}
+<div class="mb-4">{{ alert("danger", message) }}</div>
+{%- endfor %}
+
+{%- if sub.pending_plan %}
+<div class="mb-4">{{ alert("info", "Troca para o plano " ~ sub.pending_plan.name ~ " pendente",
+  ("Vale após o pagamento da fatura no valor novo." if pending_upgrade else ("Vale a partir de " ~ (sub.pending_plan_at|datahora) ~ ", fim do período já pago."))) }}</div>
+{%- endif %}
+{%- if open_payment and open_payment.invoice_url %}
+<div class="mb-4">{{ alert("warning" if open_payment.status == "overdue" else "info",
+  ("Fatura vencida em " if open_payment.status == "overdue" else "Próxima fatura vence em ") ~ (open_payment.due_date|data),
+  "R$ " ~ (open_payment.value_cents|reais) ~ " — pague por Pix, boleto ou cartão na página segura do Asaas.",
+  action=("Pagar fatura", open_payment.invoice_url)) }}</div>
+{%- endif %}
+
+<div class="kpi-grid mb-4">
+  {{ kpi("Projetos ativos", usage.projects, sub=("de " ~ usage.max_projects ~ " no plano") if usage.max_projects is not none else "ilimitado no plano") }}
+  {{ kpi("Usuários", usage.users, sub=("de " ~ usage.max_users ~ " (com convites)") if usage.max_users is not none else "ilimitado") }}
+</div>
+
+<section class="card stack mb-4" aria-labelledby="situacao">
+  <h2 class="card__title" id="situacao">Situação</h2>
+  <dl class="meta-list">
+    <div><dt>Situação da assinatura</dt><dd>{{ status_label }}</dd></div>
+    {%- if sub.status == "trialing" and sub.trial_ends_at %}
+    <div><dt>Teste grátis até</dt><dd>{{ sub.trial_ends_at|datahora }}</dd></div>
+    {%- endif %}
+    {%- if sub.current_period_end %}
+    <div><dt>{{ "Acesso completo até" if sub.status == "canceled" else "Período pago até" }}</dt><dd>{{ sub.current_period_end|datahora }}</dd></div>
+    {%- endif %}
+    {%- if sub.status == "past_due" and sub.grace_until %}
+    <div><dt>Carência até</dt><dd>{{ sub.grace_until|datahora }}</dd></div>
+    {%- endif %}
+    {%- if sub.canceled_at %}
+    <div><dt>Cancelada em</dt><dd>{{ sub.canceled_at|datahora }}</dd></div>
+    {%- endif %}
+  </dl>
+  {%- if sub.status == "expired" %}
+  <p class="muted">Sua conta está em modo leitura: dá para ver e exportar tudo, nada foi apagado. Escolha um plano para voltar a registrar.</p>
+  {%- endif %}
+</section>
+
+<section class="stack mb-4" aria-labelledby="faturas-recentes">
+  <div class="cluster">
+    <h2 class="section-title" id="faturas-recentes">Faturas recentes</h2>
+    <a class="btn btn--ghost" href="{{ url_for('billing.invoices') }}">Ver todas</a>
+  </div>
+  {%- if payments %}
+  {% call data_table([("Vencimento", ""), ("Valor", "is-num"), ("Situação", "")], caption="Faturas recentes") %}
+    <tbody>
+    {%- for p in payments %}
+      <tr>
+        <td class="is-plain">{{ p.due_date|data }}</td>
+        <td class="is-num" data-label="Valor">R$ {{ p.value_cents|reais }}</td>
+        <td data-label="Situação">{{ badge(payment_labels.get(p.status, p.status), payment_tones.get(p.status, "neutral")) }}</td>
+      </tr>
+    {%- endfor %}
+    </tbody>
+  {% endcall %}
+  {%- else %}
+  <p class="muted">Nenhuma fatura ainda. {% if checkout %}O teste grátis não pede cartão.{% endif %}</p>
+  {%- endif %}
+</section>
+
+{%- if can_cancel %}
+<section class="card stack" aria-labelledby="cancelar-titulo">
+  <h2 class="card__title" id="cancelar-titulo">Cancelar assinatura</h2>
+  <p class="muted">O cancelamento vale no fim do período já pago{% if sub.status == "trialing" %} (ou do teste grátis){% endif %}. Depois disso a conta fica em modo leitura e nenhum dado é apagado.</p>
+  <div>{{ button("Cancelar assinatura", "danger", href="#cancelar") }}</div>
+</section>
+{{ confirm_dialog("cancelar", "Cancelar a assinatura?",
+  "Novas cobranças deixam de ser geradas. Você mantém acesso completo até o fim do período pago; depois, modo leitura.",
+  "Cancelar assinatura", url_for('billing.cancel'), cancel_label="Manter assinatura") }}
+{%- endif %}
+{% endblock %}

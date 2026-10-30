@@ -1,0 +1,75 @@
+{#
+  Gráfico de barras simples — design-system §15. SVG gerado no servidor, sem biblioteca e
+  sem estilo inline (CSP): só atributos de geometria; cores vêm das classes (tokens).
+  Rótulos e valores ficam em HTML (não escalam com o SVG). Tabela equivalente em <details>.
+  series = lista de dicts {label, value, max (opcional), text (opcional), done (opcional)}.
+#}
+{% macro bar_chart(series, title, max=None, unit="", orientation="horizontal", table_headers=("Item", "Valor")) -%}
+{%- set top = max or ((series|map(attribute="value")|max) if series else 0) or 1 -%}
+{%- set cid = "grafico-" ~ (title|lower|replace(" ", "-")) -%}
+<figure class="chart" aria-labelledby="{{ cid }}">
+  <figcaption class="section-title" id="{{ cid }}">{{ title }}</figcaption>
+  {%- if not series %}
+  <p class="muted">Sem registros neste período.</p>
+  {%- elif orientation == "horizontal" %}
+  <div class="chart-h" aria-hidden="true">
+    {%- for s in series %}
+    {%- set m = s.max or top -%}
+    {%- set w = ((s.value / m) * 100) if m else 0 -%}
+    <div class="chart-h__row">
+      <span class="chart-h__label">{{ s.label }}</span>
+      <span class="chart-h__value">{{ s.text or (s.value ~ unit) }}</span>
+      <svg class="chart-h__svg" viewBox="0 0 100 10" preserveAspectRatio="none" focusable="false">
+        <rect class="chart__track" x="0" y="0" width="100" height="10"></rect>
+        <rect class="chart__bar{% if s.done %} is-done{% endif %}" x="0" y="0" width="{{ '%.2f'|format([w, 100]|min) }}" height="10"></rect>
+      </svg>
+    </div>
+    {%- endfor %}
+  </div>
+  {%- else %}
+  <div class="chart-v" aria-hidden="true">
+    {%- for s in series %}
+    {%- set h = ((s.value / top) * 100) if top else 0 -%}
+    <div class="chart-v__col">
+      <span class="chart-v__value">{{ s.text or s.value }}</span>
+      <svg class="chart-v__svg" viewBox="0 0 10 100" preserveAspectRatio="none" focusable="false">
+        <rect class="chart__bar" x="1" y="{{ '%.2f'|format(100 - h) }}" width="8" height="{{ '%.2f'|format(h) }}"></rect>
+      </svg>
+      <span class="chart-v__label">{{ s.label }}</span>
+    </div>
+    {%- endfor %}
+  </div>
+  {%- endif %}
+  {%- if series %}
+  <details class="chart__data">
+    <summary>Ver dados em tabela</summary>
+    <div class="table-wrap mt-2">
+      <table class="table">
+        <thead><tr><th scope="col">{{ table_headers[0] }}</th><th scope="col" class="is-num">{{ table_headers[1] }}</th></tr></thead>
+        <tbody>
+          {%- for s in series %}
+          <tr><td>{{ s.label }}</td><td class="is-num">{{ s.text or (s.value ~ unit) }}</td></tr>
+          {%- endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {%- endif %}
+</figure>
+{%- endmacro %}
+
+{#
+  ===== Etapa E — gráficos do painel do projeto =====
+  Todos SVG do servidor, sem script e sem estilo inline (CSP). Geometria vem de
+  app/services/charts.py via app/services/dashboard.py; aqui só se imprime. Cor nunca sozinha:
+  cada série tem texto (legenda e valores), cada gráfico tem <title>/<desc> e os números
+  também aparecem em texto/tabela. O SVG decorativo fica aria-hidden quando o texto ao lado já diz tudo.
+#}
+
+{# Medidor de 270° (progresso geral). Decorativo: o número grande fica ao lado, em HTML. #}
+{% macro gauge(m) -%}
+<svg class="gauge" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+  <circle class="gauge__track" cx="50" cy="50" r="40" pathLength="100" stroke-dasharray="{{ m.trilho }}" transform="rotate(135 50 50)"></circle>
+  <circle class="gauge__fill" cx="50" cy="50" r="40" pathLength="100" stroke-dasharray="{{ m.preenchido }}" transform="rotate(135 50 50)"></circle>
+</svg>
+{%- endmacro %}

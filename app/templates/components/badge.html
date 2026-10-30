@@ -1,0 +1,21 @@
+{% from "components/icon.html" import icon %}
+{#
+  Selo de status — design-system §7. Cor nunca sozinha: sempre texto + ícone.
+  status_badge recebe o texto de calc (“Concluída”, “Em andamento”, “Não iniciada”).
+#}
+{% set STATUS_TONES = {
+  "Concluída": ("success", "check"),
+  "Em andamento": ("progress", "progress"),
+  "Não iniciada": ("neutral", "circle"),
+  "Atrasado": ("danger", "alert"),
+} %}
+
+{% macro status_badge(status) -%}
+{%- set tone, ico = STATUS_TONES.get(status, ("neutral", "circle")) -%}
+<span class="badge badge--{{ tone }}">{{ icon(ico) }}{{ status }}</span>
+{%- endmacro %}
+
+{# Selo livre: tone = success | warning | neutral | danger | info. #}
+{% macro badge(text, tone="neutral", icon_name=None) -%}
+<span class="badge badge--{{ tone }}">{% if icon_name %}{{ icon(icon_name) }}{% endif %}{{ text }}</span>
+{%- endmacro %}

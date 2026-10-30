@@ -1,0 +1,42 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/badge.html" import badge %}
+{% from "components/table.html" import data_table %}
+{% from "components/empty_state.html" import empty_state %}
+{% set nav_current = "billing" %}
+{% block title %}Faturas · Assinatura · Teroz{% endblock %}
+{% block content %}
+{# F8-7: faturas com status e link de pagamento (página do Asaas). #}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('billing.overview') }}">{{ icon("chevron-left") }}Assinatura</a>
+    <h1>Faturas</h1>
+  </div>
+</header>
+
+{%- if payments %}
+{% call data_table([("Vencimento", ""), ("Valor", "is-num"), ("Situação", ""), ("Pago em", "is-num"), ("Pagamento", "")], caption="Faturas") %}
+  <tbody>
+  {%- for p in payments %}
+    <tr>
+      <td class="is-plain">{{ p.due_date|data }}</td>
+      <td class="is-num" data-label="Valor">R$ {{ p.value_cents|reais }}</td>
+      <td data-label="Situação">{{ badge(payment_labels.get(p.status, p.status), payment_tones.get(p.status, "neutral")) }}</td>
+      <td class="is-num" data-label="Pago em">{{ p.paid_at|datahora if p.paid_at else "—" }}</td>
+      <td data-label="Pagamento">
+        {%- if p.invoice_url and p.status in ("pending", "overdue") %}
+        <a class="btn btn--primary" href="{{ p.invoice_url }}" rel="noopener noreferrer">Pagar</a>
+        {%- elif p.invoice_url %}
+        <a class="btn btn--ghost" href="{{ p.invoice_url }}" rel="noopener noreferrer">Ver fatura</a>
+        {%- else %}—{% endif %}
+      </td>
+    </tr>
+  {%- endfor %}
+  </tbody>
+{% endcall %}
+{%- else %}
+<div class="card">
+  {{ empty_state("Nenhuma fatura ainda", "As faturas aparecem aqui quando você assina um plano.", action=("Escolher plano", url_for('billing.plans'))) }}
+</div>
+{%- endif %}
+{% endblock %}

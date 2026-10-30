@@ -1,0 +1,34 @@
+{% extends "base_app.html" %}
+{% from "components/icon.html" import icon %}
+{% from "components/badge.html" import badge %}
+{% set nav_current = "templates" %}
+{% block title %}Versões · {{ template.name }}{% endblock %}
+{% block content %}
+{# Versões imutáveis do modelo (mais nova primeiro), com as etapas de cada uma. #}
+<header class="page-header">
+  <div class="page-header__titles">
+    <a class="back-link" href="{{ url_for('modelos.edit', template_id=template.id) }}">{{ icon("chevron-left") }}{{ template.name }}</a>
+    <h1>Versões</h1>
+    <p class="page-header__subtitle">{{ items|length }} {{ "versão" if items|length == 1 else "versões" }}</p>
+  </div>
+</header>
+
+<div class="stack">
+  {%- for version, minutes in items %}
+  <details class="card"{% if loop.first %} open{% endif %}>
+    <summary class="cluster">
+      {{ badge("v" ~ version.number, "info") }}
+      {%- if version.id == template.current_version_id %}{{ badge("Atual", "success", "check") }}{% endif %}
+      <span class="muted text-sm">{{ version.created_at|datahora }} · {{ version.stages|length }} etapas · {{ (minutes / 60)|horas }} por unidade</span>
+    </summary>
+    <ol class="stack--sm mt-4">
+      {%- for stage in version.stages %}
+      <li><span class="text-strong">{{ stage.name }}</span>
+        <span class="muted text-sm">— {% for a in stage.activities %}{{ a.name }} ({{ a.ideal_minutes|num(0) }} min){% if not loop.last %}, {% endif %}{% else %}sem subatividades{% endfor %}</span>
+      </li>
+      {%- endfor %}
+    </ol>
+  </details>
+  {%- endfor %}
+</div>
+{% endblock %}
