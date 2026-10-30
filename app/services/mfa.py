@@ -29,7 +29,7 @@ from app.extensions import db
 from app.models import MfaRecoveryCode, User
 from app.services.tokens import utcnow
 
-ISSUER = "Controle de Produção"
+ISSUER = "Teroz"
 RECOVERY_CODES = 10
 _RECOVERY_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"  # sem 0/o/1/l/i
 
@@ -100,7 +100,7 @@ def qr_svg(uri: str) -> bytes:
     import segno
 
     buffer = io.BytesIO()
-    segno.make(uri, error="m").save(buffer, kind="svg", scale=6, border=2, xmldecl=False, svgns=True, title="QR code do MFA")
+    segno.make(uri, error="m").save(buffer, kind="svg", scale=6, border=2, xmldecl=False, svgns=True, title="QR code da verificação em duas etapas")
     return buffer.getvalue()
 
 

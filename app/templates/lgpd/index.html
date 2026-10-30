@@ -3,7 +3,7 @@
 {% from "components/button.html" import button %}
 {% from "components/alert.html" import alert %}
 {% set nav_current = "privacy" %}
-{% block title %}Privacidade e dados · Controle de Produção{% endblock %}
+{% block title %}Privacidade e dados · Teroz{% endblock %}
 {% block content %}
 {# Fase 7 (LGPD): exportar dados da empresa e excluir com carência. Layout final na Fase 6. #}
 <header class="page-header">
@@ -19,7 +19,7 @@
 
 <section class="card stack mb-4" aria-labelledby="exportar-titulo">
   <h2 class="section-title" id="exportar-titulo">Exportar todos os dados</h2>
-  <p>Baixe um arquivo ZIP com uma planilha CSV para cada tipo de dado da empresa: projetos, etapas, atividades, registros de peças, modelos, usuários, convites, assinatura, auditoria e integrações. Senhas e chaves não são incluídas.</p>
+  <p>Baixe um arquivo ZIP com uma planilha CSV para cada tipo de dado da empresa: projetos, etapas, subatividades, registros de peças, modelos, usuários, convites, assinatura, auditoria e integrações. Senhas e chaves não são incluídas.</p>
   <form method="post" action="{{ url_for('lgpd.export') }}">
     {{ action_form.csrf_token }}
     {{ button("Baixar ZIP", "secondary") }}

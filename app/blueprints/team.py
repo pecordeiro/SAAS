@@ -113,7 +113,7 @@ def deactivate(membership_id):
         accounts.deactivate_member(member)
     except AccountError as exc:
         return _page(400, error=str(exc))
-    flash(f"{member.user.name} foi desativado e perdeu o acesso.", "info")
+    flash(f"{member.user.name} perdeu o acesso a esta empresa.", "info")
     return redirect(url_for("team.users"), code=303)
 
 
@@ -125,7 +125,7 @@ def reactivate(membership_id):
         accounts.reactivate_member(member)
     except AccountError as exc:
         return _page(400, error=str(exc))
-    flash(f"{member.user.name} foi reativado.", "sucesso")
+    flash(f"O acesso de {member.user.name} voltou.", "sucesso")
     return redirect(url_for("team.users"), code=303)
 
 
@@ -134,7 +134,7 @@ def reactivate(membership_id):
 def require_mfa():
     company = g.company
     if not entitlements.has_feature(company, "mfa_required"):
-        return _page(403, error="Exigir MFA é um recurso do plano Empresa.")
+        return _page(403, error="Exigir a verificação em duas etapas dos proprietários é um recurso do plano Empresa.")
     turn_on = request.form.get("exigir") == "1"
     if turn_on and not current_user.mfa_enabled:
         return _page(400, error="Ative a verificação em duas etapas na sua conta antes de exigir dos proprietários.")
@@ -144,7 +144,7 @@ def require_mfa():
         object_type="company", object_id=company.id, details={"value": turn_on},
     )
     db.session.commit()
-    flash("Exigência de MFA para proprietários " + ("ligada." if turn_on else "desligada."), "sucesso")
+    flash("Verificação em duas etapas " + ("agora é obrigatória para os proprietários." if turn_on else "deixou de ser obrigatória para os proprietários."), "sucesso")
     return redirect(url_for("team.users"), code=303)
 
 
@@ -174,7 +174,7 @@ def accept_invite(token: str):
             from app.tenancy import set_company
 
             set_company(membership)
-            flash(f"Bem-vindo a {company_name}!", "sucesso")
+            flash(f"Você agora faz parte de {company_name}.", "sucesso")
             return no_referrer(redirect(url_for("app.projects"), code=303))
         mismatch = accounts.normalize_email(current_user.email) != invitation.email
         return _accept_page(invitation, state, company_name=company_name, form=form, mode="logged", mismatch=mismatch)
@@ -193,7 +193,7 @@ def accept_invite(token: str):
         from app.tenancy import set_company
 
         set_company(result.membership)
-        flash(f"Conta criada. Bem-vindo a {company_name}!", "sucesso")
+        flash(f"Conta criada. Você agora faz parte de {company_name}.", "sucesso")
         return no_referrer(redirect(url_for("app.projects"), code=303))
     status = 400 if request.method == "POST" else 200
     return _accept_page(invitation, state, status, company_name=company_name, form=form, mode="new")

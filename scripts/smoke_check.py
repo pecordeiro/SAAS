@@ -70,7 +70,7 @@ def run(base: str, *, production: bool, other_host: str | None, session: request
     # 2. Páginas públicas e cabeçalhos
     home = get("/")
     r.check("GET / = 200", home.status_code == 200, f"HTTP {home.status_code}")
-    r.check("home é o produto", "Controle de Produção" in home.text)
+    r.check("home é o produto", "Teroz" in home.text)
     headers = home.headers
     csp = headers.get("Content-Security-Policy", "")
     r.check("CSP estrita (sem unsafe-inline, com default-src 'self')", "default-src 'self'" in csp and "unsafe-inline" not in csp, csp[:80])

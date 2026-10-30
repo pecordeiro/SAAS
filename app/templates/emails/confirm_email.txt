@@ -1,7 +1,7 @@
 {% extends "emails/_base.txt" %}
 {% block body %}Olá, {{ name }}.
 
-{% if change %}Para trocar o e-mail da sua conta para este endereço, confirme pelo link abaixo.{% else %}Confirme seu e-mail para manter o acesso ao Controle de Produção.{% endif %}
+{% if change %}Para trocar o e-mail da sua conta para este endereço, confirme pelo link abaixo.{% else %}Confirme seu e-mail para manter o acesso à Teroz.{% endif %}
 O link vale 24 horas e só pode ser usado uma vez.
 
 Confirmar e-mail: {{ url }}{% endblock %}

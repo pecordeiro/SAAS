@@ -10,7 +10,7 @@
 {% set general = general | default(false) %}
 {% set nav_current = "history" %}
 {% if project %}{% set nav_project = project %}{% endif %}
-{% block title %}Histórico{% if project %} · {{ project.name }}{% endif %} · Controle de Produção{% endblock %}
+{% block title %}Histórico{% if project %} · {{ project.name }}{% endif %} · Teroz{% endblock %}
 {% block content %}
 {# telas.md §9: lista cronológica (quando, quem, onde, quanto, de → para) em páginas, filtros e peças por dia. #}
 {%- set here = url_for(history_endpoint, **url_args_base) %}
@@ -46,9 +46,9 @@
     </div>
     {%- else %}
     <div class="field filters__select">
-      <label class="field__label" for="f-atividade">Atividade</label>
+      <label class="field__label" for="f-atividade">Subatividade</label>
       <select class="field__input" id="f-atividade" name="atividade">
-        <option value="">Todas as atividades</option>
+        <option value="">Todas as subatividades</option>
         {%- for aid, aname in activity_choices %}<option value="{{ aid }}"{% if sel_activity == aid %} selected{% endif %}>{{ aname }}</option>{% endfor %}
       </select>
     </div>
@@ -73,7 +73,7 @@
 </div>
 {%- endif %}
 
-{% call data_table([("Quando", "is-nowrap"), ("Pessoa", ""), ("Etapa › atividade", ""), ("Qtd.", "is-num"), ("De → para", "is-num"), ("", "")], caption="Registros de peças", class_="history-table") %}
+{% call data_table([("Quando", "is-nowrap"), ("Pessoa", ""), ("Etapa › subatividade", ""), ("Qtd.", "is-num"), ("De → para", "is-num"), ("", "")], caption="Registros de peças", class_="history-table") %}
   {%- for day, items in days.items() %}
   <tbody>
     <tr class="table__group"><th scope="rowgroup" colspan="6">{{ day|dia_rotulo }}</th></tr>
@@ -101,7 +101,7 @@
 {%- else %}
 <div class="card">
   {%- if filtered %}
-  {{ empty_state("Nenhum registro com estes filtros", "Tente outra atividade ou pessoa, ou limpe os filtros.", ghost_action=("Limpar filtros", here), icon="history") }}
+  {{ empty_state("Nenhum registro com estes filtros", "Tente outra subatividade ou pessoa, ou limpe os filtros.", ghost_action=("Limpar filtros", here), icon="history") }}
   {%- elif project %}
   {{ empty_state("Nenhum registro ainda", "Os registros aparecem quando alguém soma peças.", ghost_action=("Ir para o projeto", url_for('app.project_detail', project_id=project.id)), icon="history") }}
   {%- else %}

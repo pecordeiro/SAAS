@@ -8,7 +8,7 @@
 {% from "components/table.html" import data_table %}
 {% set nav_current = "projects" %}
 {% set nav_project = project %}
-{% block title %}Unidades · {{ project.name }} · Controle de Produção{% endblock %}
+{% block title %}Unidades · {{ project.name }} · Teroz{% endblock %}
 {% block content %}
 {#
   Etapa G — números de série do projeto (rastreabilidade; o progresso continua vindo das peças
@@ -34,12 +34,12 @@
 </form>
 
 {%- if units %}
-{% call data_table([("Número de série", ""), ("Status", ""), ("Cadastrada em", "")], caption="Unidades do projeto") %}
+{% call data_table([("Número de série", ""), ("Situação", ""), ("Cadastrada em", "")], caption="Unidades do projeto") %}
   <tbody>
   {%- for u in units %}
     <tr>
       <td class="text-strong" data-label="Número de série"><a class="row-link" href="{{ url_for('qualidade.unit_detail', unit_id=u.id) }}">{{ u.serial }}</a></td>
-      <td data-label="Status">{{ badge(labels.get(u.status, u.status), "success" if u.status in ("done", "shipped") else ("danger" if u.status == "scrapped" else "neutral")) }}</td>
+      <td data-label="Situação">{{ badge(labels.get(u.status, u.status), "success" if u.status in ("done", "shipped") else ("danger" if u.status == "scrapped" else "neutral")) }}</td>
       <td class="num" data-label="Cadastrada em">{{ u.created_at|datahora }}</td>
     </tr>
   {%- endfor %}

@@ -9,7 +9,7 @@
 {% from "components/optional.html" import optional_badge %}
 {% set nav_current = "fill" %}
 {% set nav_project = project %}
-{% block title %}{{ project.name }} · Controle de Produção{% endblock %}
+{% block title %}{{ project.name }} · Teroz{% endblock %}
 {% block content %}
 {#
   telas.md §8 — tela principal. Ordem: indicadores → etapas com registro rápido →
@@ -57,7 +57,7 @@
     {%- endif %}
     <div class="stages">
       <div class="stages__head wide-only" aria-hidden="true">
-        <span>Etapa</span><span class="is-num">Unid.</span><span>Progresso</span><span class="is-num">Faltam</span><span>Status</span>
+        <span>Etapa</span><span class="is-num">Unid.</span><span>Progresso</span><span class="is-num">Faltam</span><span>Situação</span>
       </div>
       {%- for stage, sr, activities in rows %}
       {%- set stage_has_error = errors.get(stage.id) or (activities | selectattr("0.id", "in", errors) | list) %}
@@ -108,21 +108,21 @@
             {%- for activity, ar in activities %}
             {% include "app/detail/_activity.html" %}
             {%- else %}
-            <li class="activity activity--empty muted">Nenhuma atividade nesta etapa.</li>
+            <li class="activity activity--empty muted">Nenhuma subatividade nesta etapa.</li>
             {%- endfor %}
           </ul>
           {%- if can_edit %}
           <form class="inline-form" method="post" action="{{ url_for('app.activity_create', stage_id=stage.id) }}">
             {{ activity_form.csrf_token }}
             <div class="field">
-              <label class="field__label" for="nova-atividade-{{ stage.id }}">Nova atividade</label>
+              <label class="field__label" for="nova-atividade-{{ stage.id }}">Nova subatividade</label>
               <input class="field__input" id="nova-atividade-{{ stage.id }}" type="text" name="name" maxlength="160" required>
             </div>
             <div class="field inline-form__small">
               <label class="field__label" for="tempo-{{ stage.id }}">Tempo ideal (min)</label>
               <input class="field__input" id="tempo-{{ stage.id }}" type="number" name="ideal_minutes" min="0" step="0.01" inputmode="decimal" required>
             </div>
-            {{ button("Incluir atividade", "secondary", icon="plus") }}
+            {{ button("Incluir subatividade", "secondary", icon="plus") }}
           </form>
           {%- endif %}
         </div>

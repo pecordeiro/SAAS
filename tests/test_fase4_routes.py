@@ -160,7 +160,7 @@ def test_edicao_do_projeto_pelas_telas(client, app, tenants):
     a, _ = tenants
     login(client, app, a.supervisor_email)
     page = client.get(f"/app/projetos/{a.project_id}/editar")
-    assert page.status_code == 200 and "Etapas e atividades" in text_of(page)
+    assert page.status_code == 200 and "Etapas e subatividades" in text_of(page)
     data = {"name": "Renomeado", "quantity": 12, "people": 2, "hours_per_day": "8"}
     assert post(client, app, f"/app/projetos/{a.project_id}/editar", data).status_code == 303
     assert post(client, app, f"/app/projetos/{a.project_id}/editar", {**data, "quantity": 0}).status_code == 400
@@ -265,7 +265,7 @@ def test_exportar_importar_pelas_telas(client, app, tenants):
     assert client.get("/app/importar/modelo.csv").data.decode("utf-8-sig").startswith("Projeto;")
     preview = _upload(client, app, "projeto.csv", csv_bytes, {"name": ""})
     page = preview.get_data(as_text=True)
-    assert preview.status_code == 200 and "Pré-visualização" in page and "Atividade 1" in page
+    assert preview.status_code == 200 and "Prévia" in page and "Atividade 1" in page
     payload = _hidden(page, "payload")
     before = _count(app, Project, company_id=a.company_id)
     response = post(client, app, "/app/importar/confirmar", {"payload": payload, "name": "Importado"})

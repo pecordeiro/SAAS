@@ -5,7 +5,7 @@
 {% from "components/badge.html" import badge %}
 {% from "components/steps.html" import steps %}
 {% set nav_current = "spreadsheet" %}
-{% block title %}{{ "Escolher projetos" if step == 2 else "Prévia" }} · Importar planilha · Controle de Produção{% endblock %}
+{% block title %}{{ "Escolher projetos" if step == 2 else "Prévia" }} · Importar planilha · Teroz{% endblock %}
 {% block content %}
 {#
   R7 — arquivo com VÁRIOS projetos (abas “Acompanhamento/Equipe/Como funciona” e
@@ -45,7 +45,7 @@
         {%- endif %}
         <p class="import-projects__meta num">
           <span>{{ result.stages|length }} {{ "etapa" if result.stages|length == 1 else "etapas" }}</span>
-          <span>{{ result.activity_count }} {{ "atividade" if result.activity_count == 1 else "atividades" }}</span>
+          <span>{{ result.activity_count }} {{ "subatividade" if result.activity_count == 1 else "subatividades" }}</span>
           {%- if result.quantity %}<span>meta {{ result.quantity }}</span>{% endif %}
           {%- if project and project.key %}<span class="muted">abas “{{ project.key }} - …”</span>{% elif project %}<span class="muted">abas sem prefixo</span>{% endif %}
         </p>
@@ -83,7 +83,7 @@
           <span class="import-projects__name">{{ r.name }}</span>
           <span class="import-projects__meta num">
             <span>{{ r.stages|length }} {{ "etapa" if r.stages|length == 1 else "etapas" }}</span>
-            <span>{{ r.activity_count }} {{ "atividade" if r.activity_count == 1 else "atividades" }}</span>
+            <span>{{ r.activity_count }} {{ "subatividade" if r.activity_count == 1 else "subatividades" }}</span>
             <span>meta {{ r.quantity }}</span>
             <span>{{ r.people }} {{ "pessoa" if r.people == 1 else "pessoas" }} × {{ r.hours_per_day|num(1) }} h</span>
           </span>
@@ -91,7 +91,7 @@
         </summary>
         <ul class="import-projects__stages">
           {%- for stage in r.stages %}
-          <li><span>{{ stage.name }}</span> <span class="muted num">{{ stage.activities|length }} {{ "atividade" if stage.activities|length == 1 else "atividades" }}</span></li>
+          <li><span>{{ stage.name }}</span> <span class="muted num">{{ stage.activities|length }} {{ "subatividade" if stage.activities|length == 1 else "subatividades" }}</span></li>
           {%- endfor %}
         </ul>
       </details>

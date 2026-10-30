@@ -559,7 +559,7 @@ def test_importar_limites_de_linhas(ctx, monkeypatch):
     monkeypatch.setattr(importer, "MAX_ACTIVITIES_PER_STAGE", 1)
     rows = [["L", "2", "", "", "", "", "E", "A", "1", "0", "ativa"], _row("E", "B", "1"), _row("F", "C", "1")]
     messages = [e.message for e in importer.parse_upload("x.csv", _csv(rows), 10**6).errors]
-    assert messages == ["mais de 1 atividades na etapa", "mais de 2 linhas"]
+    assert messages == ["mais de 1 subatividades na etapa", "mais de 2 linhas"]
     rows = [["L", "2", "", "", "", "", "E", "A", "1", "0", "ativa"], _row("F", "C", "1")]
     assert [e.message for e in importer.parse_upload("x.csv", _csv(rows), 10**6).errors] == ["mais de 1 etapas"]
 

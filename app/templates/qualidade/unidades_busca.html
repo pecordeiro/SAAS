@@ -5,7 +5,7 @@
 {% from "components/empty_state.html" import empty_state %}
 {% from "components/table.html" import data_table %}
 {% set nav_current = "units" %}
-{% block title %}Buscar unidade · Controle de Produção{% endblock %}
+{% block title %}Buscar unidade · Teroz{% endblock %}
 {% block content %}
 {# Etapa G — busca por número de série em todos os projetos ativos da empresa da sessão. #}
 <header class="page-header">
@@ -24,13 +24,13 @@
 </form>
 
 {%- if units %}
-{% call data_table([("Número de série", ""), ("Projeto", ""), ("Status", "")], caption="Unidades encontradas") %}
+{% call data_table([("Número de série", ""), ("Projeto", ""), ("Situação", "")], caption="Unidades encontradas") %}
   <tbody>
   {%- for u in units %}
     <tr>
       <td class="text-strong" data-label="Número de série"><a class="row-link" href="{{ url_for('qualidade.unit_detail', unit_id=u.id) }}">{{ u.serial }}</a></td>
       <td data-label="Projeto">{{ u.project.name }}</td>
-      <td data-label="Status">{{ badge(labels.get(u.status, u.status)) }}</td>
+      <td data-label="Situação">{{ badge(labels.get(u.status, u.status)) }}</td>
     </tr>
   {%- endfor %}
   </tbody>

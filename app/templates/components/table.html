@@ -5,7 +5,8 @@
   Linha inteira clicável: ponha <a class="row-link"> na primeira célula.
 #}
 {% macro data_table(columns, caption=None, cards=True, class_="") -%}
-<div class="table-wrap{% if class_ %} {{ class_ }}{% endif %}">
+{#- Sem o modo "cartões" a tabela mantém as colunas e rola de lado no celular: a região precisa receber foco para quem usa teclado (WCAG 2.1.1). -#}
+<div class="table-wrap{% if class_ %} {{ class_ }}{% endif %}"{% if not cards %} role="region" tabindex="0"{% if caption %} aria-label="{{ caption }}"{% endif %}{% endif %}>
   <table class="table{% if cards %} table--cards{% endif %}">
     {%- if caption %}<caption class="visually-hidden">{{ caption }}</caption>{% endif %}
     <thead>

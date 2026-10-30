@@ -269,9 +269,9 @@ class Change:
         if self.kind == "stage_removed":
             return f"Etapa “{self.stage}” sai do projeto (fica arquivada com o histórico)"
         if self.kind == "activity_added":
-            return f"Nova atividade “{self.activity}” em “{self.stage}” ({self.new} min)"
+            return f"Nova subatividade “{self.activity}” em “{self.stage}” ({self.new} min)"
         if self.kind == "activity_removed":
-            return f"Atividade “{self.activity}” de “{self.stage}” sai (fica arquivada com o histórico)"
+            return f"Subatividade “{self.activity}” de “{self.stage}” sai (fica arquivada com o histórico)"
         if self.kind == "checklist_changed":
             return f"Checklist de inspeção de “{self.stage}” muda (itens novos entram; respostas antigas ficam)"
         if self.kind == "minutes_changed":

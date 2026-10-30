@@ -1,7 +1,7 @@
 {% extends "emails/_base.txt" %}
 {% block body %}Olá, {{ name }}.
 
-Foi pedida a exclusão da empresa {{ company_name }} no Controle de Produção.
+Foi pedida a exclusão da empresa {{ company_name }} na Teroz.
 Todos os dados serão apagados definitivamente em {{ purge_at|data }}.
 
 Até lá tudo continua funcionando e qualquer proprietário pode cancelar em Privacidade e dados.

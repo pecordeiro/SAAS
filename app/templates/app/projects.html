@@ -7,7 +7,7 @@
 {% from "components/empty_state.html" import empty_state %}
 {% from "components/pagination.html" import pagination %}
 {% set nav_current = "projects" %}
-{% block title %}Projetos · Controle de Produção{% endblock %}
+{% block title %}Projetos · Teroz{% endblock %}
 {% block content %}
 {# telas.md §7: abas de status + busca + prazo; projetos com progresso, unidades e prazo; Novo/Exportar (supervisor+). #}
 {%- macro page_url(n) %}{{ url_for('app.projects', status=filters.status, prazo=filters.prazo or None, q=filters.q or None, page=n if n > 1 else None) }}{% endmacro %}
@@ -34,7 +34,7 @@
   <input type="hidden" name="status" value="{{ filters.status }}">
   <div class="filters__row">
     <div class="field filters__search">
-      <label class="field__label" for="busca">Buscar lote ou produto</label>
+      <label class="field__label" for="busca">Buscar projeto ou produto</label>
       <input class="field__input" id="busca" type="search" name="q" value="{{ filters.q }}" maxlength="80" autocomplete="off" placeholder="Ex.: 2026-014">
     </div>
     <div class="field filters__select">
@@ -50,7 +50,7 @@
 
 <div id="lista-projetos">
 {%- if items %}
-{% call data_table([("Projeto", ""), ("Unid.", "is-num"), ("Progresso", ""), ("Faltam", "is-num"), ("Prazo", "is-num"), ("Status", "")], caption="Projetos", class_="projects-table") %}
+{% call data_table([("Projeto", ""), ("Unid.", "is-num"), ("Progresso", ""), ("Faltam", "is-num"), ("Prazo", "is-num"), ("Situação", "")], caption="Projetos", class_="projects-table") %}
   <tbody>
   {%- for it in items %}
   {%- set project = it.project %}{% set r = it.result %}{% set status = it.status %}{% set deadline = it.deadline %}
@@ -81,7 +81,7 @@
   {%- if filtered or filters.status != "todos" and counts["todos"] %}
   {{ empty_state("Nenhum projeto encontrado", "Nada combina com estes filtros. Tente outra busca ou veja todos os projetos.", ghost_action=("Ver todos", url_for('app.projects', status='todos'))) }}
   {%- elif can_create %}
-  {{ empty_state("Nenhum projeto ainda", "Crie o primeiro lote com as etapas, a quantidade e o prazo.", action=("Novo projeto", url_for('app.project_new'))) }}
+  {{ empty_state("Nenhum projeto ainda", "Crie o primeiro projeto com as etapas, a meta e o prazo.", action=("Novo projeto", url_for('app.project_new'))) }}
   {%- else %}
   {{ empty_state("Nenhum projeto para você", "Quando um supervisor criar um projeto, ele aparece aqui.") }}
   {%- endif %}

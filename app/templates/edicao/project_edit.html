@@ -64,9 +64,9 @@
   </form>
 
   <section class="stack" aria-labelledby="estrutura-titulo">
-    <h2 class="section-title" id="estrutura-titulo"><span>Etapas e atividades</span><span class="num">{{ stages|length }}</span></h2>
+    <h2 class="section-title" id="estrutura-titulo"><span>Etapas e subatividades</span><span class="num">{{ stages|length }}</span></h2>
     <p class="muted text-sm">Arquivar tira da tela e dos cálculos, mas os registros continuam no histórico e na exportação.</p>
-    <p class="muted text-sm js-only">Arraste pela alça ⠿ para reordenar etapas ou levar uma atividade para outra etapa; os botões Subir/Descer e “Mover” fazem o mesmo sem arrastar.</p>
+    <p class="muted text-sm js-only">Arraste pela alça ⠿ para reordenar etapas ou levar uma subatividade para outra etapa; os botões Subir/Descer e “Mover” fazem o mesmo sem arrastar.</p>
     {#- Etapa D: o arrastar só preenche e envia estes formulários; o servidor valida e decide. #}
     <form id="ordem-etapas" method="post" action="{{ url_for('edicao.stages_reorder', project_id=project.id) }}" hidden>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -102,11 +102,11 @@
       {%- set ac = conflict if conflict and conflict.id == activity.id else none %}
       {%- if ac %}{{ alert("warning", ac.message, role="alert") }}{% endif %}
       <div class="cluster sort-item" id="atividade-{{ activity.id }}" data-sort-id="{{ activity.id }}" data-version="{{ activity.version }}" data-move-url="{{ url_for('edicao.activity_position', activity_id=activity.id) }}">
-        <span class="drag-handle js-only" data-drag-handle title="Arrastar a atividade" aria-hidden="true">⠿</span>
+        <span class="drag-handle js-only" data-drag-handle title="Arrastar a subatividade" aria-hidden="true">⠿</span>
         <form class="cluster" method="post" action="{{ url_for('edicao.activity_edit', activity_id=activity.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="version" value="{{ activity.version }}">
-          <label class="visually-hidden" for="atv-nome-{{ activity.id }}">Atividade</label>
+          <label class="visually-hidden" for="atv-nome-{{ activity.id }}">Subatividade</label>
           <input class="field__input" id="atv-nome-{{ activity.id }}" name="name" value="{{ ac.mine.name if ac else activity.name }}" maxlength="160" required>
           <label class="visually-hidden" for="atv-min-{{ activity.id }}">Tempo ideal (min)</label>
           <input class="field__input" id="atv-min-{{ activity.id }}" name="ideal_minutes" value="{{ ac.mine.ideal_minutes if ac else activity.ideal_minutes }}" inputmode="decimal" required>
@@ -144,7 +144,7 @@
         </form>
       </div>
       {%- else %}
-      <p class="muted text-sm">Sem atividades. Inclua pela tela do projeto.</p>
+      <p class="muted text-sm">Sem subatividades. Inclua pela tela do projeto.</p>
       {%- endfor %}
       </div>
     </article>

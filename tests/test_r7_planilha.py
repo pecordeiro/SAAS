@@ -199,7 +199,7 @@ def test_mapeamento_erros_por_linha():
     assert not result.ok
     found = {(e.line, e.column) for e in result.errors}
     assert found >= {
-        (2, "tempo ideal"), (3, "Previstas (meta)"), (4, "Prazo (data)"), (4, "Etapa"),
+        (2, "tempo ideal"), (3, "Meta (previstas)"), (4, "Prazo (data)"), (4, "Etapa"),
         (5, exporter.COL_UNITS), (6, "% concluído"),
     }
 
@@ -452,7 +452,7 @@ def test_importar_qualquer_planilha_pelas_telas(client, app, tenants):
     form = {"grid": grid, "current_sheet": "Linha", "sheet": "Linha", "header_row": 1, "etapa": "0",
             "subatividade": "1", "tempo": "2", "concluidas": "3", "previstas": "4", "name": "Linha 3"}
     preview = post(client, app, "/app/importar/colunas", form)
-    assert preview.status_code == 200 and "Pré-visualização" in text_of(preview)
+    assert preview.status_code == 200 and "Prévia" in text_of(preview)
     payload = _hidden(preview.get_data(as_text=True), "payload")
     response = post(client, app, "/app/importar/confirmar", {"payload": payload, "name": "Linha 3"})
     assert response.status_code == 303
@@ -476,7 +476,7 @@ def test_formato_reconhecido_pode_ir_para_colunas(client, app, tenants):
     a, _ = tenants
     login(client, app, a.supervisor_email)
     csv_bytes = client.get(f"/app/projetos/{a.project_id}/exportar.csv").data
-    assert "Pré-visualização" in text_of(_upload(client, app, "p.csv", csv_bytes))
+    assert "Prévia" in text_of(_upload(client, app, "p.csv", csv_bytes))
     page = _upload(client, app, "p.csv", csv_bytes, {"map_columns": "y"})
     assert page.status_code == 200 and "Escolher colunas" in text_of(page)
 
@@ -489,7 +489,7 @@ def test_exportar_planilha_no_layout_pela_tela_e_importar_de_volta(client, app, 
     assert response.headers["Content-Disposition"] == 'attachment; filename="projeto-a-planilha.xlsx"'
     assert load_workbook(io.BytesIO(response.data)).sheetnames == ["Acompanhamento", "Equipe"]
     preview = _upload(client, app, "volta.xlsx", response.data)
-    assert preview.status_code == 200 and "Pré-visualização" in text_of(preview)
+    assert preview.status_code == 200 and "Prévia" in text_of(preview)
     operator = app.test_client()
     login(operator, app, a.operator_email)
     assert operator.get(f"/app/projetos/{a.project_id}/exportar-planilha.xlsx").status_code == 403

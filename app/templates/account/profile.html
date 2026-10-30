@@ -4,7 +4,7 @@
 {% from "components/alert.html" import alert %}
 {% from "components/badge.html" import badge %}
 {% set nav_current = "profile" %}
-{% block title %}Perfil · Controle de Produção{% endblock %}
+{% block title %}Perfil · Teroz{% endblock %}
 {% block content %}
 {# Perfil: nome, e-mail (com reconfirmação), senha (pede a atual), MFA e sessões. #}
 <header class="page-header">
@@ -87,7 +87,7 @@
       {{ prefs_form.csrf_token }}
       <fieldset class="fieldset stack--sm">
         <legend class="field__label">Quero receber</legend>
-        {{ checkbox("notify_assignment", "Atividade atribuída a mim (com o link)", checked=prefs_form.notify_assignment.data, value="y", id="pref-atribuicao") }}
+        {{ checkbox("notify_assignment", "Subatividade atribuída a mim (com o link)", checked=prefs_form.notify_assignment.data, value="y", id="pref-atribuicao") }}
         {{ checkbox("notify_alerts", "Alertas de produção: prazo em risco, atraso previsto, etapa parada, peça atrasada", checked=prefs_form.notify_alerts.data, value="y", id="pref-alertas") }}
         {{ checkbox("notify_weekly", "Relatório semanal com planilha (XLSX)", checked=prefs_form.notify_weekly.data, value="y", id="pref-semanal") }}
         <p class="field__hint">Alertas e relatório semanal só chegam a supervisores e proprietários. Vale para todas as suas empresas.</p>

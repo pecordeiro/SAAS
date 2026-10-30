@@ -59,7 +59,7 @@ CATALOG: tuple[Module, ...] = (
     Module(
         ATRIBUICAO,
         "Responsáveis e progresso por pessoa",
-        "Escolha quem cuida de cada atividade, avise a pessoa por e-mail e veja quantas peças cada um lançou.",
+        "Escolha quem cuida de cada subatividade, avise a pessoa por e-mail e veja quantas peças cada um lançou.",
         "Campo “Responsável”, quadro “Pessoas” e a tela de progresso por pessoa.",
         endpoints=("app.project_people", "edicao.activity_assign"),
     ),
@@ -80,8 +80,8 @@ CATALOG: tuple[Module, ...] = (
     Module(
         FOTOS,
         "Fotos e comentários",
-        "Guarde fotos e comentários em cada atividade, como registro do que foi feito.",
-        "Botão “Fotos e comentários” nas etapas e a tela de cada atividade.",
+        "Guarde fotos e comentários em cada subatividade, como registro do que foi feito.",
+        "Botão “Fotos e comentários” nas etapas e a tela de cada subatividade.",
         endpoints=(
             "qualidade.evidence",
             "qualidade.comment_create",
@@ -125,7 +125,7 @@ CATALOG: tuple[Module, ...] = (
     Module(
         API,
         "API de integração",
-        "Ligue outros sistemas ao Controle de Produção com tokens de acesso.",
+        "Ligue outros sistemas à Teroz com tokens de acesso.",
         "Tela de tokens e o endereço /api/v1.",
         endpoint_prefixes=("api_tokens_ui.", "api_v1."),
         requires_config="FEATURE_PUBLIC_API",

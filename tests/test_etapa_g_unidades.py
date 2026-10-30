@@ -84,7 +84,7 @@ def test_status_com_versao_e_auditoria_no_historico(app, client, tenants):
     assert post(client, app, f"/app/unidades/{unit_id}/status", {"status": "shipped", "version": 1}).status_code == 409
     assert post(client, app, f"/app/unidades/{unit_id}/status", {"status": "perdida", "version": 2}).status_code == 400
     page = text_of(client.get(f"/app/unidades/{unit_id}"))
-    assert "Status da unidade alterado" in page and "Em produção → Concluída" in page
+    assert "Situação da unidade alterada" in page and "Em produção → Concluída" in page
 
 
 def test_registrar_atividade_na_unidade_uma_vez_e_desfazer_libera(app, tenants):

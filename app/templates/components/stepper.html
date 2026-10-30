@@ -31,7 +31,7 @@
       <p class="sheet__title" id="{{ sid }}-titulo"><span class="muted">{{ stage_name }} ›</span> {{ activity_name }}</p>
       <a class="btn btn--ghost btn--icon sheet__close" href="{{ return_href }}" aria-label="Fechar">{{ icon("x") }}</a>
     </div>
-    <p class="register__meta muted num">{{ done }} de {{ planned }} concluídas · faltam {{ faltam }}</p>
+    <p class="register__meta muted num">{{ done }} de {{ planned }} prontas · faltam {{ faltam }}</p>
     {%- if error %}
     <div class="register__error">{{ alert("warning" if conflict else "danger", error, role="alert") }}</div>
     {%- endif %}

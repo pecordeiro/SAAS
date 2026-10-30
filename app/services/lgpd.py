@@ -158,15 +158,15 @@ def export_company(company: Company) -> tuple[bytes, dict[str, int]]:
             zf.writestr(f"{table.name}.csv", data)
 
         readme = (
-            "Exportação de dados da empresa — Controle de Produção\n"
+            "Exportação de dados da empresa — Teroz\n"
             f"Gerada em {_now().isoformat()} (UTC).\n\n"
             "Um arquivo CSV por tabela (separador ';', UTF-8 com BOM, abre no Excel).\n"
             "Datas em ISO 8601 (UTC). Textos que começam com = + - @ ganham um apóstrofo\n"
             "para a planilha não executar fórmula.\n"
             "Não incluídos por segurança: hashes de senha e de tokens, segredo do MFA.\n"
-            "Fotos de evidência: activity_photos.csv lista os METADADOS (atividade, data, quem\n"
+            "Fotos de evidência: activity_photos.csv lista os METADADOS (subatividade, data, quem\n"
             "enviou, tamanho, SHA-256); os arquivos de imagem não vão no ZIP — abra cada foto na\n"
-            "tela da atividade ou peça ao encarregado de dados a cópia das imagens.\n"
+            "tela da subatividade ou peça ao encarregado de dados a cópia das imagens.\n"
             "Briefing de identidade visual: visual_briefings.csv (texto) e visual_briefing_files.csv\n"
             "(metadados do logo e das fotos de produto; as imagens abrem na tela do briefing).\n\n"
             "Arquivos e linhas:\n" + "".join(f"  {name}: {n}\n" for name, n in counts.items())

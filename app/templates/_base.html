@@ -8,8 +8,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>{% block title %}Controle de Produção{% endblock %}</title>
-  <meta name="description" content="{% block description %}Acompanhe a produção por etapas: unidades concluídas, horas que faltam e prazo em dias úteis, do celular ao escritório.{% endblock %}">
+  <title>{% block title %}Teroz{% endblock %}</title>
+  <meta name="description" content="{% block description %}Acompanhe a produção por etapas: unidades prontas, horas que faltam e prazo em dias úteis, do celular ao escritório.{% endblock %}">
   <meta name="color-scheme" content="light dark">
   {%- set tc = theme_colors['marca' if marca else 'app'] %}
   <meta name="theme-color" content="{{ tc.light }}" media="(prefers-color-scheme: light)">
@@ -22,7 +22,7 @@
   <meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"historyCacheSize":0,"refreshOnHistoryMiss":true,"selfRequestsOnly":true,"scrollIntoViewOnBoost":false,"attributesToSettle":["class","width","height"],"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":true,"error":true},{"code":"...","swap":false}]}'>
   <meta property="og:type" content="website">
   <meta property="og:locale" content="pt_BR">
-  <meta property="og:site_name" content="Controle de Produção">
+  <meta property="og:site_name" content="Teroz">
   <meta property="og:title" content="{{ self.title() }}">
   <meta property="og:description" content="{{ self.description() }}">
   <meta property="og:image" content="{{ url_for('static', filename='img/og-image.png', _external=True) }}">

@@ -923,7 +923,7 @@ def como_funciona(
     if not simples:
         add(
             "% concluído da subatividade",
-            "Peças concluídas ÷ unidades previstas. Você só digita as peças.",
+            "Peças prontas ÷ meta. Você só digita as peças.",
             lambda: f"{nome_a}: {a.pecas} ÷ {quantidade} = {_br_pct(ra.pct)}",
         )
         add(
@@ -932,8 +932,8 @@ def como_funciona(
             lambda: f"{nome}: {_br_pct(re_.progresso, 1)}",
         )
         add(
-            "Unidades concluídas da etapa (Tabela 2)",
-            "Menor número de peças concluídas entre as subatividades: uma unidade só está pronta quando passou por todas.",
+            "Unidades prontas da etapa (Tabela 2)",
+            "Menor número de peças prontas entre as subatividades: uma unidade só está pronta quando passou por todas.",
             lambda: (
                 f"{nome}: menor nº de peças = {re_.unidades} → {re_.unidades} ÷ {quantidade} = "
                 f"{_br_pct(razao(re_.unidades, quantidade))}, mesmo com as tarefas em {_br_pct(re_.progresso)}"
@@ -941,12 +941,12 @@ def como_funciona(
         )
         add(
             "Tempo total da subatividade",
-            "Tempo ideal × unidades previstas.",
+            "Tempo ideal × meta.",
             lambda: f"{nome_a}: {_br_min(a.ideal_min)} min × {quantidade} = {_br_min(ra.tempo_total_min)} min",
         )
         add(
             "Tempo que falta",
-            "Tempo ideal × (previstas − peças concluídas).",
+            "Tempo ideal × (meta − peças prontas).",
             lambda: (
                 f"{nome_a}: {_br_min(a.ideal_min)} min × ({quantidade} − {min(a.pecas, quantidade)}) = "
                 f"{_br_min(ra.tempo_restante_min)} min"
@@ -955,19 +955,19 @@ def como_funciona(
     else:
         add(
             "Tempo que falta da etapa",
-            "Tempo da etapa × (previstas − unidades concluídas).",
+            "Tempo da etapa × (meta − unidades prontas).",
             lambda: (
                 f"{nome}: {_br_min(re_.tempo_unidade_min)} min × ({quantidade} − {min(a.pecas, quantidade)}) = "
                 f"{_br_min(re_.tempo_restante_min)} min"
             ),
         )
     add(
-        "Unidades concluídas do projeto",
-        "Menor número de unidades concluídas entre todas as etapas: uma unidade só está pronta quando passou por todas.",
+        "Unidades prontas do projeto",
+        "Menor número de unidades prontas entre todas as etapas: uma unidade só está pronta quando passou por todas.",
         lambda: f"Menor valor entre as etapas = {r.unidades_concluidas} de {quantidade}",
     )
     add(
-        "Progresso geral",
+        "Progresso pelas tarefas do projeto",
         "1 − tempo que falta ÷ tempo total, somando todas as etapas.",
         lambda: (
             f"1 − {_br(r.tempo_restante_h)} h ÷ {_br(r.tempo_total_h)} h = {_br_pct(r.progresso_geral, 1)}"

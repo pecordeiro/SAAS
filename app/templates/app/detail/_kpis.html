@@ -6,7 +6,7 @@
 #}
 <section class="kpi-grid" id="indicadores" aria-label="Indicadores"{% if oob %} hx-swap-oob="true"{% endif %}>
   {{ kpi("Unidades", result.unidades_concluidas ~ "/" ~ project.quantity, sub="concluídas") }}
-  {% call kpi("Progresso", result.progresso_geral|pct(0)) %}{{ progress(result.progresso_geral, 1, label="Progresso geral", size="sm", show_text=False, value_text=result.progresso_geral|pct) }}{% endcall %}
+  {% call kpi("Progresso", result.progresso_geral|pct(0)) %}{{ progress(result.progresso_geral, 1, label="Progresso pelas tarefas", size="sm", show_text=False, value_text=result.progresso_geral|pct) }}{% endcall %}
   {{ kpi("Faltam", result.tempo_restante_h|horas, sub="de " ~ (result.tempo_total_h|horas)) }}
   {%- if result.dias_uteis_restantes is none %}
   {{ kpi("Dias úteis", None, empty_sub="informe a equipe") }}

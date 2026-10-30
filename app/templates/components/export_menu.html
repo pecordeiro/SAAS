@@ -15,11 +15,11 @@
     <p class="export-menu__group">Lista simples</p>
     <a class="action-menu__item export-menu__item" href="{{ url_for('dados.export_csv', project_id=project.id) }}" download>
       <span class="export-menu__title">Lista simples (.csv)</span>
-      <span class="export-menu__desc">Uma linha por atividade</span>
+      <span class="export-menu__desc">Uma linha por subatividade</span>
     </a>
     <a class="action-menu__item export-menu__item" href="{{ url_for('dados.export_xlsx', project_id=project.id) }}" download>
       <span class="export-menu__title">Lista simples (.xlsx)</span>
-      <span class="export-menu__desc">Uma linha por atividade, para filtrar no Excel</span>
+      <span class="export-menu__desc">Uma linha por subatividade, para filtrar no Excel</span>
     </a>
   </div>
 </details>

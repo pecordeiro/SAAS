@@ -1,6 +1,6 @@
 {% extends "emails/_base.txt" %}
 {% block body %}Olá{% if name %}, {{ name }}{% endif %}.
 
-{% if outcome == "cancelada" %}A equipe cancelou a ligação de {{ when }} (horário de Brasília). Se quiser outro horário, escolha um na tela da ligação.{% else %}A equipe manteve a ligação de {{ when }} (horário de Brasília). Se precisar, responda a este e-mail.{% endif %}
+{% if outcome == "cancelada" %}A equipe cancelou a ligação de {{ when }} (horário de Brasília). Se quiser outro horário, escolha um na tela da ligação.{% else %}A equipe manteve a ligação de {{ when }} (horário de Brasília). Se precisar de outra mudança, peça pela tela da ligação.{% endif %}
 
 Ver a ligação: {{ url }}{% endblock %}

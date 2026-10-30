@@ -31,7 +31,7 @@ SCOPE_READ_PROJECTS = "read:projects"
 SCOPE_WRITE_PROGRESS = "write:progress"
 SCOPES: dict[str, str] = {
     SCOPE_READ_PROJECTS: "Ler projetos, resumos e eventos",
-    SCOPE_WRITE_PROGRESS: "Registrar progresso de atividades",
+    SCOPE_WRITE_PROGRESS: "Registrar progresso de subatividades",
 }
 EXPIRY_CHOICES: tuple[tuple[str, str], ...] = (
     ("30", "30 dias"),

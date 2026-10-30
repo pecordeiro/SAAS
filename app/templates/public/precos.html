@@ -3,7 +3,7 @@
 {% from "components/table.html" import data_table %}
 {% from "components/icon.html" import icon %}
 {% set marca = true %}
-{% block title %}Preços · Controle de Produção{% endblock %}
+{% block title %}Preços · Teroz{% endblock %}
 {% block description %}{%- set first = plans|selectattr("price")|first %}Planos por empresa{% if first %}, a partir de R$ {{ first.price|num(0) if first.price == first.price|int else first.price|num(2) }} por mês{% endif %}. {{ trial_days }} dias grátis, sem cartão, no Essencial e no Profissional. Projetos, pessoas, histórico e exportação.{% endblock %}
 {% block main %}
 {# R10 (ADR-0016): preço e limites da tabela plans; tabela comparativa; perguntas; chamada final. #}
@@ -35,7 +35,7 @@
       <tr><th scope="row">Pessoas</th>{% for plan in plans %}<td class="is-num">{{ plan.users.replace(" pessoas", "") }}</td>{% endfor %}</tr>
       <tr><th scope="row">Preço por mês</th>{% for plan in plans %}<td class="is-num">{% if plan.price is none %}Sob orçamento{% else %}R$ {{ plan.price|num(0) if plan.price == plan.price|int else plan.price|num(2) }}{% endif %}</td>{% endfor %}</tr>
       <tr><th scope="row">Teste grátis de {{ trial_days }} dias, sem cartão</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.trial else "—" }}</td>{% endfor %}</tr>
-      <tr><th scope="row">Verificação em duas etapas obrigatória (MFA)</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.mfa_required else "—" }}</td>{% endfor %}</tr>
+      <tr><th scope="row">Verificação em duas etapas obrigatória para proprietários</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.mfa_required else "—" }}</td>{% endfor %}</tr>
       <tr><th scope="row">API para ligar a outros sistemas</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.api else "—" }}</td>{% endfor %}</tr>
       <tr><th scope="row">Identidade visual da sua empresa</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.visual_custom else "—" }}</td>{% endfor %}</tr>
       <tr><th scope="row">{{ services[0] }}</th>{% for plan in plans %}<td class="is-num">{{ "Sim" if plan.features.implantacao else "—" }}</td>{% endfor %}</tr>

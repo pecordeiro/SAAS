@@ -324,7 +324,7 @@ def mfa_disable():
         from app.services.passwords import verify_password
 
         if _owner_requires_mfa():
-            flash("Uma empresa em que você é proprietário exige MFA: não dá para desativar.", "erro")
+            flash("Uma empresa em que você tem o papel Proprietário exige a verificação em duas etapas: não dá para desativá-la.", "erro")
             return redirect(url_for("account.profile"), code=303)
         if verify_password(current_user.password_hash, form.current_password.data) and (
             mfa.verify_user_totp(current_user, form.code.data) or mfa.use_recovery_code(current_user, form.code.data)

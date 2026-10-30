@@ -4,7 +4,7 @@
 {% from "components/badge.html" import badge %}
 {% from "components/alert.html" import alert %}
 {% set nav_current = "billing" %}
-{% block title %}Planos · Assinatura · Controle de Produção{% endblock %}
+{% block title %}Planos · Assinatura · Teroz{% endblock %}
 {% block content %}
 {# F8-2 / F8-5: escolher plano. Sem assinatura no provedor → dados de cobrança e checkout;
    com assinatura → projeção da troca e confirmação. #}
@@ -35,7 +35,7 @@
     <ul class="plan__list">
       <li>{{ icon("check") }}<span>{{ plan.max_projects if plan.max_projects is not none else "Ilimitados" }} projetos ativos</span></li>
       <li>{{ icon("check") }}<span>{{ ("Até " ~ plan.max_users ~ " pessoas") if plan.max_users is not none else "Pessoas ilimitadas" }}</span></li>
-      {%- if plan.features.get("mfa_required") %}<li>{{ icon("check") }}<span>MFA obrigatório</span></li>{% endif %}
+      {%- if plan.features.get("mfa_required") %}<li>{{ icon("check") }}<span>Verificação em duas etapas obrigatória</span></li>{% endif %}
       {%- if plan.features.get("api") %}<li>{{ icon("check") }}<span>API de integração</span></li>{% endif %}
       {%- if plan.features.get("visual_custom") %}<li>{{ icon("check") }}<span>Identidade visual personalizada</span></li>{% endif %}
       {%- if plan.features.get("implantacao") %}{% for service in implantacao_services %}<li>{{ icon("check") }}<span>{{ service }}</span></li>{% endfor %}{% endif %}

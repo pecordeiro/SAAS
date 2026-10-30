@@ -4,7 +4,7 @@
 {% from "components/button.html" import button %}
 {% from "components/steps.html" import steps %}
 {% set nav_current = "spreadsheet" %}
-{% block title %}Escolher colunas · Importar planilha · Controle de Produção{% endblock %}
+{% block title %}Escolher colunas · Importar planilha · Teroz{% endblock %}
 {% block content %}
 {#
   R7 — passo 2: escolher aba, linha do cabeçalho e o que cada coluna é (“Isto é…”). A sugestão
@@ -108,7 +108,7 @@
   <section class="card stack" aria-labelledby="projeto-titulo">
     <h2 class="section-title" id="projeto-titulo">Projeto</h2>
     <div class="import-where">
-      {{ field(form.quantity, optional=True, hint="Use se a planilha não tem a coluna de previstas.", attrs={"inputmode": "numeric", "min": 1, "autocomplete": "off"}) }}
+      {{ field(form.quantity, optional=True, hint="Use se a planilha não tem a coluna de meta (previstas).", attrs={"inputmode": "numeric", "min": 1, "autocomplete": "off"}) }}
       {{ field(form.name, optional=True, hint="Se ficar vazio, usamos o nome do arquivo.", attrs={"autocomplete": "off"}) }}
     </div>
   </section>

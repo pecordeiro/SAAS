@@ -199,7 +199,7 @@ def _main_sheet(ws, project: Project, stages: list, lay: Layout) -> None:
     )
     w.put(
         "A3",
-        f"Exportado do Controle de Produção em {datetime.now(timezone.utc):%d/%m/%Y}. "
+        f"Exportado da Teroz em {datetime.now(timezone.utc):%d/%m/%Y}. "
         "Para devolver ao site, importe este arquivo.",
         color=MUTED,
     )

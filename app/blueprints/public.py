@@ -32,7 +32,7 @@ SITEMAP_PAGES = (
 LEGAL_UPDATED = date(2026, 10, 14)
 FEATURED_PLAN = "profissional"
 PLAN_EXTRAS = (
-    ("mfa_required", "Verificação em duas etapas obrigatória (MFA)"),
+    ("mfa_required", "Verificação em duas etapas obrigatória para proprietários"),
     ("api", "API para ligar a outros sistemas"),
     ("visual_custom", "Identidade visual da sua empresa"),
 )

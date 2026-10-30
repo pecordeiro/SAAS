@@ -112,7 +112,7 @@
           {%- if can_edit %}<input class="cell cell--num" id="tempo-etapa" name="ideal_minutes" form="f-etapa" value="{{ a.ideal_minutes|minutos }}" inputmode="decimal" autocomplete="off" aria-label="Tempo da etapa em minutos por unidade" aria-describedby="salvo-status">
           {%- else %}<span class="num">{{ a.ideal_minutes|minutos }}</span>{% endif -%}
         </td>
-        <td><span class="pct-cell" id="pct-{{ a.id }}"><progress class="mini mini--units" value="{{ [ar.pct, 1]|min }}" max="1" aria-label="Unidades concluídas">{{ ar.pct|pct(0) }}</progress><span class="num">{{ a.units_done }}/{{ quantity }}</span></span></td>
+        <td><span class="pct-cell" id="pct-{{ a.id }}"><progress class="mini mini--units" value="{{ [ar.pct, 1]|min }}" max="1" aria-label="Unidades prontas">{{ ar.pct|pct(0) }}</progress><span class="num">{{ a.units_done }}/{{ quantity }}</span></span></td>
         <td class="num cfg-only"><span class="num" id="tt-{{ a.id }}">{{ ar.tempo_total_min|num(0) }}</span></td>
         <td class="num cfg-only"><span class="num" id="tf-{{ a.id }}">{{ ar.tempo_restante_min|num(0) }}</span></td>
         <td class="etab__actions"><button class="btn btn--secondary btn--sm no-js-only" type="submit" form="f-etapa">Salvar</button></td>
@@ -216,7 +216,7 @@
         <td class="etab__name"><input class="cell cell--new" id="nova-nome" name="name" form="f-nova" maxlength="160" placeholder="Nova subatividade…" autocomplete="off" aria-label="Nome da nova subatividade"></td>
         <td class="num"><input class="cell cell--num cell--new" name="ideal_minutes" form="f-nova" inputmode="decimal" placeholder="0" autocomplete="off" aria-label="Tempo ideal da nova subatividade (min)"></td>
         <td></td>
-        <td class="num"><input class="cell cell--num cell--new" name="units_done" form="f-nova" inputmode="numeric" placeholder="0" autocomplete="off" aria-label="Peças concluídas da nova subatividade"></td>
+        <td class="num"><input class="cell cell--num cell--new" name="units_done" form="f-nova" inputmode="numeric" placeholder="0" autocomplete="off" aria-label="Peças prontas da nova subatividade"></td>
         <td colspan="3"></td>
         {%- if "atribuicao" in modules %}<td></td>{% endif %}
         <td class="etab__actions">

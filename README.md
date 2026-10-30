@@ -244,6 +244,14 @@ migrations no PostgreSQL só rodam com `TEST_DATABASE_URL`; no SQLite aparecem c
   falha ao salvar e trava contra clique duplo.
 - Telas, fluxo e decisão de cada gráfico: [`docs/design/redesign-2026-10-28.md`](docs/design/redesign-2026-10-28.md).
 
+### Textos da Teroz (auditoria de copy, 2026-10-29)
+
+- Vocabulário único em [`docs/teroz-terminologia.md`](docs/teroz-terminologia.md) (Teroz, subatividade, peças e
+  unidades prontas, meta, situação…) e voz em [`docs/teroz-voice-and-tone.md`](docs/teroz-voice-and-tone.md).
+- Inventário de todos os textos (arquivo:linha, antes → depois, status) em
+  [`docs/ux-copy-inventory.md`](docs/ux-copy-inventory.md). Endereços, IDs, API e o formato da planilha exportada não
+  mudaram; o importador continua reconhecendo os nomes antigos das colunas.
+
 ### Site público na identidade oliva (R10, ADR-0016)
 
 - Páginas: `/`, `/precos`, `/como-funciona` (como funciona com a sua planilha), `/termos`, `/privacidade`,

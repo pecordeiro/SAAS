@@ -409,7 +409,7 @@ def _send_invite(invitation: Invitation, company: Company, inviter: User, token:
 
     send_template(
         invitation.email,
-        f"Convite para {company.name} no Controle de Produção",
+        f"Convite para {company.name} na Teroz",
         "invite",
         company_name=company.name,
         inviter_name=inviter.name,

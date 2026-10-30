@@ -78,7 +78,7 @@ def parse_activities(text: str | None) -> list[NewActivity]:
             raise ValidationError(f"Linha {number}: use o formato “Nome; minutos”.")
         name = name.strip()
         if not name or len(name) > 160:
-            raise ValidationError(f"Linha {number}: nome da atividade vazio ou longo demais.")
+            raise ValidationError(f"Linha {number}: nome da subatividade vazio ou longo demais.")
         try:
             value = Decimal(minutes.strip().replace(",", "."))
         except InvalidOperation:
@@ -87,7 +87,7 @@ def parse_activities(text: str | None) -> list[NewActivity]:
             raise ValidationError(f"Linha {number}: tempo ideal deve ficar entre 0 e 100000 minutos.")
         activities.append(NewActivity(name=name, ideal_minutes=value.quantize(Decimal("0.01"))))
     if len(activities) > MAX_ACTIVITIES_PER_STAGE:
-        raise ValidationError(f"No máximo {MAX_ACTIVITIES_PER_STAGE} atividades por etapa.")
+        raise ValidationError(f"No máximo {MAX_ACTIVITIES_PER_STAGE} subatividades por etapa.")
     return activities
 
 
@@ -119,7 +119,7 @@ class StageSlotForm(Form):
         locales = ("pt_BR", "pt")
 
     name = StringField("Etapa", filters=[_strip], validators=[Optional(), Length(max=160)])
-    activities = TextAreaField("Atividades (uma por linha: Nome; minutos por unidade)")
+    activities = TextAreaField("Subatividades (uma por linha: Nome; minutos por unidade)")
     # Etapa G: checklist de inspeção da etapa (copiado ao projeto) e se ele é exigido (sinal).
     checklist = TextAreaField("Checklist de inspeção (um item por linha)")
     checklist_required = BooleanField("Exigir checklist assinado")
@@ -132,7 +132,7 @@ class StageSlotForm(Form):
         if parsed and not self.name.data:
             raise ValidationError("Dê um nome à etapa.")
         if self.name.data and not parsed and not getattr(self, "allow_without_activities", False):
-            raise ValidationError("Inclua pelo menos uma atividade.")
+            raise ValidationError("Inclua pelo menos uma subatividade.")
         if getattr(self, "allow_without_activities", False) and len(parsed) > 1:
             # R4, modo simples: a etapa tem só o %; uma linha opcional dá o tempo da etapa.
             raise ValidationError("No modo simples, deixe em branco ou use uma linha só (o tempo da etapa).")
@@ -180,7 +180,7 @@ class StageForm(BaseForm):
 
 
 class ActivityForm(BaseForm):
-    name = StringField("Nova atividade", filters=[_strip], validators=[DataRequired(), Length(max=160)])
+    name = StringField("Nova subatividade", filters=[_strip], validators=[DataRequired(), Length(max=160)])
     ideal_minutes = DecimalField(
         "Tempo ideal (min por unidade)", places=2,
         validators=[InputRequired(), NumberRange(min=Decimal("0"), max=Decimal("100000"))],
@@ -188,5 +188,5 @@ class ActivityForm(BaseForm):
 
 
 class ProgressForm(BaseForm):
-    delta = IntegerField("Peças concluídas agora", validators=[InputRequired(), NumberRange(min=1, max=100000)])
+    delta = IntegerField("Peças prontas agora", validators=[InputRequired(), NumberRange(min=1, max=100000)])
     version = IntegerField(validators=[Optional()])

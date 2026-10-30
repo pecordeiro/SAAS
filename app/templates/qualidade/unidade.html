@@ -7,7 +7,7 @@
 {% from "components/table.html" import data_table %}
 {% set nav_current = "projects" %}
 {% set nav_project = project %}
-{% block title %}Unidade {{ unit.serial }} · Controle de Produção{% endblock %}
+{% block title %}Unidade {{ unit.serial }} · Teroz{% endblock %}
 {% block content %}
 {#
   Etapa G — histórico completo da unidade: lançamentos ligados a ela (com desfazeres),
@@ -62,7 +62,7 @@
         <li class="comment"><p class="text-sm">{{ action_labels.get(c.action, c.action) }}{% if c.details and c.details.get("para") %}: {{ labels.get(c.details.get("de"), c.details.get("de")) }} → {{ labels.get(c.details.get("para"), c.details.get("para")) }}{% endif %} · <span class="muted num">{{ c.at|datahora }}</span></p></li>
         {%- endfor %}
       </ul>
-      {%- else %}<p class="muted">Sem alterações de status.</p>{% endif %}
+      {%- else %}<p class="muted">Sem alterações de situação.</p>{% endif %}
     </div>
   </section>
 
@@ -72,7 +72,7 @@
       <h2 class="card__title">Registrar nesta unidade</h2>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="field">
-        <label class="field__label" for="unidade-atividade">Atividade concluída</label>
+        <label class="field__label" for="unidade-atividade">Subatividade concluída</label>
         <select class="field__input" id="unidade-atividade" name="activity_id" required>
           {%- for stage, a in activities %}
           <option value="{{ a.id }}"{% if a.id in h.done_activities %} disabled{% endif %}>{{ stage.name }} › {{ a.name }}{% if a.id in h.done_activities %} (já registrada){% endif %}</option>
@@ -83,16 +83,16 @@
     </form>
     {%- if can_manage %}
     <form class="card stack" method="post" action="{{ url_for('qualidade.unit_status', unit_id=unit.id) }}">
-      <h2 class="card__title">Status</h2>
+      <h2 class="card__title">Situação</h2>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="version" value="{{ unit.version }}">
       <div class="field">
-        <label class="field__label" for="unidade-status">Status da unidade</label>
+        <label class="field__label" for="unidade-status">Situação da unidade</label>
         <select class="field__input" id="unidade-status" name="status">
           {%- for value, label in labels.items() %}<option value="{{ value }}"{% if value == unit.status %} selected{% endif %}>{{ label }}</option>{% endfor %}
         </select>
       </div>
-      <div>{{ button("Salvar status", "secondary") }}</div>
+      <div>{{ button("Salvar situação", "secondary") }}</div>
     </form>
     {%- endif %}
     {%- endif %}

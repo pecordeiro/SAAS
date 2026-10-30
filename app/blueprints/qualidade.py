@@ -477,7 +477,7 @@ def unit_status(unit_id):
         db.session.rollback()
         return _unit_page(get_or_404(Unit, unit_id), status=400, error=str(exc))
     db.session.commit()
-    flash("Status da unidade atualizado.", "sucesso")
+    flash("Situação da unidade atualizada.", "sucesso")
     return redirect(url_for("qualidade.unit_detail", unit_id=unit.id), 303)
 
 

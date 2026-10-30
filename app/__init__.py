@@ -170,7 +170,7 @@ def _register_errors(app: Flask) -> None:
 
     @app.errorhandler(400)
     def bad_request(err):
-        return page("errors/400.html", 400, message="Requisição inválida.")
+        return page("errors/400.html", 400, message="Algo no envio não veio como esperado. Volte à página anterior e tente de novo.")
 
     @app.errorhandler(403)
     def forbidden(err):
@@ -182,7 +182,7 @@ def _register_errors(app: Flask) -> None:
 
     @app.errorhandler(405)
     def method_not_allowed(err):
-        return page("errors/400.html", 405, message="Método não permitido.")
+        return page("errors/400.html", 405, message="Esta página não aceita esse envio. Volte e tente pela tela.")
 
     @app.errorhandler(429)
     def too_many(err):

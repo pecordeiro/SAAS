@@ -6,7 +6,7 @@
 {% from "components/modal.html" import confirm_dialog %}
 {% from "components/table.html" import data_table %}
 {% set nav_current = "billing" %}
-{% block title %}Assinatura · Controle de Produção{% endblock %}
+{% block title %}Assinatura · Teroz{% endblock %}
 {% block content %}
 {# Fase 8 (F8-2..F8-7): assinatura atual, uso × limites, fatura em aberto, ações. Só owner. #}
 <header class="page-header">
@@ -50,7 +50,7 @@
 <section class="card stack mb-4" aria-labelledby="situacao">
   <h2 class="card__title" id="situacao">Situação</h2>
   <dl class="meta-list">
-    <div><dt>Status</dt><dd>{{ status_label }}</dd></div>
+    <div><dt>Situação da assinatura</dt><dd>{{ status_label }}</dd></div>
     {%- if sub.status == "trialing" and sub.trial_ends_at %}
     <div><dt>Teste grátis até</dt><dd>{{ sub.trial_ends_at|datahora }}</dd></div>
     {%- endif %}
@@ -75,13 +75,13 @@
     <a class="btn btn--ghost" href="{{ url_for('billing.invoices') }}">Ver todas</a>
   </div>
   {%- if payments %}
-  {% call data_table([("Vencimento", ""), ("Valor", "is-num"), ("Status", "")], caption="Faturas recentes") %}
+  {% call data_table([("Vencimento", ""), ("Valor", "is-num"), ("Situação", "")], caption="Faturas recentes") %}
     <tbody>
     {%- for p in payments %}
       <tr>
         <td class="is-plain">{{ p.due_date|data }}</td>
         <td class="is-num" data-label="Valor">R$ {{ p.value_cents|reais }}</td>
-        <td data-label="Status">{{ badge(payment_labels.get(p.status, p.status), payment_tones.get(p.status, "neutral")) }}</td>
+        <td data-label="Situação">{{ badge(payment_labels.get(p.status, p.status), payment_tones.get(p.status, "neutral")) }}</td>
       </tr>
     {%- endfor %}
     </tbody>

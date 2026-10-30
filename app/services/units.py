@@ -130,9 +130,9 @@ def import_list(project: Project, text: str | None, user_id: uuid.UUID | None) -
 
 def set_status(unit: Unit, status: str, user_id: uuid.UUID | None, expected_version: int | None = None) -> None:
     if status not in UNIT_STATUSES:
-        raise UnitError("Status inválido.")
+        raise UnitError("Situação inválida.")
     if expected_version is not None and expected_version != unit.version:
-        raise UnitConflict("Outra pessoa alterou esta unidade. Confira o status atual.")
+        raise UnitConflict("Outra pessoa alterou esta unidade. Confira a situação atual.")
     if status == unit.status:
         return
     before = unit.status
@@ -145,7 +145,7 @@ def set_status(unit: Unit, status: str, user_id: uuid.UUID | None, expected_vers
         .execution_options(synchronize_session=False)
     )
     if result.rowcount != 1:  # pragma: no cover - corrida entre abas
-        raise UnitConflict("Outra pessoa alterou esta unidade. Confira o status atual.")
+        raise UnitConflict("Outra pessoa alterou esta unidade. Confira a situação atual.")
     db.session.refresh(unit)
     audit.record(
         audit.UNIT_STATUS_CHANGED, company_id=unit.company_id, actor_user_id=user_id, object_type="unit",
@@ -170,9 +170,9 @@ def _active_entry(activity: Activity, unit: Unit) -> ProgressEntry | None:
 
 def register_for_unit(unit: Unit, activity: Activity, user_id: uuid.UUID, expected_version: int | None = None) -> ProgressEntry:
     if activity.stage.project_id != unit.project_id or activity.company_id != unit.company_id:
-        raise UnitError("Atividade de outro projeto.")
+        raise UnitError("Subatividade de outro projeto.")
     if _active_entry(activity, unit) is not None:
-        raise UnitError(f"A unidade {unit.serial} já foi registrada nesta atividade.")
+        raise UnitError(f"A unidade {unit.serial} já foi registrada nesta subatividade.")
     return projects_svc.register_progress(activity, 1, expected_version, user_id, unit_id=unit.id)
 
 

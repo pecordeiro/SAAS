@@ -4,7 +4,7 @@
 {% from "components/badge.html" import badge %}
 {% from "components/empty_state.html" import empty_state %}
 {% set nav_current = "templates" %}
-{% block title %}Modelos de etapas · Controle de Produção{% endblock %}
+{% block title %}Modelos de etapas · Teroz{% endblock %}
 {% block content %}
 {# telas.md §11 (lista): modelos com versão, nº de etapas, tempo por unidade e uso. #}
 <header class="page-header">
@@ -32,7 +32,7 @@
 {% endcall %}
 {%- else %}
 <div class="card">
-  {{ empty_state("Nenhum modelo de etapas", "Monte etapas e atividades com tempo ideal, ou importe um CSV.", action=("Novo modelo", url_for('modelos.new')), ghost_action=("Importar", url_for('dados.import_upload'))) }}
+  {{ empty_state("Nenhum modelo de etapas", "Monte etapas e subatividades com tempo ideal, ou importe um CSV.", action=("Novo modelo", url_for('modelos.new')), ghost_action=("Importar", url_for('dados.import_upload'))) }}
 </div>
 {%- endif %}
 {% endblock %}

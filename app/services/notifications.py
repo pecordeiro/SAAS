@@ -23,7 +23,7 @@ from app.services import email as email_svc
 logger = logging.getLogger(__name__)
 
 VISUAL_REQUEST_SUBJECT = "Nova requisição de identidade visual"
-ASSIGNED_SUBJECT = "Nova atividade atribuída a você"
+ASSIGNED_SUBJECT = "Nova subatividade atribuída a você"
 
 
 PREFS = ("notify_assignment", "notify_alerts", "notify_weekly")

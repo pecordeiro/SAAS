@@ -1,8 +1,8 @@
-Controle de Produção
+Teroz
 ====================
 
 {% block body %}{% endblock %}
 
 --
-{% block footer %}Você recebeu esta mensagem por causa de uma ação na sua conta do Controle de Produção.
+{% block footer %}Você recebeu esta mensagem por causa de uma ação na sua conta da Teroz.
 Se não foi você, ignore este e-mail ou troque a senha. Não responda: esta caixa não é lida.{% endblock %}

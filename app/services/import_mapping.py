@@ -77,7 +77,7 @@ UNIT_WARN_MEAN_HOURS_ABOVE = Decimal("24")    # em horas, média > 24 h por unid
 FIELD_HELP: dict[str, str] = {
     F_STAGE: "O grupo de trabalho, ex.: Soldagem. É a única coluna obrigatória.",
     F_ACTIVITY: (
-        "A tarefa dentro da etapa, ex.: Soldar suporte. Se a sua planilha não tem esse nível, "
+        "A subatividade dentro da etapa, ex.: Soldar suporte. Se a sua planilha não tem esse nível, "
         "deixe sem coluna e o projeto entra no modo simples."
     ),
     F_MINUTES: "Quanto tempo leva para fazer uma unidade, ex.: 12 (minutos) ou 0,2 (horas). Escolha a unidade abaixo.",
@@ -95,8 +95,8 @@ FIELDS: tuple[tuple[str, str, bool], ...] = (
     (F_STAGE, "Etapa", True),
     (F_ACTIVITY, "Subatividade", False),
     (F_MINUTES, "Tempo ideal (min)", False),
-    (F_PLANNED, "Previstas (meta)", False),
-    (F_DONE, "Concluídas (peças)", False),
+    (F_PLANNED, "Meta (previstas)", False),
+    (F_DONE, "Peças prontas", False),
     (F_PCT, "% concluído", False),
     (F_DUE, "Prazo (data)", False),
 )
@@ -191,8 +191,8 @@ COLUMN_CHOICES: tuple[tuple[str, str], ...] = (
     (F_STAGE, "Etapa"),
     (F_ACTIVITY, "Subatividade (opcional)"),
     (F_MINUTES, "Tempo ideal (opcional)"),
-    (F_PLANNED, "Previstas / meta (opcional)"),
-    (F_DONE, "Concluídas (opcional)"),
+    (F_PLANNED, "Meta / previstas (opcional)"),
+    (F_DONE, "Peças prontas (opcional)"),
     (F_PCT, "% da etapa (opcional)"),
     (F_DUE, "Prazo (opcional)"),
 )
@@ -451,7 +451,7 @@ def parse_mapped(
         if activity is None:
             continue
         if len(stage.activities) >= MAX_ACTIVITIES_PER_STAGE:
-            result.error(line, FIELD_LABELS[F_ACTIVITY], f"mais de {MAX_ACTIVITIES_PER_STAGE} atividades na etapa")
+            result.error(line, FIELD_LABELS[F_ACTIVITY], f"mais de {MAX_ACTIVITIES_PER_STAGE} subatividades na etapa")
             continue
         stage.activities.append(activity)
     result.stages = list(stages.values())
@@ -538,7 +538,7 @@ def _read_quantity(result: ImportResult, rows, get, quantity: int | None) -> Non
     if result.quantity:
         return
     if any(_clean(get(v, F_DONE)) for _, v in rows):
-        result.error(0, "meta", "com peças concluídas, informe a meta (coluna de previstas ou o número)")
+        result.error(0, "meta", "com peças prontas, informe a meta (coluna de meta ou o número)")
         return
     if any(_clean(get(v, F_PCT)) for _, v in rows):
         result.quantity = DEFAULT_QUANTITY_PCT

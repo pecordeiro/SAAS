@@ -2,7 +2,7 @@
 {% from "components/plan_card.html" import plan_card %}
 {% from "components/icon.html" import icon %}
 {% set marca = true %}
-{% block title %}Controle de Produção · saiba em que etapa está cada lote{% endblock %}
+{% block title %}Teroz · saiba em que etapa está cada lote{% endblock %}
 {% block description %}Acompanhe a produção etapa por etapa: progresso, unidades prontas, horas que faltam e prazo em dias úteis. Importe a sua planilha e comece com {{ trial_days }} dias grátis, sem cartão.{% endblock %}
 {% block main %}
 {# R10 (ADR-0016): título → tela real do painel no aparelho → faixa de produtos → 3 passos → sua planilha → opcionais → planos → dúvidas → chamada final. Preços e limites vêm da tabela plans. #}
@@ -26,10 +26,10 @@
           <source srcset="{{ url_for('static', filename='img/vitrine/painel-celular-escuro.webp') }}" media="(max-width: 35em) and (prefers-color-scheme: dark)" width="600" height="1169" type="image/webp">
           <source srcset="{{ url_for('static', filename='img/vitrine/painel-celular-claro.webp') }}" media="(max-width: 35em)" width="600" height="1169" type="image/webp">
           <source srcset="{{ url_for('static', filename='img/vitrine/painel-escuro.webp') }}" media="(prefers-color-scheme: dark)" width="1600" height="1000" type="image/webp">
-          <img class="pub-device__shot" src="{{ url_for('static', filename='img/vitrine/painel-claro.webp') }}" width="1600" height="1000" alt="Painel de um lote no Teroz: progresso geral de 39%, horas que faltam, dias úteis até o prazo, barras de tarefas e unidades por etapa e a situação das etapas." fetchpriority="high">
+          <img class="pub-device__shot" src="{{ url_for('static', filename='img/vitrine/painel-claro.webp') }}" width="1600" height="1000" alt="Painel de um projeto na Teroz: progresso pelas tarefas de 40%, horas que faltam, dias úteis até o prazo, barras de tarefas e unidades por etapa e a situação das etapas." fetchpriority="high">
         </picture>
         </div>
-        <figcaption class="pub-device__cap">Tela real do Teroz, com dados de exemplo.</figcaption>
+        <figcaption class="pub-device__cap">Tela real da Teroz, com dados de exemplo.</figcaption>
       </figure>
     </div>
   </div>
@@ -50,9 +50,9 @@
       <h2 id="como-titulo">Três passos, sem treinamento longo.</h2>
       <p class="pub-sub">Quem monta lotes já conhece as etapas. O sistema só faz a conta.</p></div>
     <ol class="pub-steps" data-steps>
-      <li class="pub-step is-on rv" data-delay="1"><div class="pub-art pub-art--1"><img src="{{ url_for('static', filename='img/vitrine/passo-planilha.webp') }}" width="900" height="484" alt="Tela Importar planilha, no passo Enviar arquivo." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">1</span><h3>Traga sua planilha</h3><p>Envie o arquivo e diga qual coluna é a etapa, qual é a atividade e qual é o tempo. Se preferir, monte as etapas direto na tela.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
-      <li class="pub-step rv" data-delay="2"><div class="pub-art pub-art--2"><img src="{{ url_for('static', filename='img/vitrine/passo-painel.webp') }}" width="900" height="1207" alt="Gráfico Tarefas × unidades por etapa, do painel do projeto." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">2</span><h3>Veja o painel</h3><p>Cada etapa mostra o progresso pelas tarefas e as unidades prontas. Você vê também as horas que faltam e o prazo em dias úteis.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
-      <li class="pub-step rv" data-delay="3"><div class="pub-art pub-art--3 pub-art--phone"><img src="{{ url_for('static', filename='img/vitrine/passo-celular.webp') }}" width="600" height="723" alt="Preencher etapas no celular: lista de etapas com o progresso de cada uma." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">3</span><h3>Lance o progresso</h3><p>Quem está na bancada registra as peças concluídas pelo celular. As horas que faltam e o prazo se recalculam na hora.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
+      <li class="pub-step is-on rv" data-delay="1"><div class="pub-art pub-art--1"><img src="{{ url_for('static', filename='img/vitrine/passo-planilha.webp') }}" width="900" height="484" alt="Tela Importar planilha, no passo Enviar arquivo." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">1</span><h3>Traga sua planilha</h3><p>Envie o arquivo e diga qual coluna é a etapa, qual é a subatividade e qual é o tempo. Se preferir, monte as etapas direto na tela.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
+      <li class="pub-step rv" data-delay="2"><div class="pub-art pub-art--2"><img src="{{ url_for('static', filename='img/vitrine/passo-painel.webp') }}" width="900" height="1221" alt="Gráfico Tarefas × unidades por etapa, do painel do projeto." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">2</span><h3>Veja o painel</h3><p>Cada etapa mostra o progresso pelas tarefas e as unidades prontas. Você vê também as horas que faltam e o prazo em dias úteis.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
+      <li class="pub-step rv" data-delay="3"><div class="pub-art pub-art--3 pub-art--phone"><img src="{{ url_for('static', filename='img/vitrine/passo-celular.webp') }}" width="600" height="723" alt="Preencher etapas no celular: lista de etapas com o progresso de cada uma." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">3</span><h3>Lance o progresso</h3><p>Quem está na bancada registra as peças prontas pelo celular. As horas que faltam e o prazo se recalculam na hora.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
     </ol>
   </div>
 </section>
@@ -72,9 +72,9 @@
     <div class="pub-map rv" data-delay="1">
       <h3 class="pub-map__title">Quais colunas são quais?</h3>
       <div class="pub-mrow"><span class="pub-mrow__src">Fase</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Etapa</span></div>
-      <div class="pub-mrow"><span class="pub-mrow__src">Serviço</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Atividade</span></div>
+      <div class="pub-mrow"><span class="pub-mrow__src">Serviço</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Subatividade</span></div>
       <div class="pub-mrow"><span class="pub-mrow__src">Tempo</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Tempo ideal</span></div>
-      <div class="pub-mrow"><span class="pub-mrow__src">Feitas</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Peças concluídas</span></div>
+      <div class="pub-mrow"><span class="pub-mrow__src">Feitas</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Peças prontas</span></div>
       <p class="pub-note">Nomes de colunas de exemplo. Na sua planilha, você escolhe os seus.</p>
     </div>
   </div>
@@ -84,9 +84,9 @@
   <div class="pub-in">
     <div class="rv"><span class="pub-eyebrow">Opcional, quando você precisar</span>
       <h2 id="opcionais-titulo">O começo é simples. O resto você liga se quiser.</h2>
-      <p class="pub-sub">Etapas, atividades e peças vêm prontas. O que está abaixo fica desligado até você ativar em Configurações.</p></div>
+      <p class="pub-sub">Etapas, subatividades e peças vêm prontas. O que está abaixo fica desligado até você ativar em Configurações.</p></div>
     <div class="pub-opts">
-      {%- for ic, title, text in [("camera", "Fotos e comentários", "Anexe fotos e observações ao registro de uma atividade."), ("clipboard-check", "Checklist de inspeção", "Uma lista de itens para conferir antes de dar a atividade como pronta."), ("bell", "Alertas por e-mail", "Aviso de etapa atrasada e um resumo semanal na caixa de entrada."), ("team", "Equipe", "Atribua atividades a pessoas e veja o progresso de cada uma.")] %}
+      {%- for ic, title, text in [("camera", "Fotos e comentários", "Guarde fotos e observações em cada subatividade, como registro do que foi feito."), ("clipboard-check", "Checklist de inspeção", "Uma lista de conferência por etapa, assinada por quem inspecionou."), ("bell", "Alertas por e-mail", "Aviso quando o prazo entra em risco ou uma etapa para, e um resumo toda segunda-feira."), ("team", "Responsáveis", "Defina quem cuida de cada subatividade e veja quantas peças cada pessoa lançou.")] %}
       <div class="pub-opt rv" data-delay="{{ loop.index0 }}">
         <span class="pub-opt__ic">{{ icon(ic, "lg") }}</span>
         <h3>{{ title }} <em>Opcional</em></h3>

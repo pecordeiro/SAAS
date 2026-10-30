@@ -7,7 +7,7 @@
 {% from "components/progress.html" import progress %}
 {% from "components/modal.html" import confirm_dialog %}
 {% set nav_current = "users" %}
-{% block title %}Usuários · Controle de Produção{% endblock %}
+{% block title %}Usuários · Teroz{% endblock %}
 {% block content %}
 {# telas.md §12: pessoas ativas com papel · convites pendentes · Convidar · uso do plano. #}
 <header class="page-header">
@@ -25,7 +25,7 @@
 <div class="alert-focus mt-4" tabindex="-1" data-autofocus>{{ alert("danger", error, role="alert") }}</div>
 {%- endif %}
 
-{% call data_table([("Nome", ""), ("E-mail", "is-desktop"), ("Papel", ""), ("Último acesso", "is-desktop"), ("MFA", "is-desktop"), ("Ações", "")], caption="Membros da empresa", class_="mt-4") %}
+{% call data_table([("Nome", ""), ("E-mail", "is-desktop"), ("Papel", ""), ("Último acesso", "is-desktop"), ("Duas etapas", "is-desktop"), ("Ações", "")], caption="Membros da empresa", class_="mt-4") %}
   <tbody>
   {%- for m in members %}
     <tr>
@@ -33,7 +33,7 @@
       <td data-label="E-mail" class="is-desktop">{{ m.user.email }}</td>
       <td data-label="Papel">{{ badge(role_labels.get(m.role, m.role), "info" if m.role == "owner" else "neutral") }}{% if not m.active %} {{ badge("Desativado", "danger", "x") }}{% endif %}</td>
       <td data-label="Último acesso" class="is-desktop">{{ m.user.last_login_at|datahora if m.user.last_login_at else "—" }}</td>
-      <td data-label="MFA" class="is-desktop">{{ "Sim" if m.user.mfa_enabled else "Não" }}</td>
+      <td data-label="Duas etapas" class="is-desktop">{{ "Sim" if m.user.mfa_enabled else "Não" }}</td>
       <td data-label="Ações">
         {%- if is_owner %}
         <div class="cluster">
@@ -119,7 +119,7 @@
   <form method="post" action="{{ url_for('team.require_mfa') }}">
     {{ action_form.csrf_token }}
     <input type="hidden" name="exigir" value="{{ '0' if current_company.mfa_required else '1' }}">
-    {{ button("Desligar exigência" if current_company.mfa_required else "Exigir MFA dos proprietários", "secondary") }}
+    {{ button("Desligar exigência" if current_company.mfa_required else "Exigir dos proprietários", "secondary") }}
   </form>
   {%- else %}
   <p class="muted">Exigir verificação em duas etapas dos proprietários é um recurso do plano Empresa.</p>

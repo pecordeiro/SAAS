@@ -9,6 +9,10 @@
     vertical-align: middle;
   }
   .icon--sm { width: var(--space-4); height: var(--space-4); }
+  /* Botão claro/escuro do site público: lua no tema claro, sol no escuro (fica aqui, na mesma camada do .icon). */
+  .theme-toggle .theme-toggle__sun { display: none; }
+  :root[data-theme="dark"] .theme-toggle .theme-toggle__moon { display: none; }
+  :root[data-theme="dark"] .theme-toggle .theme-toggle__sun { display: inline-block; }
   .icon--lg { width: var(--icon-size-lg); height: var(--icon-size-lg); }
   .icon--xl { width: var(--space-12); height: var(--space-12); }
 

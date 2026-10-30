@@ -55,6 +55,18 @@
     for (var i = 0; i < radios.length; i++) radios[i].checked = radios[i].value === (value || "system");
   }
 
+  // Botão claro/escuro do site público: o site abre claro, então só "dark" conta como escuro.
+  document.addEventListener("click", function (event) {
+    var btn = event.target.closest && event.target.closest("[data-theme-toggle]");
+    if (!btn) return;
+    event.preventDefault();
+    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    applyTheme(next);
+    btn.setAttribute("aria-pressed", next === "dark" ? "true" : "false");
+    var hidden = btn.form && btn.form.querySelector("[data-theme-next]");
+    if (hidden) hidden.value = next === "dark" ? "light" : "dark";
+  });
+
   document.addEventListener("change", function (event) {
     var input = event.target;
     if (input && input.name === "tema" && input.closest("[data-theme-form]")) applyTheme(input.value);

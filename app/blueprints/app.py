@@ -654,7 +654,7 @@ def activity_create(stage_id):
         return _render_detail(stage.project, errors={stage.id: "Informe nome e tempo ideal (min) válidos."}, status=400)
     svc.add_activity(stage, NewActivity(name=form.name.data, ideal_minutes=form.ideal_minutes.data))
     db.session.commit()
-    flash("Atividade incluída.", "sucesso")
+    flash("Subatividade incluída.", "sucesso")
     return redirect(url_for("app.project_detail", project_id=stage.project_id, _anchor=f"etapa-{stage.id}"), 303)
 
 
@@ -743,7 +743,7 @@ def activity_progress(activity_id):
         project = activity.stage.project
         faltam = max(0, project.quantity - activity.units_done)
         message = (
-            f"Outra pessoa registrou antes: esta atividade agora está em {activity.units_done} de {project.quantity}."
+            f"Outra pessoa registrou antes: esta subatividade agora está em {activity.units_done} de {project.quantity}."
         )
         if faltam == 0:
             message += " Ela já está completa; nada a somar."

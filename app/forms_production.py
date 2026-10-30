@@ -97,7 +97,7 @@ class RenameForm(BaseForm):
 
 
 class ActivityEditForm(BaseForm):
-    name = StringField("Atividade", filters=[_strip], validators=[DataRequired(), Length(max=160)])
+    name = StringField("Subatividade", filters=[_strip], validators=[DataRequired(), Length(max=160)])
     ideal_minutes = DecimalField(
         "Tempo ideal (min)", places=2, validators=[InputRequired(), NumberRange(min=Decimal("0"), max=Decimal("100000"))]
     )
@@ -194,8 +194,8 @@ class ImportMapForm(BaseForm):
     etapa = _column_choice("Etapa")
     subatividade = _column_choice("Subatividade")
     tempo = _column_choice("Tempo ideal (min)")
-    previstas = _column_choice("Previstas (meta)")
-    concluidas = _column_choice("Concluídas (peças)")
+    previstas = _column_choice("Meta (previstas)")
+    concluidas = _column_choice("Peças prontas")
     percentual = _column_choice("% concluído")
     prazo = _column_choice("Prazo (data)")
     quantity = IntegerField("Meta (unidades previstas)", validators=[Optional(), NumberRange(min=1, max=100000)])

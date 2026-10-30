@@ -1497,3 +1497,17 @@ Plano: `docs/plano/reestruturacao.md` (aprovado). ADR-0015 (visual da base) subs
   negrito e números das duas caixas em azul (tarefas) e laranja (unidades). axe-core sem violações (claro/escuro).
 - Menu lateral recolhível (faixa de ícones que abre em 0,8 s empurrando o conteúdo; `--sidebar-rail`,
   `--duration-rail`, `@property --rail-now`).
+
+## Auditoria e reescrita dos textos (2026-10-29) — aguardando aprovação do commit
+- Inventário automático de todos os textos que a pessoa lê (templates, e-mails e mensagens do backend): 3.331 textos.
+  Comparação com o estado anterior em `docs/ux-copy-inventory.md` (arquivo:linha, antes → depois, motivo, status).
+- Glossário em `docs/teroz-terminologia.md` e voz em `docs/teroz-voice-and-tone.md`. Marca "Teroz" (feminino) no lugar
+  de "Controle de Produção"; "subatividade" no lugar de "atividade"; peças e unidades "prontas"; "Meta"; "Situação";
+  "verificação em duas etapas" sem sigla; mensagens de erro com o que fazer; textos sem masculino genérico.
+- Contradições corrigidas: e-mails que pediam resposta a uma caixa não lida; página de erro 500 que dizia "já fomos
+  avisados"; descrições dos módulos opcionais na página inicial que não batiam com o produto.
+- Sem mudança em rotas, IDs, API, cálculo, permissões ou no formato da planilha exportada; o importador continua
+  aceitando os nomes antigos das colunas. Testes que conferiam textos antigos foram atualizados para os novos.
+- Pendentes de decisão: remetente `MAIL_FROM` com o nome antigo (configuração de produção), "Quantidade de
+  equipamentos" no formulário antigo de novo projeto, F-06, revisão linha a linha de Identidade visual, Painel interno
+  e API (só passaram pela troca automática de termos).

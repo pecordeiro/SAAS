@@ -1,5 +1,9 @@
 # Inventário de textos das telas redesenhadas (2026-10-28)
 
+> Substituído pela auditoria completa de 2026-10-29: inventário de todos os textos em
+> [`docs/ux-copy-inventory.md`](../ux-copy-inventory.md), glossário em [`docs/teroz-terminologia.md`](../teroz-terminologia.md)
+> e voz em [`docs/teroz-voice-and-tone.md`](../teroz-voice-and-tone.md). Este arquivo fica como registro do redesign.
+
 Textos que a pessoa lê nas três tarefas (registrar, acompanhar, configurar), com o arquivo e a decisão. Regra:
 nomear pelo que a pessoa reconhece, por extenso, em voz ativa; a mesma ação tem o mesmo nome do botão à mensagem.
 

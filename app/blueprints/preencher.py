@@ -38,7 +38,7 @@ bp = Blueprint("preencher", __name__, url_prefix="/app")
 FIELD_LABELS = {
     "name": "Nome",
     "ideal_minutes": "Tempo ideal",
-    "units_done": "Peças concluídas",
+    "units_done": "Peças prontas",
     "percent": "% concluído",
 }
 

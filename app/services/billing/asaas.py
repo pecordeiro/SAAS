@@ -147,7 +147,7 @@ class AsaasProvider(PaymentProvider):
             return None
         if response.status_code >= 400:
             codes: tuple[str, ...] = ()
-            message = "O Asaas recusou a operação."
+            message = "O Asaas recusou a operação. Confira os dados de cobrança e tente de novo; se continuar, fale com a gente."
             try:
                 errors = (response.json() or {}).get("errors") or []
                 codes = tuple(str(e.get("code") or "") for e in errors if isinstance(e, dict))

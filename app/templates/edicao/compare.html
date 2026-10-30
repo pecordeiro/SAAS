@@ -22,7 +22,7 @@
 </header>
 
 {%- if not comparison.changes %}
-{{ alert("success", "Nada a aplicar", "O projeto já tem as mesmas etapas, atividades e tempos da versão atual.") }}
+{{ alert("success", "Nada a aplicar", "O projeto já tem as mesmas etapas, subatividades e tempos da versão atual.") }}
 {%- else %}
 <section class="card stack" aria-labelledby="dif-titulo">
   <h2 class="section-title" id="dif-titulo">O que muda no projeto</h2>
@@ -31,7 +31,7 @@
     <li>{{ change.label }}</li>
     {%- endfor %}
   </ul>
-  <p class="muted text-sm">Peças já registradas e o histórico não mudam. Etapas e atividades que saem ficam arquivadas.</p>
+  <p class="muted text-sm">Peças já registradas e o histórico não mudam. Etapas e subatividades que saem ficam arquivadas.</p>
   <form class="stack" method="post" action="{{ url_for('edicao.project_apply_template', project_id=project.id) }}">
     {{ confirm_form.csrf_token }}
     <input type="hidden" name="version_id" value="{{ comparison.current_version.id }}">

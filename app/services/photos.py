@@ -187,7 +187,7 @@ def add_photo(activity: Activity, data: bytes, user_id: uuid.UUID | None, captio
         raise PhotoError(f"A legenda tem no máximo {PHOTO_CAPTION_MAX} caracteres.")
     per_activity = _cfg("PHOTOS_MAX_PER_ACTIVITY", 20)
     if _count(ActivityPhoto.company_id == activity.company_id, ActivityPhoto.activity_id == activity.id) >= per_activity:
-        raise PhotoError(f"Esta atividade já tem {per_activity} fotos (o máximo). Apague uma para enviar outra.")
+        raise PhotoError(f"Esta subatividade já tem {per_activity} fotos (o máximo). Apague uma para enviar outra.")
     per_company = _cfg("PHOTOS_MAX_PER_COMPANY", 5000)
     if _count(ActivityPhoto.company_id == activity.company_id) >= per_company:
         raise PhotoError("A empresa atingiu o limite de fotos guardadas. Apague fotos antigas ou fale com o suporte.")

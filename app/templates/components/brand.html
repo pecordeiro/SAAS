@@ -4,8 +4,8 @@
    em qualquer tema (no escuro o link ficava sem nome). #}
 {% macro logo(height) -%}
 {%- set w = (height * 3.876)|round|int -%}
-<img class="brand__logo brand__logo--claro" src="{{ url_for('static', filename='img/logo.svg') }}" alt="Teroz, Controle de Produção" width="{{ w }}" height="{{ height }}">
-<img class="brand__logo brand__logo--escuro" src="{{ url_for('static', filename='img/logo-escuro.svg') }}" alt="Teroz, Controle de Produção" width="{{ w }}" height="{{ height }}">
+<img class="brand__logo brand__logo--claro" src="{{ url_for('static', filename='img/logo.svg') }}" alt="Teroz" width="{{ w }}" height="{{ height }}">
+<img class="brand__logo brand__logo--escuro" src="{{ url_for('static', filename='img/logo-escuro.svg') }}" alt="Teroz" width="{{ w }}" height="{{ height }}">
 {%- endmacro %}
 
 {# Só o símbolo (barra superior do celular e páginas de erro). #}

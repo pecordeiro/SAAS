@@ -6,7 +6,7 @@
 {% from "components/empty_state.html" import empty_state %}
 {% set nav_current = "projects" %}
 {% set nav_project = project %}
-{% block title %}Evidências · {{ activity.name }} · Controle de Produção{% endblock %}
+{% block title %}Fotos e comentários · {{ activity.name }} · Teroz{% endblock %}
 {% block content %}
 {#
   Etapa G — evidências da atividade (montagem / não conformidade): fotos e comentários.
@@ -17,7 +17,7 @@
   <div class="page-header__titles">
     <a class="back-link" href="{{ url_for('preencher.fill', projeto=project.id, etapa=stage.id) }}">{{ icon("chevron-left") }}{{ project.name }}</a>
     <h1>{{ activity.name }}{{ optional_badge() }}</h1>
-    <p class="page-header__subtitle muted">Evidências · {{ stage.name }}</p>
+    <p class="page-header__subtitle muted">Fotos e comentários · {{ stage.name }}</p>
   </div>
   <div class="page-header__actions">
     {%- if "checklist" in modules %}
@@ -73,7 +73,7 @@
     <div>{{ button("Enviar foto", "primary", icon="plus") }}</div>
   </form>
   {%- else %}
-  <p class="muted text-sm mt-4">Limite de {{ photos_max }} fotos nesta atividade.{% if can_delete %} Apague uma para enviar outra.{% endif %}</p>
+  <p class="muted text-sm mt-4">Limite de {{ photos_max }} fotos nesta subatividade.{% if can_delete %} Apague uma para enviar outra.{% endif %}</p>
   {%- endif %}
   {%- else %}
   <p class="muted text-sm mt-4">O envio de fotos não está configurado neste ambiente.</p>

@@ -117,7 +117,7 @@ def create_project(
     if progress_mode not in PROGRESS_MODES:
         raise ValueError(f"modo de progresso inválido: {progress_mode!r}")
     if progress_mode == PROGRESS_SIMPLE and any(len(s.activities) > 1 for s in stages):
-        raise EditError("No modo simples cada etapa tem só o %: no máximo uma atividade por etapa.")
+        raise EditError("No modo simples cada etapa tem só o %: no máximo uma subatividade por etapa.")
     if check_limits:
         entitlements.check_can_create_project(company)
     project = Project(
@@ -218,9 +218,9 @@ def register_progress(
     previstas = project.quantity
     maximo = max(0, previstas - activity.units_done)
     if expected_version is not None and expected_version != activity.version:
-        raise ConflictError("Esta atividade foi atualizada por outra pessoa. Confira os números e tente de novo.")
+        raise ConflictError("Esta subatividade foi atualizada por outra pessoa. Confira os números e tente de novo.")
     if delta > maximo:
-        raise ProgressError(f"Máximo {maximo} peça(s) nesta atividade.")
+        raise ProgressError(f"Máximo {maximo} peça(s) nesta subatividade.")
     stage_before = _stage_done(activity.stage)
     project_before = _project_done(project)
     # UPDATE condicional: só grava se ninguém mudou a linha entre a leitura e a escrita.
@@ -237,7 +237,7 @@ def register_progress(
     )
     if result.rowcount != 1:
         db.session.rollback()
-        raise ConflictError("Esta atividade foi atualizada por outra pessoa. Confira os números e tente de novo.")
+        raise ConflictError("Esta subatividade foi atualizada por outra pessoa. Confira os números e tente de novo.")
     entry = ProgressEntry(
         company_id=activity.company_id, activity_id=activity.id, user_id=user_id, delta=delta, unit_id=unit_id
     )
@@ -327,7 +327,7 @@ def undo_progress(entry: ProgressEntry, user_id: uuid.UUID) -> ProgressEntry:
     )
     if result.rowcount != 1:  # pragma: no cover - corrida rara entre duas abas
         db.session.rollback()
-        raise ConflictError("A atividade mudou enquanto você desfazia. Confira e tente de novo.")
+        raise ConflictError("A subatividade mudou enquanto você desfazia. Confira e tente de novo.")
     reversal = ProgressEntry(
         company_id=entry.company_id,
         activity_id=activity.id,
@@ -474,7 +474,7 @@ def update_project(
     registradas em alguma atividade."""
     most = max((a.units_done for s in project.stages for a in s.activities), default=0)
     if quantity < most:
-        raise EditError(f"Já há {most} peças registradas numa atividade: a quantidade não pode ser menor.")
+        raise EditError(f"Já há {most} peças registradas numa subatividade: a quantidade não pode ser menor.")
     if due_date and start_date and due_date < start_date:
         raise EditError("O prazo não pode ser antes do início.")
     from app.services.units import count_units
@@ -537,7 +537,7 @@ def _guarded_update(model, obj, expected_version: int | None, values: dict, stat
 
 
 STAGE_CONFLICT = "Outra pessoa alterou esta etapa enquanto você editava."
-ACTIVITY_CONFLICT = "Esta atividade mudou enquanto você editava."
+ACTIVITY_CONFLICT = "Esta subatividade mudou enquanto você editava."
 
 
 def rename_stage(stage: Stage, name: str, expected_version: int | None = None, user_id: uuid.UUID | None = None) -> None:
@@ -630,7 +630,7 @@ def update_activity(
 ) -> None:
     """Edita nome e tempo ideal. ``expected_version`` velha (alguém editou, registrou peças
     ou moveu a atividade) → ``EditConflict`` com o valor atual (409 na rota)."""
-    name = _clean_name(name, "atividade")
+    name = _clean_name(name, "subatividade")
     if ideal_minutes is None or ideal_minutes < 0:
         raise EditError("Tempo ideal inválido.")
     before = {"name": activity.name, "ideal_minutes": str(activity.ideal_minutes)}
@@ -805,12 +805,12 @@ def unarchive_activity(activity: Activity, user_id: uuid.UUID | None) -> None:
     """Desfaz a exclusão da atividade (volta no fim da etapa, com as peças que tinha).
     Etapa excluída → traga a etapa antes; projeto no modo simples já com atividade → recusa."""
     if activity.archived_at is None:
-        raise EditError("Esta atividade não está excluída.")
+        raise EditError("Esta subatividade não está excluída.")
     stage = activity.stage
     if stage.archived_at is not None:
-        raise EditError("A etapa desta atividade também foi excluída: desfaça a exclusão da etapa primeiro.")
+        raise EditError("A etapa desta subatividade também foi excluída: desfaça a exclusão da etapa primeiro.")
     if is_simple(stage.project) and active_activities(stage):
-        raise EditError("No modo simples a etapa tem só o %: não dá para trazer uma segunda atividade.")
+        raise EditError("No modo simples a etapa tem só o %: não dá para trazer uma segunda subatividade.")
     activity.archived_at = None
     activity.position = max((a.position for a in stage.activities if a.id != activity.id), default=-1) + 1
     db.session.flush()
@@ -841,7 +841,7 @@ def parse_pieces(raw: str | None, quantity: int) -> int:
         raise ProgressError(f"Use um número inteiro de peças, de 0 a {quantity}.")
     value = int(text)
     if value > quantity:
-        raise ProgressError(f"As peças concluídas não podem passar das previstas ({quantity}).")
+        raise ProgressError(f"As peças prontas não podem passar das previstas ({quantity}).")
     return value
 
 
@@ -886,9 +886,9 @@ def set_units_done(
     na rota), com auditoria ``progress.corrected``. Igual ao atual → nada muda (``None``)."""
     project = activity.stage.project
     if not 0 <= target <= project.quantity:
-        raise ProgressError(f"As peças concluídas vão de 0 a {project.quantity}.")
+        raise ProgressError(f"As peças prontas vão de 0 a {project.quantity}.")
     if expected_version is not None and expected_version != activity.version:
-        raise ConflictError("Esta atividade foi atualizada por outra pessoa. Confira os números e tente de novo.")
+        raise ConflictError("Esta subatividade foi atualizada por outra pessoa. Confira os números e tente de novo.")
     delta = target - activity.units_done
     if delta == 0:
         return None
@@ -909,7 +909,7 @@ def set_units_done(
     )
     if result.rowcount != 1:  # pragma: no cover - corrida rara entre duas abas
         db.session.rollback()
-        raise ConflictError("Esta atividade foi atualizada por outra pessoa. Confira os números e tente de novo.")
+        raise ConflictError("Esta subatividade foi atualizada por outra pessoa. Confira os números e tente de novo.")
     before = activity.units_done
     entry = ProgressEntry(company_id=activity.company_id, activity_id=activity.id, user_id=user_id, delta=delta)
     db.session.add(entry)

@@ -63,7 +63,7 @@ def test_painel_mostra_kpis_graficos_e_tabela(client, app, tenants):
     for texto in (
         "Atualizado às",
         "Preencher etapas",
-        "Progresso geral",
+        "Progresso pelas tarefas",
         "Unidades prontas",
         "Etapas concluídas",
         "Horas que faltam",
@@ -83,7 +83,7 @@ def test_painel_mostra_kpis_graficos_e_tabela(client, app, tenants):
     html = response.get_data(as_text=True)
     # números do servidor (calc): etapas concluídas sobre o total, unidade em cinza ao lado
     assert re.search(rf'{r.etapas_concluidas}<span class="kpi__unit">/ 5</span>', html)
-    assert f"tarefas concluídas: {r.tarefas_concluidas} de {r.tarefas}" in page
+    assert f"subatividades em 100%: {r.tarefas_concluidas} de {r.tarefas}" in page
     # legenda em texto com a contagem por situação (cor nunca sozinha)
     for nome in ("Concluída", "Em andamento", "Aguardando peça", "Atrasada", "Não iniciada"):
         assert nome in page
@@ -153,7 +153,7 @@ def test_painel_tabela_de_unidades_e_aba_invalida(client, app, tenants):
     _projeto_rico(app, a)
     login(client, app, a.operator_email)
     unidades = text_of(_painel(client, a, "?tabela=unidades"))
-    assert "Tabela 2 · Unidades concluídas por etapa" in unidades and "Feitas" in unidades
+    assert "Tabela 2 · Unidades prontas por etapa" in unidades and "Prontas" in unidades
     padrao = text_of(_painel(client, a, "?tabela=qualquer-coisa"))
     assert "Progresso por etapa pelas tarefas" in padrao and "Tempo por unidade (min)" in padrao
 

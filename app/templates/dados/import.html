@@ -8,7 +8,7 @@
 {% from "components/steps.html" import steps %}
 {% set nav_current = "spreadsheet" %}
 {%- set step = 3 if result else 1 %}
-{% block title %}{{ "Prévia" if step == 3 else "Enviar arquivo" }} · Importar planilha · Controle de Produção{% endblock %}
+{% block title %}{{ "Prévia" if step == 3 else "Enviar arquivo" }} · Importar planilha · Teroz{% endblock %}
 {% block content %}
 {#
   R7 — importar planilha em 3 passos: 1 enviar (aqui) → 2 escolher colunas (import_map.html,
@@ -19,7 +19,7 @@
   <div class="page-header__titles">
     <a class="back-link" href="{{ url_for('app.projects') }}">{{ icon("chevron-left") }}Projetos</a>
     <h1>Importar planilha</h1>
-    <p class="page-header__subtitle">Traga etapas e atividades de uma planilha .xlsx ou .csv. Nada é gravado antes da sua confirmação.</p>
+    <p class="page-header__subtitle">Traga etapas e subatividades de uma planilha .xlsx ou .csv. Nada é gravado antes da sua confirmação.</p>
   </div>
 </header>
 
@@ -72,17 +72,17 @@
 {# ---------- Passo 3: prévia e confirmar ---------- #}
 <section class="card stack" aria-labelledby="previa-titulo">
   <div class="import-head">
-    <h2 class="section-title" id="previa-titulo">Pré-visualização</h2>
+    <h2 class="section-title" id="previa-titulo">Prévia</h2>
     <p class="import-summary">
       {%- if result.mode == "simples" %}{{ badge("Modo simples", "neutral") }}{% else %}{{ badge("Modo detalhado", "info") }}{% endif %}
       <span class="num">{{ result.stages|length }} {{ "etapa" if result.stages|length == 1 else "etapas" }}</span>
-      <span class="num">{{ result.activity_count }} {{ "atividade" if result.activity_count == 1 else "atividades" }}</span>
+      <span class="num">{{ result.activity_count }} {{ "subatividade" if result.activity_count == 1 else "subatividades" }}</span>
       <span class="num">meta {{ result.quantity }} {{ "unidade" if result.quantity == 1 else "unidades" }}</span>
       {%- if result.due_date %}<span class="num">prazo {{ result.due_date.strftime("%d/%m/%Y") }}</span>{% endif %}
     </p>
     <p class="muted text-sm">
       {%- if result.mode == "simples" %}Uma linha por etapa, com o % concluído.
-      {%- else %}Cada linha vira uma atividade dentro da etapa, com tempo ideal e peças concluídas.{% endif %}
+      {%- else %}Cada linha vira uma subatividade dentro da etapa, com tempo ideal e peças prontas.{% endif %}
       {%- if result.source == "planilha" %} Formato da planilha de acompanhamento reconhecido.{% elif not back %} Formato do site reconhecido.{% endif %}
     </p>
   </div>
@@ -98,18 +98,18 @@
   {%- if usage and usage.max_projects is not none and usage.projects >= usage.max_projects %}
   {{ alert("warning", "Limite do plano atingido", "Seu plano " ~ usage.plan.name ~ " permite " ~ usage.max_projects ~ " projetos ativos. Arquive um projeto ou mude de plano para importar.") }}
   {%- endif %}
-  {% call data_table([("Etapa › atividade", ""), ("Tempo ideal (min)", "is-num"), ("Concluídas", "is-num")], caption="Etapas e atividades lidas", class_="import-preview") %}
+  {% call data_table([("Etapa › subatividade", ""), ("Tempo ideal (min)", "is-num"), ("Peças prontas", "is-num")], caption="Etapas e subatividades lidas", class_="import-preview") %}
     {%- for stage in result.stages %}
   <tbody>
-    <tr class="table__group"><th scope="rowgroup" colspan="3">{{ stage.name }}{% if stage.archived %} {{ badge("arquivada", "neutral") }}{% endif %} <span class="import-preview__count num">{{ stage.activities|length }} {{ "atividade" if stage.activities|length == 1 else "atividades" }}</span></th></tr>
+    <tr class="table__group"><th scope="rowgroup" colspan="3">{{ stage.name }}{% if stage.archived %} {{ badge("arquivada", "neutral") }}{% endif %} <span class="import-preview__count num">{{ stage.activities|length }} {{ "subatividade" if stage.activities|length == 1 else "subatividades" }}</span></th></tr>
     {%- for a in stage.activities %}
     <tr>
       <td class="is-plain import-preview__name">{{ a.name }}{% if a.archived %} {{ badge("arquivada", "neutral") }}{% endif %}</td>
       <td class="is-num" data-label="Tempo ideal (min)">{{ a.ideal_minutes|num(2 if result.time_unit else 0) }}</td>
-      <td class="is-num" data-label="Concluídas">{{ a.units_done }} <span class="muted">de {{ result.quantity }}</span></td>
+      <td class="is-num" data-label="Peças prontas">{{ a.units_done }} <span class="muted">de {{ result.quantity }}</span></td>
     </tr>
     {%- else %}
-    <tr><td class="is-plain muted" colspan="3">Sem atividades</td></tr>
+    <tr><td class="is-plain muted" colspan="3">Sem subatividades</td></tr>
     {%- endfor %}
   </tbody>
     {%- endfor %}

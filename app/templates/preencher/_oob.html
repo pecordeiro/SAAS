@@ -14,7 +14,7 @@
 {%- if simple and simple_activity %}
 {%- set a, ar = simple_activity, simple_result %}
 {{ parts.version_input("va-etapa", "activity_version", "f-etapa", a.version, oob=True) }}
-<span class="pct-cell" id="pct-{{ a.id }}" hx-swap-oob="true"><progress class="mini mini--units" value="{{ [ar.pct, 1]|min }}" max="1" aria-label="Unidades concluídas">{{ ar.pct|pct(0) }}</progress><span class="num">{{ a.units_done }}/{{ quantity }}</span></span>
+<span class="pct-cell" id="pct-{{ a.id }}" hx-swap-oob="true"><progress class="mini mini--units" value="{{ [ar.pct, 1]|min }}" max="1" aria-label="Unidades prontas">{{ ar.pct|pct(0) }}</progress><span class="num">{{ a.units_done }}/{{ quantity }}</span></span>
 <span class="num" id="tt-{{ a.id }}" hx-swap-oob="true">{{ ar.tempo_total_min|num(0) }}</span>
 <span class="num" id="tf-{{ a.id }}" hx-swap-oob="true">{{ ar.tempo_restante_min|num(0) }}</span>
 {%- else %}

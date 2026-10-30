@@ -61,7 +61,7 @@ def test_calc_como_funciona_exemplos_com_os_numeros_atuais():
     assert por_conta["% concluído da subatividade"] == "Cortar: 4 ÷ 10 = 40%"
     assert por_conta["Progresso da etapa pelas tarefas (Tabela 1)"] == "Preparação: 80,0%"
     assert por_conta["Tempo que falta"] == "Cortar: 15 min × (10 − 4) = 90 min"
-    assert por_conta["Unidades concluídas do projeto"] == "Menor valor entre as etapas = 2 de 10"
+    assert por_conta["Unidades prontas do projeto"] == "Menor valor entre as etapas = 2 de 10"
     assert por_conta["Dias úteis restantes (Meta e equipe)"] == "9,5 h ÷ (2 pessoas × 8 h) = 0,6 dias úteis"
     assert len(linhas) == 11
 

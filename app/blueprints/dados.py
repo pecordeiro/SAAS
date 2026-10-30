@@ -429,17 +429,17 @@ def import_confirm_many():
 def import_confirm():
     form = ImportConfirmForm()
     if not form.validate():
-        return _page(ImportForm(formdata=None), 400, upload_error="Pré-visualização inválida. Envie o arquivo de novo.")
+        return _page(ImportForm(formdata=None), 400, upload_error="Prévia inválida. Envie o arquivo de novo.")
     try:
         data = _serializer().loads(form.payload.data, max_age=PAYLOAD_MAX_AGE)
     except BadSignature:
-        return _page(ImportForm(formdata=None), 400, upload_error="Pré-visualização expirada ou inválida. Envie o arquivo de novo.")
+        return _page(ImportForm(formdata=None), 400, upload_error="Prévia expirada ou inválida. Envie o arquivo de novo.")
     if data.get("c") != str(g.company.id) or data.get("u") != str(current_user.id):
-        return _page(ImportForm(formdata=None), 400, upload_error="Pré-visualização de outra sessão. Envie o arquivo de novo.")
+        return _page(ImportForm(formdata=None), 400, upload_error="Prévia de outra sessão. Envie o arquivo de novo.")
     result = importer.from_payload(data.get("d") or {})
     if not result.ok:
         return _page(ImportForm(formdata=None), 400, result=result)
     project = importer.save(g.company, result, current_user.id, name=form.name.data or None)
     db.session.commit()
-    flash(f"Projeto importado: {len(result.stages)} etapas, {result.activity_count} atividades.", "sucesso")
+    flash(f"Projeto importado: {len(result.stages)} etapas, {result.activity_count} subatividades.", "sucesso")
     return redirect(url_for("app.project_detail", project_id=project.id), 303)

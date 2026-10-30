@@ -5,7 +5,7 @@
 {% from "components/stepper.html" import stepper %}
 {% from "components/alert.html" import alert %}
 {% set nav_current = "projects" %}
-{% block title %}Novo projeto · Controle de Produção{% endblock %}
+{% block title %}Novo projeto · Teroz{% endblock %}
 {% block content %}
 {#
   telas.md §10 (supervisor+): modelo de etapas (cartões de escolha) → nome, produto, quantidade
@@ -80,7 +80,7 @@
       <fieldset class="fieldset stack--sm">
         <legend class="field__label">{{ form.progress_mode.label.text }}</legend>
         <div class="radio-cards">
-          {%- for value, label, desc in [("simples", "Simples", "Você lança o % de cada etapa. Atividades ficam em branco (ou uma linha com o tempo da etapa)."), ("detalhado", "Detalhado", "Subatividades com tempo ideal e peças, igual à planilha: uma por linha, Nome; minutos por unidade.")] %}
+          {%- for value, label, desc in [("simples", "Simples", "Você lança o % de cada etapa. Subatividades ficam em branco (ou uma linha com o tempo da etapa)."), ("detalhado", "Detalhado", "Subatividades com tempo ideal e peças, igual à planilha: uma por linha, Nome; minutos por unidade.")] %}
           <label class="radio-card">
             <input type="radio" name="progress_mode" value="{{ value }}"{% if (form.progress_mode.data or "simples") == value %} checked{% endif %}>
             <span class="radio-card__body">
@@ -102,7 +102,7 @@
       <fieldset class="fieldset stage-slot stack--sm">
         <legend class="stage-slot__legend">Etapa {{ loop.index }}</legend>
         {{ field(slot.form.name, label="Nome da etapa", attrs=({"placeholder": "Montagem mecânica"} if loop.first else {})) }}
-        {{ field(slot.form.activities, label="Atividades", hint="Ex.: Fixação da base; 120", attrs={"rows": 4}) }}
+        {{ field(slot.form.activities, label="Subatividades", hint="Ex.: Fixação da base; 120", attrs={"rows": 4}) }}
       </fieldset>
       {%- if loop.last and loop.length > 2 %}
         </div>

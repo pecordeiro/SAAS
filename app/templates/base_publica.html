@@ -39,6 +39,17 @@
       {{ button("Teste grátis", "primary", href=url_for('auth.signup')) }}
       {%- endif %}
     </nav>
+    {#- Tema claro/escuro: o site público abre claro; este botão alterna e grava o cookie “tema” (o mesmo do sistema).
+        Sem JS, o formulário envia a escolha à rota /tema e volta para esta página. -#}
+    <form class="theme-toggle" method="post" action="{{ url_for('public.set_theme') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+      <input type="hidden" name="tema" value="{{ 'light' if theme == 'dark' else 'dark' }}" data-theme-next>
+      <button class="btn btn--ghost btn--icon theme-toggle__btn" type="submit" data-theme-toggle aria-pressed="{{ 'true' if theme == 'dark' else 'false' }}" title="Alternar entre tema claro e escuro">
+        {{ icon("moon", class_="theme-toggle__moon") }}{{ icon("sun", class_="theme-toggle__sun") }}
+        <span class="visually-hidden">Tema escuro</span>
+      </button>
+    </form>
     <a class="btn btn--ghost btn--icon site-header__menu only-mobile" href="#menu" aria-haspopup="dialog" aria-controls="menu">{{ icon("menu") }}<span class="visually-hidden">Abrir menu</span></a>
   </div>
 </header>
@@ -62,7 +73,7 @@
       <span aria-hidden="true">·</span>
       <a href="{{ url_for('auth.login') }}">Entrar</a>
     </nav>
-    <p>© 2026 Controle de Produção</p>
+    <p>© 2026 Teroz</p>
   </div>
 </footer>
 

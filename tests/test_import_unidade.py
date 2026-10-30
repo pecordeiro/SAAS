@@ -146,7 +146,7 @@ def test_fluxo_horas_previa_convertida_e_confirmacao(client, app, tela):
     _, form, a = tela
     prev = post(client, app, "/app/importar/colunas", {**form, "time_unit": "horas"})
     text = text_of(prev)
-    assert prev.status_code == 200 and "Pré-visualização" in text
+    assert prev.status_code == 200 and "Prévia" in text
     assert "105,00 min" in text and "horas (convertidas para minutos)" in text
     assert "Confira a unidade do tempo" not in text
     # voltar às colunas devolve a unidade escolhida
@@ -162,7 +162,7 @@ def test_fluxo_aviso_na_previa_nao_bloqueia(client, app, tela):
     _, form, _ = tela
     prev = post(client, app, "/app/importar/colunas", {**form, "time_unit": "minutos"})  # 1,5 e 0,25 min
     text = text_of(prev)
-    assert prev.status_code == 200 and "Pré-visualização" in text
+    assert prev.status_code == 200 and "Prévia" in text
     assert "Confira a unidade do tempo" in text and "escolha “Horas”" in text
     assert "Importar projeto" in text
 

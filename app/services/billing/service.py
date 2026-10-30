@@ -345,7 +345,7 @@ def _customer(company: Company, info: BillingInfo) -> CustomerData:
 
 
 def _description(plan: Plan) -> str:
-    return f"Controle de Produção — plano {plan.name}"
+    return f"Teroz — plano {plan.name}"
 
 
 def check_plan_fits(company: Company, plan: Plan) -> None:

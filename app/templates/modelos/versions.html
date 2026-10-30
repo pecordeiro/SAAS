@@ -24,7 +24,7 @@
     <ol class="stack--sm mt-4">
       {%- for stage in version.stages %}
       <li><span class="text-strong">{{ stage.name }}</span>
-        <span class="muted text-sm">— {% for a in stage.activities %}{{ a.name }} ({{ a.ideal_minutes|num(0) }} min){% if not loop.last %}, {% endif %}{% else %}sem atividades{% endfor %}</span>
+        <span class="muted text-sm">— {% for a in stage.activities %}{{ a.name }} ({{ a.ideal_minutes|num(0) }} min){% if not loop.last %}, {% endif %}{% else %}sem subatividades{% endfor %}</span>
       </li>
       {%- endfor %}
     </ol>

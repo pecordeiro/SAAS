@@ -72,7 +72,7 @@
 <div class="app-shell">
   <aside class="app-sidebar" aria-label="Menu lateral">
     <a class="brand" href="{{ url_for('app.home') }}">
-      {{ brand.symbol(24, "Teroz, Controle de Produção — Painel") }}
+      {{ brand.symbol(24, "Teroz — Painel") }}
     </a>
     {%- if current_company %}
     <p class="sidebar__company">{{ current_company.name }}<br><span class="sidebar__role">{{ role_label }}</span></p>
@@ -103,8 +103,8 @@
   </aside>
 
   <header class="app-topbar">
-    <a href="{{ url_for('app.home') }}" class="app-topbar__logo">{{ brand.symbol(28, "Teroz, Controle de Produção — Painel") }}</a>
-    <span class="app-topbar__company">{{ current_company.name if current_company else "Controle de Produção" }}</span>
+    <a href="{{ url_for('app.home') }}" class="app-topbar__logo">{{ brand.symbol(28, "Teroz — Painel") }}</a>
+    <span class="app-topbar__company">{{ current_company.name if current_company else "Teroz" }}</span>
     <a class="avatar" href="#mais" aria-haspopup="dialog" aria-controls="mais" title="{{ current_user.name }}"><span aria-hidden="true">{{ initials }}</span><span class="visually-hidden">Conta e opções de {{ current_user.name }}</span></a>
   </header>
 

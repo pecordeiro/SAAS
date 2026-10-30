@@ -1,7 +1,7 @@
 {% extends "emails/_base.txt" %}
 {% block body %}Olá, {{ name }}.
 
-A equipe de suporte do Controle de Produção recebeu acesso temporário à empresa {{ company_name }}.
+A equipe de suporte da Teroz recebeu acesso temporário à empresa {{ company_name }}.
 
 Pessoa: {{ support_name }}
 Papel: {{ role_label }}

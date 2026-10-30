@@ -306,7 +306,7 @@ def activity_edit(activity_id):
         flash(str(exc), "erro")
         return _back(project_id)
     db.session.commit()
-    flash("Atividade atualizada.", "sucesso")
+    flash("Subatividade atualizada.", "sucesso")
     return _back(project_id)
 
 
@@ -333,7 +333,7 @@ def activity_assign(activity_id):
         abort(404)
     db.session.commit()
     if changed:
-        flash("Responsável definido." if assignee_id else "Atividade sem responsável.", "sucesso")
+        flash("Responsável definido." if assignee_id else "Subatividade sem responsável.", "sucesso")
     return _back(project_id, stage_id)
 
 
@@ -367,7 +367,7 @@ def activity_position(activity_id):
         db.session.rollback()
         abort(404)
     db.session.commit()
-    flash("Subatividade movida." if _to_fill() else "Atividade movida.", "sucesso")
+    flash("Subatividade movida.", "sucesso")
     return _back(project_id, target.id)
 
 
@@ -395,7 +395,7 @@ def activity_archive(activity_id):
     if _to_fill():
         flash(f"Subatividade “{activity.name}” apagada. Para desfazer, use “Subatividades apagadas” abaixo da tabela.", "sucesso")
         return _back(project_id, stage_id)
-    flash("Atividade arquivada. Os registros dela continuam no histórico.", "sucesso")
+    flash("Subatividade arquivada. Os registros dela continuam no histórico.", "sucesso")
     return _back(project_id)
 
 

@@ -8,7 +8,7 @@
 {% from "components/empty_state.html" import empty_state %}
 {% set nav_current = "history" %}
 {% set nav_project = project %}
-{% block title %}Restaurar para uma data · {{ project.name }} · Controle de Produção{% endblock %}
+{% block title %}Restaurar para uma data · {{ project.name }} · Teroz{% endblock %}
 {% block content %}
 {#
   R8 (supervisor+): voltar as peças do projeto para como estavam numa data e hora (fuso da
@@ -41,7 +41,7 @@
     </div>
     {{ button("Ver o que muda", "secondary" if preview else "primary") }}
   </div>
-  <p class="field__hint" id="ate-dica">Hora de {{ tz_label|replace("_", " ") }}. Voltam só as peças concluídas de cada atividade; nomes, tempos, meta e etapas ficam como estão. O histórico não perde nada e dá para desfazer depois.</p>
+  <p class="field__hint" id="ate-dica">Hora de {{ tz_label|replace("_", " ") }}. Voltam só as peças prontas de cada subatividade; nomes, tempos, meta e etapas ficam como estão. O histórico não perde nada e dá para desfazer depois.</p>
 </form>
 
 {%- if preview %}
@@ -54,10 +54,10 @@
   <dl class="restore-summary">
     {%- set b, a = preview.before, preview.after %}
     {%- for label, before, after in [
-      ("Progresso geral", b.progresso_geral|pct, a.progresso_geral|pct),
+      ("Progresso pelas tarefas", b.progresso_geral|pct, a.progresso_geral|pct),
       ("Unidades prontas", b.unidades_concluidas ~ " de " ~ project.quantity, a.unidades_concluidas ~ " de " ~ project.quantity),
-      ("Tarefas concluídas", b.tarefas_concluidas ~ " de " ~ b.tarefas, a.tarefas_concluidas ~ " de " ~ a.tarefas),
-      ("Tempo que falta", b.tempo_restante_h|horas, a.tempo_restante_h|horas),
+      ("Subatividades em 100%", b.tarefas_concluidas ~ " de " ~ b.tarefas, a.tarefas_concluidas ~ " de " ~ a.tarefas),
+      ("Horas que faltam", b.tempo_restante_h|horas, a.tempo_restante_h|horas),
     ] %}
     <div class="restore-summary__item{% if before != after %} is-changed{% endif %}">
       <dt>{{ label }}</dt>
@@ -72,8 +72,8 @@
   {%- set changed_count = preview.changes|length %}
   <div class="table-wrap">
     <table class="table table--cards restore-table">
-      <caption class="visually-hidden">Peças concluídas agora e depois de restaurar, por etapa e atividade</caption>
-      <thead><tr><th scope="col">Etapa › atividade</th><th scope="col" class="is-num">Agora</th><th scope="col" class="is-num">Depois</th><th scope="col" class="is-num">Diferença</th></tr></thead>
+      <caption class="visually-hidden">Peças prontas agora e depois de restaurar, por etapa e subatividade</caption>
+      <thead><tr><th scope="col">Etapa › subatividade</th><th scope="col" class="is-num">Agora</th><th scope="col" class="is-num">Depois</th><th scope="col" class="is-num">Diferença</th></tr></thead>
       {%- for s in preview.stages if s.changed %}
       <tbody>
         <tr class="table__group"><th scope="rowgroup" colspan="4">{{ s.stage.name }} <span class="restore-table__stage num">{{ s.before.progresso|pct }} → {{ s.after.progresso|pct }}</span></th></tr>
@@ -89,12 +89,12 @@
       {%- endfor %}
     </table>
   </div>
-  <p class="muted text-sm num">{{ changed_count }} {{ "atividade muda" if changed_count == 1 else "atividades mudam" }}; as outras ficam como estão.</p>
+  <p class="muted text-sm num">{{ changed_count }} {{ "subatividade muda" if changed_count == 1 else "subatividades mudam" }}; as outras ficam como estão.</p>
   <form class="stack restore-confirm" method="post" action="{{ url_for('edicao.project_restore_apply', project_id=project.id) }}">
     {{ form.csrf_token }}
     <input type="hidden" name="ate" value="{{ ate }}">
     <input type="hidden" name="token" value="{{ preview.token }}">
-    {{ checkbox("confirm", "Entendi: as peças voltam para " ~ ate_label ~ ", com um lançamento de restauração por atividade no histórico.", value="y") }}
+    {{ checkbox("confirm", "Entendi: as peças voltam para " ~ ate_label ~ ", com um lançamento de restauração por subatividade no histórico.", value="y") }}
     <div class="form-actions">
       {{ button("Restaurar o projeto", "primary") }}
       {{ button("Cancelar", "ghost", href=history_url) }}

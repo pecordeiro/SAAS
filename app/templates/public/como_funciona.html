@@ -1,6 +1,6 @@
 {% extends "base_publica.html" %}
 {% set marca = true %}
-{% block title %}Como funciona com a sua planilha · Controle de Produção{% endblock %}
+{% block title %}Como funciona com a sua planilha · Teroz{% endblock %}
 {% block description %}Traga a planilha que a sua equipe já usa: você escolhe a aba, diz o que cada coluna significa, confere os erros e importa. Depois exporte no formato da equipe, com fórmulas funcionando.{% endblock %}
 {% block main %}
 {# R10 (ADR-0016): página “como funciona com a sua planilha”. Só descreve o que o sistema faz hoje (R7/R8). #}
@@ -18,9 +18,9 @@
     <div class="pub-map pub-up" data-delay="2">
       <h2 class="pub-map__title">Quais colunas são quais?</h2>
       <div class="pub-mrow"><span class="pub-mrow__src">Fase</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Etapa</span></div>
-      <div class="pub-mrow"><span class="pub-mrow__src">Serviço</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Atividade</span></div>
+      <div class="pub-mrow"><span class="pub-mrow__src">Serviço</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Subatividade</span></div>
       <div class="pub-mrow"><span class="pub-mrow__src">Tempo</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Tempo ideal</span></div>
-      <div class="pub-mrow"><span class="pub-mrow__src">Feitas</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Peças concluídas</span></div>
+      <div class="pub-mrow"><span class="pub-mrow__src">Feitas</span><i aria-hidden="true">&rarr;</i><span class="pub-mrow__dst">Peças prontas</span></div>
       <p class="pub-note">Nomes de colunas de exemplo. Na sua planilha, você escolhe os seus.</p>
     </div>
   </div>
@@ -33,8 +33,8 @@
       <p class="pub-sub">Aceitamos planilhas em Excel (XLSX) e em CSV, até 2 MB e 2.000 linhas de dados. Nada é salvo até você conferir e confirmar.</p></div>
     <ol class="pub-steps" data-steps>
       <li class="pub-step is-on rv" data-delay="1"><div class="pub-art pub-art--1"><img src="{{ url_for('static', filename='img/vitrine/passo-planilha.webp') }}" width="900" height="484" alt="Tela Importar planilha, no passo Enviar arquivo." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">1</span><h3>Envie o arquivo</h3><p>Escolha a planilha no seu computador. Se ela tem várias abas, você diz qual aba tem os dados.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
-      <li class="pub-step rv" data-delay="2"><div class="pub-art pub-art--2"><img src="{{ url_for('static', filename='img/vitrine/importar-colunas.webp') }}" width="900" height="412" alt="Tela Escolher colunas: cada coluna da planilha com exemplos e o significado escolhido, como Etapa, Subatividade e Tempo ideal." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">2</span><h3>Diga o que é cada coluna</h3><p>O sistema sugere o significado pelo nome do cabeçalho. Você corrige o que precisar: etapa, atividade, tempo ideal, peças previstas e concluídas ou prazo.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
-      <li class="pub-step rv" data-delay="3"><div class="pub-art pub-art--3"><img src="{{ url_for('static', filename='img/vitrine/importar-previa.webp') }}" width="900" height="383" alt="Tela Prévia e confirmar: etapas e atividades lidas da planilha, com tempo ideal e peças concluídas." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">3</span><h3>Confira e confirme</h3><p>Veja uma prévia com as etapas e as atividades. Se houver erro, o sistema mostra a linha, a coluna e o problema, e você volta às colunas sem enviar o arquivo de novo.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
+      <li class="pub-step rv" data-delay="2"><div class="pub-art pub-art--2"><img src="{{ url_for('static', filename='img/vitrine/importar-colunas.webp') }}" width="900" height="410" alt="Tela Escolher colunas: cada coluna da planilha com exemplos e o significado escolhido, como Etapa, Subatividade e Tempo ideal." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">2</span><h3>Diga o que é cada coluna</h3><p>O sistema sugere o significado pelo nome do cabeçalho. Você corrige o que precisar: etapa, subatividade, tempo ideal, peças previstas e concluídas ou prazo.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
+      <li class="pub-step rv" data-delay="3"><div class="pub-art pub-art--3"><img src="{{ url_for('static', filename='img/vitrine/importar-previa.webp') }}" width="900" height="337" alt="Tela Prévia e confirmar: etapas e subatividades lidas da planilha, com tempo ideal e peças prontas." loading="lazy"></div><span class="pub-step__n" aria-hidden="true">3</span><h3>Confira e confirme</h3><p>Veja uma prévia com as etapas e as subatividades. Se houver erro, o sistema mostra a linha, a coluna e o problema, e você volta às colunas sem enviar o arquivo de novo.</p><span class="pub-step__bar" aria-hidden="true"></span></li>
     </ol>
   </div>
 </section>
@@ -45,7 +45,7 @@
       <h2 id="modos-titulo">Sua planilha pode ser simples ou detalhada.</h2></div>
     <div class="pub-opts pub-opts--two">
       <div class="pub-card rv" data-delay="0"><h3>Só etapa e porcentagem</h3><p>Se a planilha diz apenas quanto cada etapa já avançou, o sistema acompanha por etapa. É o jeito mais rápido de começar.</p></div>
-      <div class="pub-card rv" data-delay="1"><h3>Etapa, atividade e tempo</h3><p>Se ela detalha as atividades de cada etapa, com tempo ideal e peças feitas, você ganha as horas que faltam e o prazo em dias úteis com mais precisão.</p></div>
+      <div class="pub-card rv" data-delay="1"><h3>Etapa, subatividade e tempo</h3><p>Se ela detalha as subatividades de cada etapa, com tempo ideal e peças feitas, você ganha as horas que faltam e o prazo em dias úteis com mais precisão.</p></div>
       <div class="pub-card rv" data-delay="2"><h3>Vários projetos no mesmo arquivo</h3><p>Quando o arquivo tem mais de um projeto, você escolhe quais importar. Cada um vira um projeto separado.</p></div>
       <div class="pub-card rv" data-delay="3"><h3>Importou errado?</h3><p>Cada mudança fica no histórico, com quem fez e quando. Dá para voltar o projeto a uma data anterior e desfazer a volta.</p></div>
     </div>

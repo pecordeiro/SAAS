@@ -248,7 +248,7 @@ def _parse_flat(result: ImportResult, header: list, data_rows) -> ImportResult:
             continue
         activity.archived = status == STATUS_ARCHIVED
         if len(stage.activities) >= MAX_ACTIVITIES_PER_STAGE:
-            result.error(line, COL_ACTIVITY, f"mais de {MAX_ACTIVITIES_PER_STAGE} atividades na etapa")
+            result.error(line, COL_ACTIVITY, f"mais de {MAX_ACTIVITIES_PER_STAGE} subatividades na etapa")
             continue
         stage.activities.append(activity)
     if first:
@@ -685,7 +685,7 @@ def _parse_reference_sheets(ws: Sheet | None, team: Sheet | None) -> ImportResul
             if activity is not None:
                 stage.activities.append(activity)
         if len(stage.activities) > MAX_ACTIVITIES_PER_STAGE:
-            result.error(title_row, "A", f"mais de {MAX_ACTIVITIES_PER_STAGE} atividades na etapa")
+            result.error(title_row, "A", f"mais de {MAX_ACTIVITIES_PER_STAGE} subatividades na etapa")
         result.stages.append(stage)
         if len(result.stages) > MAX_STAGES:
             result.error(title_row, "A", f"mais de {MAX_STAGES} etapas")
@@ -795,7 +795,7 @@ def validate(result: ImportResult) -> None:
                 or not Decimal("0") <= activity.ideal_minutes <= MAX_MINUTES
                 or not 0 <= activity.units_done <= result.quantity
             ):
-                result.error(0, COL_ACTIVITY, f"atividade “{activity.name}” inválida")
+                result.error(0, COL_ACTIVITY, f"subatividade “{activity.name}” inválida")
 
 
 def save(company: Company, result: ImportResult, user_id: uuid.UUID | None, name: str | None = None) -> Project:

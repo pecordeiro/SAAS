@@ -59,7 +59,7 @@ class ProfileEmailForm(BaseForm):
 class NotificationPrefsForm(BaseForm):
     """Etapa F: preferências de e-mail (caixa desmarcada = desligado)."""
 
-    notify_assignment = BooleanField("Atividade atribuída a mim")
+    notify_assignment = BooleanField("Subatividade atribuída a mim")
     notify_alerts = BooleanField("Alertas de produção")
     notify_weekly = BooleanField("Relatório semanal")
 

@@ -82,7 +82,7 @@ def test_console_guarda_em_memoria_e_nao_loga_corpo(app, caplog):
     assert len(outbox(app)) == 1
     msg = outbox(app)[0]
     assert "SEGREDO123" in msg.text and "SEGREDO123" in msg.html
-    assert "Controle de Produção" in msg.html and "Controle de Produção" in msg.text
+    assert "Teroz" in msg.html and "Teroz" in msg.text  # nome do produto (copy 2026-10-29)
     assert "SEGREDO123" not in caplog.text and "x@exemplo.com" not in caplog.text
 
 

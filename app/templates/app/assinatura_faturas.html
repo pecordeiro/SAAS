@@ -4,7 +4,7 @@
 {% from "components/table.html" import data_table %}
 {% from "components/empty_state.html" import empty_state %}
 {% set nav_current = "billing" %}
-{% block title %}Faturas · Assinatura · Controle de Produção{% endblock %}
+{% block title %}Faturas · Assinatura · Teroz{% endblock %}
 {% block content %}
 {# F8-7: faturas com status e link de pagamento (página do Asaas). #}
 <header class="page-header">
@@ -15,13 +15,13 @@
 </header>
 
 {%- if payments %}
-{% call data_table([("Vencimento", ""), ("Valor", "is-num"), ("Status", ""), ("Pago em", "is-num"), ("Pagamento", "")], caption="Faturas") %}
+{% call data_table([("Vencimento", ""), ("Valor", "is-num"), ("Situação", ""), ("Pago em", "is-num"), ("Pagamento", "")], caption="Faturas") %}
   <tbody>
   {%- for p in payments %}
     <tr>
       <td class="is-plain">{{ p.due_date|data }}</td>
       <td class="is-num" data-label="Valor">R$ {{ p.value_cents|reais }}</td>
-      <td data-label="Status">{{ badge(payment_labels.get(p.status, p.status), payment_tones.get(p.status, "neutral")) }}</td>
+      <td data-label="Situação">{{ badge(payment_labels.get(p.status, p.status), payment_tones.get(p.status, "neutral")) }}</td>
       <td class="is-num" data-label="Pago em">{{ p.paid_at|datahora if p.paid_at else "—" }}</td>
       <td data-label="Pagamento">
         {%- if p.invoice_url and p.status in ("pending", "overdue") %}
